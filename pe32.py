@@ -103,6 +103,7 @@ class PE32:
         self.imports = self._parse_imports()
         self.exports = self._parse_exports()
         self.relocations = self._parse_relocations()
+        self.highlow_relocation_rvas = frozenset(item.rva for item in self.relocations if item.kind == 3)
         self.debug_records = self._parse_debug_records()
 
     def _u16(self, offset: int) -> int:

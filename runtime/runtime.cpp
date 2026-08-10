@@ -18,11 +18,12 @@
 namespace lifted {
 
 Runtime* g_runtime = nullptr;
+ProcessMemory* g_process_memory = nullptr;
 
 namespace {
 
 constexpr std::size_t kCallbackStackCopy = 64u * 1024u;
-constexpr wchar_t kGuestRootEnvironment[] = L"SFERA_GUEST_ROOT";
+constexpr wchar_t kClientRootEnvironment[] = L"SFERA_CLIENT_ROOT";
 constexpr wchar_t kDeepDiagnosticsEnvironment[] = L"SFERA_IR_DEEP_TRACE";
 bool g_deep_diagnostics = false;
 
@@ -85,7 +86,7 @@ bool regular_file_exists(const std::wstring& path) noexcept {
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
-bool is_guest_root(const std::wstring& path) noexcept {
+bool is_client_root(const std::wstring& path) noexcept {
     return regular_file_exists(path_join(path, L"mbc\\_main.mbc"));
 }
 
@@ -112,16 +113,16 @@ std::string narrow_path(const std::wstring& value) {
     return result;
 }
 
-std::wstring wide_guest_filename() {
-    return std::wstring(kGuestExecutableName.begin(), kGuestExecutableName.end());
+std::wstring wide_client_filename() {
+    return std::wstring(kClientExecutableName.begin(), kClientExecutableName.end());
 }
 
-std::wstring guest_executable_path() {
-    return path_join(guest_root_directory(), wide_guest_filename());
+std::wstring client_executable_path() {
+    return path_join(client_root_directory(), wide_client_filename());
 }
 
-std::string guest_executable_path_ansi() {
-    const std::wstring wide = guest_executable_path();
+std::string client_executable_path_ansi() {
+    const std::wstring wide = client_executable_path();
     const int required = WideCharToMultiByte(CP_ACP, 0, wide.data(), static_cast<int>(wide.size()), nullptr, 0, nullptr, nullptr);
     if (required <= 0) { throw std::runtime_error(win32_error("WideCharToMultiByte")); }
     std::string result(static_cast<std::size_t>(required), '\0');
@@ -148,24 +149,26 @@ bool safe_copy(void* destination, const void* source, std::size_t size) noexcept
 
 template <class T>
 bool try_memory_read(std::uint32_t address, T& value) noexcept {
-    return safe_copy(&value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), sizeof(T));
+    return g_process_memory && g_process_memory->try_read(address, &value, sizeof(T));
 }
 
 template <class T>
 T memory_read(std::uint32_t address) {
     T value{};
-    if (!g_deep_diagnostics) { std::memcpy(&value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), sizeof(T)); return value; }
-    if (!try_memory_read(address, value)) { throw std::runtime_error("Guest read fault at " + hex_u32(address) + ", size=" + std::to_string(sizeof(T))); }
+    if (!g_process_memory) { throw std::runtime_error("Process memory is not initialized"); }
+    g_process_memory->read(address, &value, sizeof(T));
     return value;
 }
 
 template <class T>
 void memory_write(std::uint32_t address, T value) {
-    if (!g_deep_diagnostics) { std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), &value, sizeof(T)); return; }
-    if (!safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), &value, sizeof(T))) { throw std::runtime_error("Guest write fault at " + hex_u32(address) + ", size=" + std::to_string(sizeof(T))); }
-    std::uint64_t diagnostic_value = 0;
-    std::memcpy(&diagnostic_value, &value, std::min(sizeof(value), sizeof(diagnostic_value)));
-    diagnostic_guest_write(address, static_cast<std::uint32_t>(sizeof(T)), diagnostic_value);
+    if (!g_process_memory) { throw std::runtime_error("Process memory is not initialized"); }
+    g_process_memory->write(address, &value, sizeof(T));
+}
+
+std::uint32_t local_image_address(std::uint32_t source_va) {
+    if (!g_process_memory) { throw std::runtime_error("Process memory is not initialized"); }
+    return g_process_memory->source_address(source_va);
 }
 
 class NativeCallArguments {
@@ -173,14 +176,14 @@ public:
     explicit NativeCallArguments(std::uint32_t stack) noexcept : stack_(stack) {}
     NativeCallArguments(const NativeCallArguments&) = delete;
     NativeCallArguments& operator=(const NativeCallArguments&) = delete;
-    ~NativeCallArguments() { while (patch_count_ != 0) { const Patch& patch = patches_[--patch_count_]; safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(patch.address)), &patch.original, sizeof(patch.original)); } }
+    ~NativeCallArguments() { while (patch_count_ != 0) { const Patch& patch = patches_[--patch_count_]; if (g_process_memory) { g_process_memory->try_write(patch.address, &patch.original, sizeof(patch.original)); } } }
     std::uint32_t read(std::uint8_t index) const { return memory_read<std::uint32_t>(stack_ + static_cast<std::uint32_t>(index) * 4u); }
     void alias(std::uint8_t index, std::uint32_t expected, std::uint32_t replacement) {
         const std::uint32_t address = stack_ + static_cast<std::uint32_t>(index) * 4u;
         const std::uint32_t original = memory_read<std::uint32_t>(address);
         if (original != expected) { throw std::runtime_error("Native argument changed before aliasing"); }
         if (patch_count_ == patches_.size()) { throw std::runtime_error("Too many native argument aliases"); }
-        if (!safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), &replacement, sizeof(replacement))) { throw std::runtime_error("Unable to alias native argument at " + hex_u32(address)); }
+        if (!g_process_memory || !g_process_memory->try_write(address, &replacement, sizeof(replacement))) { throw std::runtime_error("Unable to alias native argument at " + hex_u32(address)); }
         patches_[patch_count_++] = {address, original};
     }
 private:
@@ -198,7 +201,7 @@ std::uint32_t process_module_handle() {
     return static_cast<std::uint32_t>(value);
 }
 
-std::string guest_c_string(std::uint32_t address, std::size_t limit = 2048u) noexcept {
+std::string local_c_string(std::uint32_t address, std::size_t limit = 2048u) noexcept {
     if (address == 0) { return "<null>"; }
     std::string result;
     result.reserve(std::min<std::size_t>(limit, 256u));
@@ -215,15 +218,15 @@ std::string guest_c_string(std::uint32_t address, std::size_t limit = 2048u) noe
     return result + "<truncated>";
 }
 
-std::size_t guest_string_length(std::uint32_t address, std::size_t limit) {
-    if (address == 0) { throw std::runtime_error("Null guest string"); }
+std::size_t local_string_length(std::uint32_t address, std::size_t limit) {
+    if (address == 0) { throw std::runtime_error("Null local string"); }
     for (std::size_t length = 0; length != limit; ++length) {
         if (memory_read<char>(address + static_cast<std::uint32_t>(length)) == '\0') { return length; }
     }
-    throw std::runtime_error("Unterminated guest string at " + hex_u32(address));
+    throw std::runtime_error("Unterminated local string at " + hex_u32(address));
 }
 
-bool guest_string_starts_with(std::uint32_t address, std::string_view prefix) {
+bool local_string_starts_with(std::uint32_t address, std::string_view prefix) {
     if (address == 0) { return false; }
     for (std::size_t index = 0; index != prefix.size(); ++index) {
         if (memory_read<char>(address + static_cast<std::uint32_t>(index)) != prefix[index]) { return false; }
@@ -232,12 +235,12 @@ bool guest_string_starts_with(std::uint32_t address, std::string_view prefix) {
 }
 
 std::uint32_t summarized_config_lookup(std::uint32_t key_address) {
-    const std::uint32_t text_address = memory_read<std::uint32_t>(kConfigTextPointerAddress);
-    const std::uint32_t text_length = memory_read<std::uint32_t>(kConfigTextLengthAddress);
+    const std::uint32_t text_address = memory_read<std::uint32_t>(local_image_address(kConfigTextPointerAddress));
+    const std::uint32_t text_length = memory_read<std::uint32_t>(local_image_address(kConfigTextLengthAddress));
     if (text_address == 0) { return 0; }
-    const std::size_t key_length = guest_string_length(key_address, 4096u);
+    const std::size_t key_length = local_string_length(key_address, 4096u);
     const std::size_t scan_limit = static_cast<std::size_t>(std::min(text_length, kConfigTextCapacity)) + 1u;
-    if (static_cast<std::uint64_t>(text_address) + scan_limit > 0x100000000ull) { throw std::runtime_error("Guest config text crosses the Win32 address boundary"); }
+    if (static_cast<std::uint64_t>(text_address) + scan_limit > 0x100000000ull) { throw std::runtime_error("Local config text crosses the Win32 address boundary"); }
     const auto text_at = [text_address](std::size_t offset) {
         return memory_read<char>(text_address + static_cast<std::uint32_t>(offset));
     };
@@ -293,19 +296,19 @@ void summarize_unsigned_decimal_string(CpuState& state) {
 }
 
 bool execute_semantic_summary(CpuState& state, std::uint32_t callsite, std::uint32_t target) {
-    if (kConfigLookupTarget != 0 && kConfigTextPointerAddress != 0 && kConfigTextLengthAddress != 0 && kConfigTextCapacity != 0 && target == kConfigLookupTarget) {
+    if (kConfigLookupTarget != 0 && kConfigTextPointerAddress != 0 && kConfigTextLengthAddress != 0 && kConfigTextCapacity != 0 && target == local_image_address(kConfigLookupTarget)) {
         const std::uint32_t key_address = memory_read<std::uint32_t>(state.esp);
         state.eax = summarized_config_lookup(key_address);
         state.esp += 4u; // The lifted function returns with ret 4.
-        if (guest_string_starts_with(key_address, "NEW_FONT_")) {
-            const std::string key = guest_c_string(key_address, 160u);
+        if (local_string_starts_with(key_address, "NEW_FONT_")) {
+            const std::string key = local_c_string(key_address, 160u);
             std::string note = "semantic config lookup key=\"" + key + "\"";
-            note += state.eax == 0 ? ", result=missing" : ", value=\"" + guest_c_string(state.eax, 160u) + "\"";
+            note += state.eax == 0 ? ", result=missing" : ", value=\"" + local_c_string(state.eax, 160u) + "\"";
             diagnostic_note(note.c_str());
         }
         return true;
     }
-    if (kUnsignedDecimalStringTarget != 0 && target == kUnsignedDecimalStringTarget && callsite == kUnsignedDecimalStringCallsite) {
+    if (kUnsignedDecimalStringTarget != 0 && target == local_image_address(kUnsignedDecimalStringTarget) && callsite == local_image_address(kUnsignedDecimalStringCallsite)) {
         summarize_unsigned_decimal_string(state);
         return true; // The lifted function uses a plain ret.
     }
@@ -313,43 +316,44 @@ bool execute_semantic_summary(CpuState& state, std::uint32_t callsite, std::uint
 }
 
 template <class Char>
-std::uint32_t write_guest_path(std::uint32_t address, std::uint32_t capacity, const std::basic_string<Char>& path) {
+std::uint32_t write_local_path(std::uint32_t address, std::uint32_t capacity, const std::basic_string<Char>& path) {
     if (address == 0 || capacity == 0) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return 0; }
     const std::size_t copy_count = std::min<std::size_t>(path.size(), static_cast<std::size_t>(capacity - 1u));
     std::vector<Char> output(copy_count + 1u, Char{});
     std::copy_n(path.data(), copy_count, output.data());
     const std::size_t byte_count = output.size() * sizeof(Char);
-    if (!safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), output.data(), byte_count)) { throw std::runtime_error("Guest write fault at " + hex_u32(address) + ", size=" + std::to_string(byte_count)); }
-    diagnostic_guest_write(address, static_cast<std::uint32_t>(byte_count), 0);
+    if (!g_process_memory) { throw std::runtime_error("Process memory is not initialized"); }
+    g_process_memory->write(address, output.data(), byte_count);
+    diagnostic_memory_write(address, static_cast<std::uint32_t>(byte_count), 0);
     if (copy_count != path.size()) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return capacity; }
     return static_cast<std::uint32_t>(path.size());
 }
 
 std::string fatal_handler_failure(const CpuState& state, std::uint32_t callsite) {
-    const std::string fatal_text = guest_c_string(state.ecx);
-    std::string message = "Guest fatal handler trap: call=" + hex_u32(callsite) + ", message-address=" + hex_u32(state.ecx) + ", message=\"" + fatal_text + "\"";
-    if (fatal_text.rfind("Can't load font", 0) == 0) { message += ", last-config-key=\"" + guest_c_string(0x006BE618u, 160u) + "\""; }
+    const std::string fatal_text = local_c_string(state.ecx);
+    std::string message = "IR fatal handler trap: call=" + hex_u32(callsite) + ", message-address=" + hex_u32(state.ecx) + ", message=\"" + fatal_text + "\"";
+    if (fatal_text.rfind("Can't load font", 0) == 0) { message += ", last-config-key=\"" + local_c_string(local_image_address(0x006BE618u), 160u) + "\""; }
     std::uint32_t quick_file = 0;
     std::int16_t loaded_files = -1;
-    if (try_memory_read(0x04016680u, quick_file) && quick_file != 0 && try_memory_read(quick_file + 0x20C98u, loaded_files)) { message += ", loaded-mbc-files=" + std::to_string(loaded_files) + ", quick-file=" + hex_u32(quick_file); }
-    message += ", guest-root=\"" + narrow_path(guest_root_directory()) + "\"";
+    if (try_memory_read(local_image_address(0x04016680u), quick_file) && quick_file != 0 && try_memory_read(quick_file + 0x20C98u, loaded_files)) { message += ", loaded-mbc-files=" + std::to_string(loaded_files) + ", quick-file=" + hex_u32(quick_file); }
+    message += ", client-root=\"" + narrow_path(client_root_directory()) + "\"";
     return message;
 }
 
 void append_write_origin(std::string& message, std::string_view label, std::uint32_t address) {
-    GuestWriteInfo origin{};
+    MemoryWriteInfo origin{};
     message += ", " + std::string(label) + "=" + hex_u32(address);
-    if (diagnostic_last_guest_write(address, origin)) { message += "{writer=" + hex_u32(origin.instruction) + ",write=" + hex_u32(origin.address) + ",size=" + std::to_string(origin.size) + ",value=" + hex_u32(static_cast<std::uint32_t>(origin.value)) + "}"; }
+    if (diagnostic_last_memory_write(address, origin)) { message += "{writer=" + hex_u32(origin.instruction) + ",write=" + hex_u32(origin.address) + ",size=" + std::to_string(origin.size) + ",value=" + hex_u32(static_cast<std::uint32_t>(origin.value)) + "}"; }
     else { message += "{writer=unobserved}"; }
 }
 
 void append_mbc_provenance(std::string& message, std::uint32_t callsite) {
-    if (callsite != 0x0047670Cu) { return; }
+    if (callsite != local_image_address(0x0047670Cu)) { return; }
     std::uint32_t cursor = 0;
     std::uint32_t mbc_base = 0;
     std::uint32_t mbc_pointer = 0;
-    if (!try_memory_read(0x0401661Cu, cursor) || !try_memory_read(0x04B5FE78u, mbc_base) || !try_memory_read(0x006BE2D4u, mbc_pointer) || cursor == 0 || cursor > 0x10000u) { return; }
-    const std::uint32_t token = 0x0401A688u + (cursor - 1u) * 32u;
+    if (!try_memory_read(local_image_address(0x0401661Cu), cursor) || !try_memory_read(local_image_address(0x04B5FE78u), mbc_base) || !try_memory_read(local_image_address(0x006BE2D4u), mbc_pointer) || cursor == 0 || cursor > 0x10000u) { return; }
+    const std::uint32_t token = local_image_address(0x0401A688u) + (cursor - 1u) * 32u;
     std::uint32_t token_type = 0;
     std::uint32_t source_offset = 0;
     std::uint32_t token_value = 0;
@@ -365,8 +369,8 @@ void append_mbc_provenance(std::string& message, std::uint32_t callsite) {
 }
 
 std::string bound_check_failure(const CpuState& state, std::uint32_t callsite, std::uint32_t target) {
-    const char* kind = target == 0x00401120u ? "upper" : "lower";
-    std::string message = std::string("Guest BoundCheckArray ") + kind + "-bound trap: call=" + hex_u32(callsite) + ", index=" + std::to_string(static_cast<std::int32_t>(state.edx)) + " (" + hex_u32(state.edx) + "), metadata=" + hex_u32(state.ecx);
+    const char* kind = target == local_image_address(0x00401120u) ? "upper" : "lower";
+    std::string message = std::string("IR BoundCheckArray ") + kind + "-bound trap: call=" + hex_u32(callsite) + ", index=" + std::to_string(static_cast<std::int32_t>(state.edx)) + " (" + hex_u32(state.edx) + "), metadata=" + hex_u32(state.ecx);
     std::uint32_t array_data = 0;
     std::uint32_t array_count = 0;
     std::uint32_t source_line = 0;
@@ -518,12 +522,13 @@ void write_register(CpuState& state, Reg reg, std::uint64_t value) {
 std::uint32_t effective_address(CpuState& state, const OperandDescriptor& operand) {
     const std::uint64_t base = read_register(state, operand.base);
     const std::uint64_t index = read_register(state, operand.index);
-    return static_cast<std::uint32_t>(base + index * operand.scale + operand.value);
+    const std::uint32_t displacement = operand.image_address ? local_image_address(operand.value) : operand.value;
+    return static_cast<std::uint32_t>(base + index * operand.scale + displacement);
 }
 
 std::uint64_t fs_read(CpuState& state, std::uint32_t offset, std::uint16_t width) {
     const std::size_t size = width / 8u;
-    if (offset + size > state.fs_data.size()) { throw std::runtime_error("Guest FS read outside virtual TEB"); }
+    if (offset + size > state.fs_data.size()) { throw std::runtime_error("IR FS read outside virtual TEB"); }
     std::uint64_t value = 0;
     std::memcpy(&value, state.fs_data.data() + offset, size);
     return value;
@@ -531,13 +536,13 @@ std::uint64_t fs_read(CpuState& state, std::uint32_t offset, std::uint16_t width
 
 void fs_write(CpuState& state, std::uint32_t offset, std::uint16_t width, std::uint64_t value) {
     const std::size_t size = width / 8u;
-    if (offset + size > state.fs_data.size()) { throw std::runtime_error("Guest FS write outside virtual TEB"); }
+    if (offset + size > state.fs_data.size()) { throw std::runtime_error("IR FS write outside virtual TEB"); }
     std::memcpy(state.fs_data.data() + offset, &value, size);
 }
 
 std::uint64_t read_operand(CpuState& state, const OperandDescriptor& operand) {
     if (operand.kind == OperandKind::reg) { return read_register(state, operand.reg) & width_mask(operand.width); }
-    if (operand.kind == OperandKind::imm || operand.kind == OperandKind::branch) { return operand.value & width_mask(operand.width); }
+    if (operand.kind == OperandKind::imm || operand.kind == OperandKind::branch) { return (operand.image_address ? local_image_address(operand.value) : operand.value) & width_mask(operand.width); }
     if (operand.kind != OperandKind::mem) { throw std::runtime_error("Instruction reads an empty operand"); }
     const std::uint32_t address = effective_address(state, operand);
     if (operand.segment == Reg::fs) { return fs_read(state, address, operand.width); }
@@ -576,8 +581,8 @@ std::array<std::uint8_t, 16> read_vector(CpuState& state, const OperandDescripto
     if (operand.kind != OperandKind::mem) { throw std::runtime_error("Unsupported SIMD source operand"); }
     std::array<std::uint8_t, 16> value{};
     const std::uint32_t address = effective_address(state, operand);
-    if (!g_deep_diagnostics) { std::memcpy(value.data(), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), value.size()); return value; }
-    if (!safe_copy(value.data(), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), value.size())) { throw std::runtime_error("Guest SIMD read fault at " + hex_u32(address)); }
+    if (!g_process_memory) { throw std::runtime_error("Process memory is not initialized"); }
+    g_process_memory->read(address, value.data(), value.size());
     return value;
 }
 
@@ -585,8 +590,8 @@ void write_vector(CpuState& state, const OperandDescriptor& operand, const std::
     if (operand.kind == OperandKind::reg) { xmm_register(state, operand.reg) = value; return; }
     if (operand.kind != OperandKind::mem) { throw std::runtime_error("Unsupported SIMD destination operand"); }
     const std::uint32_t address = effective_address(state, operand);
-    if (!g_deep_diagnostics) { std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value.data(), value.size()); return; }
-    if (!safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value.data(), value.size())) { throw std::runtime_error("Guest SIMD write fault at " + hex_u32(address)); }
+    if (!g_process_memory) { throw std::runtime_error("Process memory is not initialized"); }
+    g_process_memory->write(address, value.data(), value.size());
 }
 
 double read_scalar_double(CpuState& state, const OperandDescriptor& operand) {
@@ -696,28 +701,28 @@ bool is_float_return(std::string_view name) {
 
 } // namespace
 
-const std::wstring& guest_root_directory() {
+const std::wstring& client_root_directory() {
     static const std::wstring root = [] {
-        const std::wstring configured = environment_path(kGuestRootEnvironment);
+        const std::wstring configured = environment_path(kClientRootEnvironment);
         if (!configured.empty()) {
-            if (!is_guest_root(configured)) { throw std::runtime_error("SFERA_GUEST_ROOT does not contain mbc\\_main.mbc: " + narrow_path(configured)); }
+            if (!is_client_root(configured)) { throw std::runtime_error("SFERA_CLIENT_ROOT does not contain mbc\\_main.mbc: " + narrow_path(configured)); }
             return configured;
         }
         std::vector<std::wstring> candidates;
         add_candidate_with_parents(candidates, current_directory());
         add_candidate_with_parents(candidates, parent_directory(host_executable_path()));
         for (const std::wstring& candidate : candidates) {
-            if (is_guest_root(candidate)) { return candidate; }
+            if (is_client_root(candidate)) { return candidate; }
         }
-        throw std::runtime_error("Unable to locate mbc\\_main.mbc. Set SFERA_GUEST_ROOT to the original client directory that contains the mbc folder.");
+        throw std::runtime_error("Unable to locate mbc\\_main.mbc. Set SFERA_CLIENT_ROOT to the client directory that contains the mbc folder.");
     }();
     return root;
 }
 
-void configure_guest_environment() {
-    const std::wstring& root = guest_root_directory();
+void configure_process_environment() {
+    const std::wstring& root = client_root_directory();
     if (!SetCurrentDirectoryW(root.c_str())) { throw std::runtime_error(win32_error("SetCurrentDirectoryW")); }
-    const std::string note = "guest resource root: " + narrow_path(root);
+    const std::string note = "client resource root: " + narrow_path(root);
     diagnostic_note(note.c_str());
 }
 
@@ -731,62 +736,100 @@ std::string hex_u32(std::uint32_t value) {
     return buffer;
 }
 
-GuestStack::GuestStack(std::size_t reserve_size) : size_(std::max<std::size_t>(reserve_size, 1024u * 1024u)) {
+LocalStack::LocalStack(std::size_t reserve_size) : size_(std::max<std::size_t>(reserve_size, 1024u * 1024u)) {
     memory_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, size_, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
-    if (!memory_) { throw std::runtime_error(win32_error("VirtualAlloc(guest stack)")); }
+    if (!memory_) { throw std::runtime_error(win32_error("VirtualAlloc(local stack)")); }
 }
 
-GuestStack::~GuestStack() {
+LocalStack::~LocalStack() {
     if (memory_) { VirtualFree(memory_, 0, MEM_RELEASE); }
 }
 
-std::uint32_t GuestStack::top() const noexcept {
+std::uint32_t LocalStack::top() const noexcept {
     const std::uintptr_t value = reinterpret_cast<std::uintptr_t>(memory_ + size_ - 64u);
     return static_cast<std::uint32_t>(value & ~std::uintptr_t{0xFu});
 }
 
-std::uint32_t GuestStack::base() const noexcept {
+std::uint32_t LocalStack::base() const noexcept {
     return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(memory_ + size_));
 }
 
-std::uint32_t GuestStack::limit() const noexcept {
+std::uint32_t LocalStack::limit() const noexcept {
     return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(memory_));
 }
 
-NativeGuestMemory::NativeGuestMemory() {
+ProcessMemory::ProcessMemory() {
+    if (g_process_memory) { throw std::runtime_error("Only one process-memory instance is supported"); }
     DiagnosticPhaseScope phase(RuntimePhase::map_image);
     map();
-    diagnostic_note("guest image mapped without executable payload");
+    g_process_memory = this;
+    const std::string note = "local image mapped at " + hex_u32(load_base()) + " from source base " + hex_u32(kSourceImageBase);
+    diagnostic_note(note.c_str());
 }
 
-NativeGuestMemory::~NativeGuestMemory() {
+ProcessMemory::~ProcessMemory() {
     release();
 }
 
-std::uint32_t NativeGuestMemory::load_base() const noexcept {
+std::uint32_t ProcessMemory::load_base() const noexcept {
     return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(image_));
 }
 
-std::uint32_t NativeGuestMemory::entry_va() const noexcept {
+std::uint32_t ProcessMemory::entry_va() const noexcept {
     return load_base() + kEntryRva;
 }
 
-std::uint8_t* NativeGuestMemory::data() noexcept {
+std::uint32_t ProcessMemory::image_address(std::uint32_t rva) const {
+    if (!image_ || rva >= kImageSize) { throw std::runtime_error("Image RVA is outside local process memory: " + hex_u32(rva)); }
+    return load_base() + rva;
+}
+
+std::uint32_t ProcessMemory::source_address(std::uint32_t source_va) const {
+    if (source_va < kSourceImageBase || static_cast<std::uint64_t>(source_va) >= static_cast<std::uint64_t>(kSourceImageBase) + kImageSize) { throw std::runtime_error("Source image address is outside the generated image: " + hex_u32(source_va)); }
+    return image_address(source_va - kSourceImageBase);
+}
+
+bool ProcessMemory::image_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
+    if (!image_ || address < load_base() || static_cast<std::uint64_t>(address) >= static_cast<std::uint64_t>(load_base()) + kImageSize) { return false; }
+    rva = address - load_base();
+    return true;
+}
+
+std::uint8_t* ProcessMemory::data() noexcept {
     return image_;
 }
 
-const std::vector<ResolvedImport>& NativeGuestMemory::resolved_imports() const noexcept {
+const std::vector<ResolvedImport>& ProcessMemory::resolved_imports() const noexcept {
     return resolved_imports_;
 }
 
-void NativeGuestMemory::map() {
+bool ProcessMemory::try_read(std::uint32_t address, void* value, std::size_t size) const noexcept {
+    return value && safe_copy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size);
+}
+
+bool ProcessMemory::try_write(std::uint32_t address, const void* value, std::size_t size) noexcept {
+    return value && safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size);
+}
+
+void ProcessMemory::read(std::uint32_t address, void* value, std::size_t size) const {
+    if (!value) { throw std::runtime_error("Local memory read has a null destination"); }
+    if (!g_deep_diagnostics) { std::memcpy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size); return; }
+    if (!try_read(address, value, size)) { throw std::runtime_error("Local process read fault at " + hex_u32(address) + ", size=" + std::to_string(size)); }
+}
+
+void ProcessMemory::write(std::uint32_t address, const void* value, std::size_t size) {
+    if (!value) { throw std::runtime_error("Local memory write has a null source"); }
+    if (!g_deep_diagnostics) { std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size); return; }
+    if (!try_write(address, value, size)) { throw std::runtime_error("Local process write fault at " + hex_u32(address) + ", size=" + std::to_string(size)); }
+    std::uint64_t diagnostic_value = 0;
+    std::memcpy(&diagnostic_value, value, std::min(size, sizeof(diagnostic_value)));
+    diagnostic_memory_write(address, static_cast<std::uint32_t>(size), diagnostic_value);
+}
+
+void ProcessMemory::map() {
     if (sizeof(void*) != 4 || kMachine != IMAGE_FILE_MACHINE_I386) { throw std::runtime_error("Generated runtime requires Win32/x86"); }
-    void* const requested = reinterpret_cast<void*>(static_cast<std::uintptr_t>(kPreferredImageBase));
-    MEMORY_BASIC_INFORMATION region{};
-    const SIZE_T queried = VirtualQuery(requested, &region, sizeof(region));
-    const bool pre_reserved = queried != 0 && region.State == MEM_RESERVE && region.AllocationBase == requested;
-    image_ = static_cast<std::uint8_t*>(pre_reserved ? VirtualAlloc(requested, kImageSize, MEM_COMMIT, PAGE_READWRITE) : VirtualAlloc(requested, kImageSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
-    if (!image_) { throw std::runtime_error("Unable to reserve guest image at " + hex_u32(kPreferredImageBase)); }
+    image_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, kImageSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    if (!image_) { throw std::runtime_error(win32_error("VirtualAlloc(local image)")); }
     try {
         map_file();
     } catch (...) {
@@ -795,20 +838,22 @@ void NativeGuestMemory::map() {
     }
 }
 
-void NativeGuestMemory::initialize_native() {
+void ProcessMemory::initialize_native() {
     try {
         install_recovered_data();
         install_jump_tables();
+        apply_relocations();
+        patch_image_base();
         install_callback_stubs();
         {
             DiagnosticPhaseScope phase(RuntimePhase::load_imports);
             resolve_imports();
-            diagnostic_note("native imports resolved");
+            diagnostic_note("native imports resolved in the current process");
         }
         {
             DiagnosticPhaseScope phase(RuntimePhase::protect_image);
             protect_image();
-            diagnostic_note("guest image protections applied");
+            diagnostic_note("local image protections applied");
         }
         FlushInstructionCache(GetCurrentProcess(), image_, kImageSize);
     } catch (...) {
@@ -817,7 +862,7 @@ void NativeGuestMemory::initialize_native() {
     }
 }
 
-void NativeGuestMemory::map_file() {
+void ProcessMemory::map_file() {
     const std::vector<std::uint8_t> file = decode_mapped_payload();
     if (kHeadersSize > file.size() || kHeadersSize > kImageSize) { throw std::runtime_error("Invalid generated PE headers"); }
     std::memcpy(image_, file.data(), kHeadersSize);
@@ -829,7 +874,7 @@ void NativeGuestMemory::map_file() {
     }
 }
 
-void NativeGuestMemory::resolve_imports() {
+void ProcessMemory::resolve_imports() {
     std::unordered_map<std::string, HMODULE> modules;
     for (const ImportDescriptor& item : kImports) {
         const std::string dll(item.dll);
@@ -854,18 +899,38 @@ void NativeGuestMemory::resolve_imports() {
     }
 }
 
-void NativeGuestMemory::install_recovered_data() {
+void ProcessMemory::install_recovered_data() {
     for (const RecoveredDataDescriptor& range : kRecoveredData) {
         if ((range.hex.size() & 1u) != 0u || range.rva + range.hex.size() / 2u > kImageSize) { throw std::runtime_error("Invalid recovered lookup-data range"); }
         for (std::size_t index = 0; index < range.hex.size(); index += 2u) { image_[range.rva + index / 2u] = static_cast<std::uint8_t>((decode_hex_digit(range.hex[index]) << 4u) | decode_hex_digit(range.hex[index + 1u])); }
     }
 }
 
-void NativeGuestMemory::install_jump_tables() {
+void ProcessMemory::install_jump_tables() {
     for (const JumpTableDescriptor& entry : kJumpTableEntries) { std::memcpy(image_ + entry.rva, &entry.target, sizeof(entry.target)); }
 }
 
-void NativeGuestMemory::install_callback_stubs() {
+void ProcessMemory::apply_relocations() {
+    for (const RelocationDescriptor& relocation : kLocalRelocations) {
+        if (relocation.rva + sizeof(std::uint32_t) > kImageSize) { throw std::runtime_error("Invalid local relocation RVA " + hex_u32(relocation.rva)); }
+        std::uint32_t source_va = 0;
+        std::memcpy(&source_va, image_ + relocation.rva, sizeof(source_va));
+        const std::uint32_t local_va = source_address(source_va);
+        std::memcpy(image_ + relocation.rva, &local_va, sizeof(local_va));
+    }
+}
+
+void ProcessMemory::patch_image_base() {
+    if (kHeadersSize < 0x40u || image_[0] != 'M' || image_[1] != 'Z') { throw std::runtime_error("Invalid mapped DOS header"); }
+    std::uint32_t pe_offset = 0;
+    std::memcpy(&pe_offset, image_ + 0x3Cu, sizeof(pe_offset));
+    const std::uint64_t image_base_offset = static_cast<std::uint64_t>(pe_offset) + 24u + 28u;
+    if (image_base_offset + sizeof(std::uint32_t) > kHeadersSize) { throw std::runtime_error("Invalid mapped PE optional header"); }
+    const std::uint32_t local_base = load_base();
+    std::memcpy(image_ + image_base_offset, &local_base, sizeof(local_base));
+}
+
+void ProcessMemory::install_callback_stubs() {
     const std::uintptr_t bridge = reinterpret_cast<std::uintptr_t>(&callback_bridge);
     for (const CallbackDescriptor& callback : kCallbacks) {
         std::uint8_t* const source = image_ + callback.rva;
@@ -877,7 +942,7 @@ void NativeGuestMemory::install_callback_stubs() {
     }
 }
 
-void NativeGuestMemory::protect_image() {
+void ProcessMemory::protect_image() {
     constexpr std::uint32_t page_size = 0x1000u;
     auto protect = [this](std::uint32_t rva, std::uint32_t size, DWORD protection) {
         if (size == 0) { return; }
@@ -890,7 +955,8 @@ void NativeGuestMemory::protect_image() {
     for (const SectionDescriptor& section : kSections) { protect(section.virtual_address, std::max(section.virtual_size, section.raw_size), page_protection(section.access)); }
 }
 
-void NativeGuestMemory::release() noexcept {
+void ProcessMemory::release() noexcept {
+    if (g_process_memory == this) { g_process_memory = nullptr; }
     resolved_imports_.clear();
     for (auto iterator = loaded_modules_.rbegin(); iterator != loaded_modules_.rend(); ++iterator) { if (*iterator) { FreeLibrary(*iterator); } }
     loaded_modules_.clear();
@@ -1103,19 +1169,19 @@ void execute_divide(CpuState& state, const InstructionDescriptor& instruction, b
     const OperandDescriptor& source = instruction.operands[0];
     const std::uint16_t width = source.width;
     const std::uint64_t divisor = read_operand(state, source);
-    if (divisor == 0) { throw std::runtime_error("Guest division by zero"); }
+    if (divisor == 0) { throw std::runtime_error("IR division by zero"); }
     if (width == 8) {
         if (signed_divide) {
             const std::int16_t dividend = static_cast<std::int16_t>(state.eax & 0xFFFFu);
             const std::int16_t quotient = dividend / static_cast<std::int8_t>(divisor);
             const std::int16_t remainder = dividend % static_cast<std::int8_t>(divisor);
-            if (quotient < -128 || quotient > 127) { throw std::runtime_error("Guest signed division overflow"); }
+            if (quotient < -128 || quotient > 127) { throw std::runtime_error("IR signed division overflow"); }
             write_register(state, Reg::al, quotient);
             write_register(state, Reg::ah, remainder);
         } else {
             const std::uint16_t dividend = static_cast<std::uint16_t>(state.eax);
             const std::uint16_t quotient = dividend / static_cast<std::uint8_t>(divisor);
-            if (quotient > 0xFFu) { throw std::runtime_error("Guest division overflow"); }
+            if (quotient > 0xFFu) { throw std::runtime_error("IR division overflow"); }
             write_register(state, Reg::al, quotient);
             write_register(state, Reg::ah, dividend % static_cast<std::uint8_t>(divisor));
         }
@@ -1125,16 +1191,16 @@ void execute_divide(CpuState& state, const InstructionDescriptor& instruction, b
         if (signed_divide) {
             const std::int64_t dividend = static_cast<std::int64_t>((static_cast<std::uint64_t>(state.edx) << 32u) | state.eax);
             const std::int32_t signed_divisor = static_cast<std::int32_t>(divisor);
-            if (dividend == std::numeric_limits<std::int64_t>::min() && signed_divisor == -1) { throw std::runtime_error("Guest signed division overflow"); }
+            if (dividend == std::numeric_limits<std::int64_t>::min() && signed_divisor == -1) { throw std::runtime_error("IR signed division overflow"); }
             const std::int64_t quotient = dividend / signed_divisor;
             const std::int64_t remainder = dividend % signed_divisor;
-            if (quotient < std::numeric_limits<std::int32_t>::min() || quotient > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("Guest signed division overflow"); }
+            if (quotient < std::numeric_limits<std::int32_t>::min() || quotient > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("IR signed division overflow"); }
             state.eax = static_cast<std::uint32_t>(quotient);
             state.edx = static_cast<std::uint32_t>(remainder);
         } else {
             const std::uint64_t dividend = (static_cast<std::uint64_t>(state.edx) << 32u) | state.eax;
             const std::uint64_t quotient = dividend / static_cast<std::uint32_t>(divisor);
-            if (quotient > std::numeric_limits<std::uint32_t>::max()) { throw std::runtime_error("Guest division overflow"); }
+            if (quotient > std::numeric_limits<std::uint32_t>::max()) { throw std::runtime_error("IR division overflow"); }
             state.eax = static_cast<std::uint32_t>(quotient);
             state.edx = static_cast<std::uint32_t>(dividend % static_cast<std::uint32_t>(divisor));
         }
@@ -1219,13 +1285,13 @@ extern "C" __declspec(noinline) std::uint32_t __fastcall bridge_test_fastcall(st
 
 void verify_native_bridge() {
     DiagnosticPhaseScope phase(RuntimePhase::abi_self_test);
-    GuestStack stack(64u * 1024u);
+    LocalStack stack(64u * 1024u);
     CpuState state{};
     auto prepare = [&]() {
         state = CpuState{};
         state.esp = stack.top();
-        state.guest_stack_base = stack.base();
-        state.guest_stack_limit = stack.limit();
+        state.stack_base = stack.base();
+        state.stack_limit = stack.limit();
         state.ebx = 0xB1B2B3B4u;
         state.ebp = 0xB5B6B7B8u;
         state.esi = 0x51525354u;
@@ -1308,20 +1374,22 @@ Runtime::Runtime() {
     diagnostic_note(summary_note.c_str());
 }
 
-NativeGuestMemory& Runtime::memory() noexcept {
+ProcessMemory& Runtime::memory() noexcept {
     return memory_;
 }
 
 const InstructionDescriptor& Runtime::lookup(std::uint32_t eip) const {
-    if (eip < kPreferredImageBase + kCodeMinRva || eip >= kPreferredImageBase + kCodeMaxRva) { throw std::runtime_error("No decoded IR instruction at guest EIP " + hex_u32(eip)); }
-    const InstructionDescriptor* instruction = instruction_index_data_[eip - kPreferredImageBase - kCodeMinRva];
-    if (!instruction) { throw std::runtime_error("No decoded IR instruction at guest EIP " + hex_u32(eip)); }
+    std::uint32_t rva = 0;
+    if (!memory_.image_rva(eip, rva) || rva < kCodeMinRva || rva >= kCodeMaxRva) { throw std::runtime_error("No decoded IR instruction at local EIP " + hex_u32(eip)); }
+    const InstructionDescriptor* instruction = instruction_index_data_[rva - kCodeMinRva];
+    if (!instruction) { throw std::runtime_error("No decoded IR instruction at local EIP " + hex_u32(eip)); }
     return *instruction;
 }
 
 bool Runtime::has_instruction(std::uint32_t eip) const noexcept {
-    if (eip < kPreferredImageBase + kCodeMinRva || eip >= kPreferredImageBase + kCodeMaxRva) { return false; }
-    return instruction_index_data_[eip - kPreferredImageBase - kCodeMinRva] != nullptr;
+    std::uint32_t rva = 0;
+    if (!memory_.image_rva(eip, rva) || rva < kCodeMinRva || rva >= kCodeMaxRva) { return false; }
+    return instruction_index_data_[rva - kCodeMinRva] != nullptr;
 }
 
 const ImportDescriptor* Runtime::find_import(std::uint32_t target) const {
@@ -1332,19 +1400,19 @@ const ImportDescriptor* Runtime::find_import(std::uint32_t target) const {
 void Runtime::run(CpuState& state, std::uint32_t stop_target) {
     DiagnosticPhaseScope phase(RuntimePhase::interpret);
     DiagnosticRunScope run_scope(&state);
-    DiagnosticGuestRunScope guest_run_scope(state.eip, stop_target, state.esp);
+    DiagnosticExecutionScope execution_scope(state.eip, stop_target, state.esp);
     state.stopped = false;
     while (!state.stopped) {
         const std::uint32_t current_eip = state.eip;
         const InstructionDescriptor* instruction = nullptr;
         try {
             instruction = &lookup(current_eip);
-            set_diagnostic_instruction(kPreferredImageBase + instruction->rva, op_name(instruction->op).data());
+            set_diagnostic_instruction(memory_.image_address(instruction->rva), op_name(instruction->op).data());
             step(state, *instruction, stop_target);
         } catch (const std::exception& error) {
             const std::string operation = instruction ? std::string(op_name(instruction->op)) : "lookup";
             const std::string failure = "IR failure at " + hex_u32(current_eip) + " [" + operation + "]: " + error.what();
-            diagnostic_guest_failure(state, failure.c_str());
+            diagnostic_ir_failure(state, failure.c_str());
             throw std::runtime_error(failure);
         }
     }
@@ -1358,7 +1426,7 @@ void Runtime::call_native(CpuState& state, std::uint32_t target) {
     MEMORY_BASIC_INFORMATION target_region{};
     const DWORD executable_protection = PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
     if (target == 0 || VirtualQuery(reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), &target_region, sizeof(target_region)) == 0 || target_region.State != MEM_COMMIT || (target_region.Protect & executable_protection) == 0 || (target_region.Protect & (PAGE_GUARD | PAGE_NOACCESS)) != 0) { throw std::runtime_error("Invalid native call target " + hex_u32(target)); }
-    if (name == "_CxxThrowException" || name == "RaiseException") { throw std::runtime_error("Guest SEH/C++ exception crossed the interpreter boundary"); }
+    if (name == "_CxxThrowException" || name == "RaiseException") { throw std::runtime_error("IR SEH/C++ exception crossed the interpreter boundary"); }
     if ((name == "GetModuleHandleA" || name == "GetModuleHandleW") && memory_read<std::uint32_t>(state.esp) == 0) {
         state.eax = memory_.load_base();
         state.esp += 4u;
@@ -1367,9 +1435,9 @@ void Runtime::call_native(CpuState& state, std::uint32_t target) {
     if ((name == "GetModuleFileNameA" || name == "GetModuleFileNameW") && (memory_read<std::uint32_t>(state.esp) == 0 || memory_read<std::uint32_t>(state.esp) == memory_.load_base())) {
         const std::uint32_t buffer = memory_read<std::uint32_t>(state.esp + 4u);
         const std::uint32_t capacity = memory_read<std::uint32_t>(state.esp + 8u);
-        state.eax = name == "GetModuleFileNameW" ? write_guest_path(buffer, capacity, guest_executable_path()) : write_guest_path(buffer, capacity, guest_executable_path_ansi());
+        state.eax = name == "GetModuleFileNameW" ? write_local_path(buffer, capacity, client_executable_path()) : write_local_path(buffer, capacity, client_executable_path_ansi());
         state.esp += 12u;
-        const std::string note = "virtualized " + std::string(name) + ": " + narrow_path(guest_executable_path());
+        const std::string note = "virtualized " + std::string(name) + ": " + narrow_path(client_executable_path());
         diagnostic_note(note.c_str());
         return;
     }
@@ -1393,16 +1461,16 @@ void Runtime::call_native(CpuState& state, std::uint32_t target) {
         return;
     }
     std::string resource_note;
-    if (name == "_findfirst64i32") { resource_note = "resource enumeration pattern=\"" + guest_c_string(memory_read<std::uint32_t>(state.esp)) + "\""; }
-    else if (name == "fopen") { resource_note = "resource fopen path=\"" + guest_c_string(memory_read<std::uint32_t>(state.esp)) + "\", mode=\"" + guest_c_string(memory_read<std::uint32_t>(state.esp + 4u)) + "\""; }
+    if (name == "_findfirst64i32") { resource_note = "resource enumeration pattern=\"" + local_c_string(memory_read<std::uint32_t>(state.esp)) + "\""; }
+    else if (name == "fopen") { resource_note = "resource fopen path=\"" + local_c_string(memory_read<std::uint32_t>(state.esp)) + "\", mode=\"" + local_c_string(memory_read<std::uint32_t>(state.esp + 4u)) + "\""; }
     NativeCallArguments arguments(state.esp);
     std::string module_note;
     if (descriptor && descriptor->process_module_argument >= 0) {
         const std::uint8_t argument = static_cast<std::uint8_t>(descriptor->process_module_argument);
-        const std::uint32_t guest_handle = arguments.read(argument);
+        const std::uint32_t image_handle = arguments.read(argument);
         const std::uint32_t native_handle = process_module_handle();
-        if (native_handle != guest_handle) { arguments.alias(argument, guest_handle, native_handle); }
-        module_note = "module identity import=" + std::string(name) + ", argument=" + std::to_string(argument) + ", guest=" + hex_u32(guest_handle) + ", native=" + hex_u32(native_handle);
+        if (native_handle != image_handle) { arguments.alias(argument, image_handle, native_handle); }
+        module_note = "module identity import=" + std::string(name) + ", argument=" + std::to_string(argument) + ", image=" + hex_u32(image_handle) + ", process=" + hex_u32(native_handle);
         if (name == "DirectInput8Create") { module_note += ", version=" + hex_u32(arguments.read(1)) + ", iid=" + hex_u32(arguments.read(2)) + ", output=" + hex_u32(arguments.read(3)) + ", outer=" + hex_u32(arguments.read(4)); }
     }
     NativeCallFrame frame{&state, reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0};
@@ -1414,7 +1482,7 @@ void Runtime::call_native(CpuState& state, std::uint32_t target) {
 }
 
 void Runtime::step(CpuState& state, const InstructionDescriptor& instruction, std::uint32_t stop_target) {
-    const std::uint32_t next = kPreferredImageBase + instruction.rva + instruction.size;
+    const std::uint32_t next = memory_.image_address(instruction.rva + instruction.size);
     state.eip = next;
     if (execute_x87(state, instruction)) { return; }
     switch (instruction.op) {
@@ -1486,30 +1554,30 @@ void Runtime::step(CpuState& state, const InstructionDescriptor& instruction, st
         }
         case Op::jmp: {
             const std::uint32_t target = static_cast<std::uint32_t>(read_operand(state, instruction.operands[0]));
-            if (target == 0x00459B10u) { throw std::runtime_error(fatal_handler_failure(state, kPreferredImageBase + instruction.rva)); }
+            if (target == local_image_address(0x00459B10u)) { throw std::runtime_error(fatal_handler_failure(state, memory_.image_address(instruction.rva))); }
             if (has_instruction(target)) { state.eip = target; return; }
             const std::uint32_t return_target = pop32(state);
             call_native(state, target);
-            diagnostic_guest_return(return_target);
+            diagnostic_ir_return(return_target);
             if (return_target == stop_target) { state.stopped = true; }
             else { state.eip = return_target; }
             return;
         }
         case Op::call: {
             const std::uint32_t target = static_cast<std::uint32_t>(read_operand(state, instruction.operands[0]));
-            const std::uint32_t callsite = kPreferredImageBase + instruction.rva;
-            if (target == 0x004010F0u || target == 0x00401120u) { throw std::runtime_error(bound_check_failure(state, callsite, target)); }
-            if (target == 0x00459B10u) { throw std::runtime_error(fatal_handler_failure(state, callsite)); }
-            diagnostic_guest_call(callsite, target, next, state.esp);
-            if (execute_semantic_summary(state, callsite, target)) { diagnostic_guest_return(next); return; }
+            const std::uint32_t callsite = memory_.image_address(instruction.rva);
+            if (target == local_image_address(0x004010F0u) || target == local_image_address(0x00401120u)) { throw std::runtime_error(bound_check_failure(state, callsite, target)); }
+            if (target == local_image_address(0x00459B10u)) { throw std::runtime_error(fatal_handler_failure(state, callsite)); }
+            diagnostic_ir_call(callsite, target, next, state.esp);
+            if (execute_semantic_summary(state, callsite, target)) { diagnostic_ir_return(next); return; }
             if (has_instruction(target)) { push32(state, next); state.eip = target; }
-            else { call_native(state, target); diagnostic_guest_return(next); }
+            else { call_native(state, target); diagnostic_ir_return(next); }
             return;
         }
         case Op::ret: {
             const std::uint32_t target = pop32(state);
             if (instruction.operand_count != 0) { state.esp += static_cast<std::uint32_t>(read_operand(state, instruction.operands[0]) & 0xFFFFu); }
-            diagnostic_guest_return(target);
+            diagnostic_ir_return(target);
             if (target == stop_target) { state.stopped = true; }
             else { state.eip = target; }
             return;
@@ -1591,23 +1659,23 @@ void Runtime::step(CpuState& state, const InstructionDescriptor& instruction, st
             return;
         }
         case Op::nop: case Op::wait: return;
-        case Op::int3: throw std::runtime_error("Guest INT3");
+        case Op::int3: throw std::runtime_error("IR INT3");
         case Op::invalid: throw std::runtime_error("Invalid x86 encoding reached");
         default: throw std::runtime_error("Unsupported opcode " + std::string(op_name(instruction.op)));
     }
 }
 
 int Runtime::execute() {
-    DiagnosticPhaseScope phase(RuntimePhase::guest_setup);
-    GuestStack stack(kStackReserve);
+    DiagnosticPhaseScope phase(RuntimePhase::execution_setup);
+    LocalStack stack(kStackReserve);
     CpuState state{};
     state.esp = stack.top();
-    state.guest_stack_base = stack.base();
-    state.guest_stack_limit = stack.limit();
+    state.stack_base = stack.base();
+    state.stack_limit = stack.limit();
     state.eip = memory_.entry_va();
     initialize_fs(state);
     push32(state, kCallbackSentinel);
-    diagnostic_note("entering guest entry point");
+    diagnostic_note("entering local IR entry point");
     g_runtime = this;
     try {
         run(state, kCallbackSentinel);
@@ -1630,17 +1698,17 @@ void Runtime::dispatch_callback(CallbackRegisters& registers) {
     const std::size_t available = region_end > original_esp ? region_end - original_esp : 0;
     const std::size_t copy_size = std::min(kCallbackStackCopy, available);
     if (copy_size < 64u) { throw std::runtime_error("Native callback stack window is too small"); }
-    GuestStack clone(std::max<std::size_t>(kStackReserve, 1024u * 1024u));
+    LocalStack clone(std::max<std::size_t>(kStackReserve, 1024u * 1024u));
     const std::uint32_t clone_esp = clone.top() - static_cast<std::uint32_t>(copy_size);
     if (!safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(clone_esp)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(original_esp)), copy_size)) { throw std::runtime_error("Unable to clone native callback arguments"); }
     memory_write(clone_esp, kCallbackSentinel);
     CpuState state{};
     state.eax = registers.eax; state.ecx = registers.ecx; state.edx = registers.edx; state.ebx = registers.ebx; state.esp = clone_esp; state.ebp = registers.ebp; state.esi = registers.esi; state.edi = registers.edi; state.eip = target; state.eflags = registers.eflags;
-    state.guest_stack_base = clone.base(); state.guest_stack_limit = clone.limit();
+    state.stack_base = clone.base(); state.stack_limit = clone.limit();
     initialize_fs(state);
     run(state, kCallbackSentinel);
     const std::uint32_t stack_delta = state.esp - clone_esp;
-    if (stack_delta < 4u || stack_delta > copy_size) { throw std::runtime_error("Guest callback returned an invalid stack delta"); }
+    if (stack_delta < 4u || stack_delta > copy_size) { throw std::runtime_error("IR callback returned an invalid stack delta"); }
     if (copy_size > 4u) { safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(original_esp + 4u)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(clone_esp + 4u)), copy_size - 4u); }
     const std::uint32_t destination = original_esp + stack_delta;
     memory_write(destination - 8u, state.eax);
@@ -1770,7 +1838,7 @@ extern "C" __declspec(naked) void callback_bridge() {
 #endif
 
 int run_compiled_slice() {
-    configure_guest_environment();
+    configure_process_environment();
     g_deep_diagnostics = GetEnvironmentVariableW(kDeepDiagnosticsEnvironment, nullptr, 0) != 0;
     diagnostic_note(g_deep_diagnostics ? "structured IR execution mode: deep diagnostics" : "structured IR execution mode: fast");
     Runtime runtime;

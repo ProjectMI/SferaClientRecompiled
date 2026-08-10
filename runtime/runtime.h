@@ -33,8 +33,8 @@ struct CpuState {
     std::uint32_t edi = 0;
     std::uint32_t eip = 0;
     std::uint32_t eflags = 0x202u;
-    std::uint32_t guest_stack_base = 0;
-    std::uint32_t guest_stack_limit = 0;
+    std::uint32_t stack_base = 0;
+    std::uint32_t stack_limit = 0;
     std::array<double, 8> fpu{};
     std::uint8_t fpu_depth = 0;
     std::uint8_t fpu_top = 0;
@@ -78,12 +78,12 @@ struct ResolvedImport {
     std::uint32_t address;
 };
 
-class GuestStack {
+class LocalStack {
 public:
-    explicit GuestStack(std::size_t reserve_size);
-    GuestStack(const GuestStack&) = delete;
-    GuestStack& operator=(const GuestStack&) = delete;
-    ~GuestStack();
+    explicit LocalStack(std::size_t reserve_size);
+    LocalStack(const LocalStack&) = delete;
+    LocalStack& operator=(const LocalStack&) = delete;
+    ~LocalStack();
     std::uint32_t top() const noexcept;
     std::uint32_t base() const noexcept;
     std::uint32_t limit() const noexcept;
@@ -92,16 +92,23 @@ private:
     std::size_t size_ = 0;
 };
 
-class NativeGuestMemory {
+class ProcessMemory {
 public:
-    NativeGuestMemory();
-    NativeGuestMemory(const NativeGuestMemory&) = delete;
-    NativeGuestMemory& operator=(const NativeGuestMemory&) = delete;
-    ~NativeGuestMemory();
+    ProcessMemory();
+    ProcessMemory(const ProcessMemory&) = delete;
+    ProcessMemory& operator=(const ProcessMemory&) = delete;
+    ~ProcessMemory();
     std::uint32_t load_base() const noexcept;
     std::uint32_t entry_va() const noexcept;
+    std::uint32_t image_address(std::uint32_t rva) const;
+    std::uint32_t source_address(std::uint32_t source_va) const;
+    bool image_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
     std::uint8_t* data() noexcept;
     const std::vector<ResolvedImport>& resolved_imports() const noexcept;
+    bool try_read(std::uint32_t address, void* value, std::size_t size) const noexcept;
+    bool try_write(std::uint32_t address, const void* value, std::size_t size) noexcept;
+    void read(std::uint32_t address, void* value, std::size_t size) const;
+    void write(std::uint32_t address, const void* value, std::size_t size);
     void initialize_native();
 private:
     std::uint8_t* image_ = nullptr;
@@ -112,6 +119,8 @@ private:
     void resolve_imports();
     void install_recovered_data();
     void install_jump_tables();
+    void apply_relocations();
+    void patch_image_base();
     void install_callback_stubs();
     void protect_image();
     void release() noexcept;
@@ -125,9 +134,9 @@ public:
     int execute();
     void run(CpuState& state, std::uint32_t stop_target = 0);
     void dispatch_callback(CallbackRegisters& registers);
-    NativeGuestMemory& memory() noexcept;
+    ProcessMemory& memory() noexcept;
 private:
-    NativeGuestMemory memory_;
+    ProcessMemory memory_;
     std::vector<const InstructionDescriptor*> instruction_index_;
     const InstructionDescriptor* const* instruction_index_data_ = nullptr;
     std::unordered_map<std::uint32_t, const ImportDescriptor*> imports_by_address_;
@@ -145,8 +154,8 @@ extern "C" void callback_bridge();
 
 std::string win32_error(const char* operation, DWORD error = GetLastError());
 std::string hex_u32(std::uint32_t value);
-const std::wstring& guest_root_directory();
-void configure_guest_environment();
+const std::wstring& client_root_directory();
+void configure_process_environment();
 int run_compiled_slice();
 
 } // namespace lifted

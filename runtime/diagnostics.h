@@ -7,7 +7,7 @@ namespace lifted {
 
 struct CpuState;
 
-struct GuestWriteInfo {
+struct MemoryWriteInfo {
     std::uint32_t address;
     std::uint32_t instruction;
     std::uint32_t size;
@@ -16,14 +16,13 @@ struct GuestWriteInfo {
 
 enum class RuntimePhase : std::uint32_t {
     startup,
-    launcher,
-    child_startup,
+    process_startup,
     map_image,
     load_imports,
     protect_image,
     abi_self_test,
     build_index,
-    guest_setup,
+    execution_setup,
     interpret,
     native_call,
     callback,
@@ -63,12 +62,12 @@ private:
     const char* previous_import_name_;
 };
 
-class DiagnosticGuestRunScope {
+class DiagnosticExecutionScope {
 public:
-    DiagnosticGuestRunScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp) noexcept;
-    DiagnosticGuestRunScope(const DiagnosticGuestRunScope&) = delete;
-    DiagnosticGuestRunScope& operator=(const DiagnosticGuestRunScope&) = delete;
-    ~DiagnosticGuestRunScope();
+    DiagnosticExecutionScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp) noexcept;
+    DiagnosticExecutionScope(const DiagnosticExecutionScope&) = delete;
+    DiagnosticExecutionScope& operator=(const DiagnosticExecutionScope&) = delete;
+    ~DiagnosticExecutionScope();
 private:
     std::size_t previous_depth_;
 };
@@ -77,11 +76,11 @@ void install_crash_diagnostics() noexcept;
 void set_runtime_phase(RuntimePhase phase) noexcept;
 void set_diagnostic_instruction(std::uint32_t address, const char* operation) noexcept;
 void set_diagnostic_memory_probe(bool active) noexcept;
-void diagnostic_guest_write(std::uint32_t address, std::uint32_t size, std::uint64_t value) noexcept;
-bool diagnostic_last_guest_write(std::uint32_t address, GuestWriteInfo& result) noexcept;
-void diagnostic_guest_call(std::uint32_t callsite, std::uint32_t target, std::uint32_t return_address, std::uint32_t esp) noexcept;
-void diagnostic_guest_return(std::uint32_t return_address) noexcept;
-void diagnostic_guest_failure(const CpuState& state, const char* message) noexcept;
+void diagnostic_memory_write(std::uint32_t address, std::uint32_t size, std::uint64_t value) noexcept;
+bool diagnostic_last_memory_write(std::uint32_t address, MemoryWriteInfo& result) noexcept;
+void diagnostic_ir_call(std::uint32_t callsite, std::uint32_t target, std::uint32_t return_address, std::uint32_t esp) noexcept;
+void diagnostic_ir_return(std::uint32_t return_address) noexcept;
+void diagnostic_ir_failure(const CpuState& state, const char* message) noexcept;
 void diagnostic_note(const char* message) noexcept;
 
 } // namespace lifted

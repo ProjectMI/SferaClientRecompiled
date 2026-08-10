@@ -27,6 +27,7 @@ class Operand:
     scale: int = 1
     displacement: int = 0
     segment: str | None = None
+    image_address: bool = False
 
 
 @dataclass(frozen=True)
@@ -104,32 +105,47 @@ def _register_name(register: int) -> str | None:
     return None if name == "none" else name
 
 
-def _operand(decoded: iced.Instruction, index: int) -> Operand:
+def _operand(decoded: iced.Instruction, index: int, image_address: bool = False) -> Operand:
     kind = decoded.op_kind(index)
     if kind == iced.OpKind.REGISTER:
         register = decoded.op_register(index)
         return Operand("register", iced.RegisterExt.size(register) * 8, reg=_register_name(register))
     if kind in _IMMEDIATE_WIDTHS:
-        return Operand("immediate", _IMMEDIATE_WIDTHS[kind], imm=decoded.immediate(index))
+        return Operand("immediate", _IMMEDIATE_WIDTHS[kind], imm=decoded.immediate(index), image_address=image_address)
     if kind in _BRANCH_KINDS:
-        return Operand("branch", 32, imm=decoded.near_branch_target)
+        return Operand("branch", 32, imm=decoded.near_branch_target, image_address=image_address)
     if kind in _MEMORY_KINDS:
         base, segment = _MEMORY_KINDS[kind]
-        return Operand("memory", iced.MemorySizeExt.size(decoded.memory_size) * 8, base=base, segment=segment)
+        return Operand("memory", iced.MemorySizeExt.size(decoded.memory_size) * 8, base=base, segment=segment, image_address=image_address)
     if kind == iced.OpKind.MEMORY:
-        return Operand("memory", iced.MemorySizeExt.size(decoded.memory_size) * 8, base=_register_name(decoded.memory_base), index=_register_name(decoded.memory_index), scale=decoded.memory_index_scale, displacement=decoded.memory_displacement, segment=_register_name(decoded.memory_segment))
+        return Operand("memory", iced.MemorySizeExt.size(decoded.memory_size) * 8, base=_register_name(decoded.memory_base), index=_register_name(decoded.memory_index), scale=decoded.memory_index_scale, displacement=decoded.memory_displacement, segment=_register_name(decoded.memory_segment), image_address=image_address)
     if kind in {iced.OpKind.FAR_BRANCH16, iced.OpKind.FAR_BRANCH32}:
         return Operand("far_branch", 48, imm=((decoded.far_branch_selector & 0xFFFF) << 32) | (decoded.far_branch32 & 0xFFFFFFFF))
     raise X86DecodeError(f"Unsupported iced operand kind {_OP_KIND_NAMES.get(kind, kind)} at VA 0x{decoded.ip:08X}")
 
 
-def _instruction(pe: PE32, decoded: iced.Instruction) -> Instruction:
+def _instruction(pe: PE32, decoded: iced.Instruction, offsets: iced.ConstantOffsets) -> Instruction:
     branch_target_rva = None
     if decoded.op_count and decoded.op_kind(0) in _BRANCH_KINDS:
         target = decoded.near_branch_target
         if pe.image_base <= target < pe.image_base + pe.size_of_image:
             branch_target_rva = target - pe.image_base
-    return Instruction(decoded.ip - pe.image_base, decoded.len, _MNEMONIC_NAMES[decoded.mnemonic], _CODE_NAMES[decoded.code], tuple(_operand(decoded, index) for index in range(decoded.op_count)), branch_target_rva, _FLOW_NAMES[decoded.flow_control], decoded.has_rep_prefix, decoded.has_repe_prefix, decoded.has_repne_prefix, decoded.is_invalid, _FORMATTER.format(decoded))
+    instruction_rva = decoded.ip - pe.image_base
+    displacement_relocated = offsets.has_displacement and offsets.displacement_size == 4 and instruction_rva + offsets.displacement_offset in pe.highlow_relocation_rvas
+    immediate_relocated = offsets.has_immediate and offsets.immediate_size == 4 and instruction_rva + offsets.immediate_offset in pe.highlow_relocation_rvas
+    second_immediate_relocated = offsets.has_immediate2 and offsets.immediate_size2 == 4 and instruction_rva + offsets.immediate_offset2 in pe.highlow_relocation_rvas
+    operands = []
+    immediate_index = 0
+    for index in range(decoded.op_count):
+        kind = decoded.op_kind(index)
+        image_address = kind in _BRANCH_KINDS and branch_target_rva is not None
+        if kind == iced.OpKind.MEMORY:
+            image_address = displacement_relocated
+        elif kind in _IMMEDIATE_WIDTHS:
+            image_address = immediate_relocated if immediate_index == 0 else second_immediate_relocated
+            immediate_index += 1
+        operands.append(_operand(decoded, index, image_address))
+    return Instruction(instruction_rva, decoded.len, _MNEMONIC_NAMES[decoded.mnemonic], _CODE_NAMES[decoded.code], tuple(operands), branch_target_rva, _FLOW_NAMES[decoded.flow_control], decoded.has_rep_prefix, decoded.has_repe_prefix, decoded.has_repne_prefix, decoded.is_invalid, _FORMATTER.format(decoded))
 
 
 def _raw_for_rva(pe: PE32, rva: int) -> tuple[Section, bytes]:
@@ -145,14 +161,18 @@ def _raw_for_rva(pe: PE32, rva: int) -> tuple[Section, bytes]:
 
 def _decode_at(pe: PE32, rva: int) -> Instruction:
     _, raw = _raw_for_rva(pe, rva)
-    decoded = iced.Decoder(32, raw, ip=pe.image_base + rva).decode()
-    return _instruction(pe, decoded)
+    decoder = iced.Decoder(32, raw, ip=pe.image_base + rva)
+    decoded = decoder.decode()
+    return _instruction(pe, decoded, decoder.get_constant_offsets(decoded))
 
 
 def _linear_decode(pe: PE32, section: Section) -> dict[int, Instruction]:
     raw = pe.data[section.raw_offset:section.raw_offset + section.raw_size]
     decoder = iced.Decoder(32, raw, ip=pe.image_base + section.virtual_address)
-    return {item.ip - pe.image_base: _instruction(pe, item) for item in decoder}
+    instructions = {}
+    for item in decoder:
+        instructions[item.ip - pe.image_base] = _instruction(pe, item, decoder.get_constant_offsets(item))
+    return instructions
 
 
 def _code_pointer_seeds(pe: PE32) -> set[int]:

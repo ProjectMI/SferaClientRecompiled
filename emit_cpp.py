@@ -180,11 +180,11 @@ def operand_cpp(operand: Operand) -> str:
     if operand.kind == "register":
         return f"R(Reg::{register_token(operand.reg)}, {operand.width}u)"
     if operand.kind == "immediate":
-        return f"U({u32(operand.imm or 0)}, {operand.width}u)"
+        return f"U({u32(operand.imm or 0)}, {operand.width}u, {'true' if operand.image_address else 'false'})"
     if operand.kind == "branch":
-        return f"B({u32(operand.imm or 0)})"
+        return f"B({u32(operand.imm or 0)}, {'true' if operand.image_address else 'false'})"
     if operand.kind == "memory":
-        return f"M({operand.width}u, Reg::{register_token(operand.base)}, Reg::{register_token(operand.index)}, {operand.scale}u, {u32(operand.displacement)}, Reg::{register_token(operand.segment)})"
+        return f"M({operand.width}u, Reg::{register_token(operand.base)}, Reg::{register_token(operand.index)}, {operand.scale}u, {u32(operand.displacement)}, Reg::{register_token(operand.segment)}, {'true' if operand.image_address else 'false'})"
     if operand.kind == "far_branch":
         return f"F({u32(operand.imm or 0)})"
     return "N()"
@@ -192,6 +192,16 @@ def operand_cpp(operand: Operand) -> str:
 
 def instruction_flags(instruction: object) -> int:
     return (1 if instruction.rep else 0) | (2 if instruction.repe else 0) | (4 if instruction.repne else 0) | (8 if instruction.invalid else 0)
+
+
+def validate_image_addresses(pe: PE32, instructions: tuple[Instruction, ...]) -> None:
+    for instruction in instructions:
+        for operand in instruction.operands:
+            if not operand.image_address:
+                continue
+            value = operand.displacement if operand.kind == "memory" else operand.imm
+            if value is None or not pe.image_base <= value < pe.image_base + pe.size_of_image:
+                raise PEFormatError(f"IR image address is outside the source image at RVA 0x{instruction.rva:08X}")
 
 
 def emit_ir_files(program: X86Program, out: Path, chunk_size: int = 8192) -> list[str]:
@@ -219,7 +229,7 @@ def emit_ir_files(program: X86Program, out: Path, chunk_size: int = 8192) -> lis
         name = f"ir_{index:03d}.cpp"
         (out / name).write_text("\n".join(["#include \"ir_data.h\"", "", "namespace lifted {", "", f"const InstructionDescriptor {symbol}[{len(chunk)}] = {{", *rows, "};", "", "} // namespace lifted", ""]), encoding="utf-8", newline="\n")
         source_names.append(name)
-    header = ["#pragma once", "", "#include <array>", "#include <cstddef>", "#include <cstdint>", "#include <string_view>", "", "namespace lifted {", "", "enum class Reg : std::uint8_t {", *register_rows, "};", "", "enum class OperandKind : std::uint8_t { none, reg, imm, mem, branch, far_branch };", "", "enum class Op : std::uint16_t {", *opcode_rows, "};", "", f"inline constexpr std::array<std::string_view, {len(opcodes)}> kOpNames = {{{{", *opcode_names, "}};", "inline constexpr std::string_view op_name(Op op) noexcept { return kOpNames[static_cast<std::size_t>(op)]; }", "", "inline constexpr std::uint8_t kPrefixRep = 1u;", "inline constexpr std::uint8_t kPrefixRepe = 2u;", "inline constexpr std::uint8_t kPrefixRepne = 4u;", "inline constexpr std::uint8_t kInvalidEncoding = 8u;", "", "struct OperandDescriptor { OperandKind kind; std::uint16_t width; Reg reg; Reg base; Reg index; Reg segment; std::uint8_t scale; std::uint32_t value; };", "struct InstructionDescriptor { std::uint32_t rva; std::uint8_t size; Op op; std::uint8_t prefixes; std::uint8_t operand_count; std::array<OperandDescriptor, 3> operands; };", "inline constexpr OperandDescriptor N() noexcept { return {OperandKind::none, 0u, Reg::none, Reg::none, Reg::none, Reg::none, 1u, 0u}; }", "inline constexpr OperandDescriptor R(Reg reg, std::uint16_t width) noexcept { return {OperandKind::reg, width, reg, Reg::none, Reg::none, Reg::none, 1u, 0u}; }", "inline constexpr OperandDescriptor U(std::uint32_t value, std::uint16_t width) noexcept { return {OperandKind::imm, width, Reg::none, Reg::none, Reg::none, Reg::none, 1u, value}; }", "inline constexpr OperandDescriptor B(std::uint32_t value) noexcept { return {OperandKind::branch, 32u, Reg::none, Reg::none, Reg::none, Reg::none, 1u, value}; }", "inline constexpr OperandDescriptor F(std::uint32_t value) noexcept { return {OperandKind::far_branch, 48u, Reg::none, Reg::none, Reg::none, Reg::none, 1u, value}; }", "inline constexpr OperandDescriptor M(std::uint16_t width, Reg base, Reg index, std::uint8_t scale, std::uint32_t displacement, Reg segment) noexcept { return {OperandKind::mem, width, Reg::none, base, index, segment, scale, displacement}; }", "inline constexpr InstructionDescriptor I(std::uint32_t rva, std::uint8_t size, Op op, std::uint8_t prefixes, std::uint8_t operand_count, OperandDescriptor a, OperandDescriptor b, OperandDescriptor c) noexcept { return {rva, size, op, prefixes, operand_count, {a, b, c}}; }", "", "struct InstructionChunk { const InstructionDescriptor* data; std::size_t size; };", *declarations, "", f"inline const std::array<InstructionChunk, {len(chunks)}> kInstructionChunks = {{{{", *chunk_rows, "}};", "", "} // namespace lifted", ""]
+    header = ["#pragma once", "", "#include <array>", "#include <cstddef>", "#include <cstdint>", "#include <string_view>", "", "namespace lifted {", "", "enum class Reg : std::uint8_t {", *register_rows, "};", "", "enum class OperandKind : std::uint8_t { none, reg, imm, mem, branch, far_branch };", "", "enum class Op : std::uint16_t {", *opcode_rows, "};", "", f"inline constexpr std::array<std::string_view, {len(opcodes)}> kOpNames = {{{{", *opcode_names, "}};", "inline constexpr std::string_view op_name(Op op) noexcept { return kOpNames[static_cast<std::size_t>(op)]; }", "", "inline constexpr std::uint8_t kPrefixRep = 1u;", "inline constexpr std::uint8_t kPrefixRepe = 2u;", "inline constexpr std::uint8_t kPrefixRepne = 4u;", "inline constexpr std::uint8_t kInvalidEncoding = 8u;", "", "struct OperandDescriptor { OperandKind kind; std::uint16_t width; Reg reg; Reg base; Reg index; Reg segment; std::uint8_t scale; bool image_address; std::uint32_t value; };", "struct InstructionDescriptor { std::uint32_t rva; std::uint8_t size; Op op; std::uint8_t prefixes; std::uint8_t operand_count; std::array<OperandDescriptor, 3> operands; };", "inline constexpr OperandDescriptor N() noexcept { return {OperandKind::none, 0u, Reg::none, Reg::none, Reg::none, Reg::none, 1u, false, 0u}; }", "inline constexpr OperandDescriptor R(Reg reg, std::uint16_t width) noexcept { return {OperandKind::reg, width, reg, Reg::none, Reg::none, Reg::none, 1u, false, 0u}; }", "inline constexpr OperandDescriptor U(std::uint32_t value, std::uint16_t width, bool image_address) noexcept { return {OperandKind::imm, width, Reg::none, Reg::none, Reg::none, Reg::none, 1u, image_address, value}; }", "inline constexpr OperandDescriptor B(std::uint32_t value, bool image_address) noexcept { return {OperandKind::branch, 32u, Reg::none, Reg::none, Reg::none, Reg::none, 1u, image_address, value}; }", "inline constexpr OperandDescriptor F(std::uint32_t value) noexcept { return {OperandKind::far_branch, 48u, Reg::none, Reg::none, Reg::none, Reg::none, 1u, false, value}; }", "inline constexpr OperandDescriptor M(std::uint16_t width, Reg base, Reg index, std::uint8_t scale, std::uint32_t displacement, Reg segment, bool image_address) noexcept { return {OperandKind::mem, width, Reg::none, base, index, segment, scale, image_address, displacement}; }", "inline constexpr InstructionDescriptor I(std::uint32_t rva, std::uint8_t size, Op op, std::uint8_t prefixes, std::uint8_t operand_count, OperandDescriptor a, OperandDescriptor b, OperandDescriptor c) noexcept { return {rva, size, op, prefixes, operand_count, {a, b, c}}; }", "", "struct InstructionChunk { const InstructionDescriptor* data; std::size_t size; };", *declarations, "", f"inline const std::array<InstructionChunk, {len(chunks)}> kInstructionChunks = {{{{", *chunk_rows, "}};", "", "} // namespace lifted", ""]
     (out / "ir_data.h").write_text("\n".join(header), encoding="utf-8", newline="\n")
     return source_names
 
@@ -385,7 +395,7 @@ def code_free_payload(pe: PE32) -> bytes:
     return bytes(payload)
 
 
-def emit_source_header(pe: PE32, program: X86Program, data_analysis_instructions: tuple[Instruction, ...], summaries: SemanticSummaries, output: Path) -> tuple[int, int, int, int, list[tuple[int, int, int]], bytes]:
+def emit_source_header(pe: PE32, program: X86Program, data_analysis_instructions: tuple[Instruction, ...], summaries: SemanticSummaries, output: Path) -> tuple[int, int, int, int, int, list[tuple[int, int, int]], bytes]:
     section_rows = []
     for section in pe.sections:
         access = (1 if section.readable else 0) | (2 if section.writable else 0) | (4 if section.executable else 0)
@@ -400,7 +410,7 @@ def emit_source_header(pe: PE32, program: X86Program, data_analysis_instructions
     callback_rows = [f"    {{0x{rva:08X}u}}," for rva in callbacks]
     instruction_rvas = {instruction.rva for instruction in program.instructions}
     if any(rva not in instruction_rvas for rva in callbacks):
-        raise PEFormatError("Generated callback targets include an undecoded guest address")
+        raise PEFormatError("Generated callback targets include an undecoded image address")
     callback_bytes = {byte for rva in callbacks for byte in range(rva, rva + 5)}
     jump_bytes = {byte for rva, _ in jump_entries for byte in range(rva, rva + 4)}
     recovered_bytes = {byte for rva, data in recovered_data for byte in range(rva, rva + len(data))}
@@ -410,6 +420,21 @@ def emit_source_header(pe: PE32, program: X86Program, data_analysis_instructions
         raise PEFormatError("Generated callback stubs overlap recovered lookup data")
     if jump_bytes & recovered_bytes:
         raise PEFormatError("Recovered switch and lookup data overlap")
+    executable_ranges = [(section.virtual_address, section.virtual_address + section.mapped_size) for section in pe.sections if section.executable]
+    restored_executable_bytes = jump_bytes | recovered_bytes
+    relocation_rvas = []
+    for relocation in pe.relocations:
+        if relocation.kind != 3 or relocation.rva + 4 > pe.size_of_image:
+            continue
+        in_executable = any(begin <= relocation.rva < end for begin, end in executable_ranges)
+        if not in_executable or all(relocation.rva + offset in restored_executable_bytes for offset in range(4)):
+            relocation_rvas.append(relocation.rva)
+    mapped_image = pe.mapped_image()
+    for rva in relocation_rvas:
+        source_va = struct.unpack_from("<I", mapped_image, rva)[0]
+        if not pe.image_base <= source_va < pe.image_base + pe.size_of_image:
+            raise PEFormatError(f"Local relocation at RVA 0x{rva:08X} does not contain an image address")
+    relocation_rows = [f"    {{0x{rva:08X}u}}," for rva in relocation_rvas]
     payload = code_free_payload(pe)
     chunks = hex_chunks(payload)
     chunk_definitions = [f"inline constexpr char kMappedPayloadHex_{index}[] = {cpp_string(chunk)};" for index, chunk in enumerate(chunks)]
@@ -438,7 +463,7 @@ namespace lifted {{
 inline constexpr std::uint8_t kRead = 1u;
 inline constexpr std::uint8_t kWrite = 2u;
 inline constexpr std::uint8_t kExecute = 4u;
-inline constexpr std::uint32_t kPreferredImageBase = 0x{pe.image_base:08X}u;
+inline constexpr std::uint32_t kSourceImageBase = 0x{pe.image_base:08X}u;
 inline constexpr std::uint32_t kEntryRva = 0x{pe.entry_rva:08X}u;
 inline constexpr std::uint32_t kImageSize = 0x{pe.size_of_image:08X}u;
 inline constexpr std::uint32_t kHeadersSize = 0x{pe.size_of_headers:08X}u;
@@ -448,7 +473,7 @@ inline constexpr std::uint32_t kCodeMaxRva = 0x{max(rvas) + 1:08X}u;
 inline constexpr std::uint16_t kMachine = 0x{pe.machine:04X}u;
 inline constexpr std::size_t kMappedPayloadSize = {len(pe.data)}u;
 inline constexpr std::size_t kInstructionCount = {len(program.instructions)}u;
-inline constexpr std::string_view kGuestExecutableName = {cpp_string(pe.path.name)};
+inline constexpr std::string_view kClientExecutableName = {cpp_string(pe.path.name)};
 inline constexpr std::uint32_t kConfigLookupTarget = {u32(summaries.config_lookup_target)};
 inline constexpr std::uint32_t kConfigTextPointerAddress = {u32(summaries.config_text_pointer_address)};
 inline constexpr std::uint32_t kConfigTextLengthAddress = {u32(summaries.config_text_length_address)};
@@ -461,6 +486,7 @@ struct ImportDescriptor {{ std::string_view dll; std::string_view name; std::uin
 struct CallbackDescriptor {{ std::uint32_t rva; }};
 struct JumpTableDescriptor {{ std::uint32_t rva; std::uint32_t target; }};
 struct RecoveredDataDescriptor {{ std::uint32_t rva; std::string_view hex; }};
+struct RelocationDescriptor {{ std::uint32_t rva; }};
 struct HexChunk {{ const char* data; std::size_t size; }};
 
 inline constexpr std::array<SectionDescriptor, {len(pe.sections)}> kSections = {{{{
@@ -477,6 +503,9 @@ inline constexpr std::array<JumpTableDescriptor, {len(jump_entries)}> kJumpTable
 }}}};
 inline constexpr std::array<RecoveredDataDescriptor, {len(recovered_data)}> kRecoveredData = {{{{
 {chr(10).join(recovered_rows)}
+}}}};
+inline constexpr std::array<RelocationDescriptor, {len(relocation_rvas)}> kLocalRelocations = {{{{
+{chr(10).join(relocation_rows)}
 }}}};
 
 {chr(10).join(chunk_definitions)}
@@ -504,7 +533,7 @@ inline std::vector<std::uint8_t> decode_mapped_payload() {{
 }} // namespace lifted
 '''
     output.write_text(content, encoding="utf-8", newline="\n")
-    return len(callbacks), len(jump_entries), len(recovered_data), len(recovered_bytes), missing_executable_data, payload
+    return len(callbacks), len(jump_entries), len(recovered_data), len(recovered_bytes), len(relocation_rvas), missing_executable_data, payload
 
 
 def emit_vcxproj(project_name: str, target_name: str, dll_names: list[str], ir_sources: list[str], output: Path) -> None:
@@ -521,8 +550,8 @@ def emit_vcxproj(project_name: str, target_name: str, dll_names: list[str], ir_s
   <PropertyGroup><TargetName>{target_name}</TargetName></PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'"><OutDir>$(ProjectDir)bin\\Debug\\</OutDir><IntDir>$(ProjectDir)obj\\Debug\\</IntDir><LocalDebuggerWorkingDirectory>$(ProjectDir)..\\</LocalDebuggerWorkingDirectory><LocalDebuggerCommandArguments>/login</LocalDebuggerCommandArguments><DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor></PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'"><OutDir>$(ProjectDir)bin\\Release\\</OutDir><IntDir>$(ProjectDir)obj\\Release\\</IntDir><LocalDebuggerWorkingDirectory>$(ProjectDir)..\\</LocalDebuggerWorkingDirectory><LocalDebuggerCommandArguments>/login</LocalDebuggerCommandArguments><DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor></PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'"><ClCompile><WarningLevel>Level4</WarningLevel><Optimization>MaxSpeed</Optimization><InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion><IntrinsicFunctions>true</IntrinsicFunctions><FunctionLevelLinking>true</FunctionLevelLinking><FavorSizeOrSpeed>Speed</FavorSizeOrSpeed><DebugInformationFormat>ProgramDatabase</DebugInformationFormat><BasicRuntimeChecks>Default</BasicRuntimeChecks><SDLCheck>true</SDLCheck><PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions><ConformanceMode>true</ConformanceMode><LanguageStandard>stdcpp20</LanguageStandard><RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary><MultiProcessorCompilation>true</MultiProcessorCompilation></ClCompile><Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><BaseAddress>0x20000000</BaseAddress><FixedBaseAddress>true</FixedBaseAddress><RandomizedBaseAddress>false</RandomizedBaseAddress><TargetMachine>MachineX86</TargetMachine><AdditionalOptions>/BASE:0x20000000 /FIXED %(AdditionalOptions)</AdditionalOptions></Link><PostBuildEvent><Command>{copies}</Command></PostBuildEvent></ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'"><ClCompile><WarningLevel>Level4</WarningLevel><Optimization>MaxSpeed</Optimization><InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion><FunctionLevelLinking>true</FunctionLevelLinking><IntrinsicFunctions>true</IntrinsicFunctions><FavorSizeOrSpeed>Speed</FavorSizeOrSpeed><SDLCheck>true</SDLCheck><PreprocessorDefinitions>WIN32;NDEBUG;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions><ConformanceMode>true</ConformanceMode><LanguageStandard>stdcpp20</LanguageStandard><RuntimeLibrary>MultiThreaded</RuntimeLibrary><MultiProcessorCompilation>true</MultiProcessorCompilation></ClCompile><Link><SubSystem>Windows</SubSystem><EnableCOMDATFolding>true</EnableCOMDATFolding><OptimizeReferences>true</OptimizeReferences><GenerateDebugInformation>true</GenerateDebugInformation><BaseAddress>0x20000000</BaseAddress><FixedBaseAddress>true</FixedBaseAddress><RandomizedBaseAddress>false</RandomizedBaseAddress><TargetMachine>MachineX86</TargetMachine><AdditionalOptions>/BASE:0x20000000 /FIXED %(AdditionalOptions)</AdditionalOptions></Link><PostBuildEvent><Command>{copies}</Command></PostBuildEvent></ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'"><ClCompile><WarningLevel>Level4</WarningLevel><Optimization>MaxSpeed</Optimization><InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion><IntrinsicFunctions>true</IntrinsicFunctions><FunctionLevelLinking>true</FunctionLevelLinking><FavorSizeOrSpeed>Speed</FavorSizeOrSpeed><DebugInformationFormat>ProgramDatabase</DebugInformationFormat><BasicRuntimeChecks>Default</BasicRuntimeChecks><SDLCheck>true</SDLCheck><PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions><ConformanceMode>true</ConformanceMode><LanguageStandard>stdcpp20</LanguageStandard><RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary><MultiProcessorCompilation>true</MultiProcessorCompilation></ClCompile><Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><RandomizedBaseAddress>true</RandomizedBaseAddress><DataExecutionPrevention>true</DataExecutionPrevention><TargetMachine>MachineX86</TargetMachine></Link><PostBuildEvent><Command>{copies}</Command></PostBuildEvent></ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'"><ClCompile><WarningLevel>Level4</WarningLevel><Optimization>MaxSpeed</Optimization><InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion><FunctionLevelLinking>true</FunctionLevelLinking><IntrinsicFunctions>true</IntrinsicFunctions><FavorSizeOrSpeed>Speed</FavorSizeOrSpeed><SDLCheck>true</SDLCheck><PreprocessorDefinitions>WIN32;NDEBUG;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions><ConformanceMode>true</ConformanceMode><LanguageStandard>stdcpp20</LanguageStandard><RuntimeLibrary>MultiThreaded</RuntimeLibrary><MultiProcessorCompilation>true</MultiProcessorCompilation></ClCompile><Link><SubSystem>Windows</SubSystem><EnableCOMDATFolding>true</EnableCOMDATFolding><OptimizeReferences>true</OptimizeReferences><GenerateDebugInformation>true</GenerateDebugInformation><RandomizedBaseAddress>true</RandomizedBaseAddress><DataExecutionPrevention>true</DataExecutionPrevention><TargetMachine>MachineX86</TargetMachine></Link><PostBuildEvent><Command>{copies}</Command></PostBuildEvent></ItemDefinitionGroup>
   <ItemGroup><ClCompile Include="diagnostics.cpp" /><ClCompile Include="main.cpp" /><ClCompile Include="runtime.cpp" />{ir_compile_rows}</ItemGroup>
   <ItemGroup><ClInclude Include="diagnostics.h" /><ClInclude Include="runtime.h" /><ClInclude Include="source.h" /><ClInclude Include="ir_data.h" /></ItemGroup>
   <Import Project="$(VCTargetsPath)\\Microsoft.Cpp.targets" />
@@ -570,13 +599,13 @@ endlocal
 def emit_readme(output: Path) -> None:
     output.write_text("""# Sfera: интерпретатор структурированного IR
 
-Этот Win32/x86-проект исполняет декодированный IR и не восстанавливает исходные x86-инструкции из секции `.text`. В образ гостя переносятся PE-заголовки, ресурсы и секции данных; в обнулённой исполняемой секции создаются пятибайтовые мосты нативных callback-вызовов, элементы таблиц `switch` и все ограниченные индексные таблицы, на которые ссылается декодированный код. Генерация завершается ошибкой, если ссылка на данные внутри исполняемой секции остаётся неклассифицированной.
+Этот Win32/x86-проект исполняет декодированный IR и не восстанавливает исходные x86-инструкции из секции `.text`. PE-заголовки, ресурсы и секции данных загружаются в локальную память текущего процесса; в обнулённой исполняемой секции создаются только мосты callback-вызовов и восстановленные таблицы данных. Генерация завершается ошибкой, если ссылка на данные внутри исполняемой секции остаётся неклассифицированной.
 
 Сборка: запустите `build_release.cmd` из Visual Studio 2022 Developer Command Prompt с установленным набором Desktop development with C++. Результат появится в `bin\\Release`; необходимые DLL копируются туда автоматически. Конфигурации Debug и Release используют оптимизацию скорости, при этом Debug сохраняет PDB и отладочную CRT.
 
-При F5 launcher заранее резервирует гостевой диапазон `0x00400000` в дочернем процессе. Перед запуском он находит корень ресурсов по `mbc\\_main.mbc`, передаёт его дочернему процессу как рабочий каталог и виртуализирует `GetModuleFileNameA/W` путём исходного guest EXE. Если автообнаружение невозможно, задайте полный путь к каталогу клиента в `SFERA_GUEST_ROOT`. Нативное падение дочернего процесса следует анализировать по `sfera_ir_crash.dmp` вместе с PDB текущей сборки.
+Программа работает в одном процессе. Локальный образ размещается по свободному адресу, PE-релокации и адресные операнды IR переводятся к его фактической базе. Рантайм находит корень ресурсов по `mbc\\_main.mbc`, назначает его рабочим каталогом и виртуализирует `GetModuleFileNameA/W` путём исходного клиентского EXE. Если автообнаружение невозможно, задайте каталог клиента в `SFERA_CLIENT_ROOT`.
 
-Рантайм сохраняет регистры и EFLAGS, моделирует гостевой стек, x87 и FS/SEH-данные, поддерживает cdecl/stdcall/thiscall/fastcall через единый x86-мост и возвращает нативные callback-вызовы обратно в интерпретатор. Импортная метаинформация преобразует гостевые псевдодескрипторы в нативные значения для API, которым нужна идентичность загруженного модуля процесса. Перед входом в клиент мост проверяется встроенными ABI-тестами. Поиск значения в уже загруженном конфиге и преобразование unsigned-индекса в VC10 `std::string` связываются заново при каждой генерации по структуре IR и использованию литерала `NEW_FONT_`; decimal-summary проверяет одновременно target и callsite. Если связку нельзя определить однозначно, генератор останавливается до выпуска небезопасного рантайма. Быстрый режим использует прямые обращения к проверенной гостевой памяти; переменная `SFERA_IR_DEEP_TRACE=1` включает защищённые пробы и происхождение каждой записи для повторной диагностики сбоя. Контролируемая ошибка создаёт `sfera_ir_guest_failure.txt` с гостевыми регистрами, точным IR-вызовом, интерпретированным call stack и 256 последними инструкциями; штатные `BoundCheckArray` и fatal-handler перехватываются до клиентской аварийной очистки. Для сбоя MBC отчёт также сохраняет исходный токен, адрес переменной, последнюю наблюдавшуюся IR-запись значения и количество перечисленных MBC-файлов. Ошибка загрузки шрифта дополнительно показывает последний ключ конфигурации, а успешные и отсутствующие `NEW_FONT_n` фиксируются в runtime-логе. Начало и завершение перечислений, открытия ресурсов и преобразования аргументов импортов записываются в `sfera_ir_runtime.log`. При нативном падении рядом с EXE создаются `sfera_ir_crash.txt` и `sfera_ir_crash.dmp` с тем же гостевым контекстом. Нативное C++/SEH-исключение, пересекающее границу интерпретатора, пока не поддерживается.
+Рантайм сохраняет регистры и EFLAGS, использует локальный стек, моделирует x87 и FS/SEH-данные, поддерживает cdecl/stdcall/thiscall/fastcall и callback-вызовы через единый x86-мост. `SFERA_IR_DEEP_TRACE=1` включает защищённые пробы и происхождение записей. Контролируемая ошибка создаёт `sfera_ir_failure.txt`; нативное падение создаёт `sfera_ir_crash.txt` и `sfera_ir_crash.dmp`. Нативное C++/SEH-исключение, пересекающее границу интерпретатора, пока не поддерживается.
 
 Статические результаты проверки генерации и вычисленные привязки semantic summaries находятся в `report.json`. Полная проверка поведения требует запуска Release/Win32-сборки на Windows.
 """, encoding="utf-8", newline="\n")
@@ -604,11 +633,12 @@ def generate(pe: PE32, root: Path, out: Path) -> None:
     print("[decode] structured x86 IR")
     program = decode_program(pe)
     entry_reachable = decode_reachable(pe)
+    validate_image_addresses(pe, program.instructions)
     summaries = discover_semantic_summaries(pe, program.instructions)
     print(f"[semantic] config={summaries.config_lookup_target:#010x}, decimal={summaries.unsigned_decimal_target:#010x} at {summaries.unsigned_decimal_callsite:#010x}")
     print(f"[emit] {len(program.instructions):,} instructions")
     ir_sources = emit_ir_files(program, out)
-    callback_count, jump_table_count, recovered_data_range_count, recovered_data_byte_count, missing_executable_data, payload = emit_source_header(pe, program, program.instructions, summaries, out / "source.h")
+    callback_count, jump_table_count, recovered_data_range_count, recovered_data_byte_count, mapped_relocation_count, missing_executable_data, payload = emit_source_header(pe, program, program.instructions, summaries, out / "source.h")
     runtime_root = Path(__file__).resolve().parent / "runtime"
     shutil.copy2(runtime_root / "runtime.h", out / "runtime.h")
     shutil.copy2(runtime_root / "runtime.cpp", out / "runtime.cpp")
@@ -633,12 +663,16 @@ def generate(pe: PE32, root: Path, out: Path) -> None:
         "input_sha256": pe.sha256,
         "code_free_payload_sha256": hashlib.sha256(payload).hexdigest(),
         "runtime": "structured-ir-interpreter",
+        "address_model": "single-process-relocated-local-image",
         "instructions": len(program.instructions),
         "entry_reachable_instructions": len(entry_reachable),
         "entry_reachable_opcodes": dict(sorted(entry_mnemonics.items())),
         "all_linear_opcodes": dict(sorted(Counter(item.mnemonic for item in program.instructions).items())),
         "imports": len(pe.imports),
         "process_module_alias_imports": sum(process_module_argument(symbol.dll, symbol.name) >= 0 for symbol in pe.imports),
+        "local_image_relocations": sum(item.kind == 3 for item in pe.relocations),
+        "mapped_local_relocations": mapped_relocation_count,
+        "rebased_ir_operands": sum(operand.image_address for instruction in program.instructions for operand in instruction.operands),
         "semantic_summaries": {
             "config_lookup": {"target": f"0x{summaries.config_lookup_target:08X}", "text_pointer_address": f"0x{summaries.config_text_pointer_address:08X}", "text_length_address": f"0x{summaries.config_text_length_address:08X}", "capacity": summaries.config_text_capacity},
             "unsigned_decimal_string": {"target": f"0x{summaries.unsigned_decimal_target:08X}", "callsite": f"0x{summaries.unsigned_decimal_callsite:08X}"},

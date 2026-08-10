@@ -30,42 +30,41 @@ struct TraceEntry {
     const char* operation;
 };
 
-struct GuestCallEntry {
+struct IrCallEntry {
     std::uint32_t callsite;
     std::uint32_t target;
     std::uint32_t return_address;
     std::uint32_t esp;
 };
 
-struct GuestWriteRecord {
-    GuestWriteInfo info;
+struct MemoryWriteRecord {
+    MemoryWriteInfo info;
     std::uint64_t sequence;
 };
 
 thread_local TraceEntry g_trace[256]{};
 thread_local std::uint64_t g_trace_count = 0;
-thread_local GuestCallEntry g_guest_calls[512]{};
-thread_local std::size_t g_guest_call_count = 0;
-thread_local std::unique_ptr<GuestWriteRecord[]> g_guest_writes;
-thread_local std::uint64_t g_guest_write_sequence = 0;
-constexpr std::size_t kGuestWriteBucketCount = 65536;
-constexpr std::size_t kGuestWriteCapacity = kGuestWriteBucketCount * 4u;
+thread_local IrCallEntry g_ir_calls[512]{};
+thread_local std::size_t g_ir_call_count = 0;
+thread_local std::unique_ptr<MemoryWriteRecord[]> g_memory_writes;
+thread_local std::uint64_t g_memory_write_sequence = 0;
+constexpr std::size_t kMemoryWriteBucketCount = 65536;
+constexpr std::size_t kMemoryWriteCapacity = kMemoryWriteBucketCount * 4u;
 
-std::size_t guest_write_bucket(std::uint32_t address) noexcept {
+std::size_t memory_write_bucket(std::uint32_t address) noexcept {
     return static_cast<std::size_t>((address * 2654435761u) >> 16u) * 4u;
 }
 
 const char* phase_name(RuntimePhase phase) noexcept {
     switch (phase) {
         case RuntimePhase::startup: return "startup";
-        case RuntimePhase::launcher: return "launcher";
-        case RuntimePhase::child_startup: return "child-startup";
+        case RuntimePhase::process_startup: return "process-startup";
         case RuntimePhase::map_image: return "map-image";
         case RuntimePhase::load_imports: return "load-imports";
         case RuntimePhase::protect_image: return "protect-image";
         case RuntimePhase::abi_self_test: return "abi-self-test";
         case RuntimePhase::build_index: return "build-index";
-        case RuntimePhase::guest_setup: return "guest-setup";
+        case RuntimePhase::execution_setup: return "execution-setup";
         case RuntimePhase::interpret: return "interpret";
         case RuntimePhase::native_call: return "native-call";
         case RuntimePhase::callback: return "callback";
@@ -121,14 +120,14 @@ void append_text(char* buffer, std::size_t capacity, std::size_t& used, const ch
 
 void append_execution_context(char* report, std::size_t capacity, std::size_t& used, const CpuState* state) noexcept {
     if (state) {
-        append_text(report, capacity, used, "guest eip=%08X esp=%08X ebp=%08X eax=%08X ebx=%08X ecx=%08X edx=%08X esi=%08X edi=%08X eflags=%08X\r\n", state->eip, state->esp, state->ebp, state->eax, state->ebx, state->ecx, state->edx, state->esi, state->edi, state->eflags);
+        append_text(report, capacity, used, "ir eip=%08X esp=%08X ebp=%08X eax=%08X ebx=%08X ecx=%08X edx=%08X esi=%08X edi=%08X eflags=%08X\r\n", state->eip, state->esp, state->ebp, state->eax, state->ebx, state->ecx, state->edx, state->esi, state->edi, state->eflags);
     }
     if (g_instruction != 0) { append_text(report, capacity, used, "instruction=%08X operation=%s\r\n", g_instruction, g_operation ? g_operation : "unknown"); }
     if (g_native_target != 0) { append_text(report, capacity, used, "native-target=%08X import=%s\r\n", g_native_target, g_import_name ? g_import_name : "unknown"); }
-    if (g_guest_call_count != 0) {
-        append_text(report, capacity, used, "guest-call-stack:\r\n");
-        for (std::size_t index = 0; index < g_guest_call_count; ++index) {
-            const GuestCallEntry& entry = g_guest_calls[index];
+    if (g_ir_call_count != 0) {
+        append_text(report, capacity, used, "ir-call-stack:\r\n");
+        for (std::size_t index = 0; index < g_ir_call_count; ++index) {
+            const IrCallEntry& entry = g_ir_calls[index];
             if (entry.callsite == 0) { append_text(report, capacity, used, "  root target=%08X stop=%08X esp=%08X\r\n", entry.target, entry.return_address, entry.esp); }
             else { append_text(report, capacity, used, "  call=%08X target=%08X return=%08X esp=%08X\r\n", entry.callsite, entry.target, entry.return_address, entry.esp); }
         }
@@ -234,12 +233,12 @@ DiagnosticNativeScope::~DiagnosticNativeScope() {
     g_import_name = previous_import_name_;
 }
 
-DiagnosticGuestRunScope::DiagnosticGuestRunScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp) noexcept : previous_depth_(g_guest_call_count) {
-    diagnostic_guest_call(0, target, stop_target, esp);
+DiagnosticExecutionScope::DiagnosticExecutionScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp) noexcept : previous_depth_(g_ir_call_count) {
+    diagnostic_ir_call(0, target, stop_target, esp);
 }
 
-DiagnosticGuestRunScope::~DiagnosticGuestRunScope() {
-    g_guest_call_count = previous_depth_;
+DiagnosticExecutionScope::~DiagnosticExecutionScope() {
+    g_ir_call_count = previous_depth_;
 }
 
 void install_crash_diagnostics() noexcept {
@@ -260,28 +259,28 @@ void set_diagnostic_instruction(std::uint32_t address, const char* operation) no
 }
 void set_diagnostic_memory_probe(bool active) noexcept { g_memory_probe = active; }
 
-void diagnostic_guest_write(std::uint32_t address, std::uint32_t size, std::uint64_t value) noexcept {
-    if (!g_guest_writes) { g_guest_writes.reset(new (std::nothrow) GuestWriteRecord[kGuestWriteCapacity]{}); }
-    if (!g_guest_writes) { return; }
-    const std::size_t bucket = guest_write_bucket(address);
-    GuestWriteRecord* selected = &g_guest_writes[bucket];
+void diagnostic_memory_write(std::uint32_t address, std::uint32_t size, std::uint64_t value) noexcept {
+    if (!g_memory_writes) { g_memory_writes.reset(new (std::nothrow) MemoryWriteRecord[kMemoryWriteCapacity]{}); }
+    if (!g_memory_writes) { return; }
+    const std::size_t bucket = memory_write_bucket(address);
+    MemoryWriteRecord* selected = &g_memory_writes[bucket];
     for (std::size_t way = 0; way < 4; ++way) {
-        GuestWriteRecord& candidate = g_guest_writes[bucket + way];
+        MemoryWriteRecord& candidate = g_memory_writes[bucket + way];
         if (candidate.sequence == 0 || candidate.info.address == address) { selected = &candidate; break; }
         if (candidate.sequence < selected->sequence) { selected = &candidate; }
     }
     selected->info = {address, g_instruction, size, value};
-    selected->sequence = ++g_guest_write_sequence;
+    selected->sequence = ++g_memory_write_sequence;
 }
 
-bool diagnostic_last_guest_write(std::uint32_t address, GuestWriteInfo& result) noexcept {
-    if (!g_guest_writes) { return false; }
+bool diagnostic_last_memory_write(std::uint32_t address, MemoryWriteInfo& result) noexcept {
+    if (!g_memory_writes) { return false; }
     const std::uint32_t search_begin = address >= 15u ? address - 15u : 0u;
-    const GuestWriteRecord* selected = nullptr;
+    const MemoryWriteRecord* selected = nullptr;
     for (std::uint32_t candidate_address = search_begin; candidate_address <= address; ++candidate_address) {
-        const std::size_t bucket = guest_write_bucket(candidate_address);
+        const std::size_t bucket = memory_write_bucket(candidate_address);
         for (std::size_t way = 0; way < 4; ++way) {
-            const GuestWriteRecord& candidate = g_guest_writes[bucket + way];
+            const MemoryWriteRecord& candidate = g_memory_writes[bucket + way];
             const std::uint64_t end = static_cast<std::uint64_t>(candidate.info.address) + candidate.info.size;
             if (candidate.sequence != 0 && candidate.info.address == candidate_address && address >= candidate.info.address && address < end && (!selected || candidate.sequence > selected->sequence)) { selected = &candidate; }
         }
@@ -291,30 +290,30 @@ bool diagnostic_last_guest_write(std::uint32_t address, GuestWriteInfo& result) 
     return true;
 }
 
-void diagnostic_guest_call(std::uint32_t callsite, std::uint32_t target, std::uint32_t return_address, std::uint32_t esp) noexcept {
-    if (g_guest_call_count == std::size(g_guest_calls)) { return; }
-    g_guest_calls[g_guest_call_count++] = {callsite, target, return_address, esp};
+void diagnostic_ir_call(std::uint32_t callsite, std::uint32_t target, std::uint32_t return_address, std::uint32_t esp) noexcept {
+    if (g_ir_call_count == std::size(g_ir_calls)) { return; }
+    g_ir_calls[g_ir_call_count++] = {callsite, target, return_address, esp};
 }
 
-void diagnostic_guest_return(std::uint32_t return_address) noexcept {
-    for (std::size_t index = g_guest_call_count; index != 0; --index) {
-        if (g_guest_calls[index - 1].return_address == return_address) {
-            g_guest_call_count = index - 1;
+void diagnostic_ir_return(std::uint32_t return_address) noexcept {
+    for (std::size_t index = g_ir_call_count; index != 0; --index) {
+        if (g_ir_calls[index - 1].return_address == return_address) {
+            g_ir_call_count = index - 1;
             return;
         }
     }
 }
 
-void diagnostic_guest_failure(const CpuState& state, const char* message) noexcept {
+void diagnostic_ir_failure(const CpuState& state, const char* message) noexcept {
 #if !defined(SFERA_PORTABLE_CHECK)
     static thread_local char report[65536]{};
     std::size_t used = 0;
     report[0] = '\0';
-    append_text(report, sizeof(report), used, "Sfera structured-IR guest failure\r\n");
+    append_text(report, sizeof(report), used, "Sfera structured-IR execution failure\r\n");
     append_text(report, sizeof(report), used, "pid=%lu tid=%lu phase=%s\r\n", GetCurrentProcessId(), GetCurrentThreadId(), phase_name(g_phase));
-    append_text(report, sizeof(report), used, "%s\r\n", message ? message : "guest failure");
+    append_text(report, sizeof(report), used, "%s\r\n", message ? message : "IR execution failure");
     append_execution_context(report, sizeof(report), used, &state);
-    write_bytes(L"sfera_ir_guest_failure.txt", report, used, CREATE_ALWAYS);
+    write_bytes(L"sfera_ir_failure.txt", report, used, CREATE_ALWAYS);
     OutputDebugStringA(report);
 #else
     (void)state;
