@@ -19,13 +19,13 @@ def choose_input(root: Path, explicit: str | None) -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate a Win32 structured-IR interpreter project from a PE32/x86 image")
+    parser = argparse.ArgumentParser(description="Recover PE32/x86 functions and generate a native C17 Win32 project")
     parser.add_argument("folder", nargs="?", default=".", help="Folder containing one EXE and its DLL dependencies")
     parser.add_argument("--input", help="EXE filename when the folder contains multiple executables")
     args = parser.parse_args()
     root = Path(args.folder).resolve()
     try:
-        from emit_cpp import generate
+        from lift_c import generate
 
         target = choose_input(root, args.input)
         pe = PE32(target)

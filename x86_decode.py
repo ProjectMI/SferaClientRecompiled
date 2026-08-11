@@ -17,7 +17,7 @@ class X86DecodeError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class Operand:
+class DecodedOperand:
     kind: str
     width: int
     reg: str | None = None
@@ -31,12 +31,12 @@ class Operand:
 
 
 @dataclass(frozen=True)
-class Instruction:
+class DecodedInstruction:
     rva: int
     size: int
     mnemonic: str
     code: str
-    operands: tuple[Operand, ...]
+    operands: tuple[DecodedOperand, ...]
     branch_target_rva: int | None
     flow: str
     rep: bool
@@ -53,15 +53,15 @@ class Instruction:
 @dataclass(frozen=True)
 class DecodedSection:
     section: Section
-    instructions: tuple[Instruction, ...]
+    instructions: tuple[DecodedInstruction, ...]
 
 
 @dataclass(frozen=True)
-class X86Program:
+class DecodedProgram:
     sections: tuple[DecodedSection, ...]
 
     @property
-    def instructions(self) -> tuple[Instruction, ...]:
+    def instructions(self) -> tuple[DecodedInstruction, ...]:
         return tuple(item for section in self.sections for item in section.instructions)
 
 
@@ -105,26 +105,26 @@ def _register_name(register: int) -> str | None:
     return None if name == "none" else name
 
 
-def _operand(decoded: iced.Instruction, index: int, image_address: bool = False) -> Operand:
+def _operand(decoded: iced.Instruction, index: int, image_address: bool = False) -> DecodedOperand:
     kind = decoded.op_kind(index)
     if kind == iced.OpKind.REGISTER:
         register = decoded.op_register(index)
-        return Operand("register", iced.RegisterExt.size(register) * 8, reg=_register_name(register))
+        return DecodedOperand("register", iced.RegisterExt.size(register) * 8, reg=_register_name(register))
     if kind in _IMMEDIATE_WIDTHS:
-        return Operand("immediate", _IMMEDIATE_WIDTHS[kind], imm=decoded.immediate(index), image_address=image_address)
+        return DecodedOperand("immediate", _IMMEDIATE_WIDTHS[kind], imm=decoded.immediate(index), image_address=image_address)
     if kind in _BRANCH_KINDS:
-        return Operand("branch", 32, imm=decoded.near_branch_target, image_address=image_address)
+        return DecodedOperand("branch", 32, imm=decoded.near_branch_target, image_address=image_address)
     if kind in _MEMORY_KINDS:
         base, segment = _MEMORY_KINDS[kind]
-        return Operand("memory", iced.MemorySizeExt.size(decoded.memory_size) * 8, base=base, segment=segment, image_address=image_address)
+        return DecodedOperand("memory", iced.MemorySizeExt.size(decoded.memory_size) * 8, base=base, segment=segment, image_address=image_address)
     if kind == iced.OpKind.MEMORY:
-        return Operand("memory", iced.MemorySizeExt.size(decoded.memory_size) * 8, base=_register_name(decoded.memory_base), index=_register_name(decoded.memory_index), scale=decoded.memory_index_scale, displacement=decoded.memory_displacement, segment=_register_name(decoded.memory_segment), image_address=image_address)
+        return DecodedOperand("memory", iced.MemorySizeExt.size(decoded.memory_size) * 8, base=_register_name(decoded.memory_base), index=_register_name(decoded.memory_index), scale=decoded.memory_index_scale, displacement=decoded.memory_displacement, segment=_register_name(decoded.memory_segment), image_address=image_address)
     if kind in {iced.OpKind.FAR_BRANCH16, iced.OpKind.FAR_BRANCH32}:
-        return Operand("far_branch", 48, imm=((decoded.far_branch_selector & 0xFFFF) << 32) | (decoded.far_branch32 & 0xFFFFFFFF))
+        return DecodedOperand("far_branch", 48, imm=((decoded.far_branch_selector & 0xFFFF) << 32) | (decoded.far_branch32 & 0xFFFFFFFF))
     raise X86DecodeError(f"Unsupported iced operand kind {_OP_KIND_NAMES.get(kind, kind)} at VA 0x{decoded.ip:08X}")
 
 
-def _instruction(pe: PE32, decoded: iced.Instruction, offsets: iced.ConstantOffsets) -> Instruction:
+def _instruction(pe: PE32, decoded: iced.Instruction, offsets: iced.ConstantOffsets) -> DecodedInstruction:
     branch_target_rva = None
     if decoded.op_count and decoded.op_kind(0) in _BRANCH_KINDS:
         target = decoded.near_branch_target
@@ -145,7 +145,7 @@ def _instruction(pe: PE32, decoded: iced.Instruction, offsets: iced.ConstantOffs
             image_address = immediate_relocated if immediate_index == 0 else second_immediate_relocated
             immediate_index += 1
         operands.append(_operand(decoded, index, image_address))
-    return Instruction(instruction_rva, decoded.len, _MNEMONIC_NAMES[decoded.mnemonic], _CODE_NAMES[decoded.code], tuple(operands), branch_target_rva, _FLOW_NAMES[decoded.flow_control], decoded.has_rep_prefix, decoded.has_repe_prefix, decoded.has_repne_prefix, decoded.is_invalid, _FORMATTER.format(decoded))
+    return DecodedInstruction(instruction_rva, decoded.len, _MNEMONIC_NAMES[decoded.mnemonic], _CODE_NAMES[decoded.code], tuple(operands), branch_target_rva, _FLOW_NAMES[decoded.flow_control], decoded.has_rep_prefix, decoded.has_repe_prefix, decoded.has_repne_prefix, decoded.is_invalid, _FORMATTER.format(decoded))
 
 
 def _raw_for_rva(pe: PE32, rva: int) -> tuple[Section, bytes]:
@@ -159,14 +159,14 @@ def _raw_for_rva(pe: PE32, rva: int) -> tuple[Section, bytes]:
     raise X86DecodeError(f"Executable RVA 0x{rva:08X} is not backed by file data")
 
 
-def _decode_at(pe: PE32, rva: int) -> Instruction:
+def _decode_at(pe: PE32, rva: int) -> DecodedInstruction:
     _, raw = _raw_for_rva(pe, rva)
     decoder = iced.Decoder(32, raw, ip=pe.image_base + rva)
     decoded = decoder.decode()
     return _instruction(pe, decoded, decoder.get_constant_offsets(decoded))
 
 
-def _linear_decode(pe: PE32, section: Section) -> dict[int, Instruction]:
+def _linear_decode(pe: PE32, section: Section) -> dict[int, DecodedInstruction]:
     raw = pe.data[section.raw_offset:section.raw_offset + section.raw_size]
     decoder = iced.Decoder(32, raw, ip=pe.image_base + section.virtual_address)
     instructions = {}
@@ -188,7 +188,7 @@ def _code_pointer_seeds(pe: PE32) -> set[int]:
     return seeds
 
 
-def _successors(instruction: Instruction) -> tuple[int, ...]:
+def _successors(instruction: DecodedInstruction) -> tuple[int, ...]:
     target = instruction.branch_target_rva
     if instruction.invalid or instruction.flow in {"return", "interrupt", "exception", "xbegin_xabort_xend"}:
         return ()
@@ -201,9 +201,9 @@ def _successors(instruction: Instruction) -> tuple[int, ...]:
     return (instruction.next_rva,) if instruction.flow in {"next", "indirect_call"} else ()
 
 
-def decode_reachable(pe: PE32, seeds: set[int] | None = None) -> tuple[Instruction, ...]:
+def decode_reachable(pe: PE32, seeds: set[int] | None = None) -> tuple[DecodedInstruction, ...]:
     queue = deque(seeds or {pe.entry_rva})
-    visited: dict[int, Instruction] = {}
+    visited: dict[int, DecodedInstruction] = {}
     while queue:
         rva = queue.popleft()
         if rva in visited:
@@ -219,7 +219,7 @@ def decode_reachable(pe: PE32, seeds: set[int] | None = None) -> tuple[Instructi
     return tuple(item for _, item in sorted(visited.items()))
 
 
-def decode_program(pe: PE32) -> X86Program:
+def decode_program(pe: PE32) -> DecodedProgram:
     executable_sections = [section for section in pe.sections if section.executable and section.raw_size]
     if not executable_sections:
         raise X86DecodeError("PE image has no raw-backed executable sections")
@@ -235,4 +235,4 @@ def decode_program(pe: PE32) -> X86Program:
                     instruction_maps[section.name][rva] = exact
                     break
     sections = tuple(DecodedSection(section, tuple(item for _, item in sorted(instruction_maps[section.name].items()))) for section in executable_sections)
-    return X86Program(sections)
+    return DecodedProgram(sections)

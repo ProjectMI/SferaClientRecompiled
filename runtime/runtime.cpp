@@ -17,14 +17,14 @@
 
 namespace lifted {
 
-Runtime* g_runtime = nullptr;
+NativeRuntime* g_runtime = nullptr;
 ProcessMemory* g_process_memory = nullptr;
 
 namespace {
 
 constexpr std::size_t kCallbackStackCopy = 64u * 1024u;
 constexpr wchar_t kClientRootEnvironment[] = L"SFERA_CLIENT_ROOT";
-constexpr wchar_t kDeepDiagnosticsEnvironment[] = L"SFERA_IR_DEEP_TRACE";
+constexpr wchar_t kDeepDiagnosticsEnvironment[] = L"SFERA_NATIVE_DEEP_TRACE";
 bool g_deep_diagnostics = false;
 
 std::wstring path_join(const std::wstring& directory, const std::wstring& child) {
@@ -218,103 +218,6 @@ std::string local_c_string(std::uint32_t address, std::size_t limit = 2048u) noe
     return result + "<truncated>";
 }
 
-std::size_t local_string_length(std::uint32_t address, std::size_t limit) {
-    if (address == 0) { throw std::runtime_error("Null local string"); }
-    for (std::size_t length = 0; length != limit; ++length) {
-        if (memory_read<char>(address + static_cast<std::uint32_t>(length)) == '\0') { return length; }
-    }
-    throw std::runtime_error("Unterminated local string at " + hex_u32(address));
-}
-
-bool local_string_starts_with(std::uint32_t address, std::string_view prefix) {
-    if (address == 0) { return false; }
-    for (std::size_t index = 0; index != prefix.size(); ++index) {
-        if (memory_read<char>(address + static_cast<std::uint32_t>(index)) != prefix[index]) { return false; }
-    }
-    return true;
-}
-
-std::uint32_t summarized_config_lookup(std::uint32_t key_address) {
-    const std::uint32_t text_address = memory_read<std::uint32_t>(local_image_address(kConfigTextPointerAddress));
-    const std::uint32_t text_length = memory_read<std::uint32_t>(local_image_address(kConfigTextLengthAddress));
-    if (text_address == 0) { return 0; }
-    const std::size_t key_length = local_string_length(key_address, 4096u);
-    const std::size_t scan_limit = static_cast<std::size_t>(std::min(text_length, kConfigTextCapacity)) + 1u;
-    if (static_cast<std::uint64_t>(text_address) + scan_limit > 0x100000000ull) { throw std::runtime_error("Local config text crosses the Win32 address boundary"); }
-    const auto text_at = [text_address](std::size_t offset) {
-        return memory_read<char>(text_address + static_cast<std::uint32_t>(offset));
-    };
-    const auto key_at = [key_address](std::size_t offset) {
-        return memory_read<char>(key_address + static_cast<std::uint32_t>(offset));
-    };
-
-    std::size_t line = 0;
-    while (line < scan_limit) {
-        std::size_t token_end = line;
-        while (token_end < scan_limit) {
-            const char value = text_at(token_end);
-            if (value == ' ' || value == '\t' || value == '\r' || value == '\0') { break; }
-            ++token_end;
-        }
-
-        bool matches = token_end - line == key_length;
-        for (std::size_t index = 0; matches && index != key_length; ++index) {
-            matches = text_at(line + index) == key_at(index);
-        }
-        if (matches) {
-            std::size_t value = token_end;
-            while (value < scan_limit && (text_at(value) == ' ' || text_at(value) == '\t')) { ++value; }
-            if (value < scan_limit) { return text_address + static_cast<std::uint32_t>(value); }
-            return 0;
-        }
-
-        std::size_t next_line = token_end;
-        while (next_line < scan_limit && text_at(next_line) != '\n' && text_at(next_line) != '\0') { ++next_line; }
-        if (next_line == scan_limit || text_at(next_line) == '\0') { return 0; }
-        line = next_line + 1u;
-    }
-    return 0;
-}
-
-void summarize_unsigned_decimal_string(CpuState& state) {
-    const std::uint32_t destination = state.ecx;
-    std::uint32_t value = memory_read<std::uint32_t>(state.edx);
-    std::array<char, 16> reversed{};
-    std::size_t length = 0;
-    do {
-        reversed[length++] = static_cast<char>('0' + value % 10u);
-        value /= 10u;
-    } while (value != 0);
-
-    for (std::size_t index = 0; index != 16u; ++index) {
-        const char output = index < length ? reversed[length - index - 1u] : '\0';
-        memory_write(destination + static_cast<std::uint32_t>(index), output);
-    }
-    memory_write(destination + 0x10u, static_cast<std::uint32_t>(length));
-    memory_write(destination + 0x14u, 15u);
-    state.eax = destination;
-}
-
-bool execute_semantic_summary(CpuState& state, std::uint32_t callsite, std::uint32_t target) {
-    if (kConfigLookupTarget != 0 && kConfigTextPointerAddress != 0 && kConfigTextLengthAddress != 0 && kConfigTextCapacity != 0 && target == local_image_address(kConfigLookupTarget)) {
-        const std::uint32_t key_address = memory_read<std::uint32_t>(state.esp);
-        state.eax = summarized_config_lookup(key_address);
-        state.esp += 4u; // The lifted function returns with ret 4.
-        if (local_string_starts_with(key_address, "NEW_FONT_")) {
-            const std::string key = local_c_string(key_address, 160u);
-            std::string note = "semantic config lookup key=\"" + key + "\"";
-            note += state.eax == 0 ? ", result=missing" : ", value=\"" + local_c_string(state.eax, 160u) + "\"";
-            diagnostic_note(note.c_str());
-        }
-        return true;
-    }
-    if (kUnsignedDecimalStringTarget != 0 && target == local_image_address(kUnsignedDecimalStringTarget) && callsite == local_image_address(kUnsignedDecimalStringCallsite)) {
-        summarize_unsigned_decimal_string(state);
-        return true; // The lifted function uses a plain ret.
-    }
-    return false;
-}
-
 template <class Char>
 std::uint32_t write_local_path(std::uint32_t address, std::uint32_t capacity, const std::basic_string<Char>& path) {
     if (address == 0 || capacity == 0) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return 0; }
@@ -327,57 +230,6 @@ std::uint32_t write_local_path(std::uint32_t address, std::uint32_t capacity, co
     diagnostic_memory_write(address, static_cast<std::uint32_t>(byte_count), 0);
     if (copy_count != path.size()) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return capacity; }
     return static_cast<std::uint32_t>(path.size());
-}
-
-std::string fatal_handler_failure(const CpuState& state, std::uint32_t callsite) {
-    const std::string fatal_text = local_c_string(state.ecx);
-    std::string message = "IR fatal handler trap: call=" + hex_u32(callsite) + ", message-address=" + hex_u32(state.ecx) + ", message=\"" + fatal_text + "\"";
-    if (fatal_text.rfind("Can't load font", 0) == 0) { message += ", last-config-key=\"" + local_c_string(local_image_address(0x006BE618u), 160u) + "\""; }
-    std::uint32_t quick_file = 0;
-    std::int16_t loaded_files = -1;
-    if (try_memory_read(local_image_address(0x04016680u), quick_file) && quick_file != 0 && try_memory_read(quick_file + 0x20C98u, loaded_files)) { message += ", loaded-mbc-files=" + std::to_string(loaded_files) + ", quick-file=" + hex_u32(quick_file); }
-    message += ", client-root=\"" + narrow_path(client_root_directory()) + "\"";
-    return message;
-}
-
-void append_write_origin(std::string& message, std::string_view label, std::uint32_t address) {
-    MemoryWriteInfo origin{};
-    message += ", " + std::string(label) + "=" + hex_u32(address);
-    if (diagnostic_last_memory_write(address, origin)) { message += "{writer=" + hex_u32(origin.instruction) + ",write=" + hex_u32(origin.address) + ",size=" + std::to_string(origin.size) + ",value=" + hex_u32(static_cast<std::uint32_t>(origin.value)) + "}"; }
-    else { message += "{writer=unobserved}"; }
-}
-
-void append_mbc_provenance(std::string& message, std::uint32_t callsite) {
-    if (callsite != local_image_address(0x0047670Cu)) { return; }
-    std::uint32_t cursor = 0;
-    std::uint32_t mbc_base = 0;
-    std::uint32_t mbc_pointer = 0;
-    if (!try_memory_read(local_image_address(0x0401661Cu), cursor) || !try_memory_read(local_image_address(0x04B5FE78u), mbc_base) || !try_memory_read(local_image_address(0x006BE2D4u), mbc_pointer) || cursor == 0 || cursor > 0x10000u) { return; }
-    const std::uint32_t token = local_image_address(0x0401A688u) + (cursor - 1u) * 32u;
-    std::uint32_t token_type = 0;
-    std::uint32_t source_offset = 0;
-    std::uint32_t token_value = 0;
-    if (!try_memory_read(token, token_type) || !try_memory_read(token + 0x0Cu, source_offset) || !try_memory_read(token + 0x14u, token_value)) { return; }
-    message += ", mbc={cursor=" + std::to_string(cursor) + ",token=" + hex_u32(token) + ",type=" + hex_u32(token_type) + ",offset=" + hex_u32(source_offset) + ",value=" + hex_u32(token_value) + ",base=" + hex_u32(mbc_base) + ",ip=" + hex_u32(mbc_pointer) + "}";
-    append_write_origin(message, "token-origin", token + 0x14u);
-    const std::uint64_t source_address = static_cast<std::uint64_t>(mbc_base) + source_offset;
-    if ((token_type == 0x10u || token_type == 0x20u) && source_address <= 0xFFFFFFFFu) {
-        std::uint32_t source_value = 0;
-        if (try_memory_read(static_cast<std::uint32_t>(source_address), source_value)) { message += ", variable-value=" + hex_u32(source_value); }
-        append_write_origin(message, "variable-origin", static_cast<std::uint32_t>(source_address));
-    }
-}
-
-std::string bound_check_failure(const CpuState& state, std::uint32_t callsite, std::uint32_t target) {
-    const char* kind = target == local_image_address(0x00401120u) ? "upper" : "lower";
-    std::string message = std::string("IR BoundCheckArray ") + kind + "-bound trap: call=" + hex_u32(callsite) + ", index=" + std::to_string(static_cast<std::int32_t>(state.edx)) + " (" + hex_u32(state.edx) + "), metadata=" + hex_u32(state.ecx);
-    std::uint32_t array_data = 0;
-    std::uint32_t array_count = 0;
-    std::uint32_t source_line = 0;
-    if (state.ecx >= 8u && try_memory_read(state.ecx - 8u, array_data) && try_memory_read(state.ecx - 4u, array_count)) { message += ", data=" + hex_u32(array_data) + ", count=" + std::to_string(array_count); }
-    if (state.ecx != 0 && state.ecx <= 0xFFFFFFDFu && try_memory_read(state.ecx + 0x20u, source_line)) { message += ", source-line=" + std::to_string(source_line); }
-    append_mbc_provenance(message, callsite);
-    return message;
 }
 
 std::uint32_t align_down(std::uint32_t value, std::uint32_t alignment) noexcept {
@@ -422,277 +274,49 @@ bool even_parity(std::uint8_t value) noexcept {
     return ((0x6996u >> value) & 1u) == 0u;
 }
 
-void assign_flag(CpuState& state, std::uint32_t flag, bool value) noexcept {
+void assign_flag(LiftCpu& state, std::uint32_t flag, bool value) noexcept {
     state.eflags = value ? state.eflags | flag : state.eflags & ~flag;
 }
 
-bool flag(const CpuState& state, std::uint32_t value) noexcept {
+bool flag(const LiftCpu& state, std::uint32_t value) noexcept {
     return (state.eflags & value) != 0;
 }
 
-void set_szp(CpuState& state, std::uint64_t result, std::uint16_t width) noexcept {
+void set_szp(LiftCpu& state, std::uint64_t result, std::uint16_t width) noexcept {
     result &= width_mask(width);
-    assign_flag(state, kFlagSF, (result & sign_bit(width)) != 0);
-    assign_flag(state, kFlagZF, result == 0);
-    assign_flag(state, kFlagPF, even_parity(static_cast<std::uint8_t>(result)));
+    assign_flag(state, LIFT_FLAG_SF, (result & sign_bit(width)) != 0);
+    assign_flag(state, LIFT_FLAG_ZF, result == 0);
+    assign_flag(state, LIFT_FLAG_PF, even_parity(static_cast<std::uint8_t>(result)));
 }
 
-void set_logic_flags(CpuState& state, std::uint64_t result, std::uint16_t width) noexcept {
-    assign_flag(state, kFlagCF, false);
-    assign_flag(state, kFlagOF, false);
-    assign_flag(state, kFlagAF, false);
+void set_logic_flags(LiftCpu& state, std::uint64_t result, std::uint16_t width) noexcept {
+    assign_flag(state, LIFT_FLAG_CF, false);
+    assign_flag(state, LIFT_FLAG_OF, false);
+    assign_flag(state, LIFT_FLAG_AF, false);
     set_szp(state, result, width);
 }
 
-void set_add_flags(CpuState& state, std::uint64_t left, std::uint64_t right, std::uint64_t carry, std::uint64_t result, std::uint16_t width) noexcept {
+void set_add_flags(LiftCpu& state, std::uint64_t left, std::uint64_t right, std::uint64_t carry, std::uint64_t result, std::uint16_t width) noexcept {
     const std::uint64_t mask = width_mask(width);
     const std::uint64_t left_value = left & mask;
     const std::uint64_t right_value = right & mask;
     const std::uint64_t partial = (left_value + right_value) & mask;
     const std::uint64_t truncated = result & mask;
-    assign_flag(state, kFlagCF, partial < left_value || (carry != 0 && truncated < partial));
-    assign_flag(state, kFlagOF, ((~(left_value ^ right_value) & (left_value ^ truncated)) & sign_bit(width)) != 0);
-    assign_flag(state, kFlagAF, ((left_value ^ right_value ^ truncated) & 0x10u) != 0);
+    assign_flag(state, LIFT_FLAG_CF, partial < left_value || (carry != 0 && truncated < partial));
+    assign_flag(state, LIFT_FLAG_OF, ((~(left_value ^ right_value) & (left_value ^ truncated)) & sign_bit(width)) != 0);
+    assign_flag(state, LIFT_FLAG_AF, ((left_value ^ right_value ^ truncated) & 0x10u) != 0);
     set_szp(state, truncated, width);
 }
 
-void set_sub_flags(CpuState& state, std::uint64_t left, std::uint64_t right, std::uint64_t borrow, std::uint64_t result, std::uint16_t width) noexcept {
+void set_sub_flags(LiftCpu& state, std::uint64_t left, std::uint64_t right, std::uint64_t borrow, std::uint64_t result, std::uint16_t width) noexcept {
     const std::uint64_t mask = width_mask(width);
     const std::uint64_t left_value = left & mask;
     const std::uint64_t right_value = right & mask;
     const std::uint64_t truncated = result & mask;
-    assign_flag(state, kFlagCF, left_value < right_value || (borrow != 0 && left_value == right_value));
-    assign_flag(state, kFlagOF, (((left_value ^ right_value) & (left_value ^ truncated)) & sign_bit(width)) != 0);
-    assign_flag(state, kFlagAF, ((left_value ^ right_value ^ truncated) & 0x10u) != 0);
+    assign_flag(state, LIFT_FLAG_CF, left_value < right_value || (borrow != 0 && left_value == right_value));
+    assign_flag(state, LIFT_FLAG_OF, (((left_value ^ right_value) & (left_value ^ truncated)) & sign_bit(width)) != 0);
+    assign_flag(state, LIFT_FLAG_AF, ((left_value ^ right_value ^ truncated) & 0x10u) != 0);
     set_szp(state, truncated, width);
-}
-
-std::uint32_t& full_register(CpuState& state, Reg reg) {
-    switch (reg) {
-        case Reg::eax: case Reg::ax: case Reg::al: case Reg::ah: return state.eax;
-        case Reg::ecx: case Reg::cx: case Reg::cl: case Reg::ch: return state.ecx;
-        case Reg::edx: case Reg::dx: case Reg::dl: case Reg::dh: return state.edx;
-        case Reg::ebx: case Reg::bx: case Reg::bl: case Reg::bh: return state.ebx;
-        case Reg::esp: case Reg::sp: return state.esp;
-        case Reg::ebp: case Reg::bp: return state.ebp;
-        case Reg::esi: case Reg::si: return state.esi;
-        case Reg::edi: case Reg::di: return state.edi;
-        default: throw std::runtime_error("Register has no 32-bit storage");
-    }
-}
-
-std::uint64_t read_register(CpuState& state, Reg reg) {
-    switch (reg) {
-        case Reg::al: case Reg::cl: case Reg::dl: case Reg::bl: return full_register(state, reg) & 0xFFu;
-        case Reg::ah: case Reg::ch: case Reg::dh: case Reg::bh: return (full_register(state, reg) >> 8u) & 0xFFu;
-        case Reg::ax: case Reg::cx: case Reg::dx: case Reg::bx: case Reg::sp: case Reg::bp: case Reg::si: case Reg::di: return full_register(state, reg) & 0xFFFFu;
-        case Reg::eax: case Reg::ecx: case Reg::edx: case Reg::ebx: case Reg::esp: case Reg::ebp: case Reg::esi: case Reg::edi: return full_register(state, reg);
-        case Reg::cs: return 0x1Bu;
-        case Reg::ds: case Reg::es: case Reg::ss: return 0x23u;
-        case Reg::fs: return 0x3Bu;
-        case Reg::gs: return 0u;
-        case Reg::none: return 0u;
-        default: throw std::runtime_error("Unsupported integer register read");
-    }
-}
-
-void write_register(CpuState& state, Reg reg, std::uint64_t value) {
-    switch (reg) {
-        case Reg::al: case Reg::cl: case Reg::dl: case Reg::bl: {
-            std::uint32_t& target = full_register(state, reg);
-            target = (target & 0xFFFFFF00u) | static_cast<std::uint8_t>(value);
-            return;
-        }
-        case Reg::ah: case Reg::ch: case Reg::dh: case Reg::bh: {
-            std::uint32_t& target = full_register(state, reg);
-            target = (target & 0xFFFF00FFu) | ((static_cast<std::uint32_t>(value) & 0xFFu) << 8u);
-            return;
-        }
-        case Reg::ax: case Reg::cx: case Reg::dx: case Reg::bx: case Reg::sp: case Reg::bp: case Reg::si: case Reg::di: {
-            std::uint32_t& target = full_register(state, reg);
-            target = (target & 0xFFFF0000u) | (static_cast<std::uint32_t>(value) & 0xFFFFu);
-            return;
-        }
-        case Reg::eax: case Reg::ecx: case Reg::edx: case Reg::ebx: case Reg::esp: case Reg::ebp: case Reg::esi: case Reg::edi: full_register(state, reg) = static_cast<std::uint32_t>(value); return;
-        case Reg::cs: case Reg::ds: case Reg::es: case Reg::ss: case Reg::fs: case Reg::gs: return;
-        default: throw std::runtime_error("Unsupported integer register write");
-    }
-}
-
-std::uint32_t effective_address(CpuState& state, const OperandDescriptor& operand) {
-    const std::uint64_t base = read_register(state, operand.base);
-    const std::uint64_t index = read_register(state, operand.index);
-    const std::uint32_t displacement = operand.image_address ? local_image_address(operand.value) : operand.value;
-    return static_cast<std::uint32_t>(base + index * operand.scale + displacement);
-}
-
-std::uint64_t fs_read(CpuState& state, std::uint32_t offset, std::uint16_t width) {
-    const std::size_t size = width / 8u;
-    if (offset + size > state.fs_data.size()) { throw std::runtime_error("IR FS read outside virtual TEB"); }
-    std::uint64_t value = 0;
-    std::memcpy(&value, state.fs_data.data() + offset, size);
-    return value;
-}
-
-void fs_write(CpuState& state, std::uint32_t offset, std::uint16_t width, std::uint64_t value) {
-    const std::size_t size = width / 8u;
-    if (offset + size > state.fs_data.size()) { throw std::runtime_error("IR FS write outside virtual TEB"); }
-    std::memcpy(state.fs_data.data() + offset, &value, size);
-}
-
-std::uint64_t read_operand(CpuState& state, const OperandDescriptor& operand) {
-    if (operand.kind == OperandKind::reg) { return read_register(state, operand.reg) & width_mask(operand.width); }
-    if (operand.kind == OperandKind::imm || operand.kind == OperandKind::branch) { return (operand.image_address ? local_image_address(operand.value) : operand.value) & width_mask(operand.width); }
-    if (operand.kind != OperandKind::mem) { throw std::runtime_error("Instruction reads an empty operand"); }
-    const std::uint32_t address = effective_address(state, operand);
-    if (operand.segment == Reg::fs) { return fs_read(state, address, operand.width); }
-    switch (operand.width) {
-        case 8: return memory_read<std::uint8_t>(address);
-        case 16: return memory_read<std::uint16_t>(address);
-        case 32: return memory_read<std::uint32_t>(address);
-        case 64: return memory_read<std::uint64_t>(address);
-        default: throw std::runtime_error("Unsupported integer memory width " + std::to_string(operand.width));
-    }
-}
-
-void write_operand(CpuState& state, const OperandDescriptor& operand, std::uint64_t value) {
-    value &= width_mask(operand.width);
-    if (operand.kind == OperandKind::reg) { write_register(state, operand.reg, value); return; }
-    if (operand.kind != OperandKind::mem) { throw std::runtime_error("Instruction writes a non-writable operand"); }
-    const std::uint32_t address = effective_address(state, operand);
-    if (operand.segment == Reg::fs) { fs_write(state, address, operand.width, value); return; }
-    switch (operand.width) {
-        case 8: memory_write(address, static_cast<std::uint8_t>(value)); return;
-        case 16: memory_write(address, static_cast<std::uint16_t>(value)); return;
-        case 32: memory_write(address, static_cast<std::uint32_t>(value)); return;
-        case 64: memory_write(address, static_cast<std::uint64_t>(value)); return;
-        default: throw std::runtime_error("Unsupported integer memory width " + std::to_string(operand.width));
-    }
-}
-
-std::array<std::uint8_t, 16>& xmm_register(CpuState& state, Reg reg) {
-    const int index = static_cast<int>(reg) - static_cast<int>(Reg::xmm0);
-    if (index < 0 || index >= static_cast<int>(state.xmm.size())) { throw std::runtime_error("Invalid XMM register"); }
-    return state.xmm[static_cast<std::size_t>(index)];
-}
-
-std::array<std::uint8_t, 16> read_vector(CpuState& state, const OperandDescriptor& operand) {
-    if (operand.kind == OperandKind::reg) { return xmm_register(state, operand.reg); }
-    if (operand.kind != OperandKind::mem) { throw std::runtime_error("Unsupported SIMD source operand"); }
-    std::array<std::uint8_t, 16> value{};
-    const std::uint32_t address = effective_address(state, operand);
-    if (!g_process_memory) { throw std::runtime_error("Process memory is not initialized"); }
-    g_process_memory->read(address, value.data(), value.size());
-    return value;
-}
-
-void write_vector(CpuState& state, const OperandDescriptor& operand, const std::array<std::uint8_t, 16>& value) {
-    if (operand.kind == OperandKind::reg) { xmm_register(state, operand.reg) = value; return; }
-    if (operand.kind != OperandKind::mem) { throw std::runtime_error("Unsupported SIMD destination operand"); }
-    const std::uint32_t address = effective_address(state, operand);
-    if (!g_process_memory) { throw std::runtime_error("Process memory is not initialized"); }
-    g_process_memory->write(address, value.data(), value.size());
-}
-
-double read_scalar_double(CpuState& state, const OperandDescriptor& operand) {
-    if (operand.kind == OperandKind::mem) { return memory_read<double>(effective_address(state, operand)); }
-    const auto& value = xmm_register(state, operand.reg);
-    double result = 0;
-    std::memcpy(&result, value.data(), sizeof(result));
-    return result;
-}
-
-void push32(CpuState& state, std::uint32_t value) {
-    state.esp -= 4u;
-    memory_write(state.esp, value);
-}
-
-std::uint32_t pop32(CpuState& state) {
-    const std::uint32_t value = memory_read<std::uint32_t>(state.esp);
-    state.esp += 4u;
-    return value;
-}
-
-int st_index(Reg reg) noexcept {
-    switch (reg) {
-        case Reg::st0: return 0;
-        case Reg::st1: return 1;
-        case Reg::st2: return 2;
-        case Reg::st3: return 3;
-        case Reg::st4: return 4;
-        case Reg::st5: return 5;
-        case Reg::st6: return 6;
-        case Reg::st7: return 7;
-        default: return -1;
-    }
-}
-
-void fpu_require(const CpuState& state, std::size_t count = 1) {
-    if (state.fpu_depth < count) { throw std::runtime_error("x87 stack underflow"); }
-}
-
-void fpu_push(CpuState& state, double value) {
-    if (state.fpu_depth == state.fpu.size()) { throw std::runtime_error("x87 stack overflow"); }
-    for (std::size_t index = state.fpu_depth; index > 0; --index) { state.fpu[index] = state.fpu[index - 1]; }
-    state.fpu[0] = value;
-    state.fpu_top = static_cast<std::uint8_t>((state.fpu_top + 7u) & 7u);
-    ++state.fpu_depth;
-}
-
-void fpu_pop(CpuState& state) {
-    fpu_require(state);
-    for (std::size_t index = 1; index < state.fpu_depth; ++index) { state.fpu[index - 1] = state.fpu[index]; }
-    --state.fpu_depth;
-    state.fpu_top = static_cast<std::uint8_t>((state.fpu_top + 1u) & 7u);
-}
-
-double& fpu_register(CpuState& state, Reg reg) {
-    const int index = st_index(reg);
-    if (index < 0 || index >= state.fpu_depth) { throw std::runtime_error("Invalid x87 register"); }
-    return state.fpu[static_cast<std::size_t>(index)];
-}
-
-double read_float_memory(CpuState& state, const OperandDescriptor& operand) {
-    const std::uint32_t address = effective_address(state, operand);
-    if (operand.width == 32) { return static_cast<double>(memory_read<float>(address)); }
-    if (operand.width == 64) { return memory_read<double>(address); }
-    throw std::runtime_error("Unsupported x87 floating memory width");
-}
-
-void write_float_memory(CpuState& state, const OperandDescriptor& operand, double value) {
-    const std::uint32_t address = effective_address(state, operand);
-    if (operand.width == 32) { memory_write(address, static_cast<float>(value)); return; }
-    if (operand.width == 64) { memory_write(address, value); return; }
-    throw std::runtime_error("Unsupported x87 floating memory width");
-}
-
-double read_float_operand(CpuState& state, const OperandDescriptor& operand) {
-    if (operand.kind == OperandKind::reg) { return fpu_register(state, operand.reg); }
-    if (operand.kind == OperandKind::mem) { return read_float_memory(state, operand); }
-    throw std::runtime_error("Unsupported x87 source operand");
-}
-
-void write_float_operand(CpuState& state, const OperandDescriptor& operand, double value) {
-    if (operand.kind == OperandKind::reg) { fpu_register(state, operand.reg) = value; return; }
-    if (operand.kind == OperandKind::mem) { write_float_memory(state, operand, value); return; }
-    throw std::runtime_error("Unsupported x87 destination operand");
-}
-
-std::int64_t rounded_integer(double value, std::uint16_t control, bool truncate) {
-    if (truncate) { return static_cast<std::int64_t>(std::trunc(value)); }
-    switch ((control >> 10u) & 3u) {
-        case 1: return static_cast<std::int64_t>(std::floor(value));
-        case 2: return static_cast<std::int64_t>(std::ceil(value));
-        case 3: return static_cast<std::int64_t>(std::trunc(value));
-        default: return static_cast<std::int64_t>(std::nearbyint(value));
-    }
-}
-
-void fpu_compare(CpuState& state, double left, double right) {
-    state.fpu_status &= static_cast<std::uint16_t>(~(0x0100u | 0x0400u | 0x4000u));
-    if (std::isnan(left) || std::isnan(right)) { state.fpu_status |= 0x4500u; }
-    else if (left < right) { state.fpu_status |= 0x0100u; }
-    else if (left == right) { state.fpu_status |= 0x4000u; }
 }
 
 bool is_float_return(std::string_view name) {
@@ -700,6 +324,250 @@ bool is_float_return(std::string_view name) {
 }
 
 } // namespace
+
+extern "C" std::uint32_t __cdecl lift_image_va(std::uint32_t source_va) { return local_image_address(source_va); }
+extern "C" std::uint8_t __cdecl lift_load8(std::uint32_t address) { return memory_read<std::uint8_t>(address); }
+extern "C" std::uint16_t __cdecl lift_load16(std::uint32_t address) { return memory_read<std::uint16_t>(address); }
+extern "C" std::uint32_t __cdecl lift_load32(std::uint32_t address) { return memory_read<std::uint32_t>(address); }
+extern "C" std::uint64_t __cdecl lift_load64(std::uint32_t address) { return memory_read<std::uint64_t>(address); }
+extern "C" float __cdecl lift_load_f32(std::uint32_t address) { return memory_read<float>(address); }
+extern "C" double __cdecl lift_load_f64(std::uint32_t address) { return memory_read<double>(address); }
+extern "C" void __cdecl lift_store8(std::uint32_t address, std::uint8_t value) { memory_write(address, value); }
+extern "C" void __cdecl lift_store16(std::uint32_t address, std::uint16_t value) { memory_write(address, value); }
+extern "C" void __cdecl lift_store32(std::uint32_t address, std::uint32_t value) { memory_write(address, value); }
+extern "C" void __cdecl lift_store64(std::uint32_t address, std::uint64_t value) { memory_write(address, value); }
+extern "C" void __cdecl lift_store_f32(std::uint32_t address, float value) { memory_write(address, value); }
+extern "C" void __cdecl lift_store_f64(std::uint32_t address, double value) { memory_write(address, value); }
+
+template <class T>
+T fs_load(const LiftCpu* cpu, std::uint32_t offset) {
+    if (!cpu || static_cast<std::uint64_t>(offset) + sizeof(T) > sizeof(cpu->fs_data)) { throw std::runtime_error("FS access outside the virtual TEB"); }
+    T value{};
+    std::memcpy(&value, cpu->fs_data + offset, sizeof(value));
+    return value;
+}
+
+template <class T>
+void fs_store(LiftCpu* cpu, std::uint32_t offset, T value) {
+    if (!cpu || static_cast<std::uint64_t>(offset) + sizeof(T) > sizeof(cpu->fs_data)) { throw std::runtime_error("FS access outside the virtual TEB"); }
+    std::memcpy(cpu->fs_data + offset, &value, sizeof(value));
+}
+
+extern "C" std::uint8_t __cdecl lift_fs_load8(const LiftCpu* cpu, std::uint32_t offset) { return fs_load<std::uint8_t>(cpu, offset); }
+extern "C" std::uint16_t __cdecl lift_fs_load16(const LiftCpu* cpu, std::uint32_t offset) { return fs_load<std::uint16_t>(cpu, offset); }
+extern "C" std::uint32_t __cdecl lift_fs_load32(const LiftCpu* cpu, std::uint32_t offset) { return fs_load<std::uint32_t>(cpu, offset); }
+extern "C" void __cdecl lift_fs_store8(LiftCpu* cpu, std::uint32_t offset, std::uint8_t value) { fs_store(cpu, offset, value); }
+extern "C" void __cdecl lift_fs_store16(LiftCpu* cpu, std::uint32_t offset, std::uint16_t value) { fs_store(cpu, offset, value); }
+extern "C" void __cdecl lift_fs_store32(LiftCpu* cpu, std::uint32_t offset, std::uint32_t value) { fs_store(cpu, offset, value); }
+
+extern "C" void __cdecl lift_push32(LiftCpu* cpu, std::uint32_t value) {
+    cpu->esp -= 4u;
+    memory_write(cpu->esp, value);
+}
+
+extern "C" std::uint32_t __cdecl lift_pop32(LiftCpu* cpu) {
+    const std::uint32_t value = memory_read<std::uint32_t>(cpu->esp);
+    cpu->esp += 4u;
+    return value;
+}
+
+extern "C" void __cdecl lift_flags_add(LiftCpu* cpu, std::uint64_t left, std::uint64_t right, std::uint64_t carry, std::uint64_t result, std::uint32_t width) { set_add_flags(*cpu, left, right, carry, result, static_cast<std::uint16_t>(width)); }
+extern "C" void __cdecl lift_flags_sub(LiftCpu* cpu, std::uint64_t left, std::uint64_t right, std::uint64_t borrow, std::uint64_t result, std::uint32_t width) { set_sub_flags(*cpu, left, right, borrow, result, static_cast<std::uint16_t>(width)); }
+extern "C" void __cdecl lift_flags_logic(LiftCpu* cpu, std::uint64_t result, std::uint32_t width) { set_logic_flags(*cpu, result, static_cast<std::uint16_t>(width)); }
+
+extern "C" std::uint64_t __cdecl lift_shift_left(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) {
+    const std::uint64_t mask = width_mask(static_cast<std::uint16_t>(width));
+    count &= 0x1Fu;
+    value &= mask;
+    if (count == 0) { return value; }
+    const std::uint64_t result = (value << count) & mask;
+    assign_flag(*cpu, LIFT_FLAG_CF, count <= width && ((value >> (width - count)) & 1u) != 0);
+    if (count == 1) { assign_flag(*cpu, LIFT_FLAG_OF, ((result & sign_bit(static_cast<std::uint16_t>(width))) != 0) != flag(*cpu, LIFT_FLAG_CF)); }
+    set_szp(*cpu, result, static_cast<std::uint16_t>(width));
+    return result;
+}
+
+extern "C" std::uint64_t __cdecl lift_shift_right(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) {
+    value &= width_mask(static_cast<std::uint16_t>(width));
+    count &= 0x1Fu;
+    if (count == 0) { return value; }
+    const std::uint64_t result = value >> count;
+    assign_flag(*cpu, LIFT_FLAG_CF, count <= width && ((value >> (count - 1u)) & 1u) != 0);
+    if (count == 1) { assign_flag(*cpu, LIFT_FLAG_OF, (value & sign_bit(static_cast<std::uint16_t>(width))) != 0); }
+    set_szp(*cpu, result, static_cast<std::uint16_t>(width));
+    return result;
+}
+
+extern "C" std::uint64_t __cdecl lift_shift_arithmetic(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) {
+    value &= width_mask(static_cast<std::uint16_t>(width));
+    count &= 0x1Fu;
+    if (count == 0) { return value; }
+    const std::uint64_t result = static_cast<std::uint64_t>(signed_value(value, static_cast<std::uint16_t>(width)) >> count) & width_mask(static_cast<std::uint16_t>(width));
+    assign_flag(*cpu, LIFT_FLAG_CF, count <= width && ((value >> (count - 1u)) & 1u) != 0);
+    if (count == 1) { assign_flag(*cpu, LIFT_FLAG_OF, false); }
+    set_szp(*cpu, result, static_cast<std::uint16_t>(width));
+    return result;
+}
+
+std::uint64_t rotate_plain(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width, bool right) {
+    const std::uint64_t mask = width_mask(static_cast<std::uint16_t>(width));
+    const std::uint32_t effective = (count & 0x1Fu) % width;
+    value &= mask;
+    if (effective == 0) { return value; }
+    const std::uint64_t result = right ? ((value >> effective) | (value << (width - effective))) & mask : ((value << effective) | (value >> (width - effective))) & mask;
+    assign_flag(*cpu, LIFT_FLAG_CF, right ? (result & sign_bit(static_cast<std::uint16_t>(width))) != 0 : (result & 1u) != 0);
+    if (effective == 1) { assign_flag(*cpu, LIFT_FLAG_OF, right ? ((result ^ (result << 1u)) & sign_bit(static_cast<std::uint16_t>(width))) != 0 : ((result & sign_bit(static_cast<std::uint16_t>(width))) != 0) != flag(*cpu, LIFT_FLAG_CF)); }
+    return result;
+}
+
+extern "C" std::uint64_t __cdecl lift_rotate_left(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) { return rotate_plain(cpu, value, count, width, false); }
+extern "C" std::uint64_t __cdecl lift_rotate_right(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) { return rotate_plain(cpu, value, count, width, true); }
+
+std::uint64_t rotate_carry(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width, bool right) {
+    const std::uint64_t mask = width_mask(static_cast<std::uint16_t>(width));
+    const std::uint64_t sign = sign_bit(static_cast<std::uint16_t>(width));
+    const std::uint32_t effective = (count & 0x1Fu) % (width + 1u);
+    value &= mask;
+    for (std::uint32_t index = 0; index < effective; ++index) {
+        const bool old_carry = flag(*cpu, LIFT_FLAG_CF);
+        const bool new_carry = right ? (value & 1u) != 0 : (value & sign) != 0;
+        value = right ? (value >> 1u) | (old_carry ? sign : 0u) : ((value << 1u) & mask) | (old_carry ? 1u : 0u);
+        assign_flag(*cpu, LIFT_FLAG_CF, new_carry);
+    }
+    if (effective == 1) {
+        const bool overflow = right
+            ? ((value & sign) != 0) != ((value & (sign >> 1u)) != 0)
+            : ((value & sign) != 0) != flag(*cpu, LIFT_FLAG_CF);
+        assign_flag(*cpu, LIFT_FLAG_OF, overflow);
+    }
+    return value;
+}
+
+extern "C" std::uint64_t __cdecl lift_rotate_carry_right(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) { return rotate_carry(cpu, value, count, width, true); }
+extern "C" std::uint64_t __cdecl lift_rotate_carry_left(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) { return rotate_carry(cpu, value, count, width, false); }
+
+std::uint64_t double_shift(LiftCpu* cpu, std::uint64_t left, std::uint64_t right, std::uint32_t count, std::uint32_t width, bool toward_left) {
+    const std::uint64_t mask = width_mask(static_cast<std::uint16_t>(width));
+    count &= 0x1Fu;
+    left &= mask;
+    right &= mask;
+    if (count == 0) { return left; }
+    const std::uint64_t result = toward_left ? ((left << count) | (right >> (width - count))) & mask : ((left >> count) | (right << (width - count))) & mask;
+    assign_flag(*cpu, LIFT_FLAG_CF, toward_left ? ((left >> (width - count)) & 1u) != 0 : ((left >> (count - 1u)) & 1u) != 0);
+    if (count == 1) { assign_flag(*cpu, LIFT_FLAG_OF, toward_left ? ((result & sign_bit(static_cast<std::uint16_t>(width))) != 0) != flag(*cpu, LIFT_FLAG_CF) : ((left ^ result) & sign_bit(static_cast<std::uint16_t>(width))) != 0); }
+    set_szp(*cpu, result, static_cast<std::uint16_t>(width));
+    return result;
+}
+
+extern "C" std::uint64_t __cdecl lift_double_shift_left(LiftCpu* cpu, std::uint64_t left, std::uint64_t right, std::uint32_t count, std::uint32_t width) { return double_shift(cpu, left, right, count, width, true); }
+extern "C" std::uint64_t __cdecl lift_double_shift_right(LiftCpu* cpu, std::uint64_t left, std::uint64_t right, std::uint32_t count, std::uint32_t width) { return double_shift(cpu, left, right, count, width, false); }
+
+extern "C" void __cdecl lift_multiply_accumulator(LiftCpu* cpu, std::uint64_t source, std::uint32_t width, std::uint32_t is_signed) {
+    if (width == 8) {
+        const std::uint16_t product = is_signed ? static_cast<std::uint16_t>(static_cast<std::int16_t>(static_cast<std::int8_t>(cpu->eax)) * static_cast<std::int8_t>(source)) : static_cast<std::uint16_t>(static_cast<std::uint8_t>(cpu->eax) * static_cast<std::uint8_t>(source));
+        cpu->eax = (cpu->eax & 0xFFFF0000u) | product;
+        const bool overflow = is_signed ? static_cast<std::int16_t>(product) != static_cast<std::int8_t>(product) : (product & 0xFF00u) != 0;
+        assign_flag(*cpu, LIFT_FLAG_CF, overflow); assign_flag(*cpu, LIFT_FLAG_OF, overflow); return;
+    }
+    if (width != 32) { throw std::runtime_error("Unsupported accumulator multiply width"); }
+    const std::uint64_t product = is_signed ? static_cast<std::uint64_t>(static_cast<std::int64_t>(static_cast<std::int32_t>(cpu->eax)) * static_cast<std::int32_t>(source)) : static_cast<std::uint64_t>(cpu->eax) * static_cast<std::uint32_t>(source);
+    cpu->eax = static_cast<std::uint32_t>(product); cpu->edx = static_cast<std::uint32_t>(product >> 32u);
+    const bool overflow = is_signed ? static_cast<std::int64_t>(product) != static_cast<std::int32_t>(product) : cpu->edx != 0;
+    assign_flag(*cpu, LIFT_FLAG_CF, overflow); assign_flag(*cpu, LIFT_FLAG_OF, overflow);
+}
+
+extern "C" void __cdecl lift_divide_accumulator(LiftCpu* cpu, std::uint64_t divisor, std::uint32_t width, std::uint32_t is_signed) {
+    if (divisor == 0) { throw std::runtime_error("Division by zero in lifted code"); }
+    if (width == 8) {
+        const std::uint16_t dividend = static_cast<std::uint16_t>(cpu->eax);
+        if (is_signed) {
+            const std::int16_t quotient = static_cast<std::int16_t>(dividend) / static_cast<std::int8_t>(divisor);
+            const std::int16_t remainder = static_cast<std::int16_t>(dividend) % static_cast<std::int8_t>(divisor);
+            if (quotient < -128 || quotient > 127) { throw std::runtime_error("Signed division overflow in lifted code"); }
+            cpu->eax = (cpu->eax & 0xFFFF0000u) | (static_cast<std::uint8_t>(quotient)) | (static_cast<std::uint32_t>(static_cast<std::uint8_t>(remainder)) << 8u);
+        } else {
+            const std::uint16_t quotient = dividend / static_cast<std::uint8_t>(divisor);
+            if (quotient > 0xFFu) { throw std::runtime_error("Division overflow in lifted code"); }
+            cpu->eax = (cpu->eax & 0xFFFF0000u) | static_cast<std::uint8_t>(quotient) | (static_cast<std::uint32_t>(dividend % static_cast<std::uint8_t>(divisor)) << 8u);
+        }
+        return;
+    }
+    if (width != 32) { throw std::runtime_error("Unsupported accumulator divide width"); }
+    if (is_signed) {
+        const std::int64_t dividend = static_cast<std::int64_t>((static_cast<std::uint64_t>(cpu->edx) << 32u) | cpu->eax);
+        const std::int32_t signed_divisor = static_cast<std::int32_t>(divisor);
+        if (dividend == std::numeric_limits<std::int64_t>::min() && signed_divisor == -1) { throw std::runtime_error("Signed division overflow in lifted code"); }
+        const std::int64_t quotient = dividend / signed_divisor;
+        if (quotient < std::numeric_limits<std::int32_t>::min() || quotient > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("Signed division overflow in lifted code"); }
+        cpu->eax = static_cast<std::uint32_t>(quotient); cpu->edx = static_cast<std::uint32_t>(dividend % signed_divisor);
+    } else {
+        const std::uint64_t dividend = (static_cast<std::uint64_t>(cpu->edx) << 32u) | cpu->eax;
+        const std::uint64_t quotient = dividend / static_cast<std::uint32_t>(divisor);
+        if (quotient > std::numeric_limits<std::uint32_t>::max()) { throw std::runtime_error("Division overflow in lifted code"); }
+        cpu->eax = static_cast<std::uint32_t>(quotient); cpu->edx = static_cast<std::uint32_t>(dividend % static_cast<std::uint32_t>(divisor));
+    }
+}
+
+void require_x87(const LiftCpu* cpu, std::uint32_t count) {
+    if (!cpu || cpu->fpu_depth < count) { throw std::runtime_error("x87 stack underflow"); }
+}
+
+extern "C" double __cdecl lift_x87_get(const LiftCpu* cpu, std::uint32_t index) { require_x87(cpu, index + 1u); return cpu->fpu[index]; }
+extern "C" void __cdecl lift_x87_set(LiftCpu* cpu, std::uint32_t index, double value) { require_x87(cpu, index + 1u); cpu->fpu[index] = value; }
+extern "C" void __cdecl lift_x87_push(LiftCpu* cpu, double value) {
+    if (!cpu || cpu->fpu_depth == 8u) { throw std::runtime_error("x87 stack overflow"); }
+    for (std::size_t index = cpu->fpu_depth; index > 0; --index) { cpu->fpu[index] = cpu->fpu[index - 1]; }
+    cpu->fpu[0] = value; cpu->fpu_top = static_cast<std::uint8_t>((cpu->fpu_top + 7u) & 7u); ++cpu->fpu_depth;
+}
+extern "C" void __cdecl lift_x87_pop(LiftCpu* cpu) { require_x87(cpu, 1); for (std::size_t index = 1; index < cpu->fpu_depth; ++index) { cpu->fpu[index - 1] = cpu->fpu[index]; } --cpu->fpu_depth; cpu->fpu_top = static_cast<std::uint8_t>((cpu->fpu_top + 1u) & 7u); }
+extern "C" std::int64_t __cdecl lift_x87_round(const LiftCpu* cpu, double value, std::uint32_t truncate) {
+    if (truncate) { return static_cast<std::int64_t>(std::trunc(value)); }
+    switch ((cpu->fpu_control >> 10u) & 3u) { case 1: return static_cast<std::int64_t>(std::floor(value)); case 2: return static_cast<std::int64_t>(std::ceil(value)); case 3: return static_cast<std::int64_t>(std::trunc(value)); default: return static_cast<std::int64_t>(std::nearbyint(value)); }
+}
+extern "C" void __cdecl lift_x87_compare(LiftCpu* cpu, double left, double right) { cpu->fpu_status &= static_cast<std::uint16_t>(~0x4500u); if (std::isnan(left) || std::isnan(right)) { cpu->fpu_status |= 0x4500u; } else if (left < right) { cpu->fpu_status |= 0x0100u; } else if (left == right) { cpu->fpu_status |= 0x4000u; } }
+extern "C" void __cdecl lift_x87_sincos(LiftCpu* cpu) { const double value = lift_x87_get(cpu, 0); cpu->fpu[0] = std::sin(value); lift_x87_push(cpu, std::cos(value)); }
+
+template <class T>
+void move_string(LiftCpu* cpu, bool repeated) {
+    std::uint32_t count = repeated ? cpu->ecx : 1u;
+    const std::int32_t delta = flag(*cpu, LIFT_FLAG_DF) ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
+    while (count-- != 0) { memory_write(cpu->edi, memory_read<T>(cpu->esi)); cpu->esi += delta; cpu->edi += delta; if (repeated) { --cpu->ecx; } }
+}
+template <class T>
+void store_string(LiftCpu* cpu, bool repeated) {
+    std::uint32_t count = repeated ? cpu->ecx : 1u;
+    const std::int32_t delta = flag(*cpu, LIFT_FLAG_DF) ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
+    while (count-- != 0) { memory_write(cpu->edi, static_cast<T>(cpu->eax)); cpu->edi += delta; if (repeated) { --cpu->ecx; } }
+}
+template <class T>
+void compare_string(LiftCpu* cpu, bool repeated, bool repeat_not_equal, bool scan) {
+    std::uint32_t count = repeated ? cpu->ecx : 1u;
+    const std::int32_t delta = flag(*cpu, LIFT_FLAG_DF) ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
+    while (count-- != 0) {
+        const std::uint64_t left = scan ? static_cast<T>(cpu->eax) : memory_read<T>(cpu->esi);
+        const std::uint64_t right = memory_read<T>(cpu->edi);
+        if (!scan) { cpu->esi += delta; }
+        cpu->edi += delta; set_sub_flags(*cpu, left, right, 0, left - right, static_cast<std::uint16_t>(sizeof(T) * 8u));
+        if (!repeated) { break; }
+        --cpu->ecx;
+        if (repeat_not_equal ? flag(*cpu, LIFT_FLAG_ZF) : !flag(*cpu, LIFT_FLAG_ZF)) { break; }
+    }
+}
+extern "C" void __cdecl lift_movs8(LiftCpu* cpu, std::uint32_t repeated) { move_string<std::uint8_t>(cpu, repeated != 0); }
+extern "C" void __cdecl lift_movs16(LiftCpu* cpu, std::uint32_t repeated) { move_string<std::uint16_t>(cpu, repeated != 0); }
+extern "C" void __cdecl lift_movs32(LiftCpu* cpu, std::uint32_t repeated) { move_string<std::uint32_t>(cpu, repeated != 0); }
+extern "C" void __cdecl lift_stos8(LiftCpu* cpu, std::uint32_t repeated) { store_string<std::uint8_t>(cpu, repeated != 0); }
+extern "C" void __cdecl lift_stos16(LiftCpu* cpu, std::uint32_t repeated) { store_string<std::uint16_t>(cpu, repeated != 0); }
+extern "C" void __cdecl lift_stos32(LiftCpu* cpu, std::uint32_t repeated) { store_string<std::uint32_t>(cpu, repeated != 0); }
+extern "C" void __cdecl lift_cmps8(LiftCpu* cpu, std::uint32_t repeated, std::uint32_t repeat_not_equal) { compare_string<std::uint8_t>(cpu, repeated != 0, repeat_not_equal != 0, false); }
+extern "C" void __cdecl lift_cmps16(LiftCpu* cpu, std::uint32_t repeated, std::uint32_t repeat_not_equal) { compare_string<std::uint16_t>(cpu, repeated != 0, repeat_not_equal != 0, false); }
+extern "C" void __cdecl lift_cmps32(LiftCpu* cpu, std::uint32_t repeated, std::uint32_t repeat_not_equal) { compare_string<std::uint32_t>(cpu, repeated != 0, repeat_not_equal != 0, false); }
+extern "C" void __cdecl lift_scas8(LiftCpu* cpu, std::uint32_t repeated, std::uint32_t repeat_not_equal) { compare_string<std::uint8_t>(cpu, repeated != 0, repeat_not_equal != 0, true); }
+extern "C" void __cdecl lift_scas16(LiftCpu* cpu, std::uint32_t repeated, std::uint32_t repeat_not_equal) { compare_string<std::uint16_t>(cpu, repeated != 0, repeat_not_equal != 0, true); }
+extern "C" void __cdecl lift_scas32(LiftCpu* cpu, std::uint32_t repeated, std::uint32_t repeat_not_equal) { compare_string<std::uint32_t>(cpu, repeated != 0, repeat_not_equal != 0, true); }
+
+extern "C" void __cdecl lift_enter_block(LiftCpu* cpu, std::uint32_t source_va) { cpu->eip = local_image_address(source_va); set_diagnostic_instruction(cpu->eip, "native-c"); }
+extern "C" LIFT_NORETURN void __cdecl lift_trap(LiftCpu* cpu, std::uint32_t source_va, const char* reason) { lift_enter_block(cpu, source_va); throw std::runtime_error(std::string("Lifted C trap at ") + hex_u32(cpu->eip) + ": " + (reason ? reason : "unknown")); }
 
 const std::wstring& client_root_directory() {
     static const std::wstring root = [] {
@@ -965,316 +833,13 @@ void ProcessMemory::release() noexcept {
 
 namespace {
 
-bool condition(CpuState& state, Op op) {
-    const bool cf = flag(state, kFlagCF);
-    const bool pf = flag(state, kFlagPF);
-    const bool zf = flag(state, kFlagZF);
-    const bool sf = flag(state, kFlagSF);
-    const bool of = flag(state, kFlagOF);
-    switch (op) {
-        case Op::jo: case Op::seto: case Op::cmovo: return of;
-        case Op::jno: case Op::setno: case Op::cmovno: return !of;
-        case Op::jb: case Op::setb: case Op::cmovb: return cf;
-        case Op::jae: case Op::setae: case Op::cmovae: return !cf;
-        case Op::je: case Op::sete: case Op::cmove: return zf;
-        case Op::jne: case Op::setne: case Op::cmovne: return !zf;
-        case Op::jbe: case Op::setbe: case Op::cmovbe: return cf || zf;
-        case Op::ja: case Op::seta: case Op::cmova: return !cf && !zf;
-        case Op::js: case Op::sets: case Op::cmovs: return sf;
-        case Op::jns: case Op::setns: case Op::cmovns: return !sf;
-        case Op::jp: case Op::setp: case Op::cmovp: return pf;
-        case Op::jnp: case Op::setnp: case Op::cmovnp: return !pf;
-        case Op::jl: case Op::setl: case Op::cmovl: return sf != of;
-        case Op::jge: case Op::setge: case Op::cmovge: return sf == of;
-        case Op::jle: case Op::setle: case Op::cmovle: return zf || sf != of;
-        case Op::jg: case Op::setg: case Op::cmovg: return !zf && sf == of;
-        default: throw std::runtime_error("Opcode is not conditional");
-    }
-}
-
-void execute_binary(CpuState& state, const InstructionDescriptor& instruction) {
-    const OperandDescriptor& destination = instruction.operands[0];
-    const std::uint16_t width = destination.width;
-    const std::uint64_t left = read_operand(state, destination);
-    const std::uint64_t right = read_operand(state, instruction.operands[1]);
-    std::uint64_t result = 0;
-    switch (instruction.op) {
-        case Op::add: result = left + right; set_add_flags(state, left, right, 0, result, width); write_operand(state, destination, result); return;
-        case Op::adc: {
-            const std::uint64_t carry = flag(state, kFlagCF) ? 1u : 0u;
-            result = left + right + carry;
-            set_add_flags(state, left, right, carry, result, width);
-            write_operand(state, destination, result);
-            return;
-        }
-        case Op::sub: result = left - right; set_sub_flags(state, left, right, 0, result, width); write_operand(state, destination, result); return;
-        case Op::sbb: {
-            const std::uint64_t borrow = flag(state, kFlagCF) ? 1u : 0u;
-            result = left - right - borrow;
-            set_sub_flags(state, left, right, borrow, result, width);
-            write_operand(state, destination, result);
-            return;
-        }
-        case Op::cmp: result = left - right; set_sub_flags(state, left, right, 0, result, width); return;
-        case Op::and_: result = left & right; set_logic_flags(state, result, width); write_operand(state, destination, result); return;
-        case Op::or_: result = left | right; set_logic_flags(state, result, width); write_operand(state, destination, result); return;
-        case Op::xor_: result = left ^ right; set_logic_flags(state, result, width); write_operand(state, destination, result); return;
-        case Op::test: result = left & right; set_logic_flags(state, result, width); return;
-        default: throw std::runtime_error("Invalid binary arithmetic opcode");
-    }
-}
-
-void execute_shift(CpuState& state, const InstructionDescriptor& instruction) {
-    const OperandDescriptor& destination = instruction.operands[0];
-    const std::uint16_t width = destination.width;
-    const std::uint64_t mask = width_mask(width);
-    const std::uint64_t original = read_operand(state, destination) & mask;
-    const std::uint32_t count = static_cast<std::uint32_t>(read_operand(state, instruction.operands[1])) & 0x1Fu;
-    if (count == 0) { return; }
-    std::uint64_t result = original;
-    if (instruction.op == Op::shl || instruction.op == Op::sal) {
-        result = (original << count) & mask;
-        assign_flag(state, kFlagCF, count <= width && ((original >> (width - count)) & 1u) != 0);
-        if (count == 1) { assign_flag(state, kFlagOF, ((result & sign_bit(width)) != 0) != flag(state, kFlagCF)); }
-    } else if (instruction.op == Op::shr) {
-        result = original >> count;
-        assign_flag(state, kFlagCF, count <= width && ((original >> (count - 1u)) & 1u) != 0);
-        if (count == 1) { assign_flag(state, kFlagOF, (original & sign_bit(width)) != 0); }
-    } else if (instruction.op == Op::sar) {
-        result = static_cast<std::uint64_t>(signed_value(original, width) >> count) & mask;
-        assign_flag(state, kFlagCF, count <= width && ((original >> (count - 1u)) & 1u) != 0);
-        if (count == 1) { assign_flag(state, kFlagOF, false); }
-    } else if (instruction.op == Op::rol) {
-        const std::uint32_t effective = count % width;
-        result = effective == 0 ? original : ((original << effective) | (original >> (width - effective))) & mask;
-        assign_flag(state, kFlagCF, (result & 1u) != 0);
-        if (effective == 1) {
-            const bool overflow = instruction.op == Op::rcr ? ((result ^ (result << 1u)) & sign_bit(width)) != 0 : ((result & sign_bit(width)) != 0) != flag(state, kFlagCF);
-            assign_flag(state, kFlagOF, overflow);
-        }
-        write_operand(state, destination, result);
-        return;
-    } else if (instruction.op == Op::ror) {
-        const std::uint32_t effective = count % width;
-        result = effective == 0 ? original : ((original >> effective) | (original << (width - effective))) & mask;
-        assign_flag(state, kFlagCF, (result & sign_bit(width)) != 0);
-        if (effective == 1) { assign_flag(state, kFlagOF, ((result ^ (result << 1u)) & sign_bit(width)) != 0); }
-        write_operand(state, destination, result);
-        return;
-    } else if (instruction.op == Op::rcr || instruction.op == Op::rcl) {
-        const std::uint32_t effective = count % (width + 1u);
-        result = original;
-        for (std::uint32_t index = 0; index < effective; ++index) {
-            const bool old_carry = flag(state, kFlagCF);
-            if (instruction.op == Op::rcr) {
-                const bool new_carry = (result & 1u) != 0;
-                result = (result >> 1u) | (old_carry ? sign_bit(width) : 0u);
-                assign_flag(state, kFlagCF, new_carry);
-            } else {
-                const bool new_carry = (result & sign_bit(width)) != 0;
-                result = ((result << 1u) & mask) | (old_carry ? 1u : 0u);
-                assign_flag(state, kFlagCF, new_carry);
-            }
-        }
-        if (effective == 1) { assign_flag(state, kFlagOF, ((result & sign_bit(width)) != 0) != flag(state, kFlagCF)); }
-        write_operand(state, destination, result);
-        return;
-    } else {
-        throw std::runtime_error("Unsupported shift opcode");
-    }
-    set_szp(state, result, width);
-    write_operand(state, destination, result);
-}
-
-void execute_double_shift(CpuState& state, const InstructionDescriptor& instruction) {
-    const OperandDescriptor& destination = instruction.operands[0];
-    const std::uint16_t width = destination.width;
-    const std::uint32_t count = static_cast<std::uint32_t>(read_operand(state, instruction.operands[2])) & 0x1Fu;
-    if (count == 0) { return; }
-    const std::uint64_t left = read_operand(state, destination) & width_mask(width);
-    const std::uint64_t right = read_operand(state, instruction.operands[1]) & width_mask(width);
-    std::uint64_t result = 0;
-    if (instruction.op == Op::shld) {
-        result = ((left << count) | (right >> (width - count))) & width_mask(width);
-        assign_flag(state, kFlagCF, ((left >> (width - count)) & 1u) != 0);
-        if (count == 1) { assign_flag(state, kFlagOF, ((result & sign_bit(width)) != 0) != flag(state, kFlagCF)); }
-    } else {
-        result = ((left >> count) | (right << (width - count))) & width_mask(width);
-        assign_flag(state, kFlagCF, ((left >> (count - 1u)) & 1u) != 0);
-        if (count == 1) { assign_flag(state, kFlagOF, ((left ^ result) & sign_bit(width)) != 0); }
-    }
-    set_szp(state, result, width);
-    write_operand(state, destination, result);
-}
-
-void execute_compare_string(CpuState& state, const InstructionDescriptor& instruction, std::uint32_t width, bool scan) {
-    const bool repeated = (instruction.prefixes & (kPrefixRep | kPrefixRepe | kPrefixRepne)) != 0;
-    std::uint32_t count = repeated ? state.ecx : 1u;
-    const std::int32_t delta = flag(state, kFlagDF) ? -static_cast<std::int32_t>(width) : static_cast<std::int32_t>(width);
-    while (count != 0) {
-        std::uint64_t left = 0;
-        std::uint64_t right = 0;
-        if (scan) {
-            left = width == 1 ? read_register(state, Reg::al) : width == 2 ? read_register(state, Reg::ax) : state.eax;
-            right = width == 1 ? memory_read<std::uint8_t>(state.edi) : width == 2 ? memory_read<std::uint16_t>(state.edi) : memory_read<std::uint32_t>(state.edi);
-        } else {
-            left = width == 1 ? memory_read<std::uint8_t>(state.esi) : width == 2 ? memory_read<std::uint16_t>(state.esi) : memory_read<std::uint32_t>(state.esi);
-            right = width == 1 ? memory_read<std::uint8_t>(state.edi) : width == 2 ? memory_read<std::uint16_t>(state.edi) : memory_read<std::uint32_t>(state.edi);
-            state.esi += delta;
-        }
-        state.edi += delta;
-        set_sub_flags(state, left, right, 0, left - right, static_cast<std::uint16_t>(width * 8u));
-        if (!repeated) { break; }
-        --state.ecx;
-        --count;
-        if ((instruction.prefixes & kPrefixRepne) != 0 ? flag(state, kFlagZF) : !flag(state, kFlagZF)) { break; }
-    }
-}
-
-void execute_multiply(CpuState& state, const InstructionDescriptor& instruction, bool signed_multiply) {
-    const OperandDescriptor& source = instruction.operands[instruction.operand_count - 1u];
-    const std::uint16_t width = source.width;
-    if (instruction.operand_count >= 2) {
-        const std::int64_t left = signed_value(read_operand(state, instruction.operands[instruction.operand_count == 2 ? 0 : 1]), width);
-        const std::int64_t right = signed_value(read_operand(state, source), width);
-        const std::int64_t result = left * right;
-        write_operand(state, instruction.operands[0], static_cast<std::uint64_t>(result));
-        const std::int64_t truncated = signed_value(static_cast<std::uint64_t>(result), instruction.operands[0].width);
-        assign_flag(state, kFlagCF, truncated != result);
-        assign_flag(state, kFlagOF, truncated != result);
-        return;
-    }
-    const std::uint64_t source_value = read_operand(state, source);
-    if (width == 8) {
-        const std::uint16_t product = signed_multiply ? static_cast<std::uint16_t>(static_cast<std::int16_t>(static_cast<std::int8_t>(state.eax)) * static_cast<std::int8_t>(source_value)) : static_cast<std::uint16_t>(static_cast<std::uint8_t>(state.eax) * static_cast<std::uint8_t>(source_value));
-        write_register(state, Reg::ax, product);
-        const bool overflow = signed_multiply ? static_cast<std::int16_t>(product) != static_cast<std::int8_t>(product) : (product & 0xFF00u) != 0;
-        assign_flag(state, kFlagCF, overflow);
-        assign_flag(state, kFlagOF, overflow);
-        return;
-    }
-    if (width == 32) {
-        const std::uint64_t product = signed_multiply ? static_cast<std::uint64_t>(static_cast<std::int64_t>(static_cast<std::int32_t>(state.eax)) * static_cast<std::int32_t>(source_value)) : static_cast<std::uint64_t>(state.eax) * static_cast<std::uint32_t>(source_value);
-        state.eax = static_cast<std::uint32_t>(product);
-        state.edx = static_cast<std::uint32_t>(product >> 32u);
-        const bool overflow = signed_multiply ? static_cast<std::int64_t>(product) != static_cast<std::int32_t>(product) : state.edx != 0;
-        assign_flag(state, kFlagCF, overflow);
-        assign_flag(state, kFlagOF, overflow);
-        return;
-    }
-    throw std::runtime_error("Unsupported multiply width");
-}
-
-void execute_divide(CpuState& state, const InstructionDescriptor& instruction, bool signed_divide) {
-    const OperandDescriptor& source = instruction.operands[0];
-    const std::uint16_t width = source.width;
-    const std::uint64_t divisor = read_operand(state, source);
-    if (divisor == 0) { throw std::runtime_error("IR division by zero"); }
-    if (width == 8) {
-        if (signed_divide) {
-            const std::int16_t dividend = static_cast<std::int16_t>(state.eax & 0xFFFFu);
-            const std::int16_t quotient = dividend / static_cast<std::int8_t>(divisor);
-            const std::int16_t remainder = dividend % static_cast<std::int8_t>(divisor);
-            if (quotient < -128 || quotient > 127) { throw std::runtime_error("IR signed division overflow"); }
-            write_register(state, Reg::al, quotient);
-            write_register(state, Reg::ah, remainder);
-        } else {
-            const std::uint16_t dividend = static_cast<std::uint16_t>(state.eax);
-            const std::uint16_t quotient = dividend / static_cast<std::uint8_t>(divisor);
-            if (quotient > 0xFFu) { throw std::runtime_error("IR division overflow"); }
-            write_register(state, Reg::al, quotient);
-            write_register(state, Reg::ah, dividend % static_cast<std::uint8_t>(divisor));
-        }
-        return;
-    }
-    if (width == 32) {
-        if (signed_divide) {
-            const std::int64_t dividend = static_cast<std::int64_t>((static_cast<std::uint64_t>(state.edx) << 32u) | state.eax);
-            const std::int32_t signed_divisor = static_cast<std::int32_t>(divisor);
-            if (dividend == std::numeric_limits<std::int64_t>::min() && signed_divisor == -1) { throw std::runtime_error("IR signed division overflow"); }
-            const std::int64_t quotient = dividend / signed_divisor;
-            const std::int64_t remainder = dividend % signed_divisor;
-            if (quotient < std::numeric_limits<std::int32_t>::min() || quotient > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("IR signed division overflow"); }
-            state.eax = static_cast<std::uint32_t>(quotient);
-            state.edx = static_cast<std::uint32_t>(remainder);
-        } else {
-            const std::uint64_t dividend = (static_cast<std::uint64_t>(state.edx) << 32u) | state.eax;
-            const std::uint64_t quotient = dividend / static_cast<std::uint32_t>(divisor);
-            if (quotient > std::numeric_limits<std::uint32_t>::max()) { throw std::runtime_error("IR division overflow"); }
-            state.eax = static_cast<std::uint32_t>(quotient);
-            state.edx = static_cast<std::uint32_t>(dividend % static_cast<std::uint32_t>(divisor));
-        }
-        return;
-    }
-    throw std::runtime_error("Unsupported division width");
-}
-
-bool execute_x87(CpuState& state, const InstructionDescriptor& instruction) {
-    const OperandDescriptor& first = instruction.operands[0];
-    const OperandDescriptor& comparison_source = instruction.operand_count >= 2 ? instruction.operands[1] : first;
-    switch (instruction.op) {
-        case Op::fld: fpu_push(state, read_float_operand(state, first)); return true;
-        case Op::fld1: fpu_push(state, 1.0); return true;
-        case Op::fldz: fpu_push(state, 0.0); return true;
-        case Op::fild: fpu_push(state, static_cast<double>(signed_value(read_operand(state, first), first.width))); return true;
-        case Op::fst: fpu_require(state); write_float_operand(state, first, state.fpu[0]); return true;
-        case Op::fstp: fpu_require(state); write_float_operand(state, first, state.fpu[0]); fpu_pop(state); return true;
-        case Op::fist: case Op::fistp: case Op::fisttp: {
-            fpu_require(state);
-            const std::int64_t value = rounded_integer(state.fpu[0], state.fpu_control, instruction.op == Op::fisttp);
-            write_operand(state, first, static_cast<std::uint64_t>(value));
-            if (instruction.op != Op::fist) { fpu_pop(state); }
-            return true;
-        }
-        case Op::fxch: fpu_require(state); std::swap(state.fpu[0], fpu_register(state, comparison_source.reg)); return true;
-        case Op::fabs: fpu_require(state); state.fpu[0] = std::fabs(state.fpu[0]); return true;
-        case Op::fchs: fpu_require(state); state.fpu[0] = -state.fpu[0]; return true;
-        case Op::fldcw: state.fpu_control = static_cast<std::uint16_t>(read_operand(state, first)); return true;
-        case Op::fnstcw: write_operand(state, first, state.fpu_control); return true;
-        case Op::fnstsw: write_operand(state, first, static_cast<std::uint16_t>(state.fpu_status | ((state.fpu_top & 7u) << 11u))); return true;
-        case Op::fcom: case Op::fcomp: case Op::fucomp: {
-            fpu_require(state);
-            fpu_compare(state, state.fpu[0], read_float_operand(state, comparison_source));
-            if (instruction.op != Op::fcom) { fpu_pop(state); }
-            return true;
-        }
-        case Op::fcompp: case Op::fucompp: fpu_require(state, 2); fpu_compare(state, state.fpu[0], state.fpu[1]); fpu_pop(state); fpu_pop(state); return true;
-        case Op::fsincos: {
-            fpu_require(state);
-            const double value = state.fpu[0];
-            state.fpu[0] = std::sin(value);
-            fpu_push(state, std::cos(value));
-            return true;
-        }
-        default: break;
-    }
-    const bool integer_source = instruction.op == Op::fiadd || instruction.op == Op::fisub || instruction.op == Op::fisubr || instruction.op == Op::fimul || instruction.op == Op::fidiv || instruction.op == Op::fidivr;
-    const bool arithmetic = integer_source || instruction.op == Op::fadd || instruction.op == Op::faddp || instruction.op == Op::fsub || instruction.op == Op::fsubp || instruction.op == Op::fsubr || instruction.op == Op::fsubrp || instruction.op == Op::fmul || instruction.op == Op::fmulp || instruction.op == Op::fdiv || instruction.op == Op::fdivp || instruction.op == Op::fdivr || instruction.op == Op::fdivrp;
-    if (!arithmetic) { return false; }
-    fpu_require(state);
-    const bool pop = instruction.op == Op::faddp || instruction.op == Op::fsubp || instruction.op == Op::fsubrp || instruction.op == Op::fmulp || instruction.op == Op::fdivp || instruction.op == Op::fdivrp;
-    double* destination = &state.fpu[0];
-    double source = 0;
-    if (integer_source) { source = static_cast<double>(signed_value(read_operand(state, first), first.width)); }
-    else if (instruction.operand_count >= 2) { destination = &fpu_register(state, first.reg); source = read_float_operand(state, instruction.operands[1]); }
-    else { source = read_float_operand(state, first); }
-    if (instruction.op == Op::fadd || instruction.op == Op::faddp || instruction.op == Op::fiadd) { *destination += source; }
-    else if (instruction.op == Op::fmul || instruction.op == Op::fmulp || instruction.op == Op::fimul) { *destination *= source; }
-    else if (instruction.op == Op::fsub || instruction.op == Op::fsubp || instruction.op == Op::fisub) { *destination -= source; }
-    else if (instruction.op == Op::fsubr || instruction.op == Op::fsubrp || instruction.op == Op::fisubr) { *destination = source - *destination; }
-    else if (instruction.op == Op::fdiv || instruction.op == Op::fdivp || instruction.op == Op::fidiv) { *destination /= source; }
-    else { *destination = source / *destination; }
-    if (pop) { fpu_pop(state); }
-    return true;
-}
-
-void initialize_fs(CpuState& state) {
+void initialize_fs(LiftCpu& state) {
     const std::uint32_t end_of_chain = 0xFFFFFFFFu;
     const std::uint32_t teb = __readfsdword(0x18);
     const std::uint32_t peb = __readfsdword(0x30);
-    std::memcpy(state.fs_data.data(), &end_of_chain, sizeof(end_of_chain));
-    std::memcpy(state.fs_data.data() + 0x18u, &teb, sizeof(teb));
-    std::memcpy(state.fs_data.data() + 0x30u, &peb, sizeof(peb));
+    std::memcpy(state.fs_data, &end_of_chain, sizeof(end_of_chain));
+    std::memcpy(state.fs_data + 0x18u, &teb, sizeof(teb));
+    std::memcpy(state.fs_data + 0x30u, &peb, sizeof(peb));
 }
 
 #if !defined(SFERA_PORTABLE_CHECK) && defined(_M_IX86)
@@ -1286,9 +851,11 @@ extern "C" __declspec(noinline) std::uint32_t __fastcall bridge_test_fastcall(st
 void verify_native_bridge() {
     DiagnosticPhaseScope phase(RuntimePhase::abi_self_test);
     LocalStack stack(64u * 1024u);
-    CpuState state{};
+    LiftCpu state{};
     auto prepare = [&]() {
-        state = CpuState{};
+        state = LiftCpu{};
+        state.eflags = 0x202u;
+        state.fpu_control = 0x027Fu;
         state.esp = stack.top();
         state.stack_base = stack.base();
         state.stack_limit = stack.limit();
@@ -1309,8 +876,8 @@ void verify_native_bridge() {
         throw std::runtime_error(std::string("Native bridge failed to restore the host TEB after ") + convention + ": FS:[0] expected=" + hex_u32(expected_exception_list) + " actual=" + hex_u32(actual_exception_list) + ", FS:[4] expected=" + hex_u32(expected_stack_base) + " actual=" + hex_u32(actual_stack_base) + ", FS:[8] expected=" + hex_u32(expected_stack_limit) + " actual=" + hex_u32(actual_stack_limit));
     };
     prepare();
-    push32(state, 7u);
-    push32(state, 5u);
+    lift_push32(&state, 7u);
+    lift_push32(&state, 5u);
     const std::uint32_t cdecl_esp = state.esp;
     NativeCallFrame cdecl_frame{&state, reinterpret_cast<void*>(&bridge_test_cdecl), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0};
     native_call_bridge(&cdecl_frame);
@@ -1321,8 +888,8 @@ void verify_native_bridge() {
     verify_teb(cdecl_frame, "cdecl", cdecl_exception_list, cdecl_stack_base, cdecl_stack_limit);
     verify_nonvolatile();
     prepare();
-    push32(state, 0x2468ACE0u);
-    push32(state, 0x10203040u);
+    lift_push32(&state, 0x2468ACE0u);
+    lift_push32(&state, 0x10203040u);
     const std::uint32_t stdcall_esp = state.esp;
     NativeCallFrame stdcall_frame{&state, reinterpret_cast<void*>(&bridge_test_stdcall), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0};
     native_call_bridge(&stdcall_frame);
@@ -1335,7 +902,7 @@ void verify_native_bridge() {
     prepare();
     state.ecx = 11u;
     state.edx = 13u;
-    push32(state, 17u);
+    lift_push32(&state, 17u);
     const std::uint32_t fastcall_esp = state.esp;
     NativeCallFrame fastcall_frame{&state, reinterpret_cast<void*>(&bridge_test_fastcall), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0};
     native_call_bridge(&fastcall_frame);
@@ -1356,69 +923,34 @@ void verify_native_bridge() {}
 
 } // namespace
 
-Runtime::Runtime() {
+NativeRuntime::NativeRuntime() {
     memory_.initialize_native();
     verify_native_bridge();
-    DiagnosticPhaseScope phase(RuntimePhase::build_index);
-    instruction_index_.resize(kCodeMaxRva - kCodeMinRva);
-    for (const InstructionChunk& chunk : kInstructionChunks) {
-        for (std::size_t index = 0; index < chunk.size; ++index) {
-            const InstructionDescriptor& instruction = chunk.data[index];
-            if (instruction.rva >= kCodeMinRva && instruction.rva < kCodeMaxRva) { instruction_index_[instruction.rva - kCodeMinRva] = &instruction; }
-        }
+    DiagnosticPhaseScope phase(RuntimePhase::function_map);
+    import_addresses_.reserve(memory_.resolved_imports().size());
+    for (const ResolvedImport& item : memory_.resolved_imports()) {
+        imports_by_address_.try_emplace(item.address, item.descriptor);
+        import_addresses_.push_back(item.address);
     }
-    instruction_index_data_ = instruction_index_.data();
-    for (const ResolvedImport& item : memory_.resolved_imports()) { imports_by_address_.try_emplace(item.address, item.descriptor); }
-    diagnostic_note("IR index constructed");
-    const std::string summary_note = "generated semantic summaries: config=" + (kConfigLookupTarget == 0 ? std::string("disabled") : hex_u32(kConfigLookupTarget)) + ", unsigned-decimal=" + (kUnsignedDecimalStringTarget == 0 ? std::string("disabled") : hex_u32(kUnsignedDecimalStringTarget)) + ", callsite=" + (kUnsignedDecimalStringCallsite == 0 ? std::string("disabled") : hex_u32(kUnsignedDecimalStringCallsite));
-    diagnostic_note(summary_note.c_str());
+    if (import_addresses_.size() != kImports.size()) { throw std::runtime_error("Generated import table and loaded import table disagree"); }
+    diagnostic_note("native C function map initialized");
 }
 
-ProcessMemory& Runtime::memory() noexcept {
+ProcessMemory& NativeRuntime::memory() noexcept {
     return memory_;
 }
 
-const InstructionDescriptor& Runtime::lookup(std::uint32_t eip) const {
-    std::uint32_t rva = 0;
-    if (!memory_.image_rva(eip, rva) || rva < kCodeMinRva || rva >= kCodeMaxRva) { throw std::runtime_error("No decoded IR instruction at local EIP " + hex_u32(eip)); }
-    const InstructionDescriptor* instruction = instruction_index_data_[rva - kCodeMinRva];
-    if (!instruction) { throw std::runtime_error("No decoded IR instruction at local EIP " + hex_u32(eip)); }
-    return *instruction;
-}
-
-bool Runtime::has_instruction(std::uint32_t eip) const noexcept {
-    std::uint32_t rva = 0;
-    if (!memory_.image_rva(eip, rva) || rva < kCodeMinRva || rva >= kCodeMaxRva) { return false; }
-    return instruction_index_data_[rva - kCodeMinRva] != nullptr;
-}
-
-const ImportDescriptor* Runtime::find_import(std::uint32_t target) const {
+const ImportDescriptor* NativeRuntime::find_import(std::uint32_t target) const {
     const auto found = imports_by_address_.find(target);
     return found == imports_by_address_.end() ? nullptr : found->second;
 }
 
-void Runtime::run(CpuState& state, std::uint32_t stop_target) {
-    DiagnosticPhaseScope phase(RuntimePhase::interpret);
-    DiagnosticRunScope run_scope(&state);
-    DiagnosticExecutionScope execution_scope(state.eip, stop_target, state.esp);
-    state.stopped = false;
-    while (!state.stopped) {
-        const std::uint32_t current_eip = state.eip;
-        const InstructionDescriptor* instruction = nullptr;
-        try {
-            instruction = &lookup(current_eip);
-            set_diagnostic_instruction(memory_.image_address(instruction->rva), op_name(instruction->op).data());
-            step(state, *instruction, stop_target);
-        } catch (const std::exception& error) {
-            const std::string operation = instruction ? std::string(op_name(instruction->op)) : "lookup";
-            const std::string failure = "IR failure at " + hex_u32(current_eip) + " [" + operation + "]: " + error.what();
-            diagnostic_ir_failure(state, failure.c_str());
-            throw std::runtime_error(failure);
-        }
-    }
+std::uint32_t NativeRuntime::import_address(std::uint32_t index) const {
+    if (index >= import_addresses_.size()) { throw std::runtime_error("Generated import index is outside the resolved import table"); }
+    return import_addresses_[index];
 }
 
-void Runtime::call_native(CpuState& state, std::uint32_t target) {
+void NativeRuntime::call_native(LiftCpu& state, std::uint32_t target, std::uint32_t callsite) {
     const ImportDescriptor* descriptor = find_import(target);
     const std::string_view name = descriptor ? descriptor->name : std::string_view{};
     DiagnosticPhaseScope phase(RuntimePhase::native_call);
@@ -1426,7 +958,7 @@ void Runtime::call_native(CpuState& state, std::uint32_t target) {
     MEMORY_BASIC_INFORMATION target_region{};
     const DWORD executable_protection = PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
     if (target == 0 || VirtualQuery(reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), &target_region, sizeof(target_region)) == 0 || target_region.State != MEM_COMMIT || (target_region.Protect & executable_protection) == 0 || (target_region.Protect & (PAGE_GUARD | PAGE_NOACCESS)) != 0) { throw std::runtime_error("Invalid native call target " + hex_u32(target)); }
-    if (name == "_CxxThrowException" || name == "RaiseException") { throw std::runtime_error("IR SEH/C++ exception crossed the interpreter boundary"); }
+    if (name == "_CxxThrowException" || name == "RaiseException") { throw std::runtime_error("SEH/C++ exception crossed the lifted/native ABI boundary at " + hex_u32(callsite)); }
     if ((name == "GetModuleHandleA" || name == "GetModuleHandleW") && memory_read<std::uint32_t>(state.esp) == 0) {
         state.eax = memory_.load_base();
         state.esp += 4u;
@@ -1442,13 +974,13 @@ void Runtime::call_native(CpuState& state, std::uint32_t target) {
         return;
     }
     if (name == "_CIatan2" || name == "_CIpow") {
-        fpu_require(state, 2);
+        require_x87(&state, 2);
         state.fpu[1] = name == "_CIpow" ? std::pow(state.fpu[1], state.fpu[0]) : std::atan2(state.fpu[1], state.fpu[0]);
-        fpu_pop(state);
+        lift_x87_pop(&state);
         return;
     }
     if (name == "_CIacos" || name == "_CIasin" || name == "_CIatan" || name == "_CIcos" || name == "_CIexp" || name == "_CIsin" || name == "_CIsqrt" || name == "_CItan") {
-        fpu_require(state);
+        require_x87(&state, 1);
         const double value = state.fpu[0];
         if (name == "_CIacos") { state.fpu[0] = std::acos(value); }
         else if (name == "_CIasin") { state.fpu[0] = std::asin(value); }
@@ -1461,8 +993,8 @@ void Runtime::call_native(CpuState& state, std::uint32_t target) {
         return;
     }
     std::string resource_note;
-    if (name == "_findfirst64i32") { resource_note = "resource enumeration pattern=\"" + local_c_string(memory_read<std::uint32_t>(state.esp)) + "\""; }
-    else if (name == "fopen") { resource_note = "resource fopen path=\"" + local_c_string(memory_read<std::uint32_t>(state.esp)) + "\", mode=\"" + local_c_string(memory_read<std::uint32_t>(state.esp + 4u)) + "\""; }
+    if (name == "_findfirst64i32") { resource_note = "resource enumeration callsite=" + hex_u32(callsite) + ", pattern=\"" + local_c_string(memory_read<std::uint32_t>(state.esp)) + "\""; }
+    else if (name == "fopen") { resource_note = "resource fopen callsite=" + hex_u32(callsite) + ", path=\"" + local_c_string(memory_read<std::uint32_t>(state.esp)) + "\", mode=\"" + local_c_string(memory_read<std::uint32_t>(state.esp + 4u)) + "\""; }
     NativeCallArguments arguments(state.esp);
     std::string module_note;
     if (descriptor && descriptor->process_module_argument >= 0) {
@@ -1478,216 +1010,60 @@ void Runtime::call_native(CpuState& state, std::uint32_t target) {
     if (name == "_findnext64i32" && state.eax == 0xFFFFFFFFu) { resource_note = "resource enumeration complete"; }
     if (!resource_note.empty()) { resource_note += ", result=" + hex_u32(state.eax); diagnostic_note(resource_note.c_str()); }
     if (!module_note.empty()) { module_note += ", result=" + hex_u32(state.eax); diagnostic_note(module_note.c_str()); }
-    if (descriptor && is_float_return(name)) { fpu_push(state, frame.native_st0); }
+    if (descriptor && is_float_return(name)) { lift_x87_push(&state, frame.native_st0); }
 }
 
-void Runtime::step(CpuState& state, const InstructionDescriptor& instruction, std::uint32_t stop_target) {
-    const std::uint32_t next = memory_.image_address(instruction.rva + instruction.size);
-    state.eip = next;
-    if (execute_x87(state, instruction)) { return; }
-    switch (instruction.op) {
-        case Op::mov: write_operand(state, instruction.operands[0], read_operand(state, instruction.operands[1])); return;
-        case Op::lea: write_operand(state, instruction.operands[0], effective_address(state, instruction.operands[1])); return;
-        case Op::movzx: write_operand(state, instruction.operands[0], read_operand(state, instruction.operands[1])); return;
-        case Op::movsx: write_operand(state, instruction.operands[0], static_cast<std::uint64_t>(signed_value(read_operand(state, instruction.operands[1]), instruction.operands[1].width))); return;
-        case Op::add: case Op::adc: case Op::sub: case Op::sbb: case Op::cmp: case Op::and_: case Op::or_: case Op::xor_: case Op::test: execute_binary(state, instruction); return;
-        case Op::inc: {
-            const bool old_carry = flag(state, kFlagCF);
-            const std::uint64_t left = read_operand(state, instruction.operands[0]);
-            const std::uint64_t result = left + 1u;
-            set_add_flags(state, left, 1u, 0, result, instruction.operands[0].width);
-            assign_flag(state, kFlagCF, old_carry);
-            write_operand(state, instruction.operands[0], result);
-            return;
-        }
-        case Op::dec: {
-            const bool old_carry = flag(state, kFlagCF);
-            const std::uint64_t left = read_operand(state, instruction.operands[0]);
-            const std::uint64_t result = left - 1u;
-            set_sub_flags(state, left, 1u, 0, result, instruction.operands[0].width);
-            assign_flag(state, kFlagCF, old_carry);
-            write_operand(state, instruction.operands[0], result);
-            return;
-        }
-        case Op::neg: {
-            const OperandDescriptor& operand = instruction.operands[0];
-            const std::uint64_t value = read_operand(state, operand);
-            const std::uint64_t result = 0u - value;
-            set_sub_flags(state, 0, value, 0, result, operand.width);
-            assign_flag(state, kFlagCF, value != 0);
-            write_operand(state, operand, result);
-            return;
-        }
-        case Op::not_: write_operand(state, instruction.operands[0], ~read_operand(state, instruction.operands[0])); return;
-        case Op::shl: case Op::sal: case Op::shr: case Op::sar: case Op::rol: case Op::ror: case Op::rcl: case Op::rcr: execute_shift(state, instruction); return;
-        case Op::shld: case Op::shrd: execute_double_shift(state, instruction); return;
-        case Op::imul: execute_multiply(state, instruction, true); return;
-        case Op::mul: execute_multiply(state, instruction, false); return;
-        case Op::idiv: execute_divide(state, instruction, true); return;
-        case Op::div: execute_divide(state, instruction, false); return;
-        case Op::cdq: state.edx = (state.eax & 0x80000000u) != 0 ? 0xFFFFFFFFu : 0u; return;
-        case Op::cwde: state.eax = static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(state.eax))); return;
-        case Op::push: {
-            std::uint64_t value = read_operand(state, instruction.operands[0]);
-            if (instruction.operands[0].kind == OperandKind::imm && instruction.operands[0].width < 32) { value = static_cast<std::uint32_t>(signed_value(value, instruction.operands[0].width)); }
-            push32(state, static_cast<std::uint32_t>(value));
-            return;
-        }
-        case Op::pop: write_operand(state, instruction.operands[0], pop32(state)); return;
-        case Op::pushfd: push32(state, state.eflags); return;
-        case Op::popfd: state.eflags = pop32(state) | 0x2u; return;
-        case Op::pushad: {
-            const std::uint32_t original_esp = state.esp;
-            push32(state, state.eax); push32(state, state.ecx); push32(state, state.edx); push32(state, state.ebx); push32(state, original_esp); push32(state, state.ebp); push32(state, state.esi); push32(state, state.edi);
-            return;
-        }
-        case Op::popad: {
-            state.edi = pop32(state); state.esi = pop32(state); state.ebp = pop32(state); state.esp += 4u; state.ebx = pop32(state); state.edx = pop32(state); state.ecx = pop32(state); state.eax = pop32(state);
-            return;
-        }
-        case Op::xchg: {
-            const std::uint64_t left = read_operand(state, instruction.operands[0]);
-            const std::uint64_t right = read_operand(state, instruction.operands[1]);
-            write_operand(state, instruction.operands[0], right);
-            write_operand(state, instruction.operands[1], left);
-            return;
-        }
-        case Op::jmp: {
-            const std::uint32_t target = static_cast<std::uint32_t>(read_operand(state, instruction.operands[0]));
-            if (target == local_image_address(0x00459B10u)) { throw std::runtime_error(fatal_handler_failure(state, memory_.image_address(instruction.rva))); }
-            if (has_instruction(target)) { state.eip = target; return; }
-            const std::uint32_t return_target = pop32(state);
-            call_native(state, target);
-            diagnostic_ir_return(return_target);
-            if (return_target == stop_target) { state.stopped = true; }
-            else { state.eip = return_target; }
-            return;
-        }
-        case Op::call: {
-            const std::uint32_t target = static_cast<std::uint32_t>(read_operand(state, instruction.operands[0]));
-            const std::uint32_t callsite = memory_.image_address(instruction.rva);
-            if (target == local_image_address(0x004010F0u) || target == local_image_address(0x00401120u)) { throw std::runtime_error(bound_check_failure(state, callsite, target)); }
-            if (target == local_image_address(0x00459B10u)) { throw std::runtime_error(fatal_handler_failure(state, callsite)); }
-            diagnostic_ir_call(callsite, target, next, state.esp);
-            if (execute_semantic_summary(state, callsite, target)) { diagnostic_ir_return(next); return; }
-            if (has_instruction(target)) { push32(state, next); state.eip = target; }
-            else { call_native(state, target); diagnostic_ir_return(next); }
-            return;
-        }
-        case Op::ret: {
-            const std::uint32_t target = pop32(state);
-            if (instruction.operand_count != 0) { state.esp += static_cast<std::uint32_t>(read_operand(state, instruction.operands[0]) & 0xFFFFu); }
-            diagnostic_ir_return(target);
-            if (target == stop_target) { state.stopped = true; }
-            else { state.eip = target; }
-            return;
-        }
-        case Op::leave: state.esp = state.ebp; state.ebp = pop32(state); return;
-        case Op::jo: case Op::jno: case Op::jb: case Op::jae: case Op::je: case Op::jne: case Op::jbe: case Op::ja: case Op::js: case Op::jns: case Op::jp: case Op::jnp: case Op::jl: case Op::jge: case Op::jle: case Op::jg: if (condition(state, instruction.op)) { state.eip = static_cast<std::uint32_t>(read_operand(state, instruction.operands[0])); } return;
-        case Op::jecxz: if (state.ecx == 0) { state.eip = static_cast<std::uint32_t>(read_operand(state, instruction.operands[0])); } return;
-        case Op::jcxz: if ((state.ecx & 0xFFFFu) == 0) { state.eip = static_cast<std::uint32_t>(read_operand(state, instruction.operands[0])); } return;
-        case Op::loop: state.ecx -= 1u; if (state.ecx != 0) { state.eip = static_cast<std::uint32_t>(read_operand(state, instruction.operands[0])); } return;
-        case Op::loope: state.ecx -= 1u; if (state.ecx != 0 && flag(state, kFlagZF)) { state.eip = static_cast<std::uint32_t>(read_operand(state, instruction.operands[0])); } return;
-        case Op::loopne: state.ecx -= 1u; if (state.ecx != 0 && !flag(state, kFlagZF)) { state.eip = static_cast<std::uint32_t>(read_operand(state, instruction.operands[0])); } return;
-        case Op::seta: case Op::setae: case Op::setb: case Op::setbe: case Op::sete: case Op::setg: case Op::setge: case Op::setl: case Op::setle: case Op::setne: case Op::setno: case Op::setnp: case Op::setns: case Op::seto: case Op::setp: case Op::sets: write_operand(state, instruction.operands[0], condition(state, instruction.op) ? 1u : 0u); return;
-        case Op::cmova: case Op::cmovae: case Op::cmovb: case Op::cmovbe: case Op::cmove: case Op::cmovg: case Op::cmovge: case Op::cmovl: case Op::cmovle: case Op::cmovne: case Op::cmovno: case Op::cmovnp: case Op::cmovns: case Op::cmovo: case Op::cmovp: case Op::cmovs: if (condition(state, instruction.op)) { write_operand(state, instruction.operands[0], read_operand(state, instruction.operands[1])); } return;
-        case Op::clc: assign_flag(state, kFlagCF, false); return;
-        case Op::stc: assign_flag(state, kFlagCF, true); return;
-        case Op::cmc: assign_flag(state, kFlagCF, !flag(state, kFlagCF)); return;
-        case Op::cld: assign_flag(state, kFlagDF, false); return;
-        case Op::std_: assign_flag(state, kFlagDF, true); return;
-        case Op::lahf: write_register(state, Reg::ah, (state.eflags & 0xD5u) | 0x02u); return;
-        case Op::sahf: state.eflags = (state.eflags & ~0xD5u) | (static_cast<std::uint32_t>(read_register(state, Reg::ah)) & 0xD5u) | 0x2u; return;
-        case Op::movsb: case Op::movsw: case Op::movsd: {
-            const bool string_form = instruction.operand_count == 2 && instruction.operands[0].kind == OperandKind::mem && instruction.operands[1].kind == OperandKind::mem;
-            if (!string_form) {
-                const OperandDescriptor& destination = instruction.operands[0];
-                const OperandDescriptor& source = instruction.operands[1];
-                const double value = read_scalar_double(state, source);
-                if (destination.kind == OperandKind::mem) { memory_write(effective_address(state, destination), value); }
-                else {
-                    auto& target = xmm_register(state, destination.reg);
-                    if (source.kind == OperandKind::mem) { target.fill(0); }
-                    std::memcpy(target.data(), &value, sizeof(value));
-                }
-                return;
-            }
-            const std::uint32_t width = instruction.op == Op::movsb ? 1u : instruction.op == Op::movsw ? 2u : 4u;
-            std::uint32_t count = (instruction.prefixes & kPrefixRep) != 0 ? state.ecx : 1u;
-            const std::int32_t delta = flag(state, kFlagDF) ? -static_cast<std::int32_t>(width) : static_cast<std::int32_t>(width);
-            while (count--) {
-                if (width == 1) { memory_write(state.edi, memory_read<std::uint8_t>(state.esi)); }
-                else if (width == 2) { memory_write(state.edi, memory_read<std::uint16_t>(state.esi)); }
-                else { memory_write(state.edi, memory_read<std::uint32_t>(state.esi)); }
-                state.esi += delta; state.edi += delta;
-                if ((instruction.prefixes & kPrefixRep) != 0) { --state.ecx; }
-            }
-            return;
-        }
-        case Op::stosb: case Op::stosw: case Op::stosd: {
-            const std::uint32_t width = instruction.op == Op::stosb ? 1u : instruction.op == Op::stosw ? 2u : 4u;
-            std::uint32_t count = (instruction.prefixes & kPrefixRep) != 0 ? state.ecx : 1u;
-            const std::int32_t delta = flag(state, kFlagDF) ? -static_cast<std::int32_t>(width) : static_cast<std::int32_t>(width);
-            while (count--) {
-                if (width == 1) { memory_write(state.edi, static_cast<std::uint8_t>(state.eax)); }
-                else if (width == 2) { memory_write(state.edi, static_cast<std::uint16_t>(state.eax)); }
-                else { memory_write(state.edi, state.eax); }
-                state.edi += delta;
-                if ((instruction.prefixes & kPrefixRep) != 0) { --state.ecx; }
-            }
-            return;
-        }
-        case Op::lodsb: case Op::lodsw: case Op::lodsd: {
-            const std::uint32_t width = instruction.op == Op::lodsb ? 1u : instruction.op == Op::lodsw ? 2u : 4u;
-            std::uint32_t count = (instruction.prefixes & (kPrefixRep | kPrefixRepe | kPrefixRepne)) != 0 ? state.ecx : 1u;
-            const std::int32_t delta = flag(state, kFlagDF) ? -static_cast<std::int32_t>(width) : static_cast<std::int32_t>(width);
-            while (count--) {
-                if (width == 1) { write_register(state, Reg::al, memory_read<std::uint8_t>(state.esi)); }
-                else if (width == 2) { write_register(state, Reg::ax, memory_read<std::uint16_t>(state.esi)); }
-                else { state.eax = memory_read<std::uint32_t>(state.esi); }
-                state.esi += delta;
-                if ((instruction.prefixes & (kPrefixRep | kPrefixRepe | kPrefixRepne)) != 0) { --state.ecx; }
-            }
-            return;
-        }
-        case Op::cmpsb: case Op::cmpsw: case Op::cmpsd: execute_compare_string(state, instruction, instruction.op == Op::cmpsb ? 1u : instruction.op == Op::cmpsw ? 2u : 4u, false); return;
-        case Op::scasb: case Op::scasw: case Op::scasd: execute_compare_string(state, instruction, instruction.op == Op::scasb ? 1u : instruction.op == Op::scasw ? 2u : 4u, true); return;
-        case Op::movups: write_vector(state, instruction.operands[0], read_vector(state, instruction.operands[1])); return;
-        case Op::cvttsd2si: {
-            const double value = read_scalar_double(state, instruction.operands[1]);
-            write_operand(state, instruction.operands[0], static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(value))));
-            return;
-        }
-        case Op::nop: case Op::wait: return;
-        case Op::int3: throw std::runtime_error("IR INT3");
-        case Op::invalid: throw std::runtime_error("Invalid x86 encoding reached");
-        default: throw std::runtime_error("Unsupported opcode " + std::string(op_name(instruction.op)));
-    }
+extern "C" void __cdecl lift_import_call(LiftCpu* cpu, std::uint32_t import_index, std::uint32_t callsite) {
+    if (!g_runtime || !cpu) { throw std::runtime_error("Import call without an active native runtime"); }
+    g_runtime->call_native(*cpu, g_runtime->import_address(import_index), callsite);
 }
 
-int Runtime::execute() {
+extern "C" void __cdecl lift_native_call(LiftCpu* cpu, std::uint32_t target, std::uint32_t callsite) {
+    if (!g_runtime || !cpu) { throw std::runtime_error("Native call without an active native runtime"); }
+    g_runtime->call_native(*cpu, target, callsite);
+}
+
+extern "C" void __cdecl lift_note_config_lookup(std::uint32_t key_address, std::uint32_t value_address) {
+    const std::string key = local_c_string(key_address, 160u);
+    if (key.rfind("NEW_FONT_", 0) != 0) { return; }
+    std::string note = "normalized config lookup key=\"" + key + "\"";
+    note += value_address == 0 ? ", result=missing" : ", value=\"" + local_c_string(value_address, 160u) + "\"";
+    diagnostic_note(note.c_str());
+}
+
+int NativeRuntime::execute() {
     DiagnosticPhaseScope phase(RuntimePhase::execution_setup);
     LocalStack stack(kStackReserve);
-    CpuState state{};
+    LiftCpu state{};
+    state.eflags = 0x202u;
+    state.fpu_control = 0x027Fu;
     state.esp = stack.top();
     state.stack_base = stack.base();
     state.stack_limit = stack.limit();
     state.eip = memory_.entry_va();
     initialize_fs(state);
-    push32(state, kCallbackSentinel);
-    diagnostic_note("entering local IR entry point");
+    lift_push32(&state, LIFT_CALLBACK_SENTINEL);
+    DiagnosticRunScope run_scope(&state);
+    DiagnosticExecutionScope execution_scope(state.eip, LIFT_CALLBACK_SENTINEL, state.esp);
+    diagnostic_note("entering generated C entry function");
     g_runtime = this;
     try {
-        run(state, kCallbackSentinel);
+        DiagnosticPhaseScope native_phase(RuntimePhase::native_c);
+        lift_dispatch(&state, state.eip, LIFT_CALLBACK_SENTINEL);
         g_runtime = nullptr;
         return static_cast<int>(state.eax);
+    } catch (const std::exception& error) {
+        diagnostic_failure(state, error.what());
+        g_runtime = nullptr;
+        throw;
     } catch (...) {
+        diagnostic_failure(state, "Unknown failure in generated C code");
         g_runtime = nullptr;
         throw;
     }
 }
 
-void Runtime::dispatch_callback(CallbackRegisters& registers) {
+void NativeRuntime::dispatch_callback(CallbackRegisters& registers) {
     DiagnosticPhaseScope phase(RuntimePhase::callback);
     const std::uint32_t target = registers.stub_return - 5u;
     const std::uint32_t original_esp = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&registers.stub_return) + sizeof(registers.stub_return));
@@ -1701,14 +1077,17 @@ void Runtime::dispatch_callback(CallbackRegisters& registers) {
     LocalStack clone(std::max<std::size_t>(kStackReserve, 1024u * 1024u));
     const std::uint32_t clone_esp = clone.top() - static_cast<std::uint32_t>(copy_size);
     if (!safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(clone_esp)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(original_esp)), copy_size)) { throw std::runtime_error("Unable to clone native callback arguments"); }
-    memory_write(clone_esp, kCallbackSentinel);
-    CpuState state{};
+    memory_write(clone_esp, LIFT_CALLBACK_SENTINEL);
+    LiftCpu state{};
     state.eax = registers.eax; state.ecx = registers.ecx; state.edx = registers.edx; state.ebx = registers.ebx; state.esp = clone_esp; state.ebp = registers.ebp; state.esi = registers.esi; state.edi = registers.edi; state.eip = target; state.eflags = registers.eflags;
+    state.fpu_control = 0x027Fu;
     state.stack_base = clone.base(); state.stack_limit = clone.limit();
     initialize_fs(state);
-    run(state, kCallbackSentinel);
+    DiagnosticRunScope run_scope(&state);
+    DiagnosticExecutionScope execution_scope(target, LIFT_CALLBACK_SENTINEL, state.esp);
+    lift_dispatch(&state, target, LIFT_CALLBACK_SENTINEL);
     const std::uint32_t stack_delta = state.esp - clone_esp;
-    if (stack_delta < 4u || stack_delta > copy_size) { throw std::runtime_error("IR callback returned an invalid stack delta"); }
+    if (stack_delta < 4u || stack_delta > copy_size) { throw std::runtime_error("Lifted callback returned an invalid stack delta"); }
     if (copy_size > 4u) { safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(original_esp + 4u)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(clone_esp + 4u)), copy_size - 4u); }
     const std::uint32_t destination = original_esp + stack_delta;
     memory_write(destination - 8u, state.eax);
@@ -1722,7 +1101,7 @@ extern "C" void __cdecl dispatch_native_callback(CallbackRegisters* registers) {
         g_runtime->dispatch_callback(*registers);
     } catch (const std::exception& error) {
         diagnostic_note(error.what());
-        MessageBoxA(nullptr, error.what(), "Compiled IR callback failure", MB_OK | MB_ICONERROR);
+        MessageBoxA(nullptr, error.what(), "Native C callback failure", MB_OK | MB_ICONERROR);
         TerminateProcess(GetCurrentProcess(), 0xE0000002u);
     }
 }
@@ -1734,9 +1113,11 @@ extern "C" void callback_bridge() {}
 
 #elif defined(_M_IX86)
 
-static_assert(offsetof(CpuState, eax) == 0 && offsetof(CpuState, eflags) == 36 && offsetof(CpuState, fpu_control) == 114);
-static_assert(offsetof(CpuState, fs_data) == 248);
+static_assert(offsetof(LiftCpu, eax) == 0 && offsetof(LiftCpu, eflags) == 36 && offsetof(LiftCpu, fpu_control) == 114);
+static_assert(offsetof(LiftCpu, fs_data) == 248);
 static_assert(offsetof(NativeCallFrame, state) == 0 && offsetof(NativeCallFrame, native_st0) == 40);
+static_assert(offsetof(CallbackRegisters, edi) == 0 && offsetof(CallbackRegisters, eax) == 28 && offsetof(CallbackRegisters, eflags) == 32 && offsetof(CallbackRegisters, stub_return) == 36);
+static_assert(sizeof(CallbackRegisters) == 40);
 
 extern "C" __declspec(naked) void __cdecl native_call_bridge(NativeCallFrame*) {
     __asm {
@@ -1837,11 +1218,11 @@ extern "C" __declspec(naked) void callback_bridge() {
 #error The generated runtime must be compiled for Win32/x86.
 #endif
 
-int run_compiled_slice() {
+int run_native_program() {
     configure_process_environment();
     g_deep_diagnostics = GetEnvironmentVariableW(kDeepDiagnosticsEnvironment, nullptr, 0) != 0;
-    diagnostic_note(g_deep_diagnostics ? "structured IR execution mode: deep diagnostics" : "structured IR execution mode: fast");
-    Runtime runtime;
+    diagnostic_note(g_deep_diagnostics ? "generated C execution: deep diagnostics" : "generated C execution: fast");
+    NativeRuntime runtime;
     return runtime.execute();
 }
 

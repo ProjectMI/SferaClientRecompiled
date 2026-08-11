@@ -8,10 +8,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
     try {
         lifted::set_runtime_phase(lifted::RuntimePhase::process_startup);
         lifted::diagnostic_note("single-process runtime started");
-        return lifted::run_compiled_slice();
+        return lifted::run_native_program();
     } catch (const std::exception& error) {
         lifted::diagnostic_note(error.what());
-        MessageBoxA(nullptr, error.what(), "Compiled IR runtime failure", MB_OK | MB_ICONERROR);
+        MessageBoxA(nullptr, error.what(), "Compiled native C runtime failure", MB_OK | MB_ICONERROR);
         return 1;
     }
 }

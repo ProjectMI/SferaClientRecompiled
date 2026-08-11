@@ -18,7 +18,7 @@ namespace lifted {
 namespace {
 
 thread_local RuntimePhase g_phase = RuntimePhase::startup;
-thread_local const CpuState* g_cpu = nullptr;
+thread_local const LiftCpu* g_cpu = nullptr;
 thread_local std::uint32_t g_instruction = 0;
 thread_local const char* g_operation = nullptr;
 thread_local std::uint32_t g_native_target = 0;
@@ -30,7 +30,7 @@ struct TraceEntry {
     const char* operation;
 };
 
-struct IrCallEntry {
+struct CallEntry {
     std::uint32_t callsite;
     std::uint32_t target;
     std::uint32_t return_address;
@@ -44,8 +44,8 @@ struct MemoryWriteRecord {
 
 thread_local TraceEntry g_trace[256]{};
 thread_local std::uint64_t g_trace_count = 0;
-thread_local IrCallEntry g_ir_calls[512]{};
-thread_local std::size_t g_ir_call_count = 0;
+thread_local CallEntry g_calls[512]{};
+thread_local std::size_t g_call_count = 0;
 thread_local std::unique_ptr<MemoryWriteRecord[]> g_memory_writes;
 thread_local std::uint64_t g_memory_write_sequence = 0;
 constexpr std::size_t kMemoryWriteBucketCount = 65536;
@@ -55,7 +55,7 @@ std::size_t memory_write_bucket(std::uint32_t address) noexcept {
     return static_cast<std::size_t>((address * 2654435761u) >> 16u) * 4u;
 }
 
-const char* phase_name(RuntimePhase phase) noexcept {
+[[maybe_unused]] const char* phase_name(RuntimePhase phase) noexcept {
     switch (phase) {
         case RuntimePhase::startup: return "startup";
         case RuntimePhase::process_startup: return "process-startup";
@@ -63,12 +63,11 @@ const char* phase_name(RuntimePhase phase) noexcept {
         case RuntimePhase::load_imports: return "load-imports";
         case RuntimePhase::protect_image: return "protect-image";
         case RuntimePhase::abi_self_test: return "abi-self-test";
-        case RuntimePhase::build_index: return "build-index";
+        case RuntimePhase::function_map: return "function-map";
         case RuntimePhase::execution_setup: return "execution-setup";
-        case RuntimePhase::interpret: return "interpret";
+        case RuntimePhase::native_c: return "native-c";
         case RuntimePhase::native_call: return "native-call";
         case RuntimePhase::callback: return "callback";
-        case RuntimePhase::shutdown: return "shutdown";
     }
     return "unknown";
 }
@@ -118,23 +117,23 @@ void append_text(char* buffer, std::size_t capacity, std::size_t& used, const ch
     else { used = std::strlen(buffer); }
 }
 
-void append_execution_context(char* report, std::size_t capacity, std::size_t& used, const CpuState* state) noexcept {
+void append_execution_context(char* report, std::size_t capacity, std::size_t& used, const LiftCpu* state) noexcept {
     if (state) {
-        append_text(report, capacity, used, "ir eip=%08X esp=%08X ebp=%08X eax=%08X ebx=%08X ecx=%08X edx=%08X esi=%08X edi=%08X eflags=%08X\r\n", state->eip, state->esp, state->ebp, state->eax, state->ebx, state->ecx, state->edx, state->esi, state->edi, state->eflags);
+        append_text(report, capacity, used, "lifted eip=%08X esp=%08X ebp=%08X eax=%08X ebx=%08X ecx=%08X edx=%08X esi=%08X edi=%08X eflags=%08X\r\n", state->eip, state->esp, state->ebp, state->eax, state->ebx, state->ecx, state->edx, state->esi, state->edi, state->eflags);
     }
     if (g_instruction != 0) { append_text(report, capacity, used, "instruction=%08X operation=%s\r\n", g_instruction, g_operation ? g_operation : "unknown"); }
     if (g_native_target != 0) { append_text(report, capacity, used, "native-target=%08X import=%s\r\n", g_native_target, g_import_name ? g_import_name : "unknown"); }
-    if (g_ir_call_count != 0) {
-        append_text(report, capacity, used, "ir-call-stack:\r\n");
-        for (std::size_t index = 0; index < g_ir_call_count; ++index) {
-            const IrCallEntry& entry = g_ir_calls[index];
+    if (g_call_count != 0) {
+        append_text(report, capacity, used, "call-stack:\r\n");
+        for (std::size_t index = 0; index < g_call_count; ++index) {
+            const CallEntry& entry = g_calls[index];
             if (entry.callsite == 0) { append_text(report, capacity, used, "  root target=%08X stop=%08X esp=%08X\r\n", entry.target, entry.return_address, entry.esp); }
             else { append_text(report, capacity, used, "  call=%08X target=%08X return=%08X esp=%08X\r\n", entry.callsite, entry.target, entry.return_address, entry.esp); }
         }
     }
     const std::size_t trace_size = g_trace_count < std::size(g_trace) ? static_cast<std::size_t>(g_trace_count) : std::size(g_trace);
     if (trace_size != 0) {
-        append_text(report, capacity, used, "recent-ir:\r\n");
+        append_text(report, capacity, used, "recent-blocks:\r\n");
         for (std::size_t offset = trace_size; offset != 0; --offset) {
             const std::size_t index = static_cast<std::size_t>((g_trace_count - offset) % std::size(g_trace));
             const TraceEntry& entry = g_trace[index];
@@ -146,7 +145,7 @@ void append_execution_context(char* report, std::size_t capacity, std::size_t& u
 void write_minidump(EXCEPTION_POINTERS* pointers) noexcept {
     wchar_t dump_path[MAX_PATH]{};
     wchar_t system_path[MAX_PATH]{};
-    if (!artifact_path(L"sfera_ir_crash.dmp", dump_path, MAX_PATH)) { return; }
+    if (!artifact_path(L"sfera_native_crash.dmp", dump_path, MAX_PATH)) { return; }
     const UINT system_length = GetSystemDirectoryW(system_path, MAX_PATH);
     constexpr wchar_t suffix[] = L"\\dbghelp.dll";
     if (system_length == 0 || system_length + std::size(suffix) > MAX_PATH) { return; }
@@ -174,7 +173,7 @@ void write_crash_report(EXCEPTION_POINTERS* pointers) noexcept {
     std::size_t used = 0;
     const EXCEPTION_RECORD* record = pointers->ExceptionRecord;
     const CONTEXT* context = pointers->ContextRecord;
-    append_text(report, sizeof(report), used, "Sfera structured-IR runtime crash\r\n");
+    append_text(report, sizeof(report), used, "Sfera native-C runtime crash\r\n");
     append_text(report, sizeof(report), used, "pid=%lu tid=%lu phase=%s\r\n", GetCurrentProcessId(), GetCurrentThreadId(), phase_name(g_phase));
     if (record) {
         append_text(report, sizeof(report), used, "exception=0x%08lX address=%p\r\n", record->ExceptionCode, record->ExceptionAddress);
@@ -187,7 +186,7 @@ void write_crash_report(EXCEPTION_POINTERS* pointers) noexcept {
         append_text(report, sizeof(report), used, "native eip=%08lX esp=%08lX ebp=%08lX eax=%08lX ebx=%08lX ecx=%08lX edx=%08lX esi=%08lX edi=%08lX eflags=%08lX\r\n", context->Eip, context->Esp, context->Ebp, context->Eax, context->Ebx, context->Ecx, context->Edx, context->Esi, context->Edi, context->EFlags);
     }
     append_execution_context(report, sizeof(report), used, g_cpu);
-    write_bytes(L"sfera_ir_crash.txt", report, used, CREATE_ALWAYS);
+    write_bytes(L"sfera_native_crash.txt", report, used, CREATE_ALWAYS);
     OutputDebugStringA(report);
     write_minidump(pointers);
 }
@@ -211,7 +210,7 @@ LONG WINAPI unhandled_exception_handler(EXCEPTION_POINTERS* pointers) noexcept {
 DiagnosticPhaseScope::DiagnosticPhaseScope(RuntimePhase phase) noexcept : previous_(g_phase) { g_phase = phase; }
 DiagnosticPhaseScope::~DiagnosticPhaseScope() { g_phase = previous_; }
 
-DiagnosticRunScope::DiagnosticRunScope(const CpuState* state) noexcept : previous_state_(g_cpu), previous_instruction_(g_instruction), previous_operation_(g_operation) {
+DiagnosticRunScope::DiagnosticRunScope(const LiftCpu* state) noexcept : previous_state_(g_cpu), previous_instruction_(g_instruction), previous_operation_(g_operation) {
     g_cpu = state;
     g_instruction = 0;
     g_operation = nullptr;
@@ -233,12 +232,12 @@ DiagnosticNativeScope::~DiagnosticNativeScope() {
     g_import_name = previous_import_name_;
 }
 
-DiagnosticExecutionScope::DiagnosticExecutionScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp) noexcept : previous_depth_(g_ir_call_count) {
-    diagnostic_ir_call(0, target, stop_target, esp);
+DiagnosticExecutionScope::DiagnosticExecutionScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp) noexcept : previous_depth_(g_call_count) {
+    diagnostic_call(0, target, stop_target, esp);
 }
 
 DiagnosticExecutionScope::~DiagnosticExecutionScope() {
-    g_ir_call_count = previous_depth_;
+    g_call_count = previous_depth_;
 }
 
 void install_crash_diagnostics() noexcept {
@@ -290,30 +289,30 @@ bool diagnostic_last_memory_write(std::uint32_t address, MemoryWriteInfo& result
     return true;
 }
 
-void diagnostic_ir_call(std::uint32_t callsite, std::uint32_t target, std::uint32_t return_address, std::uint32_t esp) noexcept {
-    if (g_ir_call_count == std::size(g_ir_calls)) { return; }
-    g_ir_calls[g_ir_call_count++] = {callsite, target, return_address, esp};
+void diagnostic_call(std::uint32_t callsite, std::uint32_t target, std::uint32_t return_address, std::uint32_t esp) noexcept {
+    if (g_call_count == std::size(g_calls)) { return; }
+    g_calls[g_call_count++] = {callsite, target, return_address, esp};
 }
 
-void diagnostic_ir_return(std::uint32_t return_address) noexcept {
-    for (std::size_t index = g_ir_call_count; index != 0; --index) {
-        if (g_ir_calls[index - 1].return_address == return_address) {
-            g_ir_call_count = index - 1;
+void diagnostic_return(std::uint32_t return_address) noexcept {
+    for (std::size_t index = g_call_count; index != 0; --index) {
+        if (g_calls[index - 1].return_address == return_address) {
+            g_call_count = index - 1;
             return;
         }
     }
 }
 
-void diagnostic_ir_failure(const CpuState& state, const char* message) noexcept {
+void diagnostic_failure(const LiftCpu& state, const char* message) noexcept {
 #if !defined(SFERA_PORTABLE_CHECK)
     static thread_local char report[65536]{};
     std::size_t used = 0;
     report[0] = '\0';
-    append_text(report, sizeof(report), used, "Sfera structured-IR execution failure\r\n");
+    append_text(report, sizeof(report), used, "Sfera native-C execution failure\r\n");
     append_text(report, sizeof(report), used, "pid=%lu tid=%lu phase=%s\r\n", GetCurrentProcessId(), GetCurrentThreadId(), phase_name(g_phase));
-    append_text(report, sizeof(report), used, "%s\r\n", message ? message : "IR execution failure");
+    append_text(report, sizeof(report), used, "%s\r\n", message ? message : "native C execution failure");
     append_execution_context(report, sizeof(report), used, &state);
-    write_bytes(L"sfera_ir_failure.txt", report, used, CREATE_ALWAYS);
+    write_bytes(L"sfera_native_failure.txt", report, used, CREATE_ALWAYS);
     OutputDebugStringA(report);
 #else
     (void)state;
@@ -327,7 +326,7 @@ void diagnostic_note(const char* message) noexcept {
     GetLocalTime(&time);
     char line[1024]{};
     const int count = _snprintf_s(line, sizeof(line), _TRUNCATE, "%04u-%02u-%02u %02u:%02u:%02u.%03u pid=%lu tid=%lu phase=%s %s\r\n", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond, time.wMilliseconds, GetCurrentProcessId(), GetCurrentThreadId(), phase_name(g_phase), message ? message : "");
-    if (count > 0) { write_bytes(L"sfera_ir_runtime.log", line, static_cast<std::size_t>(count), OPEN_ALWAYS); }
+    if (count > 0) { write_bytes(L"sfera_native_runtime.log", line, static_cast<std::size_t>(count), OPEN_ALWAYS); }
 #else
     (void)message;
 #endif

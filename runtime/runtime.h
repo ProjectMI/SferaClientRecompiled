@@ -1,11 +1,10 @@
 #pragma once
 
+#include "lifted_abi.h"
 #include "source.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -13,41 +12,8 @@
 
 namespace lifted {
 
-inline constexpr std::uint32_t kFlagCF = 0x00000001u;
-inline constexpr std::uint32_t kFlagPF = 0x00000004u;
-inline constexpr std::uint32_t kFlagAF = 0x00000010u;
-inline constexpr std::uint32_t kFlagZF = 0x00000040u;
-inline constexpr std::uint32_t kFlagSF = 0x00000080u;
-inline constexpr std::uint32_t kFlagDF = 0x00000400u;
-inline constexpr std::uint32_t kFlagOF = 0x00000800u;
-inline constexpr std::uint32_t kCallbackSentinel = 0xFFF0FFF0u;
-
-struct CpuState {
-    std::uint32_t eax = 0;
-    std::uint32_t ecx = 0;
-    std::uint32_t edx = 0;
-    std::uint32_t ebx = 0;
-    std::uint32_t esp = 0;
-    std::uint32_t ebp = 0;
-    std::uint32_t esi = 0;
-    std::uint32_t edi = 0;
-    std::uint32_t eip = 0;
-    std::uint32_t eflags = 0x202u;
-    std::uint32_t stack_base = 0;
-    std::uint32_t stack_limit = 0;
-    std::array<double, 8> fpu{};
-    std::uint8_t fpu_depth = 0;
-    std::uint8_t fpu_top = 0;
-    std::uint16_t fpu_control = 0x037Fu;
-    std::uint16_t fpu_status = 0;
-    std::uint16_t reserved = 0;
-    std::array<std::array<std::uint8_t, 16>, 8> xmm{};
-    std::array<std::uint8_t, 4096> fs_data{};
-    bool stopped = false;
-};
-
 struct NativeCallFrame {
-    CpuState* state;
+    LiftCpu* state;
     void* target;
     std::uint32_t host_esp;
     std::uint32_t host_ebp;
@@ -126,28 +92,25 @@ private:
     void release() noexcept;
 };
 
-class Runtime {
+class NativeRuntime {
 public:
-    Runtime();
-    Runtime(const Runtime&) = delete;
-    Runtime& operator=(const Runtime&) = delete;
+    NativeRuntime();
+    NativeRuntime(const NativeRuntime&) = delete;
+    NativeRuntime& operator=(const NativeRuntime&) = delete;
     int execute();
-    void run(CpuState& state, std::uint32_t stop_target = 0);
     void dispatch_callback(CallbackRegisters& registers);
     ProcessMemory& memory() noexcept;
+    const ImportDescriptor* find_import(std::uint32_t target) const;
+    std::uint32_t import_address(std::uint32_t index) const;
+    void call_native(LiftCpu& state, std::uint32_t target, std::uint32_t callsite);
 private:
     ProcessMemory memory_;
-    std::vector<const InstructionDescriptor*> instruction_index_;
-    const InstructionDescriptor* const* instruction_index_data_ = nullptr;
     std::unordered_map<std::uint32_t, const ImportDescriptor*> imports_by_address_;
-    const InstructionDescriptor& lookup(std::uint32_t eip) const;
-    bool has_instruction(std::uint32_t eip) const noexcept;
-    void step(CpuState& state, const InstructionDescriptor& instruction, std::uint32_t stop_target);
-    void call_native(CpuState& state, std::uint32_t target);
-    const ImportDescriptor* find_import(std::uint32_t target) const;
+    std::vector<std::uint32_t> import_addresses_;
 };
 
-extern Runtime* g_runtime;
+extern NativeRuntime* g_runtime;
+extern ProcessMemory* g_process_memory;
 extern "C" void __cdecl native_call_bridge(NativeCallFrame* frame);
 extern "C" void __cdecl dispatch_native_callback(CallbackRegisters* registers);
 extern "C" void callback_bridge();
@@ -156,6 +119,6 @@ std::string win32_error(const char* operation, DWORD error = GetLastError());
 std::string hex_u32(std::uint32_t value);
 const std::wstring& client_root_directory();
 void configure_process_environment();
-int run_compiled_slice();
+int run_native_program();
 
 } // namespace lifted
