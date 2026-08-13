@@ -36,7 +36,7 @@ semantic::Matrix3x4 identity_transform() {
 }
 
 void test_bitstream_contract() {
-    semantic::attach_runtime({{}, &capture_bitstream_diagnostic, nullptr});
+    semantic::attach_runtime({{}, &capture_bitstream_diagnostic, 0u, nullptr, nullptr});
     std::array<std::uint8_t, 96> source{};
     for (std::size_t index = 0; index < source.size(); ++index) { source[index] = static_cast<std::uint8_t>((index * 37u + 11u) & 0xffu); }
     std::array<std::uint8_t, 8> destination{};
@@ -75,7 +75,7 @@ void test_geometry_and_binding() {
     assert(transform_entry->parameters[2].storage == semantic::NativeParameterStorage::stack);
     semantic::Vec3 bridged{};
     const std::array transform_arguments{pointer_argument(&bridged), pointer_argument(&transform), pointer_argument(&source)};
-    const semantic::NativeResult transform_result = semantic::invoke_native_entry(*transform_entry, transform_arguments.data(), transform_arguments.size());
+    const semantic::NativeResult transform_result = semantic::invoke_native_entry(*transform_entry, transform_arguments.data(), transform_arguments.size(), nullptr);
     assert(transform_result.kind == semantic::NativeValueKind::none);
     assert(near(bridged.x, 12.0f) && near(bridged.y, 26.0f) && near(bridged.z, 42.0f));
 
@@ -83,7 +83,7 @@ void test_geometry_and_binding() {
     assert(model_entry && model_entry->convention == semantic::NativeCallingConvention::stdcall_call && model_entry->stack_bytes == 4u);
     const char model_name[] = "sample.mdl";
     const semantic::NativeArgument model_argument = pointer_argument(model_name);
-    assert(semantic::invoke_native_entry(*model_entry, &model_argument, 1u).word == 1u);
+    assert(semantic::invoke_native_entry(*model_entry, &model_argument, 1u, nullptr).word == 1u);
 }
 
 void test_scripted_effects_audio_and_logs() {
@@ -251,13 +251,13 @@ void test_world_math_and_bindings() {
     const char text[] = "models/hero.mdl";
     const char pattern[] = "models/*.mdl";
     const std::array wildcard_arguments{pointer_argument(text), pointer_argument(pattern)};
-    assert(semantic::invoke_native_entry(*wildcard_entry, wildcard_arguments.data(), wildcard_arguments.size()).word == 1u);
+    assert(semantic::invoke_native_entry(*wildcard_entry, wildcard_arguments.data(), wildcard_arguments.size(), nullptr).word == 1u);
 
     const semantic::NativeEntry* cross_entry = semantic::find_native_entry(0x0044C1D0u);
     assert(cross_entry && cross_entry->convention == semantic::NativeCallingConvention::fastcall_call && cross_entry->parameter_count == 3u && cross_entry->stack_bytes == 4u && cross_entry->result_kind == semantic::NativeValueKind::word);
     semantic::Vec3 bridged_cross{};
     const std::array cross_arguments{pointer_argument(&bridged_cross), pointer_argument(&horizontal), pointer_argument(&vertical)};
-    const semantic::NativeResult cross_result = semantic::invoke_native_entry(*cross_entry, cross_arguments.data(), cross_arguments.size());
+    const semantic::NativeResult cross_result = semantic::invoke_native_entry(*cross_entry, cross_arguments.data(), cross_arguments.size(), nullptr);
     assert(cross_result.kind == semantic::NativeValueKind::word && cross_result.width == 4u && cross_result.word == reinterpret_cast<std::uintptr_t>(&bridged_cross));
     assert(near(bridged_cross.z, 1.0f));
 }
@@ -324,7 +324,7 @@ void test_configuration_parsing() {
     std::array<char, 256> owned{};
     char* active = owned.data();
     std::uint32_t active_length = 0u;
-    semantic::attach_runtime({{&active, &active_length, owned.data(), owned.size()}, nullptr, nullptr});
+    semantic::attach_runtime({{&active, &active_length, owned.data(), owned.size()}, nullptr, 0u, nullptr, nullptr});
     constexpr char configuration[] = "answer 42\nratio 3.5\nname \"semantic\"\nbad nope\n";
     std::array<char, 16> status{"pending"};
     assert(semantic::install_config_text(status.data(), configuration, sizeof(configuration) - 1u) == sizeof(configuration) - 1u);
@@ -478,102 +478,6 @@ void test_character_effects_and_rendering() {
     assert(effects.take_next()->shader == "blood" && effects.size() == 0u);
 }
 
-
-void test_remaining_semantic_models() {
-    using namespace semantic;
-    const std::array<std::string_view, 6> arguments{"client", "/locale", "ru", "/login", "tester", "/gamexp_sid"};
-    const auto connection = content_runtime::parse_connection_arguments(arguments, "CONNECT_TYPE=direct\nLOGIN=config_user\n");
-    assert(connection.locale == "ru" && connection.login == "tester" && connection.type == content_runtime::ConnectionType::direct);
-
-    assert(container_runtime::check_index(1, 3) == container_runtime::IndexStatus::valid);
-    assert(container_runtime::check_index(-1, 3) == container_runtime::IndexStatus::negative);
-    container_runtime::ItemArray<int> item_array{1, 2, 3};
-    container_runtime::require_index(2, item_array.size());
-    container_runtime::ListStack<int> list_stack;
-    list_stack.push_back(7);
-    assert(list_stack.back() == 7);
-
-    content_runtime::MaterialFilter filter;
-    filter.set_words({"metal", "stone"});
-    assert(filter.accepts("dark_metal") && !filter.accepts("wood"));
-    content_runtime::ModelPathRegistry models;
-    const auto model_id = models.register_model("models/hero.mdl");
-    assert(models.find("hero.mdl") == model_id && models.model(model_id));
-    content_runtime::ObjectConfig object_config;
-    assert(object_config.parse("name=hero\nhealth=100\nflags=[1,2,3]\n"));
-    assert(object_config.get("health") && object_config.get("health")->integer() == 100 && object_config.array_size("flags") == 3u);
-    content_runtime::QuickFileIndex quick_files;
-    assert(quick_files.add({"test.mbc", 32u, 64u}) && quick_files.find("TEST.MBC"));
-    content_runtime::ServerWall wall;
-    wall.set_segments({{{0.0f, 0.0f, 0.0f}, {10.0f, 0.0f, 0.0f}, 2.0f, "fx_swall"}});
-    assert(wall.blocks({5.0f, 1.0f, 0.0f}, 0.1f) && !wall.blocks({5.0f, 3.0f, 0.0f}, 0.1f));
-
-    particle_runtime::ScalarCurve scale_curve;
-    scale_curve.set({{0.0f, 1.0f}, {1.0f, 2.0f}});
-    assert(near(scale_curve.sample(0.5f), 1.5f));
-    particle_runtime::ParticleSystemDefinition particle_definition;
-    particle_definition.maximum_particles = 8u;
-    particle_definition.emission_rate = 4.0f;
-    particle_definition.lifetime = 1.0f;
-    particle_definition.speed = 1.0f;
-    particle_definition.scale = scale_curve;
-    particle_runtime::ParticleSystem particles(particle_definition, 7u);
-    particles.update(0.5f);
-    assert(particles.particles().size() == 2u);
-    particles.update(1.0f);
-    assert(particles.particles().size() <= particle_definition.maximum_particles);
-
-    markup_runtime::Document document;
-    assert(document.parse("<p>Hello <a href='item:1'>world</a></p>"));
-    assert(document.find("a").size() == 1u && document.plain_text().find("Hello") != std::string::npos);
-    markup_runtime::SimpleParser simple;
-    assert(simple.parse("time=12\nsun=1\n") && simple.value("time") == "12");
-
-    environment_runtime::SkyTimeline sky;
-    assert(sky.set({{0.0f, {1.0f, 0.0f, 0.0f}, {}, {}, 0.0f, 1.0f}, {12.0f, {0.0f, 0.0f, 1.0f}, {}, {}, 1.0f, 0.5f}}, 24.0f));
-    const auto noon = sky.sample(6.0f);
-    assert(near(noon.sun_color.x, 0.5f) && near(noon.sun_color.z, 0.5f));
-    environment_runtime::SnowField snow({0.0f, 0.0f, 0.0f}, {10.0f, 10.0f, 10.0f}, 10.0f, 5u);
-    snow.update(0.5f);
-    assert(!snow.flakes().empty());
-
-    media_runtime::SoundEffectCatalog sound_effects;
-    assert(sound_effects.store({"click", media_runtime::SoundPlayback::random, false, false, {"a.wav", "b.wav"}, 0.0f, 1.0f}));
-    assert(sound_effects.choose("click", 1u) == "b.wav");
-    media_runtime::Playlist playlist;
-    playlist.set({{"one.ogg", 1.0f, false}, {"two.ogg", 1.0f, true}});
-    assert(playlist.current() && playlist.next()->file == std::filesystem::path("two.ogg"));
-
-    client_runtime::UpdateManager updater;
-    updater.begin({{"a", "url-a", 10u, 1u}, {"b", "url-b", 20u, 2u}});
-    updater.mark_downloaded("a");
-    assert(near(updater.progress(), 0.5f));
-    updater.mark_downloaded("b");
-    assert(updater.state() == client_runtime::UpdateState::ready);
-
-    ui_runtime::PropertyBag properties;
-    properties.set("alpha", "128");
-    properties.set("enabled", "true");
-    assert(properties.integer("alpha") == 128 && properties.boolean("enabled"));
-    ui_runtime::HyperText hypertext;
-    assert(hypertext.parse("hello <a href='player:1'>player</a>") && hypertext.runs().size() >= 2u);
-    ui_runtime::RangeModel range;
-    range.set_range(0.0f, 100.0f);
-    range.set_step(10.0f);
-    range.set_value(50.0f);
-    range.increment();
-    assert(near(range.value(), 60.0f) && near(range.ratio(), 0.6f));
-    ui_runtime::HelpIndex help_index;
-    help_index.set("login", "login_help");
-    assert(help_index.find("login") == "login_help" && help_index.size() == 1u);
-
-    ui_runtime::InterfaceModel interface_model;
-    assert(interface_model.add({1u, ui_runtime::ControlKind::button, "login", {0, 0, 100, 20}, true, true, false, "Login", {}, {}}));
-    assert(interface_model.add({2u, ui_runtime::ControlKind::slider, "volume", {0, 30, 100, 50}, true, true, false, {}, {}, {}}));
-    interface_model.set_focus(1u);
-    assert(interface_model.focus() == 1u && interface_model.find("login") && interface_model.hit_test({10, 10}).size() == 1u);
-}
-
 void test_directx_table() {
     assert(std::string_view(semantic::directx::error_description(-2147483638)) == "The data necessary to complete this operation is not yet available.");
     assert(std::string_view(semantic::directx::error_description(123456789)) == "n/a");
@@ -590,7 +494,7 @@ void test_compiler_runtime() {
     assert(divide_entry && divide_entry->convention == semantic::NativeCallingConvention::stdcall_call);
     assert(divide_entry->parameter_count == 2u && divide_entry->parameters[0].width == 8u && divide_entry->stack_bytes == 16u);
     const std::array divide_arguments{integer_argument(std::bit_cast<std::uint64_t>(INT64_C(-100)), 8u), integer_argument(7u, 8u)};
-    const auto result = semantic::invoke_native_entry(*divide_entry, divide_arguments.data(), divide_arguments.size());
+    const auto result = semantic::invoke_native_entry(*divide_entry, divide_arguments.data(), divide_arguments.size(), nullptr);
     assert(std::bit_cast<std::int64_t>(result.word) == -14);
 
     std::array<std::uint8_t, 4> copied{};
@@ -598,7 +502,7 @@ void test_compiler_runtime() {
     const semantic::NativeEntry* copy_entry = semantic::find_native_entry(0x004EE804u);
     assert(copy_entry && copy_entry->parameter_count == 3u);
     const std::array copy_arguments{pointer_argument(copied.data()), pointer_argument(original.data()), integer_argument(original.size(), 4u)};
-    semantic::invoke_native_entry(*copy_entry, copy_arguments.data(), copy_arguments.size());
+    semantic::invoke_native_entry(*copy_entry, copy_arguments.data(), copy_arguments.size(), nullptr);
     assert(copied == original);
 }
 
@@ -616,7 +520,6 @@ int main() {
     test_network();
     test_assets_and_services();
     test_character_effects_and_rendering();
-    test_remaining_semantic_models();
     test_directx_table();
     test_compiler_runtime();
     std::cout << "semantic native subsystem checks passed" << std::endl;

@@ -2375,223 +2375,6 @@ float World::time() const noexcept { return time_; }
 
 } // namespace world_runtime
 
-
-namespace container_runtime {
-
-IndexStatus check_index(std::ptrdiff_t index, std::size_t size, std::size_t maximum) noexcept {
-    if (index < 0) { return IndexStatus::negative; }
-    const auto converted = static_cast<std::size_t>(index);
-    if (converted >= maximum) { return IndexStatus::maximum_exceeded; }
-    return converted < size ? IndexStatus::valid : IndexStatus::out_of_range;
-}
-
-void require_index(std::ptrdiff_t index, std::size_t size, std::size_t maximum) {
-    const IndexStatus status = check_index(index, size, maximum);
-    if (status == IndexStatus::valid) { return; }
-    if (status == IndexStatus::negative) { throw std::out_of_range("container index is negative"); }
-    if (status == IndexStatus::maximum_exceeded) { throw std::length_error("container index exceeds configured maximum"); }
-    throw std::out_of_range("container index is outside the current range");
-}
-
-} // namespace container_runtime
-
-namespace content_runtime {
-namespace {
-std::string lowercase(std::string_view value) { std::string result(value); std::transform(result.begin(), result.end(), result.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); }); return result; }
-std::string trim_text(std::string_view value) { std::size_t first = 0; while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first]))) { ++first; } std::size_t last = value.size(); while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1u]))) { --last; } return std::string(value.substr(first, last - first)); }
-std::optional<std::string> cfg_value(std::string_view text, std::string_view key) { std::size_t cursor = 0; while (cursor < text.size()) { const std::size_t end = text.find_first_of("\r\n", cursor); const std::string_view line = text.substr(cursor, end == std::string_view::npos ? text.size() - cursor : end - cursor); const std::size_t equal = line.find('='); if (equal != std::string_view::npos && lowercase(trim_text(line.substr(0, equal))) == lowercase(key)) { return trim_text(line.substr(equal + 1u)); } if (end == std::string_view::npos) { break; } cursor = end + 1u; } return std::nullopt; }
-ConnectionType parse_connection_type(std::string_view value) { const std::string text = lowercase(value); if (text == "direct" || text == "1") { return ConnectionType::direct; } if (text == "proxy" || text == "2") { return ConnectionType::proxy; } if (text.empty() || text == "auto" || text == "automatic" || text == "0") { return ConnectionType::automatic; } return ConnectionType::unknown; }
-script::Value parse_scalar(std::string_view value) { const std::string text = trim_text(value); if (text == "true") { return script::Value(true); } if (text == "false") { return script::Value(false); } char* end = nullptr; const long integer = std::strtol(text.c_str(), &end, 10); if (end && *end == '\0') { return script::Value(static_cast<std::int32_t>(integer)); } end = nullptr; const float floating = std::strtof(text.c_str(), &end); if (end && *end == '\0') { return script::Value(floating); } if (text.size() >= 2u && ((text.front() == '"' && text.back() == '"') || (text.front() == '\'' && text.back() == '\''))) { return script::Value(text.substr(1u, text.size() - 2u)); } return script::Value(text); }
-float point_segment_distance_squared(Vec3 point, const WallSegment& segment) noexcept { const float dx = segment.end.x - segment.begin.x; const float dz = segment.end.z - segment.begin.z; const float px = point.x - segment.begin.x; const float pz = point.z - segment.begin.z; const float length = dx * dx + dz * dz; const float t = length > 0.0f ? std::clamp((px * dx + pz * dz) / length, 0.0f, 1.0f) : 0.0f; const float ox = point.x - (segment.begin.x + dx * t); const float oz = point.z - (segment.begin.z + dz * t); return ox * ox + oz * oz; }
-}
-
-ConnectionArguments parse_connection_arguments(std::span<const std::string_view> arguments, std::string_view config_text) { ConnectionArguments result; if (const auto value = cfg_value(config_text, "LOCALE")) { result.locale = *value; } if (const auto value = cfg_value(config_text, "LOGIN")) { result.login = *value; } if (const auto value = cfg_value(config_text, "GAMEXP_SID")) { result.gamexp_sid = *value; } if (const auto value = cfg_value(config_text, "CONNECT_TYPE")) { result.type = parse_connection_type(*value); } for (std::size_t index = 0; index < arguments.size(); ++index) { const std::string key = lowercase(arguments[index]); const auto next = [&]() -> std::string_view { return index + 1u < arguments.size() ? arguments[++index] : std::string_view{}; }; if (key == "/locale" || key == "-locale") { result.locale = std::string(next()); } else if (key == "/login" || key == "-login") { result.login = std::string(next()); } else if (key == "/gamexp_sid" || key == "-gamexp_sid") { result.gamexp_sid = std::string(next()); } else if (key == "/connect" || key == "-connect") { result.config_file = std::filesystem::path(next()); } else if (key == "/connect_type" || key == "-connect_type") { result.type = parse_connection_type(next()); } } return result; }
-void MaterialFilter::set_base_path(std::filesystem::path path) { base_path_ = std::move(path); }
-void MaterialFilter::set_words(std::vector<std::string> words) { words_ = std::move(words); for (std::string& word : words_) { word = lowercase(word); } }
-bool MaterialFilter::accepts(std::string_view value) const noexcept { if (words_.empty()) { return true; } const std::string text = lowercase(value); return std::any_of(words_.begin(), words_.end(), [&](const std::string& word) { return text.find(word) != std::string::npos; }); }
-const std::filesystem::path& MaterialFilter::base_path() const noexcept { return base_path_; }
-const std::vector<std::string>& MaterialFilter::words() const noexcept { return words_; }
-std::uint32_t ModelPathRegistry::register_folder(std::filesystem::path folder) { folders_.push_back(std::move(folder)); return static_cast<std::uint32_t>(folders_.size() - 1u); }
-std::uint32_t ModelPathRegistry::register_model(std::filesystem::path model_path) { const std::string key = lowercase(model_path.filename().string()); if (const auto found = by_name_.find(key); found != by_name_.end()) { return found->second; } const std::uint32_t identifier = static_cast<std::uint32_t>(models_.size()); models_.push_back(std::move(model_path)); by_name_.emplace(key, identifier); return identifier; }
-const std::filesystem::path* ModelPathRegistry::model(std::uint32_t identifier) const noexcept { return identifier < models_.size() ? &models_[identifier] : nullptr; }
-std::optional<std::uint32_t> ModelPathRegistry::find(std::string_view name) const noexcept { const auto found = by_name_.find(lowercase(name)); return found == by_name_.end() ? std::nullopt : std::optional<std::uint32_t>(found->second); }
-std::size_t ModelPathRegistry::size() const noexcept { return models_.size(); }
-void ModelPathRegistry::clear() noexcept { folders_.clear(); models_.clear(); by_name_.clear(); }
-bool ObjectConfig::parse(std::string_view text) { values_.clear(); std::size_t cursor = 0; while (cursor < text.size()) { const std::size_t end = text.find_first_of("\r\n", cursor); const std::string line = trim_text(text.substr(cursor, end == std::string_view::npos ? text.size() - cursor : end - cursor)); if (!line.empty() && line.front() != '#' && line.front() != ';') { const std::size_t equal = line.find('='); if (equal != std::string::npos) { const std::string key = trim_text(std::string_view(line).substr(0, equal)); const std::string raw = trim_text(std::string_view(line).substr(equal + 1u)); if (!key.empty()) { if (raw.size() >= 2u && raw.front() == '[' && raw.back() == ']') { script::Value sequence = script::Value::sequence(); std::string_view inner(raw.data() + 1u, raw.size() - 2u); std::size_t item_cursor = 0; while (item_cursor <= inner.size()) { const std::size_t comma = inner.find(',', item_cursor); const std::string_view item = inner.substr(item_cursor, comma == std::string_view::npos ? inner.size() - item_cursor : comma - item_cursor); sequence.storage(); script::assign(sequence, script::Value(static_cast<std::uint32_t>(script::size(sequence))), parse_scalar(item)); if (comma == std::string_view::npos) { break; } item_cursor = comma + 1u; } values_[key] = std::move(sequence); } else { values_[key] = parse_scalar(raw); } } } } if (end == std::string_view::npos) { break; } cursor = end + 1u; } return true; }
-const script::Value* ObjectConfig::get(std::string_view name) const noexcept { const auto found = values_.find(std::string(name)); return found == values_.end() ? nullptr : &found->second; }
-std::size_t ObjectConfig::array_size(std::string_view name) const noexcept { const script::Value* value = get(name); return value ? script::size(*value) : 0u; }
-const script::Value* ObjectConfig::at(std::string_view name, std::size_t index) const noexcept { const script::Value* value = get(name); if (!value) { return nullptr; } const auto item = script::find(*value, script::Value(static_cast<std::uint32_t>(index))); if (!item) { return nullptr; } static thread_local script::Value scratch; scratch = *item; return &scratch; }
-void ObjectConfig::clear() noexcept { values_.clear(); }
-bool QuickFileIndex::add(QuickFileRecord record) { if (record.name.empty()) { return false; } return records_.insert_or_assign(lowercase(record.name), std::move(record)).second; }
-const QuickFileRecord* QuickFileIndex::find(std::string_view name) const noexcept { const auto found = records_.find(lowercase(name)); return found == records_.end() ? nullptr : &found->second; }
-std::size_t QuickFileIndex::size() const noexcept { return records_.size(); }
-void QuickFileIndex::clear() noexcept { records_.clear(); }
-void ServerWall::set_segments(std::vector<WallSegment> segments) { segments_ = std::move(segments); }
-bool ServerWall::blocks(Vec3 point, float radius) const noexcept { const float radius_squared = std::max(radius, 0.0f) * std::max(radius, 0.0f); return std::any_of(segments_.begin(), segments_.end(), [&](const WallSegment& segment) { return point.y <= std::max(segment.begin.y, segment.end.y) + segment.height && point_segment_distance_squared(point, segment) <= radius_squared; }); }
-const std::vector<WallSegment>& ServerWall::segments() const noexcept { return segments_; }
-void SpatialIndex::rebuild(std::vector<SpatialEntry> entries) { entries_ = std::move(entries); }
-std::vector<std::uint32_t> SpatialIndex::query(Vec3 minimum, Vec3 maximum) const { std::vector<std::uint32_t> result; for (const SpatialEntry& entry : entries_) { const bool overlap = entry.maximum.x >= minimum.x && entry.minimum.x <= maximum.x && entry.maximum.y >= minimum.y && entry.minimum.y <= maximum.y && entry.maximum.z >= minimum.z && entry.minimum.z <= maximum.z; if (overlap) { result.push_back(entry.identifier); } } return result; }
-std::vector<std::uint32_t> SpatialIndex::query_radius(Vec3 center, float radius) const { const float safe_radius = std::max(radius, 0.0f); return query({center.x - safe_radius, center.y - safe_radius, center.z - safe_radius}, {center.x + safe_radius, center.y + safe_radius, center.z + safe_radius}); }
-std::size_t SpatialIndex::size() const noexcept { return entries_.size(); }
-bool TextureSet::assign(std::string name, render::ResourceHandle texture) { if (name.empty() || !texture) { return false; } textures_.insert_or_assign(lowercase(name), texture); return true; }
-render::ResourceHandle TextureSet::find(std::string_view name) const noexcept { const auto found = textures_.find(lowercase(name)); return found == textures_.end() ? render::ResourceHandle{} : found->second; }
-bool TextureSet::erase(std::string_view name) noexcept { return textures_.erase(lowercase(name)) != 0u; }
-std::size_t TextureSet::size() const noexcept { return textures_.size(); }
-
-} // namespace content_runtime
-
-namespace particle_runtime {
-namespace {
-float cosine_blend(float amount) noexcept { return (1.0f - std::cos(std::clamp(amount, 0.0f, 1.0f) * 3.14159265358979323846f)) * 0.5f; }
-float interpolation_amount(float amount, Interpolation mode) noexcept { if (mode == Interpolation::step) { return 0.0f; } return mode == Interpolation::cosine ? cosine_blend(amount) : std::clamp(amount, 0.0f, 1.0f); }
-template <typename Key> std::pair<const Key*, const Key*> curve_pair(const std::vector<Key>& keys, float time) noexcept { if (keys.empty()) { return {nullptr, nullptr}; } if (time <= keys.front().time) { return {&keys.front(), &keys.front()}; } if (time >= keys.back().time) { return {&keys.back(), &keys.back()}; } const auto upper = std::upper_bound(keys.begin(), keys.end(), time, [](float value, const Key& key) { return value < key.time; }); return {&*(upper - 1), &*upper}; }
-Vec3 add(Vec3 left, Vec3 right) noexcept { return {left.x + right.x, left.y + right.y, left.z + right.z}; }
-Vec3 scale(Vec3 value, float amount) noexcept { return {value.x * amount, value.y * amount, value.z * amount}; }
-Vec3 interpolate(Vec3 left, Vec3 right, float amount) noexcept { return add(left, scale({right.x - left.x, right.y - left.y, right.z - left.z}, amount)); }
-}
-void ScalarCurve::set(std::vector<ScalarKey> keys, Interpolation interpolation) { std::sort(keys.begin(), keys.end(), [](const ScalarKey& left, const ScalarKey& right) { return left.time < right.time; }); keys_ = std::move(keys); interpolation_ = interpolation; }
-float ScalarCurve::sample(float time, float fallback) const noexcept { const auto [left, right] = curve_pair(keys_, time); if (!left) { return fallback; } if (left == right || right->time <= left->time) { return left->value; } const float amount = interpolation_amount((time - left->time) / (right->time - left->time), interpolation_); return left->value + (right->value - left->value) * amount; }
-bool ScalarCurve::empty() const noexcept { return keys_.empty(); }
-void VectorCurve::set(std::vector<VectorKey> keys, Interpolation interpolation) { std::sort(keys.begin(), keys.end(), [](const VectorKey& left, const VectorKey& right) { return left.time < right.time; }); keys_ = std::move(keys); interpolation_ = interpolation; }
-Vec3 VectorCurve::sample(float time, Vec3 fallback) const noexcept { const auto [left, right] = curve_pair(keys_, time); if (!left) { return fallback; } if (left == right || right->time <= left->time) { return left->value; } return interpolate(left->value, right->value, interpolation_amount((time - left->time) / (right->time - left->time), interpolation_)); }
-bool VectorCurve::empty() const noexcept { return keys_.empty(); }
-ParticleSystem::ParticleSystem(ParticleSystemDefinition definition, std::uint32_t seed) : definition_(std::move(definition)), random_state_(seed == 0u ? 1u : seed) { particles_.reserve(definition_.maximum_particles); }
-void ParticleSystem::set_origin(Vec3 origin) noexcept { origin_ = origin; }
-float ParticleSystem::random_unit() noexcept { random_state_ ^= random_state_ << 13u; random_state_ ^= random_state_ >> 17u; random_state_ ^= random_state_ << 5u; return static_cast<float>(random_state_ & 0x00ffffffu) / static_cast<float>(0x01000000u); }
-Vec3 ParticleSystem::random_direction() noexcept { const float z = random_unit() * 2.0f - 1.0f; const float angle = random_unit() * 6.28318530717958647692f; const float radius = std::sqrt(std::max(0.0f, 1.0f - z * z)); return {radius * std::cos(angle), z, radius * std::sin(angle)}; }
-Vec3 ParticleSystem::spawn_offset() noexcept { const float x = random_unit() * 2.0f - 1.0f; const float y = random_unit() * 2.0f - 1.0f; const float z = random_unit() * 2.0f - 1.0f; if (definition_.emit_shape == EmitShape::line) { return {definition_.emit_extent.x * x, definition_.emit_extent.y * x, definition_.emit_extent.z * x}; } if (definition_.emit_shape == EmitShape::disk || definition_.emit_shape == EmitShape::ring) { const float angle = random_unit() * 6.28318530717958647692f; const float radius = definition_.emit_shape == EmitShape::ring ? 1.0f : std::sqrt(random_unit()); return {std::cos(angle) * definition_.emit_extent.x * radius, 0.0f, std::sin(angle) * definition_.emit_extent.z * radius}; } if (definition_.emit_shape == EmitShape::box) { return {definition_.emit_extent.x * x, definition_.emit_extent.y * y, definition_.emit_extent.z * z}; } if (definition_.emit_shape == EmitShape::cylinder) { const float angle = random_unit() * 6.28318530717958647692f; const float radius = std::sqrt(random_unit()); return {std::cos(angle) * definition_.emit_extent.x * radius, definition_.emit_extent.y * y, std::sin(angle) * definition_.emit_extent.z * radius}; } if (definition_.emit_shape == EmitShape::sphere) { const Vec3 direction = random_direction(); const float radius = std::cbrt(random_unit()); return {direction.x * definition_.emit_extent.x * radius, direction.y * definition_.emit_extent.y * radius, direction.z * definition_.emit_extent.z * radius}; } return {}; }
-void ParticleSystem::spawn_one() { if (particles_.size() >= definition_.maximum_particles) { return; } Particle particle; particle.position = add(origin_, spawn_offset()); const Vec3 direction = random_direction(); particle.velocity = scale(direction, definition_.speed * (1.0f + (random_unit() * 2.0f - 1.0f) * definition_.spread)); particle.lifetime = std::max(definition_.lifetime, 0.001f); particle.scale = definition_.scale.sample(0.0f, 1.0f); particle.alpha = definition_.alpha.sample(0.0f, 1.0f); particles_.push_back(particle); }
-void ParticleSystem::update(float elapsed_seconds) { if (!(elapsed_seconds > 0.0f)) { return; } emission_credit_ += std::max(definition_.emission_rate, 0.0f) * elapsed_seconds; const std::size_t spawn_count = static_cast<std::size_t>(emission_credit_); emission_credit_ -= static_cast<float>(spawn_count); for (std::size_t index = 0; index < spawn_count; ++index) { spawn_one(); } for (Particle& particle : particles_) { particle.age += elapsed_seconds; const Vec3 acceleration = definition_.acceleration.sample(particle.age, {}); particle.velocity = add(particle.velocity, scale(acceleration, elapsed_seconds)); particle.position = add(particle.position, scale(particle.velocity, elapsed_seconds)); particle.scale = definition_.scale.sample(particle.age, particle.scale); particle.alpha = definition_.alpha.sample(particle.age, particle.alpha); } std::erase_if(particles_, [](const Particle& particle) { return particle.age >= particle.lifetime; }); }
-void ParticleSystem::clear() noexcept { particles_.clear(); emission_credit_ = 0.0f; }
-bool ParticleSystem::finished() const noexcept { return definition_.emission_rate <= 0.0f && particles_.empty(); }
-const ParticleSystemDefinition& ParticleSystem::definition() const noexcept { return definition_; }
-const std::vector<Particle>& ParticleSystem::particles() const noexcept { return particles_; }
-
-} // namespace particle_runtime
-
-namespace markup_runtime {
-namespace {
-std::string trim_markup(std::string_view value) { std::size_t first = 0; while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first]))) { ++first; } std::size_t last = value.size(); while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1u]))) { --last; } return std::string(value.substr(first, last - first)); }
-std::vector<std::string> split_words(std::string_view value) { std::vector<std::string> result; std::size_t cursor = 0; while (cursor < value.size()) { while (cursor < value.size() && std::isspace(static_cast<unsigned char>(value[cursor]))) { ++cursor; } if (cursor >= value.size()) { break; } const std::size_t begin = cursor; bool quoted = false; char quote = 0; while (cursor < value.size()) { const char ch = value[cursor]; if (!quoted && (ch == '"' || ch == '\'')) { quoted = true; quote = ch; } else if (quoted && ch == quote) { quoted = false; } else if (!quoted && std::isspace(static_cast<unsigned char>(ch))) { break; } ++cursor; } result.emplace_back(value.substr(begin, cursor - begin)); } return result; }
-void collect_nodes(const Node& node, std::string_view tag, std::vector<const Node*>& result) { if (node.tag == tag) { result.push_back(&node); } for (const Node& child : node.children) { collect_nodes(child, tag, result); } }
-void collect_text(const Node& node, std::string& result) { if (!node.text.empty()) { if (!result.empty() && !std::isspace(static_cast<unsigned char>(result.back()))) { result.push_back(' '); } result += node.text; } for (const Node& child : node.children) { collect_text(child, result); } }
-}
-const Attribute* Node::attribute(std::string_view name) const noexcept { const auto found = std::find_if(attributes.begin(), attributes.end(), [&](const Attribute& item) { return item.name == name; }); return found == attributes.end() ? nullptr : &*found; }
-bool Document::parse(std::string_view text) { root_ = Node{"document", {}, {}, {}}; std::vector<Node*> stack{&root_}; std::size_t cursor = 0; while (cursor < text.size()) { const std::size_t open = text.find('<', cursor); if (open == std::string_view::npos) { const std::string trailing = trim_markup(text.substr(cursor)); if (!trailing.empty()) { stack.back()->children.push_back(Node{"text", trailing, {}, {}}); } break; } const std::string before = trim_markup(text.substr(cursor, open - cursor)); if (!before.empty()) { stack.back()->children.push_back(Node{"text", before, {}, {}}); } const std::size_t close = text.find('>', open + 1u); if (close == std::string_view::npos) { return false; } std::string token = trim_markup(text.substr(open + 1u, close - open - 1u)); if (!token.empty() && token.front() == '!') { cursor = close + 1u; continue; } if (!token.empty() && token.front() == '/') { if (stack.size() > 1u) { stack.pop_back(); } cursor = close + 1u; continue; } const bool self_closing = !token.empty() && token.back() == '/'; if (self_closing) { token.pop_back(); token = trim_markup(token); } const std::vector<std::string> words = split_words(token); if (!words.empty()) { Node node; node.tag = words.front(); for (std::size_t index = 1; index < words.size(); ++index) { const std::size_t equal = words[index].find('='); if (equal == std::string::npos) { node.attributes.push_back({words[index], {}}); continue; } std::string value = words[index].substr(equal + 1u); if (value.size() >= 2u && ((value.front() == '"' && value.back() == '"') || (value.front() == '\'' && value.back() == '\''))) { value = value.substr(1u, value.size() - 2u); } node.attributes.push_back({words[index].substr(0, equal), std::move(value)}); } stack.back()->children.push_back(std::move(node)); if (!self_closing) { stack.push_back(&stack.back()->children.back()); } } cursor = close + 1u; } return true; }
-const Node& Document::root() const noexcept { return root_; }
-std::vector<const Node*> Document::find(std::string_view tag) const { std::vector<const Node*> result; collect_nodes(root_, tag, result); return result; }
-std::string Document::plain_text() const { std::string result; collect_text(root_, result); return result; }
-bool SimpleParser::parse(std::string_view text) { values_.clear(); std::size_t cursor = 0; while (cursor < text.size()) { const std::size_t end = text.find_first_of("\r\n", cursor); const std::string line = trim_markup(text.substr(cursor, end == std::string_view::npos ? text.size() - cursor : end - cursor)); if (!line.empty() && line.front() != '#' && line.front() != ';') { const std::size_t separator = line.find_first_of("=:"); if (separator != std::string::npos) { values_[trim_markup(std::string_view(line).substr(0, separator))].push_back(trim_markup(std::string_view(line).substr(separator + 1u))); } else { const std::vector<std::string> words = split_words(line); if (words.size() > 1u) { values_[words.front()].emplace_back(line.substr(words.front().size() + 1u)); } } } if (end == std::string_view::npos) { break; } cursor = end + 1u; } return true; }
-std::optional<std::string_view> SimpleParser::value(std::string_view key) const noexcept { const auto found = values_.find(std::string(key)); return found == values_.end() || found->second.empty() ? std::nullopt : std::optional<std::string_view>(found->second.front()); }
-std::span<const std::string> SimpleParser::values(std::string_view key) const noexcept { const auto found = values_.find(std::string(key)); return found == values_.end() ? std::span<const std::string>{} : std::span<const std::string>(found->second); }
-void SimpleParser::clear() noexcept { values_.clear(); }
-
-} // namespace markup_runtime
-
-namespace environment_runtime {
-namespace {
-float wrap_time(float value, float period) noexcept { if (!(period > 0.0f)) { return 0.0f; } value = std::fmod(value, period); return value < 0.0f ? value + period : value; }
-SkyState blend_sky(const SkyState& left, const SkyState& right, float amount) noexcept { const auto blend = [amount](float a, float b) { return a + (b - a) * amount; }; SkyState result; result.time = blend(left.time, right.time); result.sun_color = {blend(left.sun_color.x, right.sun_color.x), blend(left.sun_color.y, right.sun_color.y), blend(left.sun_color.z, right.sun_color.z)}; result.sky_color = {blend(left.sky_color.x, right.sky_color.x), blend(left.sky_color.y, right.sky_color.y), blend(left.sky_color.z, right.sky_color.z)}; result.fog_color = {blend(left.fog_color.x, right.fog_color.x), blend(left.fog_color.y, right.fog_color.y), blend(left.fog_color.z, right.fog_color.z)}; result.fog_density = blend(left.fog_density, right.fog_density); result.sun_intensity = blend(left.sun_intensity, right.sun_intensity); return result; }
-}
-bool SkyTimeline::set(std::vector<SkyState> states, float day_length) { if (states.empty() || !(day_length > 0.0f)) { return false; } std::sort(states.begin(), states.end(), [](const SkyState& left, const SkyState& right) { return left.time < right.time; }); states_ = std::move(states); day_length_ = day_length; return true; }
-SkyState SkyTimeline::sample(float time) const noexcept { if (states_.empty()) { return {}; } if (states_.size() == 1u) { return states_.front(); } const float local = wrap_time(time, day_length_); auto upper = std::upper_bound(states_.begin(), states_.end(), local, [](float value, const SkyState& state) { return value < state.time; }); const SkyState* right = upper == states_.end() ? &states_.front() : &*upper; const SkyState* left = upper == states_.begin() ? &states_.back() : &*(upper - 1); float left_time = left->time; float right_time = right->time; float sample_time = local; if (right_time <= left_time) { right_time += day_length_; if (sample_time < left_time) { sample_time += day_length_; } } const float amount = right_time > left_time ? (sample_time - left_time) / (right_time - left_time) : 0.0f; return blend_sky(*left, *right, std::clamp(amount, 0.0f, 1.0f)); }
-float SkyTimeline::day_length() const noexcept { return day_length_; }
-SnowField::SnowField(Vec3 minimum, Vec3 maximum, float rate, std::uint32_t seed) : minimum_(minimum), maximum_(maximum), rate_(std::max(rate, 0.0f)), random_state_(seed == 0u ? 1u : seed) {}
-float SnowField::random_unit() noexcept { random_state_ ^= random_state_ << 13u; random_state_ ^= random_state_ >> 17u; random_state_ ^= random_state_ << 5u; return static_cast<float>(random_state_ & 0x00ffffffu) / static_cast<float>(0x01000000u); }
-void SnowField::update(float elapsed_seconds) { if (!(elapsed_seconds > 0.0f)) { return; } credit_ += rate_ * elapsed_seconds; const std::size_t count = static_cast<std::size_t>(credit_); credit_ -= static_cast<float>(count); for (std::size_t index = 0; index < count; ++index) { const float x = minimum_.x + (maximum_.x - minimum_.x) * random_unit(); const float z = minimum_.z + (maximum_.z - minimum_.z) * random_unit(); const float speed = 0.5f + random_unit() * 1.5f; flakes_.push_back({{x, maximum_.y, z}, speed, 0.0f}); } for (SnowFlake& flake : flakes_) { flake.position.y -= flake.speed * elapsed_seconds; flake.lifetime += elapsed_seconds; } std::erase_if(flakes_, [&](const SnowFlake& flake) { return flake.position.y < minimum_.y; }); }
-void SnowField::set_rate(float rate) noexcept { rate_ = std::max(rate, 0.0f); }
-void SnowField::clear() noexcept { flakes_.clear(); credit_ = 0.0f; }
-const std::vector<SnowFlake>& SnowField::flakes() const noexcept { return flakes_; }
-
-} // namespace environment_runtime
-
-namespace media_runtime {
-bool SoundEffectCatalog::store(SoundEffectProfile profile, bool replace) { if (profile.name.empty() || profile.files.empty()) { return false; } if (!replace && profiles_.contains(profile.name)) { return false; } profiles_.insert_or_assign(profile.name, std::move(profile)); return true; }
-const SoundEffectProfile* SoundEffectCatalog::find(std::string_view name) const noexcept { const auto found = profiles_.find(std::string(name)); return found == profiles_.end() ? nullptr : &found->second; }
-std::optional<std::string> SoundEffectCatalog::choose(std::string_view name, std::uint32_t selector) const { const SoundEffectProfile* profile = find(name); if (!profile || profile->files.empty()) { return std::nullopt; } if (profile->playback == SoundPlayback::single || profile->playback == SoundPlayback::looped) { return profile->files.front(); } return profile->files[selector % profile->files.size()]; }
-void Playlist::set(std::vector<Track> tracks) { tracks_ = std::move(tracks); index_ = 0u; }
-const Track* Playlist::current() const noexcept { return tracks_.empty() ? nullptr : &tracks_[std::min(index_, tracks_.size() - 1u)]; }
-const Track* Playlist::next() noexcept { if (tracks_.empty()) { return nullptr; } index_ = (index_ + 1u) % tracks_.size(); return &tracks_[index_]; }
-const Track* Playlist::previous() noexcept { if (tracks_.empty()) { return nullptr; } index_ = index_ == 0u ? tracks_.size() - 1u : index_ - 1u; return &tracks_[index_]; }
-void Playlist::reset() noexcept { index_ = 0u; }
-std::size_t Playlist::size() const noexcept { return tracks_.size(); }
-
-} // namespace media_runtime
-
-namespace client_runtime {
-void NetworkConnectionChecker::begin(std::string host) { host_ = std::move(host); running_ = !host_.empty(); reachable_ = false; latency_ = {}; }
-void NetworkConnectionChecker::complete(bool reachable, std::chrono::milliseconds latency) { reachable_ = reachable; latency_ = reachable ? std::max(latency, std::chrono::milliseconds::zero()) : std::chrono::milliseconds::zero(); running_ = false; }
-const std::string& NetworkConnectionChecker::host() const noexcept { return host_; }
-bool NetworkConnectionChecker::running() const noexcept { return running_; }
-bool NetworkConnectionChecker::reachable() const noexcept { return reachable_; }
-std::chrono::milliseconds NetworkConnectionChecker::latency() const noexcept { return latency_; }
-void UpdateManager::begin(std::vector<UpdatePackage> packages) { packages_ = std::move(packages); downloaded_.clear(); error_.clear(); state_ = packages_.empty() ? UpdateState::ready : UpdateState::downloading; }
-void UpdateManager::mark_downloaded(std::string_view name) { if (state_ != UpdateState::downloading) { return; } downloaded_.insert(std::string(name)); if (downloaded_.size() >= packages_.size()) { state_ = UpdateState::ready; } }
-void UpdateManager::fail(std::string reason) { error_ = std::move(reason); state_ = UpdateState::failed; }
-UpdateState UpdateManager::state() const noexcept { return state_; }
-float UpdateManager::progress() const noexcept { return packages_.empty() ? 1.0f : static_cast<float>(downloaded_.size()) / static_cast<float>(packages_.size()); }
-const std::string& UpdateManager::error() const noexcept { return error_; }
-
-} // namespace client_runtime
-
-namespace ui_runtime {
-namespace {
-std::string trim_ui(std::string_view value) { std::size_t first = 0; while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first]))) { ++first; } std::size_t last = value.size(); while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1u]))) { --last; } return std::string(value.substr(first, last - first)); }
-std::optional<long> parse_long(std::string_view value) noexcept { const std::string text = trim_ui(value); char* end = nullptr; const long result = std::strtol(text.c_str(), &end, 0); return end && *end == '\0' ? std::optional<long>(result) : std::nullopt; }
-std::optional<float> parse_float(std::string_view value) noexcept { const std::string text = trim_ui(value); char* end = nullptr; const float result = std::strtof(text.c_str(), &end); return end && *end == '\0' ? std::optional<float>(result) : std::nullopt; }
-}
-std::int32_t Rect::width() const noexcept { return right - left; }
-std::int32_t Rect::height() const noexcept { return bottom - top; }
-bool Rect::contains(Point point) const noexcept { return point.x >= left && point.y >= top && point.x < right && point.y < bottom; }
-void PropertyBag::set(std::string key, std::string value) { values_.insert_or_assign(std::move(key), std::move(value)); }
-std::optional<std::string_view> PropertyBag::get(std::string_view key) const noexcept { const auto found = values_.find(std::string(key)); return found == values_.end() ? std::nullopt : std::optional<std::string_view>(found->second); }
-std::optional<std::int32_t> PropertyBag::integer(std::string_view key) const noexcept { const auto raw = get(key); if (!raw) { return std::nullopt; } const auto value = parse_long(*raw); return value ? std::optional<std::int32_t>(static_cast<std::int32_t>(*value)) : std::nullopt; }
-std::optional<float> PropertyBag::floating(std::string_view key) const noexcept { const auto raw = get(key); return raw ? parse_float(*raw) : std::nullopt; }
-bool PropertyBag::boolean(std::string_view key, bool fallback) const noexcept { const auto raw = get(key); if (!raw) { return fallback; } std::string value(*raw); std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); }); return value == "1" || value == "true" || value == "yes" || value == "on"; }
-bool HyperText::parse(std::string_view text) { runs_.clear(); markup_runtime::Document document; if (!document.parse(text)) { return false; } std::function<void(const markup_runtime::Node&, bool, std::string)> visit = [&](const markup_runtime::Node& node, bool inherited_link, std::string inherited_target) { bool link = inherited_link; std::string target = std::move(inherited_target); if (node.tag == "a" || node.tag == "hts" || node.tag == "mailto" || node.tag == "item" || node.tag == "player") { link = true; if (const auto* href = node.attribute("href")) { target = href->value; } else if (const auto* value = node.attribute("value")) { target = value->value; } } if (node.tag == "text" && !node.text.empty()) { runs_.push_back({node.text, {}, link, target}); } for (const auto& child : node.children) { visit(child, link, target); } }; visit(document.root(), false, {}); return true; }
-const std::vector<TextRun>& HyperText::runs() const noexcept { return runs_; }
-std::string HyperText::plain_text() const { std::string result; for (const TextRun& run : runs_) { result += run.text; } return result; }
-void ListModel::set(std::vector<std::string> items) { items_ = std::move(items); if (selection_ && *selection_ >= items_.size()) { selection_.reset(); } }
-void ListModel::append(std::string item) { items_.push_back(std::move(item)); }
-bool ListModel::erase(std::size_t index) noexcept { if (index >= items_.size()) { return false; } items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(index)); if (selection_) { if (*selection_ == index) { selection_.reset(); } else if (*selection_ > index) { --*selection_; } } return true; }
-bool ListModel::select(std::size_t index) noexcept { if (index >= items_.size()) { return false; } selection_ = index; return true; }
-std::optional<std::size_t> ListModel::selection() const noexcept { return selection_; }
-std::span<const std::string> ListModel::items() const noexcept { return items_; }
-void RangeModel::set_range(float minimum, float maximum) noexcept { if (maximum < minimum) { std::swap(minimum, maximum); } minimum_ = minimum; maximum_ = maximum; set_value(value_); }
-void RangeModel::set_value(float value) noexcept { value_ = std::clamp(value, minimum_, maximum_); }
-void RangeModel::set_step(float step) noexcept { step_ = std::max(step, 0.0f); }
-float RangeModel::minimum() const noexcept { return minimum_; }
-float RangeModel::maximum() const noexcept { return maximum_; }
-float RangeModel::value() const noexcept { return value_; }
-float RangeModel::step() const noexcept { return step_; }
-float RangeModel::ratio() const noexcept { return maximum_ > minimum_ ? (value_ - minimum_) / (maximum_ - minimum_) : 0.0f; }
-void RangeModel::increment() noexcept { set_value(value_ + step_); }
-void RangeModel::decrement() noexcept { set_value(value_ - step_); }
-void HelpIndex::set(std::string control, std::string topic) { if (!control.empty()) { topics_.insert_or_assign(std::move(control), std::move(topic)); } }
-std::optional<std::string_view> HelpIndex::find(std::string_view control) const noexcept { const auto found = topics_.find(std::string(control)); return found == topics_.end() ? std::nullopt : std::optional<std::string_view>(found->second); }
-bool HelpIndex::erase(std::string_view control) noexcept { return topics_.erase(std::string(control)) != 0u; }
-void HelpIndex::clear() noexcept { topics_.clear(); }
-std::size_t HelpIndex::size() const noexcept { return topics_.size(); }
-bool InterfaceModel::add(Control control) { if (control.id == 0u || controls_.contains(control.id) || (!control.name.empty() && by_name_.contains(control.name))) { return false; } if (!control.name.empty()) { by_name_[control.name] = control.id; } controls_.emplace(control.id, std::move(control)); return true; }
-bool InterfaceModel::remove(std::uint32_t id) noexcept { const auto found = controls_.find(id); if (found == controls_.end()) { return false; } if (!found->second.name.empty()) { by_name_.erase(found->second.name); } if (focus_ == id) { focus_ = 0u; } controls_.erase(found); return true; }
-Control* InterfaceModel::find(std::uint32_t id) noexcept { const auto found = controls_.find(id); return found == controls_.end() ? nullptr : &found->second; }
-const Control* InterfaceModel::find(std::uint32_t id) const noexcept { const auto found = controls_.find(id); return found == controls_.end() ? nullptr : &found->second; }
-Control* InterfaceModel::find(std::string_view name) noexcept { const auto found = by_name_.find(std::string(name)); return found == by_name_.end() ? nullptr : find(found->second); }
-void InterfaceModel::set_focus(std::uint32_t id) noexcept { if (Control* current = find(focus_)) { current->focused = false; } focus_ = find(id) ? id : 0u; if (Control* next = find(focus_)) { next->focused = true; } }
-std::uint32_t InterfaceModel::focus() const noexcept { return focus_; }
-void InterfaceModel::set_cursor(std::string cursor) { cursor_ = std::move(cursor); }
-const std::string& InterfaceModel::cursor() const noexcept { return cursor_; }
-void InterfaceModel::register_sprite(SpriteDefinition sprite_definition) { if (!sprite_definition.name.empty()) { sprites_.insert_or_assign(sprite_definition.name, std::move(sprite_definition)); } }
-void InterfaceModel::register_font(FontDefinition font_definition) { if (!font_definition.name.empty()) { fonts_.insert_or_assign(font_definition.name, std::move(font_definition)); } }
-const SpriteDefinition* InterfaceModel::sprite(std::string_view name) const noexcept { const auto found = sprites_.find(std::string(name)); return found == sprites_.end() ? nullptr : &found->second; }
-const FontDefinition* InterfaceModel::font(std::string_view name) const noexcept { const auto found = fonts_.find(std::string(name)); return found == fonts_.end() ? nullptr : &found->second; }
-std::vector<std::uint32_t> InterfaceModel::hit_test(Point point) const { std::vector<std::uint32_t> result; for (const auto& [id, control] : controls_) { if (control.visible && control.enabled && control.bounds.contains(point)) { result.push_back(id); } } std::sort(result.begin(), result.end()); return result; }
-std::size_t InterfaceModel::size() const noexcept { return controls_.size(); }
-InterfaceOptions& InterfaceModel::options() noexcept { return options_; }
-const InterfaceOptions& InterfaceModel::options() const noexcept { return options_; }
-
-} // namespace ui_runtime
-
 namespace compiler_runtime {
 namespace {
 
@@ -8578,6 +8361,22 @@ const char* error_description(std::int32_t result) {
 namespace native_binding {
 namespace {
 
+struct ActiveInvocation {
+    void* bridge_context{};
+    std::uint32_t source_va{};
+};
+
+thread_local ActiveInvocation g_active_invocation{};
+
+class InvocationScope {
+public:
+    InvocationScope(void* bridge_context, std::uint32_t source_va) noexcept : previous_(g_active_invocation) { g_active_invocation = {bridge_context, source_va}; }
+    ~InvocationScope() { g_active_invocation = previous_; }
+
+private:
+    ActiveInvocation previous_;
+};
+
 template <typename Value>
 Value decode_argument(const NativeArgument& argument) noexcept {
     using Plain = std::remove_cv_t<Value>;
@@ -13692,7 +13491,10 @@ NativeCallingConvention native_abi_hint(std::uint32_t source_va) noexcept {
     return found != native_binding::kAbiHints.end() && found->source_va == source_va ? found->convention : NativeCallingConvention::cdecl_call;
 }
 
-NativeResult invoke_native_entry(const NativeEntry& entry, const NativeArgument* arguments, std::size_t argument_count) { return entry.invoke(arguments, argument_count); }
+NativeResult invoke_native_entry(const NativeEntry& entry, const NativeArgument* arguments, std::size_t argument_count, void* bridge_context) {
+    native_binding::InvocationScope scope(bridge_context, entry.source_va);
+    return entry.invoke(arguments, argument_count);
+}
 
 std::size_t native_entry_count() noexcept { return native_binding::kNativeEntries.size(); }
 

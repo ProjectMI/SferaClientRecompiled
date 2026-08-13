@@ -1,17 +1,17 @@
-#include "diagnostics.h"
 #include "runtime.h"
+#include "diagnostics.h"
 
 #include <exception>
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
-    sfera::runtime::install_crash_diagnostics();
+    lifted::install_crash_diagnostics();
     try {
-        sfera::runtime::set_runtime_phase(sfera::runtime::RuntimePhase::process_startup);
-        sfera::runtime::diagnostic_note("frozen semantic/native runtime started");
-        return sfera::runtime::run_native_program();
+        lifted::set_runtime_phase(lifted::RuntimePhase::process_startup);
+        lifted::diagnostic_note("single-process runtime started");
+        return lifted::run_native_program();
     } catch (const std::exception& error) {
-        sfera::runtime::diagnostic_note(error.what());
-        MessageBoxA(nullptr, error.what(), "Sfera frozen runtime failure", MB_OK | MB_ICONERROR);
+        lifted::diagnostic_note(error.what());
+        MessageBoxA(nullptr, error.what(), "Compiled native C runtime failure", MB_OK | MB_ICONERROR);
         return 1;
     }
 }

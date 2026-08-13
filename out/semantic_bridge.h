@@ -1,9 +1,13 @@
 #pragma once
 
-#include <cstdint>
+#include "lifted_abi.h"
 
-namespace sfera::bridge {
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void attach_semantic_runtime(std::uint32_t image_base) noexcept;
+int LIFT_CDECL semantic_bridge_try_invoke(LiftCpu* cpu, uint32_t source_va, uint32_t stop_address);
 
-} // namespace sfera::bridge
+#ifdef __cplusplus
+}
+#endif
