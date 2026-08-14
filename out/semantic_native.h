@@ -1247,6 +1247,628 @@ private:
 
 } // namespace world_runtime
 
+namespace client_runtime {
+
+struct LaunchOptions {
+    std::optional<std::string> locale;
+    std::optional<std::string> login;
+    std::optional<std::string> gamexp_session;
+    std::string connect_type;
+};
+
+LaunchOptions parse_launch_arguments(std::span<const std::string_view> arguments);
+std::unordered_map<std::string, std::string> parse_key_value_config(std::string_view text);
+
+struct ManagedModel {
+    std::int32_t identifier{-1};
+    std::string name;
+    std::filesystem::path file;
+};
+
+class ModelManager {
+public:
+    bool register_folder(std::filesystem::path folder);
+    std::int32_t register_model(std::string name, std::filesystem::path file);
+    const ManagedModel* by_id(std::int32_t identifier) const noexcept;
+    const ManagedModel* by_name(std::string_view name) const noexcept;
+    std::size_t size() const noexcept;
+    void clear() noexcept;
+
+private:
+    std::vector<std::filesystem::path> folders_;
+    std::vector<ManagedModel> models_;
+    std::unordered_map<std::string, std::int32_t> names_;
+};
+
+enum class ConnectionHealth : std::uint8_t { unknown, reachable, unreachable };
+
+struct ConnectionProbe {
+    ConnectionHealth health{ConnectionHealth::unknown};
+    std::uint32_t sent{};
+    std::uint32_t received{};
+    std::uint32_t lost{};
+    std::optional<std::uint32_t> round_trip_ms;
+};
+
+ConnectionProbe parse_ping_report(std::string_view text);
+
+} // namespace client_runtime
+
+namespace content_runtime {
+
+struct MaterialRule {
+    std::string word;
+    std::string texture;
+    float weight{1.0f};
+    std::set<std::string> tags;
+};
+
+class MaterialFilter {
+public:
+    void set_rules(std::vector<MaterialRule> rules);
+    void set_exceptions(std::set<std::string> exceptions);
+    const MaterialRule* match(std::string_view word, std::string_view tag = {}) const noexcept;
+    bool excluded(std::string_view word) const noexcept;
+    std::size_t size() const noexcept;
+
+private:
+    std::vector<MaterialRule> rules_;
+    std::set<std::string> exceptions_;
+};
+
+enum class ConfigKind : std::uint8_t { null_value, integer, real, boolean, text, array, object };
+
+class ConfigNode {
+public:
+    ConfigNode() = default;
+    explicit ConfigNode(std::int64_t value);
+    explicit ConfigNode(double value);
+    explicit ConfigNode(bool value);
+    explicit ConfigNode(std::string value);
+    static ConfigNode array();
+    static ConfigNode object();
+    ConfigKind kind() const noexcept;
+    std::optional<std::int64_t> integer() const noexcept;
+    std::optional<double> real() const noexcept;
+    std::optional<bool> boolean() const noexcept;
+    const std::string* text() const noexcept;
+    const std::vector<ConfigNode>* array_items() const noexcept;
+    std::vector<ConfigNode>* array_items() noexcept;
+    const std::map<std::string, ConfigNode>* object_items() const noexcept;
+    std::map<std::string, ConfigNode>* object_items() noexcept;
+    const ConfigNode* find(std::string_view key) const noexcept;
+    const ConfigNode* at(std::size_t index) const noexcept;
+
+private:
+    ConfigKind kind_{ConfigKind::null_value};
+    std::int64_t integer_{};
+    double real_{};
+    bool boolean_{};
+    std::string text_;
+    std::vector<ConfigNode> array_;
+    std::map<std::string, ConfigNode> object_;
+};
+
+class ObjectConfig {
+public:
+    bool parse(std::string_view text, std::string* error = nullptr);
+    const ConfigNode& root() const noexcept;
+    const ConfigNode* find(std::string_view dotted_path) const noexcept;
+    void clear() noexcept;
+
+private:
+    ConfigNode root_{ConfigNode::object()};
+};
+
+enum class Interpolation : std::uint8_t { linear, cosine };
+enum class EmitterShape : std::uint8_t { line, disk, ring, box, cylinder, sphere, disk2 };
+
+struct ScalarKey {
+    float time{};
+    float value{};
+};
+
+class ScalarCurve {
+public:
+    bool set(std::vector<ScalarKey> keys, Interpolation interpolation = Interpolation::linear);
+    float sample(float time) const noexcept;
+    const std::vector<ScalarKey>& keys() const noexcept;
+
+private:
+    std::vector<ScalarKey> keys_;
+    Interpolation interpolation_{Interpolation::linear};
+};
+
+struct ColorKey {
+    float time{};
+    std::array<float, 4> value{};
+};
+
+class ColorCurve {
+public:
+    bool set(std::vector<ColorKey> keys, Interpolation interpolation = Interpolation::linear);
+    std::array<float, 4> sample(float time) const noexcept;
+
+private:
+    std::vector<ColorKey> keys_;
+    Interpolation interpolation_{Interpolation::linear};
+};
+
+struct EffectMeshDefinition {
+    std::string name;
+    std::string mesh;
+    std::string texture;
+    std::uint32_t flags{};
+    bool self_illumination{};
+    std::array<std::uint8_t, 4> color{255u, 255u, 255u, 255u};
+};
+
+struct ParticleSystemDefinition {
+    std::string name;
+    std::uint32_t particle_count{};
+    std::uint32_t flags{};
+    EmitterShape emitter{EmitterShape::line};
+    std::array<Vec3, 3> transform{};
+    ScalarCurve size;
+    ScalarCurve rotation;
+    ColorCurve color;
+    std::optional<EffectMeshDefinition> effect_mesh;
+};
+
+class ParticleLibrary {
+public:
+    bool store(ParticleSystemDefinition definition, bool replace = false);
+    const ParticleSystemDefinition* find(std::string_view name) const noexcept;
+    bool erase(std::string_view name) noexcept;
+    std::size_t size() const noexcept;
+
+private:
+    std::unordered_map<std::string, ParticleSystemDefinition> systems_;
+};
+
+struct Rect2 {
+    float left{};
+    float top{};
+    float right{};
+    float bottom{};
+};
+
+struct SpatialRecord {
+    std::uint32_t identifier{};
+    Rect2 bounds{};
+};
+
+class QuadTree {
+public:
+    explicit QuadTree(Rect2 bounds = {}, std::size_t bucket_capacity = 8u, std::size_t maximum_depth = 8u);
+    bool insert(SpatialRecord record);
+    std::vector<std::uint32_t> query(Rect2 bounds) const;
+    void clear();
+    std::size_t size() const noexcept;
+
+private:
+    struct Node {
+        Rect2 bounds{};
+        std::vector<SpatialRecord> records;
+        std::array<std::unique_ptr<Node>, 4> children{};
+    };
+    bool insert(Node& node, SpatialRecord record, std::size_t depth);
+    void query(const Node& node, Rect2 bounds, std::vector<std::uint32_t>& result) const;
+    void split(Node& node);
+    Rect2 bounds_{};
+    std::size_t bucket_capacity_{8u};
+    std::size_t maximum_depth_{8u};
+    std::size_t size_{};
+    std::unique_ptr<Node> root_;
+};
+
+class QuickFileArchive {
+public:
+    bool add(std::string name, std::vector<std::uint8_t> bytes, bool replace = false);
+    std::span<const std::uint8_t> find(std::string_view name) const noexcept;
+    bool erase(std::string_view name) noexcept;
+    std::vector<std::string> names() const;
+    void clear() noexcept;
+
+private:
+    std::unordered_map<std::string, std::vector<std::uint8_t>> files_;
+};
+
+struct WallSegment {
+    Vec3 begin{};
+    Vec3 end{};
+    std::uint32_t flags{};
+};
+
+class ServerWall {
+public:
+    void set_segments(std::vector<WallSegment> segments);
+    std::optional<Vec3> first_intersection(Vec3 begin, Vec3 end) const noexcept;
+    bool blocked(Vec3 begin, Vec3 end) const noexcept;
+    std::size_t size() const noexcept;
+
+private:
+    std::vector<WallSegment> segments_;
+};
+
+struct ShadowSettings {
+    bool enabled{true};
+    bool spot_shadows{true};
+    std::uint32_t quality{1u};
+    float maximum_distance{100.0f};
+};
+
+struct GeneratedMap {
+    std::uint32_t width{};
+    std::uint32_t height{};
+    std::vector<float> heights;
+};
+
+class MapGenerator {
+public:
+    GeneratedMap generate(std::uint32_t width, std::uint32_t height, std::uint32_t seed, float amplitude) const;
+};
+
+struct NatureState {
+    float rain{};
+    float wind{};
+    std::uint32_t rain_class{};
+};
+
+class NatureManager {
+public:
+    void register_rain_class(std::uint32_t class_id, std::string name);
+    const std::string* rain_class(std::uint32_t class_id) const noexcept;
+    void set_state(NatureState state) noexcept;
+    NatureState state() const noexcept;
+
+private:
+    std::unordered_map<std::uint32_t, std::string> rain_classes_;
+    NatureState state_{};
+};
+
+struct ZoneParameters {
+    std::int32_t x_patch_min{};
+    std::int32_t z_patch_min{};
+    float x_min{};
+    float z_min{};
+    float x_max{};
+    float z_max{};
+    std::uint32_t identifier{};
+};
+
+class ZoningManager {
+public:
+    bool set_zones(std::vector<ZoneParameters> zones);
+    const ZoneParameters* zone_at(float x, float z) const noexcept;
+    std::optional<std::uint32_t> patch_owner(std::int32_t x_patch, std::int32_t z_patch) const noexcept;
+    std::size_t size() const noexcept;
+
+private:
+    std::vector<ZoneParameters> zones_;
+};
+
+class TextureSet {
+public:
+    bool set(std::string name, std::filesystem::path file, bool replace = true);
+    const std::filesystem::path* find(std::string_view name) const noexcept;
+    bool erase(std::string_view name) noexcept;
+    std::size_t size() const noexcept;
+
+private:
+    std::unordered_map<std::string, std::filesystem::path> textures_;
+};
+
+struct UpdateEntry {
+    std::filesystem::path file;
+    std::uint64_t size{};
+    std::uint32_t checksum{};
+};
+
+class UpdatePlan {
+public:
+    void set_local(std::vector<UpdateEntry> entries);
+    void set_remote(std::vector<UpdateEntry> entries);
+    std::vector<UpdateEntry> required() const;
+
+private:
+    std::unordered_map<std::string, UpdateEntry> local_;
+    std::unordered_map<std::string, UpdateEntry> remote_;
+};
+
+} // namespace content_runtime
+
+namespace markup_runtime {
+
+struct LinkTarget {
+    std::string scheme;
+    std::string value;
+};
+
+struct TextRun {
+    std::string text;
+    std::optional<LinkTarget> link;
+    bool bold{};
+    bool italic{};
+};
+
+class HyperTextDocument {
+public:
+    bool parse(std::string_view text);
+    const std::vector<TextRun>& runs() const noexcept;
+    std::string plain_text() const;
+    void clear() noexcept;
+
+private:
+    std::vector<TextRun> runs_;
+};
+
+class TokenStream {
+public:
+    explicit TokenStream(std::string_view text = {});
+    void reset(std::string_view text);
+    std::optional<std::string> next();
+    std::size_t line() const noexcept;
+
+private:
+    std::string text_;
+    std::size_t offset_{};
+    std::size_t line_{1u};
+};
+
+bool parse_boolean(std::string_view token, bool& value) noexcept;
+
+} // namespace markup_runtime
+
+namespace sky_runtime {
+
+struct SkyState {
+    float time{};
+    Vec3 color{};
+    float fog{};
+    float sun_intensity{1.0f};
+};
+
+class SkyTimeline {
+public:
+    bool set_states(std::vector<SkyState> states, float day_length = 24.0f);
+    SkyState sample(float time) const noexcept;
+    std::size_t size() const noexcept;
+
+private:
+    std::vector<SkyState> states_;
+    float day_length_{24.0f};
+};
+
+} // namespace sky_runtime
+
+namespace legacy_sound {
+
+enum SoundFlags : std::uint32_t {
+    play_random = 1u << 0u,
+    play_random_mix = 1u << 1u,
+    play_looped = 1u << 2u,
+    type_environment = 1u << 3u,
+    play_use_region = 1u << 4u
+};
+
+struct SoundSource {
+    std::string file;
+    float volume{1.0f};
+    float probability{1.0f};
+};
+
+struct SoundEffect {
+    std::string name;
+    std::uint32_t flags{};
+    std::vector<SoundSource> sources;
+    float silence{};
+};
+
+class SoundLibrary {
+public:
+    bool store(SoundEffect effect, bool replace = false);
+    const SoundEffect* find(std::string_view name) const noexcept;
+    bool erase(std::string_view name) noexcept;
+    std::size_t size() const noexcept;
+
+private:
+    std::unordered_map<std::string, SoundEffect> effects_;
+};
+
+class SoundTrack {
+public:
+    void set_playlist(std::vector<std::string> files, bool loop);
+    const std::string* current() const noexcept;
+    const std::string* advance() noexcept;
+    void reset() noexcept;
+
+private:
+    std::vector<std::string> files_;
+    std::size_t index_{};
+    bool loop_{};
+};
+
+} // namespace legacy_sound
+
+namespace ui_runtime {
+
+struct Point {
+    std::int32_t x{};
+    std::int32_t y{};
+};
+
+struct Rect {
+    std::int32_t left{};
+    std::int32_t top{};
+    std::int32_t right{};
+    std::int32_t bottom{};
+    std::int32_t width() const noexcept { return right - left; }
+    std::int32_t height() const noexcept { return bottom - top; }
+    bool contains(Point point) const noexcept { return point.x >= left && point.x < right && point.y >= top && point.y < bottom; }
+};
+
+struct Color {
+    std::uint8_t red{255u};
+    std::uint8_t green{255u};
+    std::uint8_t blue{255u};
+    std::uint8_t alpha{255u};
+};
+
+enum class ControlKind : std::uint8_t { generic, button, checkbox, edit, image, list, menu_list, progress, radio_button, rich_edit, scrollbar, slider, slot, spin, hypertext, minimap };
+
+class PropertyBag {
+public:
+    bool parse(std::string_view text);
+    void set(std::string key, std::string value);
+    const std::string* get(std::string_view key) const noexcept;
+    std::optional<std::int32_t> integer(std::string_view key) const noexcept;
+    std::optional<float> real(std::string_view key) const noexcept;
+    std::optional<bool> boolean(std::string_view key) const noexcept;
+    std::optional<Rect> rectangle(std::string_view key) const noexcept;
+    std::optional<Color> color(std::string_view key) const noexcept;
+
+private:
+    std::unordered_map<std::string, std::string> values_;
+};
+
+struct SpriteDefinition {
+    std::string name;
+    Point size{};
+    std::vector<std::filesystem::path> textures;
+    Color tint{};
+};
+
+struct FontDefinition {
+    std::string name;
+    std::filesystem::path texture;
+    std::uint32_t glyph_count{};
+    std::int32_t line_height{};
+};
+
+struct Control {
+    std::uint32_t identifier{};
+    std::string name;
+    ControlKind kind{ControlKind::generic};
+    Rect bounds{};
+    bool visible{true};
+    bool enabled{true};
+    std::optional<std::uint32_t> parent;
+    std::vector<std::uint32_t> children;
+    PropertyBag properties;
+};
+
+class InterfaceModel {
+public:
+    bool add_sprite(SpriteDefinition sprite, bool replace = false);
+    bool add_font(FontDefinition font, bool replace = false);
+    bool create(Control control);
+    bool destroy(std::uint32_t identifier);
+    Control* find(std::uint32_t identifier) noexcept;
+    const Control* find(std::uint32_t identifier) const noexcept;
+    const SpriteDefinition* sprite(std::string_view name) const noexcept;
+    const FontDefinition* font(std::string_view name) const noexcept;
+    bool attach(std::uint32_t parent, std::uint32_t child);
+    std::vector<std::uint32_t> hit_test(Point point) const;
+    std::size_t control_count() const noexcept;
+
+private:
+    std::unordered_map<std::uint32_t, Control> controls_;
+    std::unordered_map<std::string, SpriteDefinition> sprites_;
+    std::unordered_map<std::string, FontDefinition> fonts_;
+};
+
+class TextBuffer {
+public:
+    void configure(std::size_t maximum_symbols, bool numeric, bool password);
+    bool set(std::string text);
+    bool insert(std::size_t position, std::string_view text);
+    bool erase(std::size_t position, std::size_t count);
+    const std::string& text() const noexcept;
+    std::string display_text() const;
+    std::size_t maximum_symbols() const noexcept;
+
+private:
+    std::size_t maximum_symbols_{1024u};
+    bool numeric_{};
+    bool password_{};
+    std::string text_;
+};
+
+class ScrollModel {
+public:
+    void set_range(std::int32_t minimum, std::int32_t maximum);
+    void set_page(std::int32_t page) noexcept;
+    void set_step(std::int32_t step) noexcept;
+    void set_position(std::int32_t position) noexcept;
+    std::int32_t position() const noexcept;
+    std::int32_t minimum() const noexcept;
+    std::int32_t maximum() const noexcept;
+    std::int32_t page() const noexcept;
+    void line(std::int32_t direction) noexcept;
+    void page_move(std::int32_t direction) noexcept;
+
+private:
+    std::int32_t minimum_{};
+    std::int32_t maximum_{};
+    std::int32_t page_{1};
+    std::int32_t step_{1};
+    std::int32_t position_{};
+};
+
+class ListModel {
+public:
+    void set_items(std::vector<std::string> items);
+    bool select(std::size_t index) noexcept;
+    std::optional<std::size_t> selection() const noexcept;
+    const std::vector<std::string>& items() const noexcept;
+    void clear() noexcept;
+
+private:
+    std::vector<std::string> items_;
+    std::optional<std::size_t> selection_;
+};
+
+struct ProgressModel {
+    std::int32_t minimum{};
+    std::int32_t maximum{100};
+    std::int32_t value{};
+    float fraction() const noexcept;
+    std::string label(bool percent) const;
+};
+
+struct SlotModel {
+    std::optional<std::uint32_t> item;
+    std::string full_sprite;
+    std::string empty_sprite;
+    std::string border_sprite;
+};
+
+struct VideoMode {
+    std::uint32_t width{};
+    std::uint32_t height{};
+    std::uint32_t refresh_rate{};
+    std::uint32_t format{};
+    auto operator<=>(const VideoMode&) const = default;
+};
+
+class OptionsModel {
+public:
+    void set_video_modes(std::vector<VideoMode> modes);
+    const std::vector<VideoMode>& video_modes() const noexcept;
+    bool choose_video_mode(VideoMode mode) noexcept;
+    std::optional<VideoMode> video_mode() const noexcept;
+    void set(std::string key, std::string value);
+    const std::string* get(std::string_view key) const noexcept;
+
+private:
+    std::vector<VideoMode> video_modes_;
+    std::optional<VideoMode> selected_mode_;
+    std::unordered_map<std::string, std::string> values_;
+};
+
+} // namespace ui_runtime
+
 namespace compiler_runtime {
 
 void* copy_memory(void* destination, const void* source, std::uint32_t size);

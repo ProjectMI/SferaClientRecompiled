@@ -2375,6 +2375,712 @@ float World::time() const noexcept { return time_; }
 
 } // namespace world_runtime
 
+namespace client_runtime {
+namespace {
+
+std::string lower_ascii(std::string_view value) {
+    std::string result(value);
+    std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return result;
+}
+
+std::string trim_copy(std::string_view value) {
+    const std::size_t begin = value.find_first_not_of(" \t\r\n");
+    if (begin == std::string_view::npos) { return {}; }
+    const std::size_t end = value.find_last_not_of(" \t\r\n");
+    return std::string(value.substr(begin, end - begin + 1u));
+}
+
+std::optional<std::uint32_t> number_after(std::string_view text, std::string_view label) {
+    const std::string folded = lower_ascii(text);
+    const std::string key = lower_ascii(label);
+    const std::size_t found = folded.find(key);
+    if (found == std::string::npos) { return std::nullopt; }
+    std::size_t cursor = found + key.size();
+    while (cursor < text.size() && !std::isdigit(static_cast<unsigned char>(text[cursor]))) { ++cursor; }
+    if (cursor == text.size()) { return std::nullopt; }
+    std::uint32_t value{};
+    const char* begin = text.data() + cursor;
+    const char* end = text.data() + text.size();
+    const auto parsed = std::from_chars(begin, end, value);
+    return parsed.ec == std::errc{} ? std::optional<std::uint32_t>(value) : std::nullopt;
+}
+
+} // namespace
+
+LaunchOptions parse_launch_arguments(std::span<const std::string_view> arguments) {
+    LaunchOptions result;
+    for (std::size_t index = 0; index < arguments.size(); ++index) {
+        const std::string_view argument = arguments[index];
+        const auto consume = [&](std::string_view flag) -> std::optional<std::string> {
+            if (argument == flag && index + 1u < arguments.size()) { ++index; return std::string(arguments[index]); }
+            const std::string prefix = std::string(flag) + "=";
+            if (argument.starts_with(prefix)) { return std::string(argument.substr(prefix.size())); }
+            return std::nullopt;
+        };
+        if (auto value = consume("/locale")) { result.locale = std::move(*value); continue; }
+        if (auto value = consume("/login")) { result.login = std::move(*value); continue; }
+        if (auto value = consume("/gamexp_sid")) { result.gamexp_session = std::move(*value); continue; }
+        if (auto value = consume("/connect_type")) { result.connect_type = std::move(*value); }
+    }
+    return result;
+}
+
+std::unordered_map<std::string, std::string> parse_key_value_config(std::string_view text) {
+    std::unordered_map<std::string, std::string> result;
+    std::size_t cursor = 0;
+    while (cursor <= text.size()) {
+        const std::size_t end = text.find_first_of("\r\n", cursor);
+        const std::string line = trim_copy(text.substr(cursor, end == std::string_view::npos ? text.size() - cursor : end - cursor));
+        if (!line.empty() && line[0] != '#' && line[0] != ';') {
+            const std::size_t split = line.find_first_of("=:");
+            if (split != std::string::npos) { result.insert_or_assign(lower_ascii(trim_copy(std::string_view(line).substr(0, split))), trim_copy(std::string_view(line).substr(split + 1u))); }
+        }
+        if (end == std::string_view::npos) { break; }
+        cursor = end + 1u;
+        if (cursor < text.size() && text[end] == '\r' && text[cursor] == '\n') { ++cursor; }
+    }
+    return result;
+}
+
+bool ModelManager::register_folder(std::filesystem::path folder) {
+    if (folder.empty()) { return false; }
+    const auto canonical = folder.lexically_normal();
+    if (std::find(folders_.begin(), folders_.end(), canonical) != folders_.end()) { return false; }
+    folders_.push_back(canonical);
+    return true;
+}
+
+std::int32_t ModelManager::register_model(std::string name, std::filesystem::path file) {
+    if (name.empty() || file.empty()) { return -1; }
+    const std::string key = lower_ascii(name);
+    const auto found = names_.find(key);
+    if (found != names_.end()) { return found->second; }
+    const std::int32_t identifier = static_cast<std::int32_t>(models_.size());
+    models_.push_back({identifier, std::move(name), file.lexically_normal()});
+    names_.emplace(key, identifier);
+    return identifier;
+}
+
+const ManagedModel* ModelManager::by_id(std::int32_t identifier) const noexcept {
+    if (identifier < 0 || static_cast<std::size_t>(identifier) >= models_.size()) { return nullptr; }
+    return &models_[static_cast<std::size_t>(identifier)];
+}
+
+const ManagedModel* ModelManager::by_name(std::string_view name) const noexcept {
+    const auto found = names_.find(lower_ascii(name));
+    return found == names_.end() ? nullptr : by_id(found->second);
+}
+
+std::size_t ModelManager::size() const noexcept { return models_.size(); }
+void ModelManager::clear() noexcept { folders_.clear(); models_.clear(); names_.clear(); }
+
+ConnectionProbe parse_ping_report(std::string_view text) {
+    ConnectionProbe result;
+    if (auto sent = number_after(text, "sent")) { result.sent = *sent; }
+    if (auto received = number_after(text, "received")) { result.received = *received; }
+    if (auto lost = number_after(text, "lost")) { result.lost = *lost; }
+    if (auto time = number_after(text, "time=")) { result.round_trip_ms = *time; }
+    const std::string folded = lower_ascii(text);
+    if (result.received != 0u || folded.find("ttl=") != std::string::npos) { result.health = ConnectionHealth::reachable; }
+    else if (result.sent != 0u || folded.find("timed out") != std::string::npos || folded.find("unreachable") != std::string::npos) { result.health = ConnectionHealth::unreachable; }
+    return result;
+}
+
+} // namespace client_runtime
+
+namespace content_runtime {
+namespace {
+
+std::string content_key(std::string_view value) {
+    std::string result(value);
+    std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return result;
+}
+
+float interpolate_scalar(float left, float right, float amount, Interpolation interpolation) noexcept {
+    amount = std::clamp(amount, 0.0f, 1.0f);
+    if (interpolation == Interpolation::cosine) { amount = (1.0f - std::cos(amount * 3.14159265358979323846f)) * 0.5f; }
+    return left + (right - left) * amount;
+}
+
+bool rect_valid(Rect2 bounds) noexcept { return bounds.right >= bounds.left && bounds.bottom >= bounds.top; }
+bool rect_intersects(Rect2 left, Rect2 right) noexcept { return left.left <= right.right && left.right >= right.left && left.top <= right.bottom && left.bottom >= right.top; }
+bool rect_contains(Rect2 outer, Rect2 inner) noexcept { return inner.left >= outer.left && inner.right <= outer.right && inner.top >= outer.top && inner.bottom <= outer.bottom; }
+
+class ConfigParser {
+public:
+    ConfigParser(std::string_view text, std::string* error) : text_(text), error_(error) {}
+
+    bool parse(ConfigNode& destination) {
+        destination = ConfigNode::object();
+        auto* object = destination.object_items();
+        skip();
+        if (peek() == '{') { ++offset_; if (!parse_object(*object, '}')) { return false; } }
+        else if (!parse_object(*object, '\0')) { return false; }
+        skip();
+        return offset_ == text_.size() || fail("unexpected trailing data");
+    }
+
+private:
+    void skip() {
+        while (offset_ < text_.size()) {
+            if (std::isspace(static_cast<unsigned char>(text_[offset_]))) { ++offset_; continue; }
+            if (text_[offset_] == '#') { while (offset_ < text_.size() && text_[offset_] != '\n') { ++offset_; } continue; }
+            if (text_[offset_] == '/' && offset_ + 1u < text_.size() && text_[offset_ + 1u] == '/') { offset_ += 2u; while (offset_ < text_.size() && text_[offset_] != '\n') { ++offset_; } continue; }
+            break;
+        }
+    }
+
+    char peek() const noexcept { return offset_ < text_.size() ? text_[offset_] : '\0'; }
+
+    bool fail(std::string_view message) {
+        if (error_) { *error_ = std::string(message) + " at byte " + std::to_string(offset_); }
+        return false;
+    }
+
+    std::optional<std::string> string_token() {
+        skip();
+        if (peek() == '"' || peek() == '\'') {
+            const char quote = text_[offset_++];
+            std::string result;
+            while (offset_ < text_.size() && text_[offset_] != quote) {
+                char value = text_[offset_++];
+                if (value == '\\' && offset_ < text_.size()) { const char escaped = text_[offset_++]; value = escaped == 'n' ? '\n' : escaped == 't' ? '\t' : escaped; }
+                result.push_back(value);
+            }
+            if (offset_ == text_.size()) { fail("unterminated string"); return std::nullopt; }
+            ++offset_;
+            return result;
+        }
+        const std::size_t begin = offset_;
+        while (offset_ < text_.size()) {
+            const char value = text_[offset_];
+            if (std::isspace(static_cast<unsigned char>(value)) || value == '=' || value == ':' || value == ',' || value == ';' || value == '{' || value == '}' || value == '[' || value == ']') { break; }
+            ++offset_;
+        }
+        if (begin == offset_) { fail("expected token"); return std::nullopt; }
+        return std::string(text_.substr(begin, offset_ - begin));
+    }
+
+    bool parse_object(std::map<std::string, ConfigNode>& object, char terminator) {
+        for (;;) {
+            skip();
+            if (terminator != '\0' && peek() == terminator) { ++offset_; return true; }
+            if (peek() == '\0') { return terminator == '\0' || fail("unterminated object"); }
+            auto key = string_token();
+            if (!key) { return false; }
+            skip();
+            if (peek() != '=' && peek() != ':') { return fail("expected '=' or ':'"); }
+            ++offset_;
+            ConfigNode value;
+            if (!parse_value(value)) { return false; }
+            object.insert_or_assign(*key, std::move(value));
+            skip();
+            if (peek() == ',' || peek() == ';') { ++offset_; }
+        }
+    }
+
+    bool parse_array(std::vector<ConfigNode>& array) {
+        for (;;) {
+            skip();
+            if (peek() == ']') { ++offset_; return true; }
+            if (peek() == '\0') { return fail("unterminated array"); }
+            ConfigNode value;
+            if (!parse_value(value)) { return false; }
+            array.push_back(std::move(value));
+            skip();
+            if (peek() == ',') { ++offset_; continue; }
+            if (peek() == ']') { ++offset_; return true; }
+        }
+    }
+
+    bool parse_value(ConfigNode& destination) {
+        skip();
+        if (peek() == '{') { ++offset_; destination = ConfigNode::object(); return parse_object(*destination.object_items(), '}'); }
+        if (peek() == '[') { ++offset_; destination = ConfigNode::array(); return parse_array(*destination.array_items()); }
+        auto token = string_token();
+        if (!token) { return false; }
+        const std::string folded = content_key(*token);
+        if (folded == "true") { destination = ConfigNode(true); return true; }
+        if (folded == "false") { destination = ConfigNode(false); return true; }
+        if (folded == "null") { destination = ConfigNode(); return true; }
+        char* end = nullptr;
+        const long long integer = std::strtoll(token->c_str(), &end, 0);
+        if (end && *end == '\0') { destination = ConfigNode(static_cast<std::int64_t>(integer)); return true; }
+        end = nullptr;
+        const double real = std::strtod(token->c_str(), &end);
+        if (end && *end == '\0') { destination = ConfigNode(real); return true; }
+        destination = ConfigNode(std::move(*token));
+        return true;
+    }
+
+    std::string_view text_;
+    std::size_t offset_{};
+    std::string* error_{};
+};
+
+float cross2(float ax, float az, float bx, float bz) noexcept { return ax * bz - az * bx; }
+
+} // namespace
+
+void MaterialFilter::set_rules(std::vector<MaterialRule> rules) { rules_ = std::move(rules); }
+void MaterialFilter::set_exceptions(std::set<std::string> exceptions) { exceptions_.clear(); for (const auto& value : exceptions) { exceptions_.insert(content_key(value)); } }
+bool MaterialFilter::excluded(std::string_view word) const noexcept { return exceptions_.contains(content_key(word)); }
+std::size_t MaterialFilter::size() const noexcept { return rules_.size(); }
+
+const MaterialRule* MaterialFilter::match(std::string_view word, std::string_view tag) const noexcept {
+    if (excluded(word)) { return nullptr; }
+    const std::string normalized_word = content_key(word);
+    const std::string normalized_tag = content_key(tag);
+    const MaterialRule* best = nullptr;
+    for (const MaterialRule& rule : rules_) {
+        if (content_key(rule.word) != normalized_word) { continue; }
+        if (!normalized_tag.empty() && !rule.tags.empty()) {
+            bool matched = false;
+            for (const auto& rule_tag : rule.tags) { if (content_key(rule_tag) == normalized_tag) { matched = true; break; } }
+            if (!matched) { continue; }
+        }
+        if (!best || rule.weight > best->weight) { best = &rule; }
+    }
+    return best;
+}
+
+ConfigNode::ConfigNode(std::int64_t value) : kind_(ConfigKind::integer), integer_(value) {}
+ConfigNode::ConfigNode(double value) : kind_(ConfigKind::real), real_(value) {}
+ConfigNode::ConfigNode(bool value) : kind_(ConfigKind::boolean), boolean_(value) {}
+ConfigNode::ConfigNode(std::string value) : kind_(ConfigKind::text), text_(std::move(value)) {}
+ConfigNode ConfigNode::array() { ConfigNode result; result.kind_ = ConfigKind::array; return result; }
+ConfigNode ConfigNode::object() { ConfigNode result; result.kind_ = ConfigKind::object; return result; }
+ConfigKind ConfigNode::kind() const noexcept { return kind_; }
+std::optional<std::int64_t> ConfigNode::integer() const noexcept { return kind_ == ConfigKind::integer ? std::optional<std::int64_t>(integer_) : std::nullopt; }
+std::optional<double> ConfigNode::real() const noexcept { if (kind_ == ConfigKind::real) { return real_; } if (kind_ == ConfigKind::integer) { return static_cast<double>(integer_); } return std::nullopt; }
+std::optional<bool> ConfigNode::boolean() const noexcept { return kind_ == ConfigKind::boolean ? std::optional<bool>(boolean_) : std::nullopt; }
+const std::string* ConfigNode::text() const noexcept { return kind_ == ConfigKind::text ? &text_ : nullptr; }
+const std::vector<ConfigNode>* ConfigNode::array_items() const noexcept { return kind_ == ConfigKind::array ? &array_ : nullptr; }
+std::vector<ConfigNode>* ConfigNode::array_items() noexcept { return kind_ == ConfigKind::array ? &array_ : nullptr; }
+const std::map<std::string, ConfigNode>* ConfigNode::object_items() const noexcept { return kind_ == ConfigKind::object ? &object_ : nullptr; }
+std::map<std::string, ConfigNode>* ConfigNode::object_items() noexcept { return kind_ == ConfigKind::object ? &object_ : nullptr; }
+const ConfigNode* ConfigNode::find(std::string_view key) const noexcept { if (kind_ != ConfigKind::object) { return nullptr; } const auto found = object_.find(std::string(key)); return found == object_.end() ? nullptr : &found->second; }
+const ConfigNode* ConfigNode::at(std::size_t index) const noexcept { return kind_ == ConfigKind::array && index < array_.size() ? &array_[index] : nullptr; }
+
+bool ObjectConfig::parse(std::string_view text, std::string* error) { ConfigNode parsed; ConfigParser parser(text, error); if (!parser.parse(parsed)) { return false; } root_ = std::move(parsed); return true; }
+const ConfigNode& ObjectConfig::root() const noexcept { return root_; }
+void ObjectConfig::clear() noexcept { root_ = ConfigNode::object(); }
+
+const ConfigNode* ObjectConfig::find(std::string_view dotted_path) const noexcept {
+    const ConfigNode* node = &root_;
+    std::size_t cursor = 0;
+    while (cursor <= dotted_path.size()) {
+        const std::size_t dot = dotted_path.find('.', cursor);
+        const std::string_view part = dotted_path.substr(cursor, dot == std::string_view::npos ? dotted_path.size() - cursor : dot - cursor);
+        if (part.empty()) { return nullptr; }
+        node = node->find(part);
+        if (!node) { return nullptr; }
+        if (dot == std::string_view::npos) { return node; }
+        cursor = dot + 1u;
+    }
+    return node;
+}
+
+bool ScalarCurve::set(std::vector<ScalarKey> keys, Interpolation interpolation) {
+    if (keys.empty()) { keys_.clear(); interpolation_ = interpolation; return true; }
+    std::sort(keys.begin(), keys.end(), [](const ScalarKey& left, const ScalarKey& right) { return left.time < right.time; });
+    for (std::size_t index = 1; index < keys.size(); ++index) { if (!(keys[index].time > keys[index - 1u].time)) { return false; } }
+    keys_ = std::move(keys); interpolation_ = interpolation; return true;
+}
+
+float ScalarCurve::sample(float time) const noexcept {
+    if (keys_.empty()) { return 0.0f; }
+    if (time <= keys_.front().time) { return keys_.front().value; }
+    if (time >= keys_.back().time) { return keys_.back().value; }
+    const auto right = std::upper_bound(keys_.begin(), keys_.end(), time, [](float value, const ScalarKey& key) { return value < key.time; });
+    const auto& left = *std::prev(right);
+    return interpolate_scalar(left.value, right->value, (time - left.time) / (right->time - left.time), interpolation_);
+}
+const std::vector<ScalarKey>& ScalarCurve::keys() const noexcept { return keys_; }
+
+bool ColorCurve::set(std::vector<ColorKey> keys, Interpolation interpolation) {
+    if (keys.empty()) { keys_.clear(); interpolation_ = interpolation; return true; }
+    std::sort(keys.begin(), keys.end(), [](const ColorKey& left, const ColorKey& right) { return left.time < right.time; });
+    for (std::size_t index = 1; index < keys.size(); ++index) { if (!(keys[index].time > keys[index - 1u].time)) { return false; } }
+    keys_ = std::move(keys); interpolation_ = interpolation; return true;
+}
+
+std::array<float, 4> ColorCurve::sample(float time) const noexcept {
+    if (keys_.empty()) { return {}; }
+    if (time <= keys_.front().time) { return keys_.front().value; }
+    if (time >= keys_.back().time) { return keys_.back().value; }
+    const auto right = std::upper_bound(keys_.begin(), keys_.end(), time, [](float value, const ColorKey& key) { return value < key.time; });
+    const auto& left = *std::prev(right);
+    const float amount = (time - left.time) / (right->time - left.time);
+    std::array<float, 4> result{};
+    for (std::size_t index = 0; index < result.size(); ++index) { result[index] = interpolate_scalar(left.value[index], right->value[index], amount, interpolation_); }
+    return result;
+}
+
+bool ParticleLibrary::store(ParticleSystemDefinition definition, bool replace) {
+    if (definition.name.empty() || definition.particle_count == 0u) { return false; }
+    const std::string key = content_key(definition.name);
+    if (!replace && systems_.contains(key)) { return false; }
+    systems_.insert_or_assign(key, std::move(definition));
+    return true;
+}
+const ParticleSystemDefinition* ParticleLibrary::find(std::string_view name) const noexcept { const auto found = systems_.find(content_key(name)); return found == systems_.end() ? nullptr : &found->second; }
+bool ParticleLibrary::erase(std::string_view name) noexcept { return systems_.erase(content_key(name)) != 0u; }
+std::size_t ParticleLibrary::size() const noexcept { return systems_.size(); }
+
+QuadTree::QuadTree(Rect2 bounds, std::size_t bucket_capacity, std::size_t maximum_depth) : bounds_(bounds), bucket_capacity_(std::max<std::size_t>(1u, bucket_capacity)), maximum_depth_(std::max<std::size_t>(1u, maximum_depth)) { if (rect_valid(bounds_)) { root_ = std::make_unique<Node>(); root_->bounds = bounds_; } }
+
+void QuadTree::split(Node& node) {
+    if (node.children[0]) { return; }
+    const float middle_x = (node.bounds.left + node.bounds.right) * 0.5f;
+    const float middle_y = (node.bounds.top + node.bounds.bottom) * 0.5f;
+    const std::array<Rect2, 4> bounds{{{node.bounds.left, node.bounds.top, middle_x, middle_y}, {middle_x, node.bounds.top, node.bounds.right, middle_y}, {node.bounds.left, middle_y, middle_x, node.bounds.bottom}, {middle_x, middle_y, node.bounds.right, node.bounds.bottom}}};
+    for (std::size_t index = 0; index < node.children.size(); ++index) { node.children[index] = std::make_unique<Node>(); node.children[index]->bounds = bounds[index]; }
+}
+
+bool QuadTree::insert(Node& node, SpatialRecord record, std::size_t depth) {
+    if (!rect_intersects(node.bounds, record.bounds)) { return false; }
+    if (depth < maximum_depth_ && (node.children[0] || node.records.size() >= bucket_capacity_)) {
+        if (!node.children[0]) { split(node); }
+        for (auto& child : node.children) { if (rect_contains(child->bounds, record.bounds)) { return insert(*child, std::move(record), depth + 1u); } }
+    }
+    node.records.push_back(std::move(record));
+    return true;
+}
+
+bool QuadTree::insert(SpatialRecord record) {
+    if (!root_ || !rect_valid(record.bounds) || !rect_intersects(bounds_, record.bounds)) { return false; }
+    if (!insert(*root_, std::move(record), 0u)) { return false; }
+    ++size_;
+    return true;
+}
+
+void QuadTree::query(const Node& node, Rect2 bounds, std::vector<std::uint32_t>& result) const {
+    if (!rect_intersects(node.bounds, bounds)) { return; }
+    for (const SpatialRecord& record : node.records) { if (rect_intersects(record.bounds, bounds)) { result.push_back(record.identifier); } }
+    for (const auto& child : node.children) { if (child) { query(*child, bounds, result); } }
+}
+
+std::vector<std::uint32_t> QuadTree::query(Rect2 bounds) const { std::vector<std::uint32_t> result; if (root_ && rect_valid(bounds)) { query(*root_, bounds, result); } return result; }
+void QuadTree::clear() { size_ = 0u; root_ = rect_valid(bounds_) ? std::make_unique<Node>() : nullptr; if (root_) { root_->bounds = bounds_; } }
+std::size_t QuadTree::size() const noexcept { return size_; }
+
+bool QuickFileArchive::add(std::string name, std::vector<std::uint8_t> bytes, bool replace) { if (name.empty()) { return false; } const std::string key = content_key(name); if (!replace && files_.contains(key)) { return false; } files_.insert_or_assign(key, std::move(bytes)); return true; }
+std::span<const std::uint8_t> QuickFileArchive::find(std::string_view name) const noexcept { const auto found = files_.find(content_key(name)); return found == files_.end() ? std::span<const std::uint8_t>{} : std::span<const std::uint8_t>(found->second); }
+bool QuickFileArchive::erase(std::string_view name) noexcept { return files_.erase(content_key(name)) != 0u; }
+std::vector<std::string> QuickFileArchive::names() const { std::vector<std::string> result; result.reserve(files_.size()); for (const auto& [name, bytes] : files_) { static_cast<void>(bytes); result.push_back(name); } std::sort(result.begin(), result.end()); return result; }
+void QuickFileArchive::clear() noexcept { files_.clear(); }
+
+void ServerWall::set_segments(std::vector<WallSegment> segments) { segments_ = std::move(segments); }
+
+std::optional<Vec3> ServerWall::first_intersection(Vec3 begin, Vec3 end) const noexcept {
+    const float ray_x = end.x - begin.x;
+    const float ray_z = end.z - begin.z;
+    float best_t = std::numeric_limits<float>::infinity();
+    std::optional<Vec3> result;
+    for (const WallSegment& wall : segments_) {
+        const float wall_x = wall.end.x - wall.begin.x;
+        const float wall_z = wall.end.z - wall.begin.z;
+        const float denominator = cross2(ray_x, ray_z, wall_x, wall_z);
+        if (std::fabs(denominator) < 1.0e-6f) { continue; }
+        const float offset_x = wall.begin.x - begin.x;
+        const float offset_z = wall.begin.z - begin.z;
+        const float t = cross2(offset_x, offset_z, wall_x, wall_z) / denominator;
+        const float u = cross2(offset_x, offset_z, ray_x, ray_z) / denominator;
+        if (t >= 0.0f && t <= 1.0f && u >= 0.0f && u <= 1.0f && t < best_t) { best_t = t; result = Vec3{begin.x + ray_x * t, begin.y + (end.y - begin.y) * t, begin.z + ray_z * t}; }
+    }
+    return result;
+}
+bool ServerWall::blocked(Vec3 begin, Vec3 end) const noexcept { return first_intersection(begin, end).has_value(); }
+std::size_t ServerWall::size() const noexcept { return segments_.size(); }
+
+GeneratedMap MapGenerator::generate(std::uint32_t width, std::uint32_t height, std::uint32_t seed, float amplitude) const {
+    GeneratedMap result{width, height, {}};
+    if (width == 0u || height == 0u) { return result; }
+    result.heights.resize(static_cast<std::size_t>(width) * height);
+    std::uint32_t state = seed == 0u ? 0x9E3779B9u : seed;
+    for (float& value : result.heights) { state ^= state << 13u; state ^= state >> 17u; state ^= state << 5u; const float unit = static_cast<float>(state & 0x00FFFFFFu) / static_cast<float>(0x00FFFFFFu); value = (unit * 2.0f - 1.0f) * amplitude; }
+    return result;
+}
+
+void NatureManager::register_rain_class(std::uint32_t class_id, std::string name) { if (!name.empty()) { rain_classes_.insert_or_assign(class_id, std::move(name)); } }
+const std::string* NatureManager::rain_class(std::uint32_t class_id) const noexcept { const auto found = rain_classes_.find(class_id); return found == rain_classes_.end() ? nullptr : &found->second; }
+void NatureManager::set_state(NatureState state) noexcept { state.rain = std::clamp(state.rain, 0.0f, 1.0f); state_ = state; }
+NatureState NatureManager::state() const noexcept { return state_; }
+
+bool ZoningManager::set_zones(std::vector<ZoneParameters> zones) {
+    for (const ZoneParameters& zone : zones) { if (!(zone.x_max > zone.x_min) || !(zone.z_max > zone.z_min)) { return false; } }
+    zones_ = std::move(zones);
+    return true;
+}
+const ZoneParameters* ZoningManager::zone_at(float x, float z) const noexcept { for (const ZoneParameters& zone : zones_) { if (x >= zone.x_min && x < zone.x_max && z >= zone.z_min && z < zone.z_max) { return &zone; } } return nullptr; }
+std::optional<std::uint32_t> ZoningManager::patch_owner(std::int32_t x_patch, std::int32_t z_patch) const noexcept { for (const ZoneParameters& zone : zones_) { if (x_patch >= zone.x_patch_min && z_patch >= zone.z_patch_min) { const float x = static_cast<float>(x_patch); const float z = static_cast<float>(z_patch); if (x < zone.x_max && z < zone.z_max) { return zone.identifier; } } } return std::nullopt; }
+std::size_t ZoningManager::size() const noexcept { return zones_.size(); }
+
+bool TextureSet::set(std::string name, std::filesystem::path file, bool replace) { if (name.empty() || file.empty()) { return false; } const std::string key = content_key(name); if (!replace && textures_.contains(key)) { return false; } textures_.insert_or_assign(key, file.lexically_normal()); return true; }
+const std::filesystem::path* TextureSet::find(std::string_view name) const noexcept { const auto found = textures_.find(content_key(name)); return found == textures_.end() ? nullptr : &found->second; }
+bool TextureSet::erase(std::string_view name) noexcept { return textures_.erase(content_key(name)) != 0u; }
+std::size_t TextureSet::size() const noexcept { return textures_.size(); }
+
+void UpdatePlan::set_local(std::vector<UpdateEntry> entries) { local_.clear(); for (auto& entry : entries) { local_.insert_or_assign(content_key(entry.file.generic_string()), std::move(entry)); } }
+void UpdatePlan::set_remote(std::vector<UpdateEntry> entries) { remote_.clear(); for (auto& entry : entries) { remote_.insert_or_assign(content_key(entry.file.generic_string()), std::move(entry)); } }
+std::vector<UpdateEntry> UpdatePlan::required() const { std::vector<UpdateEntry> result; for (const auto& [key, remote] : remote_) { const auto local = local_.find(key); if (local == local_.end() || local->second.size != remote.size || local->second.checksum != remote.checksum) { result.push_back(remote); } } std::sort(result.begin(), result.end(), [](const UpdateEntry& left, const UpdateEntry& right) { return left.file.generic_string() < right.file.generic_string(); }); return result; }
+
+} // namespace content_runtime
+
+namespace markup_runtime {
+namespace {
+
+std::string trim_markup(std::string_view value) {
+    const std::size_t begin = value.find_first_not_of(" \t\r\n");
+    if (begin == std::string_view::npos) { return {}; }
+    const std::size_t end = value.find_last_not_of(" \t\r\n");
+    return std::string(value.substr(begin, end - begin + 1u));
+}
+
+std::string lower_markup(std::string_view value) {
+    std::string result(value);
+    std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return result;
+}
+
+std::optional<LinkTarget> parse_link_target(std::string_view value) {
+    const std::size_t colon = value.find(':');
+    if (colon == std::string_view::npos) { return LinkTarget{"open", std::string(value)}; }
+    return LinkTarget{lower_markup(value.substr(0, colon)), std::string(value.substr(colon + 1u))};
+}
+
+} // namespace
+
+bool HyperTextDocument::parse(std::string_view text) {
+    runs_.clear();
+    bool bold = false;
+    bool italic = false;
+    std::optional<LinkTarget> link;
+    std::size_t cursor = 0;
+    while (cursor < text.size()) {
+        if (text[cursor] != '<') {
+            const std::size_t end = text.find('<', cursor);
+            const std::string value(text.substr(cursor, end == std::string_view::npos ? text.size() - cursor : end - cursor));
+            if (!value.empty()) { runs_.push_back({value, link, bold, italic}); }
+            if (end == std::string_view::npos) { break; }
+            cursor = end;
+            continue;
+        }
+        const std::size_t end = text.find('>', cursor + 1u);
+        if (end == std::string_view::npos) { runs_.push_back({std::string(text.substr(cursor)), link, bold, italic}); return false; }
+        const std::string tag = trim_markup(text.substr(cursor + 1u, end - cursor - 1u));
+        const std::string folded = lower_markup(tag);
+        if (folded == "b") { bold = true; }
+        else if (folded == "/b") { bold = false; }
+        else if (folded == "i") { italic = true; }
+        else if (folded == "/i") { italic = false; }
+        else if (folded == "/a") { link.reset(); }
+        else if (folded.starts_with("a ")) {
+            const std::size_t href = folded.find("href=");
+            if (href != std::string::npos) {
+                std::string value = trim_markup(std::string_view(tag).substr(href + 5u));
+                if (!value.empty() && (value.front() == '"' || value.front() == '\'')) { const char quote = value.front(); const std::size_t close = value.find(quote, 1u); value = close == std::string::npos ? value.substr(1u) : value.substr(1u, close - 1u); }
+                else { const std::size_t space = value.find(' '); if (space != std::string::npos) { value.resize(space); } }
+                link = parse_link_target(value);
+            }
+        }
+        cursor = end + 1u;
+    }
+    return true;
+}
+
+const std::vector<TextRun>& HyperTextDocument::runs() const noexcept { return runs_; }
+std::string HyperTextDocument::plain_text() const { std::string result; for (const TextRun& run : runs_) { result += run.text; } return result; }
+void HyperTextDocument::clear() noexcept { runs_.clear(); }
+
+TokenStream::TokenStream(std::string_view text) { reset(text); }
+void TokenStream::reset(std::string_view text) { text_ = std::string(text); offset_ = 0u; line_ = 1u; }
+
+std::optional<std::string> TokenStream::next() {
+    while (offset_ < text_.size()) {
+        if (text_[offset_] == '\n') { ++line_; ++offset_; continue; }
+        if (std::isspace(static_cast<unsigned char>(text_[offset_]))) { ++offset_; continue; }
+        if (text_[offset_] == '#') { while (offset_ < text_.size() && text_[offset_] != '\n') { ++offset_; } continue; }
+        break;
+    }
+    if (offset_ == text_.size()) { return std::nullopt; }
+    if (text_[offset_] == '"' || text_[offset_] == '\'') {
+        const char quote = text_[offset_++];
+        std::string result;
+        while (offset_ < text_.size() && text_[offset_] != quote) { if (text_[offset_] == '\n') { ++line_; } result.push_back(text_[offset_++]); }
+        if (offset_ < text_.size()) { ++offset_; }
+        return result;
+    }
+    const std::string_view punctuation = "{}[](),=;";
+    if (punctuation.find(text_[offset_]) != std::string_view::npos) { return std::string(1u, text_[offset_++]); }
+    const std::size_t begin = offset_;
+    while (offset_ < text_.size() && !std::isspace(static_cast<unsigned char>(text_[offset_])) && punctuation.find(text_[offset_]) == std::string_view::npos) { ++offset_; }
+    return std::string(std::string_view(text_).substr(begin, offset_ - begin));
+}
+std::size_t TokenStream::line() const noexcept { return line_; }
+
+bool parse_boolean(std::string_view token, bool& value) noexcept {
+    const std::string folded = lower_markup(trim_markup(token));
+    if (folded == "true" || folded == "yes" || folded == "on" || folded == "1") { value = true; return true; }
+    if (folded == "false" || folded == "no" || folded == "off" || folded == "0") { value = false; return true; }
+    return false;
+}
+
+} // namespace markup_runtime
+
+namespace sky_runtime {
+
+bool SkyTimeline::set_states(std::vector<SkyState> states, float day_length) {
+    if (!(day_length > 0.0f) || states.empty()) { return false; }
+    std::sort(states.begin(), states.end(), [](const SkyState& left, const SkyState& right) { return left.time < right.time; });
+    if (states.front().time < 0.0f || states.back().time > day_length) { return false; }
+    states_ = std::move(states); day_length_ = day_length; return true;
+}
+
+SkyState SkyTimeline::sample(float time) const noexcept {
+    if (states_.empty()) { return {}; }
+    time = std::fmod(time, day_length_); if (time < 0.0f) { time += day_length_; }
+    auto right = std::upper_bound(states_.begin(), states_.end(), time, [](float value, const SkyState& state) { return value < state.time; });
+    if (right == states_.begin()) { return *right; }
+    if (right == states_.end()) { return states_.back(); }
+    const SkyState& left = *std::prev(right);
+    const float amount = (time - left.time) / (right->time - left.time);
+    const auto mix = [amount](float from, float to) { return from + (to - from) * amount; };
+    return {time, {mix(left.color.x, right->color.x), mix(left.color.y, right->color.y), mix(left.color.z, right->color.z)}, mix(left.fog, right->fog), mix(left.sun_intensity, right->sun_intensity)};
+}
+std::size_t SkyTimeline::size() const noexcept { return states_.size(); }
+
+} // namespace sky_runtime
+
+namespace legacy_sound {
+namespace {
+std::string sound_key(std::string_view value) { std::string result(value); std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); }); return result; }
+}
+
+bool SoundLibrary::store(SoundEffect effect, bool replace) { if (effect.name.empty() || effect.sources.empty()) { return false; } const std::string key = sound_key(effect.name); if (!replace && effects_.contains(key)) { return false; } effects_.insert_or_assign(key, std::move(effect)); return true; }
+const SoundEffect* SoundLibrary::find(std::string_view name) const noexcept { const auto found = effects_.find(sound_key(name)); return found == effects_.end() ? nullptr : &found->second; }
+bool SoundLibrary::erase(std::string_view name) noexcept { return effects_.erase(sound_key(name)) != 0u; }
+std::size_t SoundLibrary::size() const noexcept { return effects_.size(); }
+
+void SoundTrack::set_playlist(std::vector<std::string> files, bool loop) { files_ = std::move(files); index_ = 0u; loop_ = loop; }
+const std::string* SoundTrack::current() const noexcept { return index_ < files_.size() ? &files_[index_] : nullptr; }
+const std::string* SoundTrack::advance() noexcept { if (files_.empty()) { return nullptr; } if (index_ + 1u < files_.size()) { ++index_; } else if (loop_) { index_ = 0u; } else { index_ = files_.size(); } return current(); }
+void SoundTrack::reset() noexcept { index_ = 0u; }
+
+} // namespace legacy_sound
+
+namespace ui_runtime {
+namespace {
+
+std::string ui_key(std::string_view value) { std::string result(value); std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); }); return result; }
+std::string ui_trim(std::string_view value) { const std::size_t begin = value.find_first_not_of(" \t\r\n"); if (begin == std::string_view::npos) { return {}; } const std::size_t end = value.find_last_not_of(" \t\r\n"); return std::string(value.substr(begin, end - begin + 1u)); }
+
+bool parse_i32(std::string_view text, std::int32_t& value) noexcept { const std::string trimmed = ui_trim(text); const auto parsed = std::from_chars(trimmed.data(), trimmed.data() + trimmed.size(), value); return parsed.ec == std::errc{} && parsed.ptr == trimmed.data() + trimmed.size(); }
+bool parse_float_value(std::string_view text, float& value) noexcept { const std::string trimmed = ui_trim(text); char* end = nullptr; value = std::strtof(trimmed.c_str(), &end); return end && *end == '\0'; }
+
+} // namespace
+
+bool PropertyBag::parse(std::string_view text) {
+    values_.clear();
+    std::size_t cursor = 0;
+    while (cursor <= text.size()) {
+        const std::size_t end = text.find_first_of(";\r\n", cursor);
+        const std::string line = ui_trim(text.substr(cursor, end == std::string_view::npos ? text.size() - cursor : end - cursor));
+        if (!line.empty() && line.front() != '#') { const std::size_t split = line.find('='); if (split == std::string::npos) { return false; } set(ui_trim(std::string_view(line).substr(0, split)), ui_trim(std::string_view(line).substr(split + 1u))); }
+        if (end == std::string_view::npos) { break; }
+        cursor = end + 1u;
+    }
+    return true;
+}
+void PropertyBag::set(std::string key, std::string value) { values_.insert_or_assign(ui_key(key), std::move(value)); }
+const std::string* PropertyBag::get(std::string_view key) const noexcept { const auto found = values_.find(ui_key(key)); return found == values_.end() ? nullptr : &found->second; }
+std::optional<std::int32_t> PropertyBag::integer(std::string_view key) const noexcept { const std::string* value = get(key); if (!value) { return std::nullopt; } std::int32_t parsed{}; return parse_i32(*value, parsed) ? std::optional<std::int32_t>(parsed) : std::nullopt; }
+std::optional<float> PropertyBag::real(std::string_view key) const noexcept { const std::string* value = get(key); if (!value) { return std::nullopt; } float parsed{}; return parse_float_value(*value, parsed) ? std::optional<float>(parsed) : std::nullopt; }
+std::optional<bool> PropertyBag::boolean(std::string_view key) const noexcept { const std::string* value = get(key); if (!value) { return std::nullopt; } bool parsed{}; return markup_runtime::parse_boolean(*value, parsed) ? std::optional<bool>(parsed) : std::nullopt; }
+
+std::optional<Rect> PropertyBag::rectangle(std::string_view key) const noexcept {
+    const std::string* value = get(key); if (!value) { return std::nullopt; }
+    std::istringstream input(*value); Rect result; return input >> result.left >> result.top >> result.right >> result.bottom ? std::optional<Rect>(result) : std::nullopt;
+}
+
+std::optional<Color> PropertyBag::color(std::string_view key) const noexcept {
+    const std::string* value = get(key); if (!value) { return std::nullopt; }
+    std::istringstream input(*value); std::int32_t red{}, green{}, blue{}, alpha{255}; if (!(input >> red >> green >> blue)) { return std::nullopt; } input >> alpha;
+    if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255 || alpha < 0 || alpha > 255) { return std::nullopt; }
+    return Color{static_cast<std::uint8_t>(red), static_cast<std::uint8_t>(green), static_cast<std::uint8_t>(blue), static_cast<std::uint8_t>(alpha)};
+}
+
+bool InterfaceModel::add_sprite(SpriteDefinition sprite, bool replace) { if (sprite.name.empty() || sprite.textures.empty()) { return false; } const std::string key = ui_key(sprite.name); if (!replace && sprites_.contains(key)) { return false; } sprites_.insert_or_assign(key, std::move(sprite)); return true; }
+bool InterfaceModel::add_font(FontDefinition font, bool replace) { if (font.name.empty() || font.texture.empty()) { return false; } const std::string key = ui_key(font.name); if (!replace && fonts_.contains(key)) { return false; } fonts_.insert_or_assign(key, std::move(font)); return true; }
+bool InterfaceModel::create(Control control) { if (control.identifier == 0u || controls_.contains(control.identifier)) { return false; } if (control.parent && !controls_.contains(*control.parent)) { return false; } const std::uint32_t identifier = control.identifier; const auto parent = control.parent; controls_.emplace(identifier, std::move(control)); if (parent) { controls_.at(*parent).children.push_back(identifier); } return true; }
+
+bool InterfaceModel::destroy(std::uint32_t identifier) {
+    const auto found = controls_.find(identifier); if (found == controls_.end()) { return false; }
+    const auto parent = found->second.parent; const auto children = found->second.children;
+    if (parent) { auto& siblings = controls_.at(*parent).children; siblings.erase(std::remove(siblings.begin(), siblings.end(), identifier), siblings.end()); }
+    for (std::uint32_t child : children) { auto child_it = controls_.find(child); if (child_it != controls_.end()) { child_it->second.parent.reset(); } }
+    controls_.erase(found); return true;
+}
+Control* InterfaceModel::find(std::uint32_t identifier) noexcept { const auto found = controls_.find(identifier); return found == controls_.end() ? nullptr : &found->second; }
+const Control* InterfaceModel::find(std::uint32_t identifier) const noexcept { const auto found = controls_.find(identifier); return found == controls_.end() ? nullptr : &found->second; }
+const SpriteDefinition* InterfaceModel::sprite(std::string_view name) const noexcept { const auto found = sprites_.find(ui_key(name)); return found == sprites_.end() ? nullptr : &found->second; }
+const FontDefinition* InterfaceModel::font(std::string_view name) const noexcept { const auto found = fonts_.find(ui_key(name)); return found == fonts_.end() ? nullptr : &found->second; }
+
+bool InterfaceModel::attach(std::uint32_t parent, std::uint32_t child) {
+    if (parent == child) { return false; }
+    Control* parent_control = find(parent); Control* child_control = find(child); if (!parent_control || !child_control) { return false; }
+    for (std::optional<std::uint32_t> cursor = parent_control->parent; cursor; cursor = find(*cursor) ? find(*cursor)->parent : std::nullopt) { if (*cursor == child) { return false; } }
+    if (child_control->parent) { auto& siblings = controls_.at(*child_control->parent).children; siblings.erase(std::remove(siblings.begin(), siblings.end(), child), siblings.end()); }
+    child_control->parent = parent; if (std::find(parent_control->children.begin(), parent_control->children.end(), child) == parent_control->children.end()) { parent_control->children.push_back(child); } return true;
+}
+
+std::vector<std::uint32_t> InterfaceModel::hit_test(Point point) const {
+    std::vector<std::uint32_t> result;
+    for (const auto& [identifier, control] : controls_) { if (control.visible && control.enabled && control.bounds.contains(point)) { result.push_back(identifier); } }
+    std::sort(result.begin(), result.end()); return result;
+}
+std::size_t InterfaceModel::control_count() const noexcept { return controls_.size(); }
+
+void TextBuffer::configure(std::size_t maximum_symbols, bool numeric, bool password) { maximum_symbols_ = maximum_symbols; numeric_ = numeric; password_ = password; if (text_.size() > maximum_symbols_) { text_.resize(maximum_symbols_); } if (numeric_) { text_.erase(std::remove_if(text_.begin(), text_.end(), [](unsigned char c) { return !std::isdigit(c) && c != '-' && c != '+' && c != '.'; }), text_.end()); } }
+bool TextBuffer::set(std::string text) { if (text.size() > maximum_symbols_) { return false; } if (numeric_ && std::any_of(text.begin(), text.end(), [](unsigned char c) { return !std::isdigit(c) && c != '-' && c != '+' && c != '.'; })) { return false; } text_ = std::move(text); return true; }
+bool TextBuffer::insert(std::size_t position, std::string_view text) { if (position > text_.size() || text_.size() + text.size() > maximum_symbols_) { return false; } if (numeric_ && std::any_of(text.begin(), text.end(), [](unsigned char c) { return !std::isdigit(c) && c != '-' && c != '+' && c != '.'; })) { return false; } text_.insert(position, text); return true; }
+bool TextBuffer::erase(std::size_t position, std::size_t count) { if (position > text_.size()) { return false; } text_.erase(position, count); return true; }
+const std::string& TextBuffer::text() const noexcept { return text_; }
+std::string TextBuffer::display_text() const { return password_ ? std::string(text_.size(), '*') : text_; }
+std::size_t TextBuffer::maximum_symbols() const noexcept { return maximum_symbols_; }
+
+void ScrollModel::set_range(std::int32_t minimum, std::int32_t maximum) { if (minimum > maximum) { std::swap(minimum, maximum); } minimum_ = minimum; maximum_ = maximum; position_ = std::clamp(position_, minimum_, maximum_); }
+void ScrollModel::set_page(std::int32_t page) noexcept { page_ = std::max(1, page); }
+void ScrollModel::set_step(std::int32_t step) noexcept { step_ = std::max(1, std::abs(step)); }
+void ScrollModel::set_position(std::int32_t position) noexcept { position_ = std::clamp(position, minimum_, maximum_); }
+std::int32_t ScrollModel::position() const noexcept { return position_; }
+std::int32_t ScrollModel::minimum() const noexcept { return minimum_; }
+std::int32_t ScrollModel::maximum() const noexcept { return maximum_; }
+std::int32_t ScrollModel::page() const noexcept { return page_; }
+void ScrollModel::line(std::int32_t direction) noexcept { set_position(position_ + (direction < 0 ? -step_ : step_)); }
+void ScrollModel::page_move(std::int32_t direction) noexcept { set_position(position_ + (direction < 0 ? -page_ : page_)); }
+
+void ListModel::set_items(std::vector<std::string> items) { items_ = std::move(items); if (selection_ && *selection_ >= items_.size()) { selection_.reset(); } }
+bool ListModel::select(std::size_t index) noexcept { if (index >= items_.size()) { return false; } selection_ = index; return true; }
+std::optional<std::size_t> ListModel::selection() const noexcept { return selection_; }
+const std::vector<std::string>& ListModel::items() const noexcept { return items_; }
+void ListModel::clear() noexcept { items_.clear(); selection_.reset(); }
+
+float ProgressModel::fraction() const noexcept { if (maximum <= minimum) { return 0.0f; } return std::clamp(static_cast<float>(value - minimum) / static_cast<float>(maximum - minimum), 0.0f, 1.0f); }
+std::string ProgressModel::label(bool percent) const { if (percent) { return std::to_string(static_cast<std::int32_t>(std::lround(fraction() * 100.0f))) + "%"; } return std::to_string(value) + " / " + std::to_string(maximum); }
+
+void OptionsModel::set_video_modes(std::vector<VideoMode> modes) { std::sort(modes.begin(), modes.end()); modes.erase(std::unique(modes.begin(), modes.end()), modes.end()); video_modes_ = std::move(modes); if (selected_mode_ && std::find(video_modes_.begin(), video_modes_.end(), *selected_mode_) == video_modes_.end()) { selected_mode_.reset(); } }
+const std::vector<VideoMode>& OptionsModel::video_modes() const noexcept { return video_modes_; }
+bool OptionsModel::choose_video_mode(VideoMode mode) noexcept { if (std::find(video_modes_.begin(), video_modes_.end(), mode) == video_modes_.end()) { return false; } selected_mode_ = mode; return true; }
+std::optional<VideoMode> OptionsModel::video_mode() const noexcept { return selected_mode_; }
+void OptionsModel::set(std::string key, std::string value) { values_.insert_or_assign(ui_key(key), std::move(value)); }
+const std::string* OptionsModel::get(std::string_view key) const noexcept { const auto found = values_.find(ui_key(key)); return found == values_.end() ? nullptr : &found->second; }
+
+} // namespace ui_runtime
+
 namespace compiler_runtime {
 namespace {
 

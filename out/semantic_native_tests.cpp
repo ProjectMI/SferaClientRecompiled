@@ -478,6 +478,119 @@ void test_character_effects_and_rendering() {
     assert(effects.take_next()->shader == "blood" && effects.size() == 0u);
 }
 
+
+void test_completion_runtime() {
+    using namespace semantic;
+
+    const std::array<std::string_view, 8> launch_args{"sphere.exe", "/locale", "ru", "/login=tester", "/gamexp_sid", "sid42", "/connect_type", "direct"};
+    const auto launch = client_runtime::parse_launch_arguments(launch_args);
+    assert(launch.locale && *launch.locale == "ru" && launch.login && *launch.login == "tester");
+    assert(launch.gamexp_session && *launch.gamexp_session == "sid42" && launch.connect_type == "direct");
+    const auto connect_cfg = client_runtime::parse_key_value_config("CONNECT_TYPE=tcp\nHOST = 127.0.0.1\n");
+    assert(connect_cfg.at("connect_type") == "tcp" && connect_cfg.at("host") == "127.0.0.1");
+
+    client_runtime::ModelManager models;
+    assert(models.register_folder("Models") && models.register_model("Hero", "Models/Hero.mdl") == 0);
+    assert(models.by_name("hero") && models.by_id(0) && models.size() == 1u);
+    const auto ping = client_runtime::parse_ping_report("Packets: Sent = 1, Received = 1, Lost = 0; time=17ms TTL=64");
+    assert(ping.health == client_runtime::ConnectionHealth::reachable && ping.received == 1u && ping.round_trip_ms == 17u);
+
+    content_runtime::MaterialFilter filter;
+    filter.set_rules({{"metal", "metal.dds", 1.0f, {"armor"}}, {"metal", "metal_heavy.dds", 2.0f, {"armor"}}});
+    filter.set_exceptions({"skip"});
+    assert(filter.match("METAL", "armor") && filter.match("metal", "armor")->texture == "metal_heavy.dds" && filter.excluded("SKIP"));
+
+    content_runtime::ObjectConfig object_config;
+    std::string parse_error;
+    assert(object_config.parse("name = hero; stats = { hp = 100; speed = 2.5; }; flags = [true, false, 3]", &parse_error));
+    assert(object_config.find("name") && object_config.find("name")->text() && *object_config.find("name")->text() == "hero");
+    assert(object_config.find("stats.hp") && object_config.find("stats.hp")->integer() == 100);
+    assert(object_config.find("flags") && object_config.find("flags")->at(1u) && object_config.find("flags")->at(1u)->boolean() == false);
+
+    content_runtime::ScalarCurve curve;
+    assert(curve.set({{0.0f, 0.0f}, {1.0f, 10.0f}}, content_runtime::Interpolation::linear));
+    assert(near(curve.sample(0.25f), 2.5f));
+    content_runtime::ParticleLibrary particles;
+    content_runtime::ParticleSystemDefinition particle;
+    particle.name = "rain";
+    particle.particle_count = 128u;
+    particle.size = curve;
+    assert(particles.store(std::move(particle)) && particles.find("RAIN"));
+
+    content_runtime::QuadTree tree({0.0f, 0.0f, 100.0f, 100.0f}, 1u, 4u);
+    assert(tree.insert({1u, {10.0f, 10.0f, 20.0f, 20.0f}}));
+    assert(tree.insert({2u, {70.0f, 70.0f, 80.0f, 80.0f}}));
+    const auto near_origin = tree.query({0.0f, 0.0f, 30.0f, 30.0f});
+    assert(near_origin.size() == 1u && near_origin[0] == 1u);
+
+    content_runtime::QuickFileArchive archive;
+    assert(archive.add("_main.mbc", {1u, 2u, 3u}) && archive.find("_MAIN.MBC").size() == 3u);
+    content_runtime::ServerWall wall;
+    wall.set_segments({{{5.0f, 0.0f, -1.0f}, {5.0f, 0.0f, 1.0f}, 0u}});
+    assert(wall.blocked({0.0f, 0.0f, 0.0f}, {10.0f, 0.0f, 0.0f}));
+
+    content_runtime::MapGenerator map_generator;
+    const auto generated = map_generator.generate(4u, 3u, 123u, 2.0f);
+    assert(generated.width == 4u && generated.height == 3u && generated.heights.size() == 12u);
+    content_runtime::NatureManager nature;
+    nature.register_rain_class(7u, "storm"); nature.set_state({1.5f, 2.0f, 7u});
+    assert(nature.rain_class(7u) && *nature.rain_class(7u) == "storm" && near(nature.state().rain, 1.0f));
+    content_runtime::ZoningManager zoning;
+    assert(zoning.set_zones({{0, 0, 0.0f, 0.0f, 10.0f, 10.0f, 3u}}));
+    assert(zoning.zone_at(5.0f, 5.0f) && zoning.zone_at(5.0f, 5.0f)->identifier == 3u);
+
+    content_runtime::TextureSet textures;
+    assert(textures.set("Diffuse", "Effects/diffuse.dds") && textures.find("diffuse"));
+    content_runtime::UpdatePlan update;
+    update.set_local({{"a.bin", 10u, 1u}});
+    update.set_remote({{"a.bin", 10u, 2u}, {"b.bin", 5u, 3u}});
+    assert(update.required().size() == 2u);
+
+    markup_runtime::HyperTextDocument document;
+    assert(document.parse("Hello <b>bold</b> <a href=\"player:Adam\">Adam</a>"));
+    assert(document.plain_text() == "Hello bold Adam");
+    assert(document.runs().back().link && document.runs().back().link->scheme == "player" && document.runs().back().link->value == "Adam");
+    markup_runtime::TokenStream tokens("a = \"two words\"\n# comment\nb");
+    assert(tokens.next() == "a" && tokens.next() == "=" && tokens.next() == "two words" && tokens.next() == "b");
+
+    sky_runtime::SkyTimeline sky;
+    assert(sky.set_states({{0.0f, {0.0f, 0.0f, 0.0f}, 1.0f, 0.0f}, {12.0f, {1.0f, 1.0f, 1.0f}, 0.0f, 1.0f}}, 24.0f));
+    assert(near(sky.sample(6.0f).color.x, 0.5f));
+
+    legacy_sound::SoundLibrary sounds;
+    assert(sounds.store({"click", legacy_sound::play_random, {{"click.wav", 1.0f, 1.0f}}, 0.0f}) && sounds.find("CLICK"));
+    legacy_sound::SoundTrack track;
+    track.set_playlist({"one.ogg", "two.ogg"}, true);
+    assert(track.current() && *track.current() == "one.ogg");
+    assert(track.advance() && *track.current() == "two.ogg");
+    assert(track.advance() && *track.current() == "one.ogg");
+
+    ui_runtime::PropertyBag properties;
+    assert(properties.parse("range=1 9; color=10 20 30 40; horizontal=true"));
+    assert(properties.rectangle("range") == std::nullopt && properties.color("color") && properties.boolean("horizontal") == true);
+    ui_runtime::InterfaceModel interface_model;
+    assert(interface_model.add_sprite({"button", {32, 16}, {"button.dds"}, {}}));
+    assert(interface_model.add_font({"main", "font.dds", 256u, 14}));
+    ui_runtime::Control window; window.identifier = 1u; window.name = "window"; window.kind = ui_runtime::ControlKind::generic; window.bounds = {0, 0, 100, 100};
+    ui_runtime::Control button; button.identifier = 2u; button.name = "button"; button.kind = ui_runtime::ControlKind::button; button.bounds = {10, 10, 30, 30}; button.parent = 1u;
+    assert(interface_model.create(std::move(window)));
+    assert(interface_model.create(std::move(button)));
+    assert(interface_model.find(1u)->children.size() == 1u && interface_model.hit_test({15, 15}).size() == 2u);
+
+    ui_runtime::TextBuffer edit;
+    edit.configure(8u, false, true);
+    assert(edit.set("secret") && edit.display_text() == "******");
+    ui_runtime::ScrollModel scroll;
+    scroll.set_range(0, 100); scroll.set_page(10); scroll.set_step(2); scroll.set_position(50); scroll.line(1); scroll.page_move(-1);
+    assert(scroll.position() == 42);
+    ui_runtime::ProgressModel progress{0, 200, 50};
+    assert(near(progress.fraction(), 0.25f) && progress.label(true) == "25%");
+    ui_runtime::OptionsModel options;
+    const ui_runtime::VideoMode mode{1920u, 1080u, 60u, 21u};
+    options.set_video_modes({mode, mode});
+    assert(options.video_modes().size() == 1u && options.choose_video_mode(mode));
+}
+
 void test_directx_table() {
     assert(std::string_view(semantic::directx::error_description(-2147483638)) == "The data necessary to complete this operation is not yet available.");
     assert(std::string_view(semantic::directx::error_description(123456789)) == "n/a");
@@ -520,6 +633,7 @@ int main() {
     test_network();
     test_assets_and_services();
     test_character_effects_and_rendering();
+    test_completion_runtime();
     test_directx_table();
     test_compiler_runtime();
     std::cout << "semantic native subsystem checks passed" << std::endl;

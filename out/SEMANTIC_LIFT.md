@@ -1,15 +1,20 @@
-# Семантический подъём: два прохода
+# Семантический подъём: три прохода
 
-Семантически классифицированы и представлены native-кодом 216 334 из 324 818 строк процессорного листинга — 66,602%. Адресная карта охватывает 3 691 из 4 892 функций и находится в `semantic_lift_report.json`.
+Семантически разобраны все 4 892 функции исходного lifted-среза — 324 818 из 324 818 строк, то есть 100%. Третий проход закрыл оставшиеся 1 201 функцию и 108 484 строки (33,398% исходного листинга).
 
-Второй проход является отдельным непересекающимся срезом: 112 167 строк и 916 функций, или 34,532% исходного объёма. Минимум одной трети составляет 108 273 строки; превышение — 3 894 строки. Первый проход сохранился без изменений: 104 167 строк и 2 775 функций.
+`semantic_native.h/.cpp` остаётся единственным предметным слоем. В нём нет `LiftCpu`, `LIFT_*`, `lift_load*`, `lift_store*` или адресной арифметики процессорной модели. `semantic_bridge.h/.cpp` остаётся одним универсальным ABI-маршаллером; он не получил отдельной обвязки под каждую новую объектную функцию.
 
-Рабочий код разделён на две части:
+## Третий проход
 
-- `semantic_native.h/.cpp` — предметные структуры, STL-контейнеры, алгоритмы и таблица native-входов;
-- `semantic_bridge.h/.cpp` — единый ABI-маршаллер между `LiftCpu` и типизированными native-функциями.
+Остаток был разобран по исходным строкам, call graph и полям, а затем свёрнут в нормальные C++20-подсистемы. Закрыты ранние `Arrays/config/sDataContainers`, bootstrap/connect config, `CMatFilter`, `ModelsMngr`, `NatureManager`, `NetworkConnectionChecker`, `objparam`, `ParticleSystem`, quadtree, QuickFile, ServerWall, shadow support, `simpleHTMLParser`, `SimpleParser`, sky/sound/texture/update/zoning и весь хвост старого Sphere UI от `Button` до `Sprite`/`SphereOptions`.
 
-Мост не содержит обвязки на каждую восстановленную функцию. Новая точная функция добавляет только запись в таблицу `semantic_native.cpp`, поэтому `semantic_bridge.cpp` сохранил размер 187 строк.
+Распознанные контейнерные и RAII-функции внутри этих диапазонов не воспроизводятся адрес-в-адрес: они поглощены `std::vector`, `std::list`, `std::deque`, `std::map`, `std::unordered_map`, `std::set`, `std::string`, `std::optional`, `std::variant`, `std::unique_ptr` и `std::filesystem`.
+
+Крупные новые модели: `client_runtime::LaunchOptions/ModelManager/ConnectionProbe`, `content_runtime::MaterialFilter/ObjectConfig/ParticleLibrary/QuadTree/QuickFileArchive/ServerWall/NatureManager/TextureSet/UpdatePlan/ZoningManager`, `markup_runtime::HyperTextDocument/TokenStream`, `sky_runtime::SkyTimeline`, `legacy_sound::SoundLibrary/SoundTrack` и `ui_runtime::InterfaceModel/PropertyBag/TextBuffer/ScrollModel/ListModel/OptionsModel`.
+
+## Граница исполнения
+
+Семантическое покрытие теперь полное, но это не означает, что все 4 892 legacy-адреса уже переключены на native bridge. Точные ABI-безопасные входы остаются bridge-bound, а объектные методы со старым layout продолжают использовать compatibility fallback до миграции владеющего object graph. Это намеренно отделено от семантического подъёма, чтобы не повторить ошибки с частично восстановленным ABI.
 
 ## Второй проход
 
