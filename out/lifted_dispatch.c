@@ -1,4 +1,5 @@
 #include "lifted_functions.h"
+#include "lifted_fast_ops.h"
 
 #include <stddef.h>
 
@@ -4900,30 +4901,29 @@ static const LiftFunctionEntry kLiftedFunctions[4893] = {
     {0x000FC15Au, &sfera_sub_004FC15A},
 };
 
-static LiftFunction resolve_lifted_function(uint32_t target) {
-    uint32_t base = lift_image_va(UINT32_C(0x00400000));
-    if (target < base || (uint64_t)(target - base) >= UINT64_C(0x4C62000)) { return (LiftFunction)0; }
-    uint32_t rva = target - base;
-    size_t first = 0u;
-    size_t count = sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0]);
-    while (count != 0u) {
-        size_t step = count / 2u;
-        size_t middle = first + step;
-        if (kLiftedFunctions[middle].rva < rva) { first = middle + 1u; count -= step + 1u; } else { count = step; }
+static LiftFunction kFastLiftedFunctions[LIFT_SOURCE_TEXT_SIZE];
+
+void LIFT_CDECL lift_initialize_dispatch(void) {
+    size_t index;
+    for (index = 0u; index < sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0]); ++index) {
+        uint32_t rva = kLiftedFunctions[index].rva;
+        if (rva >= UINT32_C(0x00001000) && rva - UINT32_C(0x00001000) < LIFT_SOURCE_TEXT_SIZE) { kFastLiftedFunctions[rva - UINT32_C(0x00001000)] = kLiftedFunctions[index].function; }
     }
-    return first < sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0]) && kLiftedFunctions[first].rva == rva ? kLiftedFunctions[first].function : (LiftFunction)0;
 }
 
-static int target_is_local(uint32_t target) {
-    uint32_t base = lift_image_va(UINT32_C(0x00400000));
-    return target >= base && (uint64_t)(target - base) < UINT64_C(0x4C62000);
+static LiftFunction resolve_lifted_function(uint32_t target) {
+    uint32_t rva = lift_source_rva(target);
+    if (rva < UINT32_C(0x00001000) || rva - UINT32_C(0x00001000) >= LIFT_SOURCE_TEXT_SIZE) { return (LiftFunction)0; }
+    return kFastLiftedFunctions[rva - UINT32_C(0x00001000)];
 }
+
+static int target_is_local(uint32_t target) { return lift_source_rva(target) != UINT32_MAX; }
 
 void LIFT_CDECL lift_dispatch(LiftCpu* cpu, uint32_t target, uint32_t stop_address) {
     LiftFunction function = resolve_lifted_function(target);
     if (!function) {
-        uint32_t base = lift_image_va(UINT32_C(0x00400000));
-        uint32_t source = target_is_local(target) ? UINT32_C(0x00400000) + (target - base) : UINT32_C(0x00400000);
+        uint32_t rva = lift_source_rva(target);
+        uint32_t source = rva != UINT32_MAX ? UINT32_C(0x00400000) + rva : UINT32_C(0x00400000);
         lift_trap(cpu, source, "unresolved native C function target");
     }
     cpu->eip = target;
@@ -4938,8 +4938,7 @@ int LIFT_CDECL lift_call_indirect(LiftCpu* cpu, uint32_t target, uint32_t return
         return cpu->eip == return_address;
     }
     if (target_is_local(target)) {
-        uint32_t base = lift_image_va(UINT32_C(0x00400000));
-        lift_trap(cpu, UINT32_C(0x00400000) + (target - base), "indirect call targets the middle of no recovered function");
+        lift_trap(cpu, UINT32_C(0x00400000) + lift_source_rva(target), "indirect call targets the middle of no recovered function");
     }
     lift_native_call(cpu, target, callsite);
     cpu->eip = return_address;
@@ -4950,8 +4949,7 @@ void LIFT_CDECL lift_tail_indirect(LiftCpu* cpu, uint32_t target, uint32_t stop_
     LiftFunction function = resolve_lifted_function(target);
     if (function) { function(cpu, stop_address); return; }
     if (target_is_local(target)) {
-        uint32_t base = lift_image_va(UINT32_C(0x00400000));
-        lift_trap(cpu, UINT32_C(0x00400000) + (target - base), "indirect jump targets the middle of no recovered function");
+        lift_trap(cpu, UINT32_C(0x00400000) + lift_source_rva(target), "indirect jump targets the middle of no recovered function");
     }
     uint32_t return_address = lift_pop32(cpu);
     lift_native_call(cpu, target, callsite);

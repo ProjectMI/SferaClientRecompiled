@@ -6,12 +6,15 @@
 #if defined(_MSC_VER)
 #define LIFT_CDECL __cdecl
 #define LIFT_NORETURN __declspec(noreturn)
+#define LIFT_ENTRY __declspec(noinline)
 #elif defined(__cplusplus)
 #define LIFT_CDECL
 #define LIFT_NORETURN [[noreturn]]
+#define LIFT_ENTRY __attribute__((noinline))
 #else
 #define LIFT_CDECL
 #define LIFT_NORETURN _Noreturn
+#define LIFT_ENTRY __attribute__((noinline))
 #endif
 
 #ifdef __cplusplus
@@ -46,8 +49,7 @@ typedef struct LiftCpu {
     uint16_t fpu_control;
     uint16_t fpu_status;
     uint16_t reserved;
-    uint8_t xmm[8][16];
-    uint8_t fs_data[4096];
+    uint8_t fs_data[64];
 } LiftCpu;
 
 #if defined(__cplusplus)
@@ -56,21 +58,24 @@ static_assert(offsetof(LiftCpu, eflags) == 36, "LiftCpu.eflags ABI offset change
 static_assert(offsetof(LiftCpu, stack_base) == 40, "LiftCpu.stack_base ABI offset changed");
 static_assert(offsetof(LiftCpu, stack_limit) == 44, "LiftCpu.stack_limit ABI offset changed");
 static_assert(offsetof(LiftCpu, fpu_control) == 114, "LiftCpu.fpu_control ABI offset changed");
-static_assert(offsetof(LiftCpu, fs_data) == 248, "LiftCpu.fs_data ABI offset changed");
-static_assert(sizeof(LiftCpu) == 4344, "LiftCpu ABI size changed");
+static_assert(offsetof(LiftCpu, fs_data) == 120, "LiftCpu.fs_data ABI offset changed");
+static_assert(sizeof(LiftCpu) == 184, "LiftCpu ABI size changed");
 #else
 _Static_assert(offsetof(LiftCpu, eax) == 0, "LiftCpu.eax ABI offset changed");
 _Static_assert(offsetof(LiftCpu, eflags) == 36, "LiftCpu.eflags ABI offset changed");
 _Static_assert(offsetof(LiftCpu, stack_base) == 40, "LiftCpu.stack_base ABI offset changed");
 _Static_assert(offsetof(LiftCpu, stack_limit) == 44, "LiftCpu.stack_limit ABI offset changed");
 _Static_assert(offsetof(LiftCpu, fpu_control) == 114, "LiftCpu.fpu_control ABI offset changed");
-_Static_assert(offsetof(LiftCpu, fs_data) == 248, "LiftCpu.fs_data ABI offset changed");
-_Static_assert(sizeof(LiftCpu) == 4344, "LiftCpu ABI size changed");
+_Static_assert(offsetof(LiftCpu, fs_data) == 120, "LiftCpu.fs_data ABI offset changed");
+_Static_assert(sizeof(LiftCpu) == 184, "LiftCpu ABI size changed");
 #endif
 
 typedef void (LIFT_CDECL *LiftFunction)(LiftCpu* cpu, uint32_t stop_address);
 
-uint32_t LIFT_CDECL lift_image_va(uint32_t source_va);
+extern uint32_t g_lift_header_base;
+extern uint32_t g_lift_rsrc_base;
+extern uint32_t g_lift_callback_thunk_base;
+
 uint8_t LIFT_CDECL lift_load8(uint32_t address);
 uint16_t LIFT_CDECL lift_load16(uint32_t address);
 uint32_t LIFT_CDECL lift_load32(uint32_t address);
@@ -130,10 +135,10 @@ void LIFT_CDECL lift_scas32(LiftCpu* cpu, uint32_t repeated, uint32_t repeat_not
 
 void LIFT_CDECL lift_import_call(LiftCpu* cpu, uint32_t import_index, uint32_t callsite);
 void LIFT_CDECL lift_native_call(LiftCpu* cpu, uint32_t target, uint32_t callsite);
-void LIFT_CDECL lift_note_config_lookup(uint32_t key_address, uint32_t value_address);
-void LIFT_CDECL lift_enter_block(LiftCpu* cpu, uint32_t source_va);
+uint32_t LIFT_CDECL lift_source_rva(uint32_t address);
 LIFT_NORETURN void LIFT_CDECL lift_trap(LiftCpu* cpu, uint32_t source_va, const char* reason);
 
+void LIFT_CDECL lift_initialize_dispatch(void);
 void LIFT_CDECL lift_dispatch(LiftCpu* cpu, uint32_t target, uint32_t stop_address);
 int LIFT_CDECL lift_call_indirect(LiftCpu* cpu, uint32_t target, uint32_t return_address, uint32_t callsite);
 void LIFT_CDECL lift_tail_indirect(LiftCpu* cpu, uint32_t target, uint32_t stop_address, uint32_t callsite);

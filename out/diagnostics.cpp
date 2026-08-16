@@ -23,11 +23,6 @@ thread_local std::uint32_t g_instruction = 0;
 thread_local const char* g_operation = nullptr;
 thread_local std::uint32_t g_native_target = 0;
 thread_local const char* g_import_name = nullptr;
-thread_local std::uint32_t g_semantic_source_va = 0;
-thread_local const char* g_semantic_name = nullptr;
-struct SemanticArgumentRecord { std::uint64_t word; std::uint8_t width; bool floating; };
-thread_local SemanticArgumentRecord g_semantic_arguments[16]{};
-thread_local std::size_t g_semantic_argument_count = 0;
 thread_local bool g_memory_probe = false;
 
 struct TraceEntry {
@@ -47,19 +42,12 @@ struct MemoryWriteRecord {
     std::uint64_t sequence;
 };
 
-struct MemoryReadRecord {
-    MemoryReadInfo info;
-    std::uint64_t sequence;
-};
-
 thread_local TraceEntry g_trace[256]{};
 thread_local std::uint64_t g_trace_count = 0;
 thread_local CallEntry g_calls[512]{};
 thread_local std::size_t g_call_count = 0;
 thread_local std::unique_ptr<MemoryWriteRecord[]> g_memory_writes;
 thread_local std::uint64_t g_memory_write_sequence = 0;
-thread_local MemoryReadRecord g_memory_reads[1024]{};
-thread_local std::uint64_t g_memory_read_sequence = 0;
 constexpr std::size_t kMemoryWriteBucketCount = 65536;
 constexpr std::size_t kMemoryWriteCapacity = kMemoryWriteBucketCount * 4u;
 
@@ -71,9 +59,9 @@ std::size_t memory_write_bucket(std::uint32_t address) noexcept {
     switch (phase) {
         case RuntimePhase::startup: return "startup";
         case RuntimePhase::process_startup: return "process-startup";
-        case RuntimePhase::map_image: return "map-image";
+        case RuntimePhase::static_storage: return "static-storage";
         case RuntimePhase::load_imports: return "load-imports";
-        case RuntimePhase::protect_image: return "protect-image";
+        case RuntimePhase::protect_static_storage: return "protect-static-storage";
         case RuntimePhase::abi_self_test: return "abi-self-test";
         case RuntimePhase::function_map: return "function-map";
         case RuntimePhase::execution_setup: return "execution-setup";
@@ -86,9 +74,7 @@ std::size_t memory_write_bucket(std::uint32_t address) noexcept {
 
 #if !defined(SFERA_PORTABLE_CHECK)
 
-LONG g_report_sequence = 0;
-thread_local bool g_writing_report = false;
-thread_local char g_crash_report[65536]{};
+LONG g_report_written = 0;
 wchar_t g_artifact_directory[MAX_PATH]{};
 std::size_t g_artifact_directory_length = 0;
 
@@ -137,13 +123,6 @@ void append_execution_context(char* report, std::size_t capacity, std::size_t& u
     }
     if (g_instruction != 0) { append_text(report, capacity, used, "instruction=%08X operation=%s\r\n", g_instruction, g_operation ? g_operation : "unknown"); }
     if (g_native_target != 0) { append_text(report, capacity, used, "native-target=%08X import=%s\r\n", g_native_target, g_import_name ? g_import_name : "unknown"); }
-    if (g_semantic_source_va != 0) {
-        append_text(report, capacity, used, "semantic-source=%08X semantic=%s\r\n", g_semantic_source_va, g_semantic_name ? g_semantic_name : "unknown");
-        for (std::size_t index = 0; index < g_semantic_argument_count; ++index) {
-            const SemanticArgumentRecord& argument = g_semantic_arguments[index];
-            append_text(report, capacity, used, "  arg[%zu]=0x%016llX width=%u kind=%s\r\n", index, static_cast<unsigned long long>(argument.word), static_cast<unsigned>(argument.width), argument.floating ? "float" : "word");
-        }
-    }
     if (g_call_count != 0) {
         append_text(report, capacity, used, "call-stack:\r\n");
         for (std::size_t index = 0; index < g_call_count; ++index) {
@@ -189,34 +168,27 @@ void write_minidump(EXCEPTION_POINTERS* pointers) noexcept {
 }
 
 void write_crash_report(EXCEPTION_POINTERS* pointers) noexcept {
-    if (!pointers || g_writing_report) { return; }
-    g_writing_report = true;
-    char* report = g_crash_report;
-    std::memset(report, 0, sizeof(g_crash_report));
+    if (!pointers || InterlockedCompareExchange(&g_report_written, 1, 0) != 0) { return; }
+    static char report[65536]{};
     std::size_t used = 0;
-    const LONG sequence = InterlockedIncrement(&g_report_sequence);
     const EXCEPTION_RECORD* record = pointers->ExceptionRecord;
     const CONTEXT* context = pointers->ContextRecord;
-    append_text(report, sizeof(g_crash_report), used, "Sfera native-C runtime crash\r\n");
-    append_text(report, sizeof(g_crash_report), used, "sequence=%ld pid=%lu tid=%lu phase=%s\r\n", sequence, GetCurrentProcessId(), GetCurrentThreadId(), phase_name(g_phase));
+    append_text(report, sizeof(report), used, "Sfera native-C runtime crash\r\n");
+    append_text(report, sizeof(report), used, "pid=%lu tid=%lu phase=%s\r\n", GetCurrentProcessId(), GetCurrentThreadId(), phase_name(g_phase));
     if (record) {
-        append_text(report, sizeof(g_crash_report), used, "exception=0x%08lX address=%p\r\n", record->ExceptionCode, record->ExceptionAddress);
-        const std::uintptr_t module_base = reinterpret_cast<std::uintptr_t>(GetModuleHandleW(nullptr));
-        const std::uintptr_t exception_address = reinterpret_cast<std::uintptr_t>(record->ExceptionAddress);
-        if (module_base != 0u && exception_address >= module_base) { append_text(report, sizeof(g_crash_report), used, "host-image-base=%08lX host-rva=%08lX\r\n", static_cast<unsigned long>(module_base), static_cast<unsigned long>(exception_address - module_base)); }
+        append_text(report, sizeof(report), used, "exception=0x%08lX address=%p\r\n", record->ExceptionCode, record->ExceptionAddress);
         if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record->NumberParameters >= 2) {
             const char* access = record->ExceptionInformation[0] == 0 ? "read" : record->ExceptionInformation[0] == 1 ? "write" : record->ExceptionInformation[0] == 8 ? "execute" : "unknown";
-            append_text(report, sizeof(g_crash_report), used, "access=%s target=0x%08lX\r\n", access, static_cast<unsigned long>(record->ExceptionInformation[1]));
+            append_text(report, sizeof(report), used, "access=%s target=0x%08lX\r\n", access, static_cast<unsigned long>(record->ExceptionInformation[1]));
         }
     }
     if (context) {
-        append_text(report, sizeof(g_crash_report), used, "native eip=%08lX esp=%08lX ebp=%08lX eax=%08lX ebx=%08lX ecx=%08lX edx=%08lX esi=%08lX edi=%08lX eflags=%08lX\r\n", context->Eip, context->Esp, context->Ebp, context->Eax, context->Ebx, context->Ecx, context->Edx, context->Esi, context->Edi, context->EFlags);
+        append_text(report, sizeof(report), used, "native eip=%08lX esp=%08lX ebp=%08lX eax=%08lX ebx=%08lX ecx=%08lX edx=%08lX esi=%08lX edi=%08lX eflags=%08lX\r\n", context->Eip, context->Esp, context->Ebp, context->Eax, context->Ebx, context->Ecx, context->Edx, context->Esi, context->Edi, context->EFlags);
     }
-    append_execution_context(report, sizeof(g_crash_report), used, g_cpu);
+    append_execution_context(report, sizeof(report), used, g_cpu);
     write_bytes(L"sfera_native_crash.txt", report, used, CREATE_ALWAYS);
     OutputDebugStringA(report);
     write_minidump(pointers);
-    g_writing_report = false;
 }
 
 LONG CALLBACK vectored_exception_handler(EXCEPTION_POINTERS* pointers) noexcept {
@@ -260,18 +232,6 @@ DiagnosticNativeScope::~DiagnosticNativeScope() {
     g_import_name = previous_import_name_;
 }
 
-DiagnosticSemanticScope::DiagnosticSemanticScope(std::uint32_t source_va, const char* name) noexcept : previous_source_va_(g_semantic_source_va), previous_name_(g_semantic_name) {
-    g_semantic_source_va = source_va;
-    g_semantic_name = name;
-    g_semantic_argument_count = 0;
-}
-
-DiagnosticSemanticScope::~DiagnosticSemanticScope() {
-    g_semantic_source_va = previous_source_va_;
-    g_semantic_name = previous_name_;
-    g_semantic_argument_count = 0;
-}
-
 DiagnosticExecutionScope::DiagnosticExecutionScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp) noexcept : previous_depth_(g_call_count) {
     diagnostic_call(0, target, stop_target, esp);
 }
@@ -296,18 +256,7 @@ void set_diagnostic_instruction(std::uint32_t address, const char* operation) no
     g_trace[static_cast<std::size_t>(g_trace_count % std::size(g_trace))] = {address, operation};
     ++g_trace_count;
 }
-void set_diagnostic_semantic_argument(std::size_t index, std::uint64_t word, std::uint8_t width, bool floating) noexcept {
-    if (index >= std::size(g_semantic_arguments)) { return; }
-    g_semantic_arguments[index] = {word, width, floating};
-    if (g_semantic_argument_count <= index) { g_semantic_argument_count = index + 1u; }
-}
 void set_diagnostic_memory_probe(bool active) noexcept { g_memory_probe = active; }
-
-void diagnostic_memory_read(std::uint32_t address, std::uint32_t size, std::uint64_t value) noexcept {
-    MemoryReadRecord& record = g_memory_reads[static_cast<std::size_t>(g_memory_read_sequence % std::size(g_memory_reads))];
-    record.info = {address, g_instruction, size, value};
-    record.sequence = ++g_memory_read_sequence;
-}
 
 void diagnostic_memory_write(std::uint32_t address, std::uint32_t size, std::uint64_t value) noexcept {
     if (!g_memory_writes) { g_memory_writes.reset(new (std::nothrow) MemoryWriteRecord[kMemoryWriteCapacity]{}); }
@@ -338,39 +287,6 @@ bool diagnostic_last_memory_write(std::uint32_t address, MemoryWriteInfo& result
     if (!selected) { return false; }
     result = selected->info;
     return true;
-}
-
-bool diagnostic_recent_read_value(std::uint32_t value, MemoryReadInfo& result) noexcept {
-    const std::size_t count = g_memory_read_sequence < std::size(g_memory_reads) ? static_cast<std::size_t>(g_memory_read_sequence) : std::size(g_memory_reads);
-    for (std::size_t offset = 0; offset < count; ++offset) {
-        const std::size_t index = static_cast<std::size_t>((g_memory_read_sequence - 1u - offset) % std::size(g_memory_reads));
-        const MemoryReadRecord& record = g_memory_reads[index];
-        if (record.sequence != 0u && record.info.size >= 4u && static_cast<std::uint32_t>(record.info.value) == value) { result = record.info; return true; }
-    }
-    return false;
-}
-
-void diagnostic_memory_fault(std::uint32_t address, std::uint32_t size, bool write) noexcept {
-#if !defined(SFERA_PORTABLE_CHECK)
-    static thread_local char report[65536]{};
-    std::size_t used = 0;
-    report[0] = '\0';
-    append_text(report, sizeof(report), used, "Sfera native-C memory fault\r\n");
-    append_text(report, sizeof(report), used, "pid=%lu tid=%lu phase=%s access=%s address=%08X size=%u\r\n", GetCurrentProcessId(), GetCurrentThreadId(), phase_name(g_phase), write ? "write" : "read", address, size);
-    append_execution_context(report, sizeof(report), used, g_cpu);
-    MemoryReadInfo provenance{};
-    if (!write && diagnostic_recent_read_value(address, provenance)) {
-        append_text(report, sizeof(report), used, "pointer-provenance loaded-from=%08X load-instruction=%08X load-size=%u value=%08X\r\n", provenance.address, provenance.instruction, provenance.size, address);
-        MemoryWriteInfo writer{};
-        if (diagnostic_last_memory_write(provenance.address, writer)) { append_text(report, sizeof(report), used, "pointer-last-write address=%08X instruction=%08X size=%u value=0x%016llX\r\n", writer.address, writer.instruction, writer.size, static_cast<unsigned long long>(writer.value)); }
-    }
-    write_bytes(L"sfera_native_memory_fault.txt", report, used, CREATE_ALWAYS);
-    OutputDebugStringA(report);
-#else
-    (void)address;
-    (void)size;
-    (void)write;
-#endif
 }
 
 void diagnostic_call(std::uint32_t callsite, std::uint32_t target, std::uint32_t return_address, std::uint32_t esp) noexcept {

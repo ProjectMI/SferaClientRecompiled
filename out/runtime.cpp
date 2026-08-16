@@ -8,12 +8,20 @@
 #include <cwchar>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string_view>
+#include <unordered_map>
 
 #if defined(_MSC_VER)
 #pragma intrinsic(__readfsdword)
 #endif
+
+extern "C" {
+std::uint32_t g_lift_header_base = 0;
+std::uint32_t g_lift_rsrc_base = 0;
+std::uint32_t g_lift_callback_thunk_base = 0;
+}
 
 namespace lifted {
 
@@ -22,10 +30,23 @@ ProcessMemory* g_process_memory = nullptr;
 
 namespace {
 
-constexpr std::size_t kCallbackStackCopy = 64u * 1024u;
+constexpr std::size_t kCallbackStackCopy = 16u * 1024u;
+constexpr std::uint32_t kCompactResourceRva = 0x00001000u;
+constexpr std::uint32_t kCallbackThunkSize = 10u;
+constexpr std::uint32_t kCodeTokenBase = 0xE0000000u;
 constexpr wchar_t kClientRootEnvironment[] = L"SFERA_CLIENT_ROOT";
-constexpr wchar_t kDeepDiagnosticsEnvironment[] = L"SFERA_NATIVE_DEEP_TRACE";
-bool g_deep_diagnostics = false;
+thread_local std::vector<std::unique_ptr<LocalStack>> g_callback_stacks;
+thread_local std::size_t g_callback_stack_depth = 0;
+class CallbackStackLease {
+public:
+    CallbackStackLease() { if (g_callback_stack_depth == g_callback_stacks.size()) { g_callback_stacks.push_back(std::make_unique<LocalStack>(kStackReserve)); } stack_ = g_callback_stacks[g_callback_stack_depth++].get(); }
+    CallbackStackLease(const CallbackStackLease&) = delete;
+    CallbackStackLease& operator=(const CallbackStackLease&) = delete;
+    ~CallbackStackLease() { --g_callback_stack_depth; }
+    LocalStack& stack() const noexcept { return *stack_; }
+private:
+    LocalStack* stack_ = nullptr;
+};
 
 std::wstring path_join(const std::wstring& directory, const std::wstring& child) {
     if (directory.empty()) { return child; }
@@ -130,41 +151,11 @@ std::string client_executable_path_ansi() {
     return result;
 }
 
-bool lifted_address_range_valid(std::uint32_t address, std::size_t size) noexcept {
-    if (size == 0u) { return true; }
-    return address < UINT32_C(0x80000000) && static_cast<std::uint64_t>(address) + size <= UINT64_C(0x80000000);
-}
-
-bool memory_range_accessible(const void* pointer, std::size_t size, bool write) noexcept {
-#if defined(SFERA_PORTABLE_CHECK)
-    return pointer != nullptr || size == 0u;
-#else
-    if (size == 0u) { return true; }
-    if (!pointer) { return false; }
-    std::uintptr_t current = reinterpret_cast<std::uintptr_t>(pointer);
-    const std::uintptr_t end = current + size;
-    if (end < current) { return false; }
-    while (current < end) {
-        MEMORY_BASIC_INFORMATION region{};
-        if (VirtualQuery(reinterpret_cast<const void*>(current), &region, sizeof(region)) == 0 || region.State != MEM_COMMIT || (region.Protect & (PAGE_GUARD | PAGE_NOACCESS)) != 0) { return false; }
-        const DWORD base = region.Protect & 0xFFu;
-        const bool readable = base == PAGE_READONLY || base == PAGE_READWRITE || base == PAGE_WRITECOPY || base == PAGE_EXECUTE_READ || base == PAGE_EXECUTE_READWRITE || base == PAGE_EXECUTE_WRITECOPY;
-        const bool writable = base == PAGE_READWRITE || base == PAGE_WRITECOPY || base == PAGE_EXECUTE_READWRITE || base == PAGE_EXECUTE_WRITECOPY;
-        if (write ? !writable : !readable) { return false; }
-        const std::uintptr_t region_end = reinterpret_cast<std::uintptr_t>(region.BaseAddress) + region.RegionSize;
-        if (region_end <= current) { return false; }
-        current = std::min(region_end, end);
-    }
-    return true;
-#endif
-}
-
 bool safe_copy(void* destination, const void* source, std::size_t size) noexcept {
 #if defined(SFERA_PORTABLE_CHECK)
     std::memcpy(destination, source, size);
     return true;
 #else
-    if (!memory_range_accessible(source, size, false) || !memory_range_accessible(destination, size, true)) { return false; }
     set_diagnostic_memory_probe(true);
     __try {
         std::memcpy(destination, source, size);
@@ -175,60 +166,6 @@ bool safe_copy(void* destination, const void* source, std::size_t size) noexcept
         return false;
     }
 #endif
-}
-
-struct LegacyHostentHeader {
-    std::uint32_t name;
-    std::uint32_t aliases;
-    std::int16_t address_type;
-    std::int16_t address_length;
-    std::uint32_t address_list;
-};
-
-static_assert(sizeof(LegacyHostentHeader) == 16u);
-
-struct LegacyHostentMirror {
-    LegacyHostentHeader header{};
-    std::uint32_t address_pointers[2]{};
-    std::uint8_t address[16]{};
-};
-
-bool is_legacy_hostent_import(const ImportDescriptor* descriptor) noexcept {
-    return descriptor && descriptor->by_ordinal && descriptor->dll == "WS2_32.dll" && (descriptor->ordinal == 51u || descriptor->ordinal == 52u);
-}
-
-std::uint32_t native_pointer_u32(const void* pointer) {
-    const std::uintptr_t value = reinterpret_cast<std::uintptr_t>(pointer);
-    if (value > std::numeric_limits<std::uint32_t>::max()) { throw std::runtime_error("Native pointer exceeds Win32 address space"); }
-    return static_cast<std::uint32_t>(value);
-}
-
-std::uint32_t normalize_legacy_hostent(std::uint32_t native_address, std::uint16_t ordinal, std::uint32_t callsite) {
-    if (native_address == 0u) { return 0u; }
-    LegacyHostentHeader native{};
-    if (!safe_copy(&native, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(native_address)), sizeof(native))) { diagnostic_memory_fault(native_address, sizeof(native), false); throw std::runtime_error("WS2_32 hostent header is unreadable at " + hex_u32(native_address) + ", callsite=" + hex_u32(callsite)); }
-    if (native.address_length <= 0 || native.address_length > 16 || native.address_list == 0u) { throw std::runtime_error("WS2_32 hostent has invalid address metadata: hostent=" + hex_u32(native_address) + ", length=" + std::to_string(native.address_length) + ", list=" + hex_u32(native.address_list) + ", callsite=" + hex_u32(callsite)); }
-    diagnostic_memory_read(native_address + 12u, sizeof(native.address_list), native.address_list);
-    std::uint32_t first_address = 0u;
-    if (!safe_copy(&first_address, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(native.address_list)), sizeof(first_address))) { diagnostic_memory_fault(native.address_list, sizeof(first_address), false); throw std::runtime_error("WS2_32 hostent address list is unreadable at " + hex_u32(native.address_list) + ", callsite=" + hex_u32(callsite)); }
-    diagnostic_memory_read(native.address_list, sizeof(first_address), first_address);
-    if (first_address == 0u) { throw std::runtime_error("WS2_32 hostent returned an empty address list at " + hex_u32(native_address)); }
-    thread_local LegacyHostentMirror mirror{};
-    mirror = {};
-    mirror.header = native;
-    if (!safe_copy(mirror.address, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(first_address)), static_cast<std::size_t>(native.address_length))) {
-        diagnostic_memory_fault(first_address, static_cast<std::uint32_t>(native.address_length), false);
-        std::string note = "hostent invalid address pointer ordinal=" + std::to_string(ordinal) + ", hostent=" + hex_u32(native_address) + ", list=" + hex_u32(native.address_list) + ", first=" + hex_u32(first_address) + ", length=" + std::to_string(native.address_length) + ", callsite=" + hex_u32(callsite);
-        diagnostic_note(note.c_str());
-        throw std::runtime_error("WS2_32 hostent first address is unreadable at " + hex_u32(first_address) + ", callsite=" + hex_u32(callsite));
-    }
-    mirror.address_pointers[0] = native_pointer_u32(mirror.address);
-    mirror.address_pointers[1] = 0u;
-    mirror.header.address_list = native_pointer_u32(mirror.address_pointers);
-    const std::uint32_t mirrored = native_pointer_u32(&mirror.header);
-    std::string note = "normalized WS2_32 hostent ordinal=" + std::to_string(ordinal) + ", native=" + hex_u32(native_address) + ", list=" + hex_u32(native.address_list) + ", first=" + hex_u32(first_address) + ", mirror=" + hex_u32(mirrored) + ", length=" + std::to_string(native.address_length) + ", callsite=" + hex_u32(callsite);
-    diagnostic_note(note.c_str());
-    return mirrored;
 }
 
 template <class T>
@@ -250,10 +187,6 @@ void memory_write(std::uint32_t address, T value) {
     g_process_memory->write(address, &value, sizeof(T));
 }
 
-std::uint32_t local_image_address(std::uint32_t source_va) {
-    if (!g_process_memory) { throw std::runtime_error("Process memory is not initialized"); }
-    return g_process_memory->source_address(source_va);
-}
 
 class NativeCallArguments {
 public:
@@ -373,25 +306,6 @@ void set_szp(LiftCpu& state, std::uint64_t result, std::uint16_t width) noexcept
     assign_flag(state, LIFT_FLAG_PF, even_parity(static_cast<std::uint8_t>(result)));
 }
 
-void set_logic_flags(LiftCpu& state, std::uint64_t result, std::uint16_t width) noexcept {
-    assign_flag(state, LIFT_FLAG_CF, false);
-    assign_flag(state, LIFT_FLAG_OF, false);
-    assign_flag(state, LIFT_FLAG_AF, false);
-    set_szp(state, result, width);
-}
-
-void set_add_flags(LiftCpu& state, std::uint64_t left, std::uint64_t right, std::uint64_t carry, std::uint64_t result, std::uint16_t width) noexcept {
-    const std::uint64_t mask = width_mask(width);
-    const std::uint64_t left_value = left & mask;
-    const std::uint64_t right_value = right & mask;
-    const std::uint64_t partial = (left_value + right_value) & mask;
-    const std::uint64_t truncated = result & mask;
-    assign_flag(state, LIFT_FLAG_CF, partial < left_value || (carry != 0 && truncated < partial));
-    assign_flag(state, LIFT_FLAG_OF, ((~(left_value ^ right_value) & (left_value ^ truncated)) & sign_bit(width)) != 0);
-    assign_flag(state, LIFT_FLAG_AF, ((left_value ^ right_value ^ truncated) & 0x10u) != 0);
-    set_szp(state, truncated, width);
-}
-
 void set_sub_flags(LiftCpu& state, std::uint64_t left, std::uint64_t right, std::uint64_t borrow, std::uint64_t result, std::uint16_t width) noexcept {
     const std::uint64_t mask = width_mask(width);
     const std::uint64_t left_value = left & mask;
@@ -409,7 +323,7 @@ bool is_float_return(std::string_view name) {
 
 } // namespace
 
-extern "C" std::uint32_t __cdecl lift_image_va(std::uint32_t source_va) { return local_image_address(source_va); }
+extern "C" std::uint32_t __cdecl lift_source_rva(std::uint32_t address) { std::uint32_t rva = 0; return g_process_memory && g_process_memory->source_rva(address, rva) ? rva : UINT32_MAX; }
 extern "C" std::uint8_t __cdecl lift_load8(std::uint32_t address) { return memory_read<std::uint8_t>(address); }
 extern "C" std::uint16_t __cdecl lift_load16(std::uint32_t address) { return memory_read<std::uint16_t>(address); }
 extern "C" std::uint32_t __cdecl lift_load32(std::uint32_t address) { return memory_read<std::uint32_t>(address); }
@@ -455,9 +369,6 @@ extern "C" std::uint32_t __cdecl lift_pop32(LiftCpu* cpu) {
     return value;
 }
 
-extern "C" void __cdecl lift_flags_add(LiftCpu* cpu, std::uint64_t left, std::uint64_t right, std::uint64_t carry, std::uint64_t result, std::uint32_t width) { set_add_flags(*cpu, left, right, carry, result, static_cast<std::uint16_t>(width)); }
-extern "C" void __cdecl lift_flags_sub(LiftCpu* cpu, std::uint64_t left, std::uint64_t right, std::uint64_t borrow, std::uint64_t result, std::uint32_t width) { set_sub_flags(*cpu, left, right, borrow, result, static_cast<std::uint16_t>(width)); }
-extern "C" void __cdecl lift_flags_logic(LiftCpu* cpu, std::uint64_t result, std::uint32_t width) { set_logic_flags(*cpu, result, static_cast<std::uint16_t>(width)); }
 
 extern "C" std::uint64_t __cdecl lift_shift_left(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) {
     const std::uint64_t mask = width_mask(static_cast<std::uint16_t>(width));
@@ -614,14 +525,16 @@ extern "C" void __cdecl lift_x87_sincos(LiftCpu* cpu) { const double value = lif
 template <class T>
 void move_string(LiftCpu* cpu, bool repeated) {
     std::uint32_t count = repeated ? cpu->ecx : 1u;
-    const std::int32_t delta = flag(*cpu, LIFT_FLAG_DF) ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
-    while (count-- != 0) { memory_write(cpu->edi, memory_read<T>(cpu->esi)); cpu->esi += delta; cpu->edi += delta; if (repeated) { --cpu->ecx; } }
+    if ((cpu->eflags & LIFT_FLAG_DF) == 0u && repeated) { const std::uint32_t bytes = count * static_cast<std::uint32_t>(sizeof(T)); const std::uint32_t source_end = cpu->esi + bytes; const std::uint32_t destination_end = cpu->edi + bytes; if (cpu->edi >= source_end || cpu->esi >= destination_end || bytes == 0u) { const std::uint32_t source = sfera_data_deref_range(cpu->esi, bytes); const std::uint32_t destination = sfera_data_deref_range(cpu->edi, bytes); std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(destination)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(source)), bytes); cpu->esi = source_end; cpu->edi = destination_end; cpu->ecx = 0u; return; } }
+    const std::int32_t delta = (cpu->eflags & LIFT_FLAG_DF) != 0u ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
+    while (count-- != 0u) { const T value = memory_read<T>(cpu->esi); memory_write<T>(cpu->edi, value); cpu->esi += delta; cpu->edi += delta; if (repeated) { --cpu->ecx; } }
 }
 template <class T>
 void store_string(LiftCpu* cpu, bool repeated) {
     std::uint32_t count = repeated ? cpu->ecx : 1u;
-    const std::int32_t delta = flag(*cpu, LIFT_FLAG_DF) ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
-    while (count-- != 0) { memory_write(cpu->edi, static_cast<T>(cpu->eax)); cpu->edi += delta; if (repeated) { --cpu->ecx; } }
+    if (repeated && (cpu->eflags & LIFT_FLAG_DF) == 0u) { const std::uint32_t bytes = count * static_cast<std::uint32_t>(sizeof(T)); const std::uint32_t destination = sfera_data_deref_range(cpu->edi, bytes); std::fill_n(reinterpret_cast<T*>(static_cast<std::uintptr_t>(destination)), count, static_cast<T>(cpu->eax)); cpu->edi += bytes; cpu->ecx = 0u; return; }
+    const std::int32_t delta = (cpu->eflags & LIFT_FLAG_DF) != 0u ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
+    while (count-- != 0u) { memory_write<T>(cpu->edi, static_cast<T>(cpu->eax)); cpu->edi += delta; if (repeated) { --cpu->ecx; } }
 }
 template <class T>
 void compare_string(LiftCpu* cpu, bool repeated, bool repeat_not_equal, bool scan) {
@@ -650,8 +563,7 @@ extern "C" void __cdecl lift_scas8(LiftCpu* cpu, std::uint32_t repeated, std::ui
 extern "C" void __cdecl lift_scas16(LiftCpu* cpu, std::uint32_t repeated, std::uint32_t repeat_not_equal) { compare_string<std::uint16_t>(cpu, repeated != 0, repeat_not_equal != 0, true); }
 extern "C" void __cdecl lift_scas32(LiftCpu* cpu, std::uint32_t repeated, std::uint32_t repeat_not_equal) { compare_string<std::uint32_t>(cpu, repeated != 0, repeat_not_equal != 0, true); }
 
-extern "C" void __cdecl lift_enter_block(LiftCpu* cpu, std::uint32_t source_va) { cpu->eip = local_image_address(source_va); set_diagnostic_instruction(cpu->eip, "native-c"); }
-extern "C" LIFT_NORETURN void __cdecl lift_trap(LiftCpu* cpu, std::uint32_t source_va, const char* reason) { lift_enter_block(cpu, source_va); throw std::runtime_error(std::string("Lifted C trap at ") + hex_u32(cpu->eip) + ": " + (reason ? reason : "unknown")); }
+extern "C" LIFT_NORETURN void __cdecl lift_trap(LiftCpu* cpu, std::uint32_t source_va, const char* reason) { if (cpu) { cpu->eip = source_va; } throw std::runtime_error(std::string("Lifted C trap at ") + hex_u32(source_va) + ": " + (reason ? reason : "unknown")); }
 
 const std::wstring& client_root_directory() {
     static const std::wstring root = [] {
@@ -688,15 +600,6 @@ std::string hex_u32(std::uint32_t value) {
     return buffer;
 }
 
-void* checked_memory_copy(void* destination, const void* source, std::uint32_t size) {
-    if (size == 0u) { return destination; }
-    const std::uint32_t destination_address = native_pointer_u32(destination);
-    const std::uint32_t source_address = native_pointer_u32(source);
-    if (!lifted_address_range_valid(source_address, size) || !memory_range_accessible(source, size, false)) { diagnostic_memory_fault(source_address, size, false); throw std::runtime_error("Semantic memcpy source is not readable at " + hex_u32(source_address) + ", size=" + std::to_string(size)); }
-    if (!lifted_address_range_valid(destination_address, size) || !memory_range_accessible(destination, size, true)) { diagnostic_memory_fault(destination_address, size, true); throw std::runtime_error("Semantic memcpy destination is not writable at " + hex_u32(destination_address) + ", size=" + std::to_string(size)); }
-    return std::memcpy(destination, source, size);
-}
-
 LocalStack::LocalStack(std::size_t reserve_size) : size_(std::max<std::size_t>(reserve_size, 1024u * 1024u)) {
     memory_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, size_, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
     if (!memory_) { throw std::runtime_error(win32_error("VirtualAlloc(local stack)")); }
@@ -721,216 +624,349 @@ std::uint32_t LocalStack::limit() const noexcept {
 
 ProcessMemory::ProcessMemory() {
     if (g_process_memory) { throw std::runtime_error("Only one process-memory instance is supported"); }
-    DiagnosticPhaseScope phase(RuntimePhase::map_image);
-    map();
+    DiagnosticPhaseScope phase(RuntimePhase::static_storage);
+    try { allocate_static_regions(); install_initial_static_data(); } catch (...) { release(); throw; }
     g_process_memory = this;
-    const std::string note = "local image mapped at " + hex_u32(load_base()) + " from source base " + hex_u32(kSourceImageBase);
+    const std::string note = "semantic static storage initialized; compact module=" + hex_u32(load_base()) + ", code-token=" + hex_u32(source_address(kSourceImageBase + 0x1000u)) + ", static-table-bytes=" + std::to_string(SFERA_STATIC_TABLE_STORAGE_SIZE) + ", callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata-bytes=" + std::to_string(SFERA_RDATA_SEMANTIC_SIZE) + ", data compatibility=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_data_compat_base))) + ", compatibility-segments=" + std::to_string(data_compat_segments_.size()) + ", semantic-spans=" + std::to_string(SFERA_DATA_SEMANTIC_SPAN_COUNT);
     diagnostic_note(note.c_str());
 }
 
-ProcessMemory::~ProcessMemory() {
-    release();
-}
+ProcessMemory::~ProcessMemory() { release(); }
 
-std::uint32_t ProcessMemory::load_base() const noexcept {
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(image_));
-}
+std::uint32_t ProcessMemory::load_base() const noexcept { return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(module_shell_)); }
 
 std::uint32_t ProcessMemory::entry_va() const noexcept {
-    return load_base() + kEntryRva;
+    try { return source_address(kSourceImageBase + kEntryRva); } catch (...) { return 0; }
 }
 
-std::uint32_t ProcessMemory::image_address(std::uint32_t rva) const {
-    if (!image_ || rva >= kImageSize) { throw std::runtime_error("Image RVA is outside local process memory: " + hex_u32(rva)); }
-    return load_base() + rva;
+std::uint8_t* ProcessMemory::region_pointer(std::uint32_t rva, std::size_t size) const {
+    if (rva >= UINT32_C(0x000FD000) && rva < UINT32_C(0x0011FE00)) { const std::uint32_t source_va = kSourceImageBase + rva; const std::uint32_t first = sfera_rdata_mutable_semantic_address(source_va); const std::uint32_t last = size == 0u ? first : sfera_rdata_mutable_semantic_address(source_va + static_cast<std::uint32_t>(size - 1u)); if (first != 0u && (size == 0u || (last != 0u && last - first == size - 1u))) { return reinterpret_cast<std::uint8_t*>(static_cast<std::uintptr_t>(first)); } throw std::runtime_error("Source RVA targets immutable/dead semantic .rdata: " + hex_u32(rva) + ", size=" + std::to_string(size)); }
+    for (const StaticRegion& region : regions_) {
+        if (!region.memory || rva < region.rva) { continue; }
+        const std::uint64_t offset = static_cast<std::uint64_t>(rva) - region.rva;
+        if (offset + size <= region.size) { return reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uintptr_t>(region.memory) + static_cast<std::uintptr_t>(offset)); }
+    }
+    throw std::runtime_error("Source RVA is outside generated static regions: " + hex_u32(rva) + ", size=" + std::to_string(size));
 }
+
+std::uint32_t ProcessMemory::static_address(std::uint32_t rva) const { return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(region_pointer(rva))); }
 
 std::uint32_t ProcessMemory::source_address(std::uint32_t source_va) const {
-    if (source_va < kSourceImageBase || static_cast<std::uint64_t>(source_va) >= static_cast<std::uint64_t>(kSourceImageBase) + kImageSize) { throw std::runtime_error("Source image address is outside the generated image: " + hex_u32(source_va)); }
-    return image_address(source_va - kSourceImageBase);
+    if (source_va < kSourceImageBase || static_cast<std::uint64_t>(source_va) >= static_cast<std::uint64_t>(kSourceImageBase) + kImageSize) { throw std::runtime_error("Source image address is outside the generated address space: " + hex_u32(source_va)); }
+    const std::uint32_t rva = source_va - kSourceImageBase;
+    if (rva >= 0x00001000u && rva < 0x00001000u + 0x000FB200u) {
+        const std::uint32_t callback = callback_address(rva);
+        if (callback != 0u) { return callback; }
+        if (is_static_table_rva(rva)) { return static_address(rva); }
+        return kCodeTokenBase + rva;
+    }
+    if (source_va >= SFERA_RDATA_SOURCE_BEGIN && source_va < SFERA_RDATA_SOURCE_BEGIN + SFERA_RDATA_SOURCE_SIZE) { const std::uint32_t semantic = sfera_rdata_semantic_address(source_va); if (semantic != 0u) { return semantic; } throw std::runtime_error(source_va < SFERA_RDATA_SEMANTIC_BEGIN ? "Eliminated source IAT address escaped into data flow: " + hex_u32(source_va) : "Source .rdata address is outside semantic storage: " + hex_u32(source_va)); }
+    if (source_va >= SFERA_DATA_SOURCE_BEGIN && source_va < SFERA_DATA_SOURCE_BEGIN + SFERA_DATA_SOURCE_SIZE) { return static_address(rva); }
+    return static_address(rva);
 }
 
-bool ProcessMemory::image_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
-    if (!image_ || address < load_base() || static_cast<std::uint64_t>(address) >= static_cast<std::uint64_t>(load_base()) + kImageSize) { return false; }
-    rva = address - load_base();
+bool ProcessMemory::source_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
+    const std::uint32_t token_rva = address - kCodeTokenBase;
+    if (token_rva >= 0x00001000u && token_rva < 0x00001000u + 0x000FB200u) { rva = token_rva; return true; }
+    if (callback_rva(address, rva)) { return true; }
+    { const std::uint32_t rdata_rva = sfera_rdata_source_rva(address); if (rdata_rva != UINT32_MAX) { rva = rdata_rva; return true; } }
+    { const std::uint32_t data_rva = sfera_data_source_rva(address); if (data_rva != UINT32_MAX) { rva = data_rva; return true; } }
+    for (const StaticRegion& region : regions_) {
+        if (!region.memory) { continue; }
+        const std::uint32_t begin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(region.memory));
+        if (address >= begin && static_cast<std::uint64_t>(address - begin) < region.size) { rva = region.rva + (address - begin); return true; }
+    }
+    return false;
+}
+
+bool ProcessMemory::is_static_table_rva(std::uint32_t rva) const noexcept {
+    for (const StaticTableRegionDescriptor& region : kStaticTableRegions) { if (rva >= region.rva && static_cast<std::uint64_t>(rva - region.rva) < region.size) { return true; } }
+    return false;
+}
+
+std::uint32_t ProcessMemory::callback_address(std::uint32_t rva) const noexcept {
+    if (!callback_thunks_) { return 0u; }
+    const auto found = std::lower_bound(kCallbacks.begin(), kCallbacks.end(), rva, [](const CallbackDescriptor& callback, std::uint32_t value) { return callback.rva < value; });
+    if (found == kCallbacks.end() || found->rva != rva) { return 0u; }
+    const std::size_t index = static_cast<std::size_t>(found - kCallbacks.begin());
+    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_ + index * kCallbackThunkSize));
+}
+
+bool ProcessMemory::callback_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
+    if (!callback_thunks_) { return false; }
+    const std::uint32_t begin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_));
+    if (address < begin || address - begin >= callback_thunks_size_) { return false; }
+    const std::uint32_t offset = address - begin;
+    if ((offset % kCallbackThunkSize) != 0u) { return false; }
+    const std::size_t index = offset / kCallbackThunkSize;
+    if (index >= kCallbacks.size()) { return false; }
+    rva = kCallbacks[index].rva;
     return true;
 }
 
-std::uint8_t* ProcessMemory::data() noexcept {
-    return image_;
-}
+const std::vector<ResolvedImport>& ProcessMemory::resolved_imports() const noexcept { return resolved_imports_; }
 
-const std::vector<ResolvedImport>& ProcessMemory::resolved_imports() const noexcept {
-    return resolved_imports_;
-}
-
-bool ProcessMemory::try_read(std::uint32_t address, void* value, std::size_t size) const noexcept {
-    return value && safe_copy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size);
-}
-
-bool ProcessMemory::try_write(std::uint32_t address, const void* value, std::size_t size) noexcept {
-    return value && safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size);
-}
+bool ProcessMemory::try_read(std::uint32_t address, void* value, std::size_t size) const noexcept { address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size)); return value && safe_copy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size); }
+bool ProcessMemory::try_write(std::uint32_t address, const void* value, std::size_t size) noexcept { address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size)); return value && safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size); }
 
 void ProcessMemory::read(std::uint32_t address, void* value, std::size_t size) const {
     if (!value) { throw std::runtime_error("Local memory read has a null destination"); }
-    if (!lifted_address_range_valid(address, size)) { diagnostic_memory_fault(address, static_cast<std::uint32_t>(std::min<std::size_t>(size, UINT32_MAX)), false); throw std::runtime_error("Lifted read is outside the non-LAA Win32 address space at " + hex_u32(address) + ", size=" + std::to_string(size)); }
-    if (!g_deep_diagnostics) {
-        std::memcpy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size);
-        if (size == sizeof(std::uint32_t)) { std::uint32_t word = 0; std::memcpy(&word, value, sizeof(word)); if ((word & UINT32_C(0x80000000)) != 0u) { diagnostic_memory_read(address, sizeof(word), word); } }
-        return;
-    }
-    if (!try_read(address, value, size)) { diagnostic_memory_fault(address, static_cast<std::uint32_t>(size), false); throw std::runtime_error("Local process read fault at " + hex_u32(address) + ", size=" + std::to_string(size)); }
-    std::uint64_t diagnostic_value = 0;
-    std::memcpy(&diagnostic_value, value, std::min(size, sizeof(diagnostic_value)));
-    diagnostic_memory_read(address, static_cast<std::uint32_t>(size), diagnostic_value);
+    address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size));
+    std::memcpy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size);
 }
 
 void ProcessMemory::write(std::uint32_t address, const void* value, std::size_t size) {
     if (!value) { throw std::runtime_error("Local memory write has a null source"); }
-    if (!lifted_address_range_valid(address, size)) { diagnostic_memory_fault(address, static_cast<std::uint32_t>(std::min<std::size_t>(size, UINT32_MAX)), true); throw std::runtime_error("Lifted write is outside the non-LAA Win32 address space at " + hex_u32(address) + ", size=" + std::to_string(size)); }
-    if (!g_deep_diagnostics) { std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size); return; }
-    if (!try_write(address, value, size)) { diagnostic_memory_fault(address, static_cast<std::uint32_t>(size), true); throw std::runtime_error("Local process write fault at " + hex_u32(address) + ", size=" + std::to_string(size)); }
-    std::uint64_t diagnostic_value = 0;
-    std::memcpy(&diagnostic_value, value, std::min(size, sizeof(diagnostic_value)));
-    diagnostic_memory_write(address, static_cast<std::uint32_t>(size), diagnostic_value);
+    address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size));
+    std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size);
 }
 
-void ProcessMemory::map() {
+void ProcessMemory::allocate_static_regions() {
     if (sizeof(void*) != 4 || kMachine != IMAGE_FILE_MACHINE_I386) { throw std::runtime_error("Generated runtime requires Win32/x86"); }
-    image_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, kImageSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
-    if (!image_) { throw std::runtime_error(win32_error("VirtualAlloc(local image)")); }
-    try {
-        map_file();
-    } catch (...) {
-        release();
-        throw;
+    const std::uint32_t resource_size = align_up(std::max(kResourceVirtualSize, kResourceRawSize), 0x1000u);
+    module_shell_size_ = kCompactResourceRva + resource_size;
+    module_shell_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, module_shell_size_, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    if (!module_shell_) { throw std::runtime_error(win32_error("VirtualAlloc(compact module shell)")); }
+    callback_thunks_size_ = static_cast<std::uint32_t>(kCallbacks.size()) * kCallbackThunkSize;
+    callback_thunks_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, callback_thunks_size_, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    if (!callback_thunks_) { throw std::runtime_error(win32_error("VirtualAlloc(callback thunk pool)")); }
+    owned_regions_.push_back(callback_thunks_);
+    g_lift_callback_thunk_base = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_));
+    {
+        constexpr std::uint32_t kPage = 0x1000u;
+        const std::uint32_t prefix = (kPage - (SFERA_RDATA_SEMANTIC_SIZE & (kPage - 1u))) & (kPage - 1u);
+        rdata_commit_size_ = align_up(prefix + SFERA_RDATA_SEMANTIC_SIZE, kPage);
+        const std::uint32_t reserve_size = rdata_commit_size_ + 2u * kPage;
+        rdata_reservation_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, reserve_size, MEM_RESERVE, PAGE_NOACCESS));
+        if (!rdata_reservation_) { throw std::runtime_error(win32_error("VirtualAlloc(rdata reserve)")); }
+        rdata_commit_base_ = rdata_reservation_ + kPage;
+        if (!VirtualAlloc(rdata_commit_base_, rdata_commit_size_, MEM_COMMIT, PAGE_READWRITE)) { throw std::runtime_error(win32_error("VirtualAlloc(rdata commit)")); }
+        sfera_rdata_bind_storage(rdata_commit_base_ + prefix);
+    }
+    struct DataMappingPlan { std::uint32_t offset; std::uint32_t size; std::int32_t semantic_index; HANDLE backing; };
+    std::vector<DataMappingPlan> data_plans;
+    std::uint32_t data_cursor = 0u;
+    for (std::uint32_t index = 0u; index < SFERA_DATA_SEMANTIC_SPAN_COUNT; ++index) {
+        const std::uint32_t offset = g_sfera_data_semantic_span_source_begin[index] - SFERA_DATA_SOURCE_BEGIN;
+        const std::uint32_t size = g_sfera_data_semantic_span_size[index];
+        if (offset < data_cursor || offset + size > SFERA_DATA_STORAGE_SIZE) { throw std::runtime_error("Invalid semantic data-span layout"); }
+        if (data_cursor < offset) { data_plans.push_back({data_cursor, offset - data_cursor, -1, nullptr}); }
+        data_plans.push_back({offset, size, static_cast<std::int32_t>(index), nullptr});
+        data_cursor = offset + size;
+    }
+    if (data_cursor < SFERA_DATA_STORAGE_SIZE) { data_plans.push_back({data_cursor, SFERA_DATA_STORAGE_SIZE - data_cursor, -1, nullptr}); }
+    auto close_data_backings = [&]() noexcept { for (DataMappingPlan& plan : data_plans) { if (plan.backing) { CloseHandle(plan.backing); plan.backing = nullptr; } } };
+    for (DataMappingPlan& plan : data_plans) {
+        plan.backing = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0u, plan.size, nullptr);
+        if (!plan.backing) { close_data_backings(); throw std::runtime_error(win32_error("CreateFileMappingW(data segment)")); }
+    }
+    for (std::uint32_t attempt = 0u; attempt < 8u && !data_compat_view_; ++attempt) {
+        void* candidate = VirtualAlloc(nullptr, SFERA_DATA_STORAGE_SIZE, MEM_RESERVE, PAGE_NOACCESS);
+        if (!candidate) { break; }
+        VirtualFree(candidate, 0u, MEM_RELEASE);
+        data_compat_segments_.clear();
+        bool mapped = true;
+        for (DataMappingPlan& plan : data_plans) {
+            std::uint8_t* const target = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uintptr_t>(candidate) + plan.offset);
+            std::uint8_t* const view = static_cast<std::uint8_t*>(MapViewOfFileEx(plan.backing, FILE_MAP_ALL_ACCESS, 0u, 0u, plan.size, target));
+            if (!view) { mapped = false; break; }
+            data_compat_segments_.push_back(view);
+        }
+        if (!mapped) { for (std::uint8_t* view : data_compat_segments_) { if (view) { UnmapViewOfFile(view); } } data_compat_segments_.clear(); continue; }
+        data_compat_view_ = static_cast<std::uint8_t*>(candidate);
+    }
+    if (!data_compat_view_) { close_data_backings(); throw std::runtime_error(win32_error("MapViewOfFileEx(data compatibility mosaic)")); }
+    g_sfera_data_compat_base = data_compat_view_;
+    for (DataMappingPlan& plan : data_plans) {
+        if (plan.semantic_index < 0) { continue; }
+        const std::uint32_t index = static_cast<std::uint32_t>(plan.semantic_index);
+        g_sfera_data_semantic_spans[index] = static_cast<std::uint8_t*>(MapViewOfFile(plan.backing, FILE_MAP_ALL_ACCESS, 0u, 0u, plan.size));
+        if (!g_sfera_data_semantic_spans[index]) { close_data_backings(); throw std::runtime_error(win32_error("MapViewOfFile(data semantic span)")); }
+        const std::uint32_t first_page = (g_sfera_data_semantic_span_source_begin[index] - SFERA_DATA_SOURCE_BEGIN) >> SFERA_DATA_PAGE_SHIFT;
+        const std::uint32_t page_count = g_sfera_data_semantic_span_size[index] >> SFERA_DATA_PAGE_SHIFT;
+        for (std::uint32_t page = 0u; page < page_count; ++page) { g_sfera_data_semantic_page_alias[first_page + page] = g_sfera_data_semantic_spans[index] + page * SFERA_DATA_PAGE_SIZE; }
+    }
+    close_data_backings();
+    regions_.clear();
+    regions_.reserve(kStaticTableRegions.size() + 4u);
+    regions_.push_back({0u, kHeadersSize, module_shell_, kRead, "headers", true});
+    for (const StaticTableRegionDescriptor& region : kStaticTableRegions) { regions_.push_back({region.rva, region.size, g_sfera_static_table_storage + region.storage_offset, kRead, "semantic static table", false}); }
+    regions_.push_back({SFERA_DATA_SOURCE_BEGIN - kSourceImageBase, SFERA_DATA_SOURCE_SIZE, data_compat_view_, kRead | kWrite, ".data compatibility view", false});
+    regions_.push_back({kResourceSourceRva, std::max(kResourceVirtualSize, kResourceRawSize), module_shell_ + kCompactResourceRva, kRead, ".rsrc shell", true});
+    g_lift_header_base = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(module_shell_));
+    g_lift_rsrc_base = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(module_shell_ + kCompactResourceRva));
+}
+void ProcessMemory::install_initial_static_data() {
+    for (const InitialStaticChunk& chunk : kInitialStaticChunks) {
+        if ((chunk.hex.size() & 1u) != 0u) { throw std::runtime_error("Odd generated static-data chunk length"); }
+        std::uint8_t* const destination = region_pointer(chunk.rva, chunk.hex.size() / 2u);
+        for (std::size_t index = 0; index < chunk.hex.size(); index += 2u) { destination[index / 2u] = static_cast<std::uint8_t>((decode_hex_digit(chunk.hex[index]) << 4u) | decode_hex_digit(chunk.hex[index + 1u])); }
     }
 }
 
 void ProcessMemory::initialize_native() {
     try {
-        install_recovered_data();
-        install_jump_tables();
-        apply_relocations();
-        patch_image_base();
-        install_callback_stubs();
-        {
-            DiagnosticPhaseScope phase(RuntimePhase::load_imports);
-            resolve_imports();
-            diagnostic_note("native imports resolved in the current process");
-        }
-        {
-            DiagnosticPhaseScope phase(RuntimePhase::protect_image);
-            protect_image();
-            diagnostic_note("local image protections applied");
-        }
-        FlushInstructionCache(GetCurrentProcess(), image_, kImageSize);
-    } catch (...) {
-        release();
-        throw;
-    }
-}
-
-void ProcessMemory::map_file() {
-    const std::vector<std::uint8_t> file = decode_mapped_payload();
-    if (kHeadersSize > file.size() || kHeadersSize > kImageSize) { throw std::runtime_error("Invalid generated PE headers"); }
-    std::memcpy(image_, file.data(), kHeadersSize);
-    for (const SectionDescriptor& section : kSections) {
-        const std::uint64_t source_end = static_cast<std::uint64_t>(section.raw_offset) + section.raw_size;
-        const std::uint64_t target_end = static_cast<std::uint64_t>(section.virtual_address) + std::max(section.virtual_size, section.raw_size);
-        if (source_end > file.size() || target_end > kImageSize) { throw std::runtime_error("Invalid generated PE section range"); }
-        if ((section.access & kExecute) == 0 && section.raw_size != 0) { std::memcpy(image_ + section.virtual_address, file.data() + section.raw_offset, section.raw_size); }
-    }
+        install_callback_thunks(); apply_static_pointer_fixups(); verify_semantic_data_views(); patch_module_shell();
+        { DiagnosticPhaseScope phase(RuntimePhase::load_imports); resolve_imports(); diagnostic_note("native imports resolved in the current process"); }
+        { DiagnosticPhaseScope phase(RuntimePhase::protect_static_storage); protect_regions(); diagnostic_note("independent static-region protections applied"); }
+        FlushInstructionCache(GetCurrentProcess(), callback_thunks_, callback_thunks_size_);
+    } catch (...) { release(); throw; }
 }
 
 void ProcessMemory::resolve_imports() {
     std::unordered_map<std::string, HMODULE> modules;
+    std::size_t import_index = 0u;
     for (const ImportDescriptor& item : kImports) {
-        const std::string dll(item.dll);
-        HMODULE module = nullptr;
-        const auto found = modules.find(dll);
-        if (found != modules.end()) { module = found->second; }
-        else {
-            module = LoadLibraryA(dll.c_str());
-            if (!module) { throw std::runtime_error(win32_error(("LoadLibraryA(" + dll + ")").c_str())); }
-            modules.emplace(dll, module);
-            loaded_modules_.push_back(module);
-        }
+        const std::string dll(item.dll); HMODULE module = nullptr; const auto found = modules.find(dll);
+        if (found != modules.end()) { module = found->second; } else { module = LoadLibraryA(dll.c_str()); if (!module) { throw std::runtime_error(win32_error(("LoadLibraryA(" + dll + ")").c_str())); } modules.emplace(dll, module); loaded_modules_.push_back(module); }
         const char* symbol = item.by_ordinal ? reinterpret_cast<const char*>(static_cast<std::uintptr_t>(item.ordinal)) : item.name.data();
         FARPROC address = GetProcAddress(module, symbol);
-        if (!address) {
-            const std::string label = item.by_ordinal ? "ordinal " + std::to_string(item.ordinal) : std::string(item.name);
-            throw std::runtime_error(win32_error(("GetProcAddress(" + dll + ", " + label + ")").c_str()));
-        }
+        if (!address) { const std::string label = item.by_ordinal ? "ordinal " + std::to_string(item.ordinal) : std::string(item.name); throw std::runtime_error(win32_error(("GetProcAddress(" + dll + ", " + label + ")").c_str())); }
         const std::uint32_t value = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(address));
-        std::memcpy(image_ + item.iat_rva, &value, sizeof(value));
+        if (import_index >= kImports.size()) { throw std::runtime_error("Resolved import index exceeds generated import table"); }
+        g_sfera_import_addresses[import_index++] = value;
         resolved_imports_.push_back({&item, value});
     }
+    if (import_index != kImports.size()) { throw std::runtime_error("Resolved import count does not match generated import table"); }
 }
 
-void ProcessMemory::install_recovered_data() {
-    for (const RecoveredDataDescriptor& range : kRecoveredData) {
-        if ((range.hex.size() & 1u) != 0u || range.rva + range.hex.size() / 2u > kImageSize) { throw std::runtime_error("Invalid recovered lookup-data range"); }
-        for (std::size_t index = 0; index < range.hex.size(); index += 2u) { image_[range.rva + index / 2u] = static_cast<std::uint8_t>((decode_hex_digit(range.hex[index]) << 4u) | decode_hex_digit(range.hex[index + 1u])); }
+
+void ProcessMemory::apply_static_pointer_fixups() {
+    for (const CallbackPointerFixup& fixup : kCallbackPointerFixups) {
+        const std::uint32_t value = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_ + static_cast<std::uint32_t>(fixup.callback_index) * kCallbackThunkSize));
+        std::memcpy(region_pointer(fixup.slot_rva, sizeof(value)), &value, sizeof(value));
+    }
+    for (const RdataPointerFixup& fixup : kRdataPointerFixups) {
+        const std::uint32_t value = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_rdata_semantic_storage + fixup.target_offset));
+        std::memcpy(region_pointer(fixup.slot_rva, sizeof(value)), &value, sizeof(value));
+    }
+    for (const DataPointerFixup& fixup : kDataPointerFixups) {
+        const std::uint32_t value = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_data_compat_base + fixup.target_offset));
+        std::memcpy(region_pointer(fixup.slot_rva, sizeof(value)), &value, sizeof(value));
     }
 }
 
-void ProcessMemory::install_jump_tables() {
-    for (const JumpTableDescriptor& entry : kJumpTableEntries) { std::memcpy(image_ + entry.rva, &entry.target, sizeof(entry.target)); }
-}
 
-void ProcessMemory::apply_relocations() {
-    for (const RelocationDescriptor& relocation : kLocalRelocations) {
-        if (relocation.rva + sizeof(std::uint32_t) > kImageSize) { throw std::runtime_error("Invalid local relocation RVA " + hex_u32(relocation.rva)); }
-        std::uint32_t source_va = 0;
-        std::memcpy(&source_va, image_ + relocation.rva, sizeof(source_va));
-        const std::uint32_t local_va = source_address(source_va);
-        std::memcpy(image_ + relocation.rva, &local_va, sizeof(local_va));
+void ProcessMemory::verify_semantic_data_views() const {
+    if (!g_sfera_data_compat_base) { throw std::runtime_error("Data compatibility view is not initialized"); }
+    for (std::uint32_t index = 0u; index < SFERA_DATA_SEMANTIC_SPAN_COUNT; ++index) {
+        const std::uint8_t* const semantic = g_sfera_data_semantic_spans[index];
+        if (!semantic) { throw std::runtime_error("Data semantic span is not initialized"); }
+        const std::uint32_t source_begin = g_sfera_data_semantic_span_source_begin[index];
+        const std::uint32_t size = g_sfera_data_semantic_span_size[index];
+        const std::uint8_t* const compatibility = reinterpret_cast<const std::uint8_t*>(reinterpret_cast<std::uintptr_t>(g_sfera_data_compat_base) + (source_begin - SFERA_DATA_SOURCE_BEGIN));
+        const std::uintptr_t semantic_begin = reinterpret_cast<std::uintptr_t>(semantic);
+        const std::uintptr_t semantic_end = semantic_begin + size;
+        const std::uintptr_t compatibility_begin = reinterpret_cast<std::uintptr_t>(compatibility);
+        const std::uintptr_t compatibility_end = compatibility_begin + size;
+        if (semantic_begin < compatibility_end && compatibility_begin < semantic_end) { throw std::runtime_error("Semantic and compatibility data views unexpectedly overlap"); }
+        if (std::memcmp(semantic, compatibility, size) != 0) { throw std::runtime_error("Semantic data view is not coherent with compatibility backing"); }
     }
 }
 
-void ProcessMemory::patch_image_base() {
-    if (kHeadersSize < 0x40u || image_[0] != 'M' || image_[1] != 'Z') { throw std::runtime_error("Invalid mapped DOS header"); }
-    std::uint32_t pe_offset = 0;
-    std::memcpy(&pe_offset, image_ + 0x3Cu, sizeof(pe_offset));
-    const std::uint64_t image_base_offset = static_cast<std::uint64_t>(pe_offset) + 24u + 28u;
-    if (image_base_offset + sizeof(std::uint32_t) > kHeadersSize) { throw std::runtime_error("Invalid mapped PE optional header"); }
-    const std::uint32_t local_base = load_base();
-    std::memcpy(image_ + image_base_offset, &local_base, sizeof(local_base));
-}
-
-void ProcessMemory::install_callback_stubs() {
-    const std::uintptr_t bridge = reinterpret_cast<std::uintptr_t>(&callback_bridge);
-    for (const CallbackDescriptor& callback : kCallbacks) {
-        std::uint8_t* const source = image_ + callback.rva;
-        const std::intptr_t delta = static_cast<std::intptr_t>(bridge - reinterpret_cast<std::uintptr_t>(source + 5));
-        if (delta < std::numeric_limits<std::int32_t>::min() || delta > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("Callback bridge is outside rel32 range"); }
-        source[0] = 0xE8u;
-        const std::int32_t relative = static_cast<std::int32_t>(delta);
-        std::memcpy(source + 1, &relative, sizeof(relative));
-    }
-}
-
-void ProcessMemory::protect_image() {
-    constexpr std::uint32_t page_size = 0x1000u;
-    auto protect = [this](std::uint32_t rva, std::uint32_t size, DWORD protection) {
-        if (size == 0) { return; }
-        const std::uint32_t begin = align_down(rva, page_size);
-        const std::uint32_t end = align_up(rva + size, page_size);
-        DWORD old_protection = 0;
-        if (end > kImageSize || !VirtualProtect(image_ + begin, end - begin, protection, &old_protection)) { throw std::runtime_error(win32_error("VirtualProtect(section)")); }
+void ProcessMemory::patch_module_shell() {
+    if (kHeadersSize < sizeof(IMAGE_DOS_HEADER) || module_shell_[0] != 'M' || module_shell_[1] != 'Z') { throw std::runtime_error("Invalid generated DOS header"); }
+    auto* dos = reinterpret_cast<IMAGE_DOS_HEADER*>(module_shell_);
+    if (dos->e_lfanew <= 0 || static_cast<std::uint32_t>(dos->e_lfanew) + sizeof(IMAGE_NT_HEADERS32) > kHeadersSize) { throw std::runtime_error("Invalid generated PE header offset"); }
+    auto* nt = reinterpret_cast<IMAGE_NT_HEADERS32*>(module_shell_ + dos->e_lfanew);
+    if (nt->Signature != IMAGE_NT_SIGNATURE || nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC) { throw std::runtime_error("Invalid generated PE optional header"); }
+    const std::uint32_t old_resource_rva = kResourceSourceRva;
+    const std::uint32_t resource_size = std::max(kResourceVirtualSize, kResourceRawSize);
+    std::uint8_t* const resource_root = module_shell_ + kCompactResourceRva;
+    auto rebase_directory = [&](auto&& self, std::uint32_t directory_offset, std::uint32_t depth) -> void {
+        if (depth > 16u || directory_offset > resource_size || resource_size - directory_offset < sizeof(IMAGE_RESOURCE_DIRECTORY)) { throw std::runtime_error("Invalid generated resource directory"); }
+        auto* directory = reinterpret_cast<IMAGE_RESOURCE_DIRECTORY*>(resource_root + directory_offset);
+        const std::uint32_t count = static_cast<std::uint32_t>(directory->NumberOfNamedEntries) + static_cast<std::uint32_t>(directory->NumberOfIdEntries);
+        const std::uint64_t entries_end = static_cast<std::uint64_t>(directory_offset) + sizeof(IMAGE_RESOURCE_DIRECTORY) + static_cast<std::uint64_t>(count) * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY);
+        if (entries_end > resource_size) { throw std::runtime_error("Generated resource directory entries are outside .rsrc"); }
+        auto* entries = reinterpret_cast<IMAGE_RESOURCE_DIRECTORY_ENTRY*>(directory + 1);
+        for (std::uint32_t index = 0; index < count; ++index) {
+            const std::uint32_t raw = entries[index].OffsetToData;
+            const std::uint32_t child = raw & 0x7FFFFFFFu;
+            if ((raw & 0x80000000u) != 0u) { self(self, child, depth + 1u); continue; }
+            if (child > resource_size || resource_size - child < sizeof(IMAGE_RESOURCE_DATA_ENTRY)) { throw std::runtime_error("Generated resource data entry is outside .rsrc"); }
+            auto* data = reinterpret_cast<IMAGE_RESOURCE_DATA_ENTRY*>(resource_root + child);
+            if (data->OffsetToData >= old_resource_rva && data->OffsetToData < old_resource_rva + resource_size) { data->OffsetToData = kCompactResourceRva + (data->OffsetToData - old_resource_rva); }
+        }
     };
-    protect(0, kHeadersSize, PAGE_READONLY);
-    for (const SectionDescriptor& section : kSections) { protect(section.virtual_address, std::max(section.virtual_size, section.raw_size), page_protection(section.access)); }
+    rebase_directory(rebase_directory, 0u, 0u);
+    IMAGE_SECTION_HEADER* const first_section = IMAGE_FIRST_SECTION(nt);
+    IMAGE_SECTION_HEADER* resource_section = nullptr;
+    for (std::uint16_t index = 0; index < nt->FileHeader.NumberOfSections; ++index) {
+        IMAGE_SECTION_HEADER* const section = first_section + index;
+        char name[9]{}; std::memcpy(name, section->Name, 8u);
+        if (std::string_view(name) == ".rsrc") { resource_section = section; break; }
+    }
+    if (!resource_section) { throw std::runtime_error("Generated PE resource section header is missing"); }
+    IMAGE_SECTION_HEADER compact_resource = *resource_section;
+    compact_resource.VirtualAddress = kCompactResourceRva;
+    compact_resource.Misc.VirtualSize = kResourceVirtualSize;
+    compact_resource.SizeOfRawData = kResourceRawSize;
+    compact_resource.PointerToRawData = 0u;
+    *first_section = compact_resource;
+    nt->FileHeader.NumberOfSections = 1u;
+    nt->OptionalHeader.ImageBase = load_base();
+    nt->OptionalHeader.AddressOfEntryPoint = 0u;
+    nt->OptionalHeader.BaseOfCode = 0u;
+    nt->OptionalHeader.BaseOfData = kCompactResourceRva;
+    nt->OptionalHeader.SizeOfCode = 0u;
+    nt->OptionalHeader.SizeOfInitializedData = resource_size;
+    nt->OptionalHeader.SizeOfUninitializedData = 0u;
+    nt->OptionalHeader.SizeOfImage = module_shell_size_;
+    for (std::uint32_t index = 0; index < IMAGE_NUMBEROF_DIRECTORY_ENTRIES; ++index) { nt->OptionalHeader.DataDirectory[index] = {}; }
+    nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress = kCompactResourceRva;
+    nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].Size = resource_size;
+}
+
+void ProcessMemory::install_callback_thunks() {
+    if (!callback_thunks_ || callback_thunks_size_ != kCallbacks.size() * kCallbackThunkSize) { throw std::runtime_error("Callback thunk pool is not initialized"); }
+    const std::uintptr_t bridge = reinterpret_cast<std::uintptr_t>(&callback_bridge);
+    for (std::size_t index = 0; index < kCallbacks.size(); ++index) {
+        std::uint8_t* const thunk = callback_thunks_ + index * kCallbackThunkSize;
+        thunk[0] = 0x68u;
+        const std::uint32_t target = kCodeTokenBase + kCallbacks[index].rva;
+        std::memcpy(thunk + 1, &target, sizeof(target));
+        thunk[5] = 0xE9u;
+        const std::intptr_t delta = static_cast<std::intptr_t>(bridge - reinterpret_cast<std::uintptr_t>(thunk + kCallbackThunkSize));
+        if (delta < std::numeric_limits<std::int32_t>::min() || delta > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("Callback bridge is outside rel32 range"); }
+        const std::int32_t relative = static_cast<std::int32_t>(delta);
+        std::memcpy(thunk + 6, &relative, sizeof(relative));
+    }
+    DWORD old_protection = 0;
+    if (!VirtualProtect(callback_thunks_, callback_thunks_size_, PAGE_EXECUTE_READ, &old_protection)) { throw std::runtime_error(win32_error("VirtualProtect(callback thunk pool)")); }
+}
+
+void ProcessMemory::protect_regions() {
+    for (const StaticRegion& region : regions_) {
+        if (!region.protect) { continue; }
+        DWORD old_protection = 0;
+        DWORD protection = page_protection(region.access);
+        if (!VirtualProtect(region.memory, region.size, protection, &old_protection)) { throw std::runtime_error(win32_error(("VirtualProtect(" + std::string(region.name ? region.name : "region") + ")").c_str())); }
+    }
+    if (rdata_commit_base_ && rdata_commit_size_) {
+        DWORD old_protection = 0;
+        if (!VirtualProtect(rdata_commit_base_, rdata_commit_size_, PAGE_READONLY, &old_protection)) { throw std::runtime_error(win32_error("VirtualProtect(semantic rdata)")); }
+    }
 }
 
 void ProcessMemory::release() noexcept {
     if (g_process_memory == this) { g_process_memory = nullptr; }
-    resolved_imports_.clear();
-    for (auto iterator = loaded_modules_.rbegin(); iterator != loaded_modules_.rend(); ++iterator) { if (*iterator) { FreeLibrary(*iterator); } }
-    loaded_modules_.clear();
-    if (image_) { VirtualFree(image_, 0, MEM_RELEASE); image_ = nullptr; }
+    resolved_imports_.clear(); for (auto iterator = loaded_modules_.rbegin(); iterator != loaded_modules_.rend(); ++iterator) { if (*iterator) { FreeLibrary(*iterator); } } loaded_modules_.clear();
+    for (std::uint32_t page = 0u; page < SFERA_DATA_PAGE_COUNT; ++page) { g_sfera_data_semantic_page_alias[page] = nullptr; }
+    for (std::uint32_t index = 0u; index < SFERA_DATA_SEMANTIC_SPAN_COUNT; ++index) {
+        if (g_sfera_data_semantic_spans[index]) { UnmapViewOfFile(g_sfera_data_semantic_spans[index]); g_sfera_data_semantic_spans[index] = nullptr; }
+    }
+    for (std::uint8_t* view : data_compat_segments_) { if (view) { UnmapViewOfFile(view); } }
+    data_compat_segments_.clear();
+    data_compat_view_ = nullptr;
+    g_sfera_data_compat_base = nullptr;
+    callback_thunks_ = nullptr; callback_thunks_size_ = 0;
+    sfera_rdata_bind_storage(nullptr);
+    if (rdata_reservation_) { VirtualFree(rdata_reservation_, 0, MEM_RELEASE); rdata_reservation_ = nullptr; rdata_commit_base_ = nullptr; rdata_commit_size_ = 0; }
+    for (void* memory : owned_regions_) { if (memory) { VirtualFree(memory, 0, MEM_RELEASE); } } owned_regions_.clear();
+    if (module_shell_) { VirtualFree(module_shell_, 0, MEM_RELEASE); module_shell_ = nullptr; }
+    regions_.clear(); module_shell_size_ = 0;
+    g_lift_header_base = 0; g_lift_rsrc_base = 0; g_lift_callback_thunk_base = 0;
 }
 
 namespace {
@@ -1029,107 +1065,75 @@ NativeRuntime::NativeRuntime() {
     memory_.initialize_native();
     verify_native_bridge();
     DiagnosticPhaseScope phase(RuntimePhase::function_map);
-    import_addresses_.reserve(memory_.resolved_imports().size());
+    std::size_t import_index = 0u;
     for (const ResolvedImport& item : memory_.resolved_imports()) {
-        imports_by_address_.try_emplace(item.address, item.descriptor);
-        import_addresses_.push_back(item.address);
+        if (import_index >= import_addresses_.size()) { throw std::runtime_error("Resolved import table is larger than generated import metadata"); }
+        std::size_t slot = ((item.address >> 4u) * UINT32_C(2654435761)) & (kImportLookupSize - 1u);
+        while (import_lookup_addresses_[slot] != 0u && import_lookup_addresses_[slot] != item.address) { slot = (slot + 1u) & (kImportLookupSize - 1u); }
+        if (import_lookup_addresses_[slot] == 0u) { import_lookup_addresses_[slot] = item.address; import_lookup_descriptors_[slot] = item.descriptor; }
+        import_addresses_[import_index++] = item.address;
     }
-    if (import_addresses_.size() != kImports.size()) { throw std::runtime_error("Generated import table and loaded import table disagree"); }
+    if (import_index != import_addresses_.size()) { throw std::runtime_error("Generated import table and loaded import table disagree: resolved=" + std::to_string(import_index) + ", generated=" + std::to_string(import_addresses_.size())); }
+    lift_initialize_dispatch();
     diagnostic_note("native C function map initialized");
 }
 
-ProcessMemory& NativeRuntime::memory() noexcept {
-    return memory_;
-}
 
 const ImportDescriptor* NativeRuntime::find_import(std::uint32_t target) const {
-    const auto found = imports_by_address_.find(target);
-    return found == imports_by_address_.end() ? nullptr : found->second;
+    std::size_t slot = ((target >> 4u) * UINT32_C(2654435761)) & (kImportLookupSize - 1u);
+    for (std::size_t probe = 0u; probe != kImportLookupSize; ++probe) { const std::uint32_t address = import_lookup_addresses_[slot]; if (address == target) { return import_lookup_descriptors_[slot]; } if (address == 0u) { return nullptr; } slot = (slot + 1u) & (kImportLookupSize - 1u); }
+    return nullptr;
 }
 
 std::uint32_t NativeRuntime::import_address(std::uint32_t index) const {
-    if (index >= import_addresses_.size()) { throw std::runtime_error("Generated import index is outside the resolved import table"); }
+    if (index >= import_addresses_.size()) { throw std::runtime_error("Generated import index " + std::to_string(index) + " is outside fixed import table size " + std::to_string(import_addresses_.size())); }
     return import_addresses_[index];
 }
 
+void NativeRuntime::call_import(LiftCpu& state, std::uint32_t index, std::uint32_t callsite) {
+    if (index >= import_addresses_.size()) { throw std::runtime_error("Generated import index " + std::to_string(index) + " is outside fixed import table size " + std::to_string(import_addresses_.size()) + " at " + hex_u32(callsite)); }
+    call_native_resolved(state, import_addresses_[index], callsite, &kImports[index]);
+}
+
 void NativeRuntime::call_native(LiftCpu& state, std::uint32_t target, std::uint32_t callsite) {
-    const ImportDescriptor* descriptor = find_import(target);
-    const std::string_view name = descriptor ? descriptor->name : std::string_view{};
-    DiagnosticPhaseScope phase(RuntimePhase::native_call);
-    DiagnosticNativeScope native_scope(target, descriptor ? descriptor->name.data() : nullptr);
-    MEMORY_BASIC_INFORMATION target_region{};
-    const DWORD executable_protection = PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
-    if (target == 0 || VirtualQuery(reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), &target_region, sizeof(target_region)) == 0 || target_region.State != MEM_COMMIT || (target_region.Protect & executable_protection) == 0 || (target_region.Protect & (PAGE_GUARD | PAGE_NOACCESS)) != 0) { throw std::runtime_error("Invalid native call target " + hex_u32(target)); }
+    call_native_resolved(state, target, callsite, find_import(target));
+}
+
+void NativeRuntime::call_native_resolved(LiftCpu& state, std::uint32_t target, std::uint32_t callsite, const ImportDescriptor* descriptor) {
+    if (target == 0u) { throw std::runtime_error("Invalid native call target 0x00000000"); }
+    if (!descriptor) { NativeCallFrame frame{&state, reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0}; native_call_bridge_fast(&frame); return; }
+    const std::string_view name = descriptor->name;
     if (name == "_CxxThrowException" || name == "RaiseException") { throw std::runtime_error("SEH/C++ exception crossed the lifted/native ABI boundary at " + hex_u32(callsite)); }
-    if ((name == "GetModuleHandleA" || name == "GetModuleHandleW") && memory_read<std::uint32_t>(state.esp) == 0) {
-        state.eax = memory_.load_base();
-        state.esp += 4u;
-        return;
-    }
-    if ((name == "GetModuleFileNameA" || name == "GetModuleFileNameW") && (memory_read<std::uint32_t>(state.esp) == 0 || memory_read<std::uint32_t>(state.esp) == memory_.load_base())) {
+    if ((name == "GetModuleHandleA" || name == "GetModuleHandleW") && memory_read<std::uint32_t>(state.esp) == 0u) { state.eax = memory_.load_base(); state.esp += 4u; return; }
+    if ((name == "GetModuleFileNameA" || name == "GetModuleFileNameW") && (memory_read<std::uint32_t>(state.esp) == 0u || memory_read<std::uint32_t>(state.esp) == memory_.load_base())) {
         const std::uint32_t buffer = memory_read<std::uint32_t>(state.esp + 4u);
         const std::uint32_t capacity = memory_read<std::uint32_t>(state.esp + 8u);
         state.eax = name == "GetModuleFileNameW" ? write_local_path(buffer, capacity, client_executable_path()) : write_local_path(buffer, capacity, client_executable_path_ansi());
         state.esp += 12u;
-        const std::string note = "virtualized " + std::string(name) + ": " + narrow_path(client_executable_path());
-        diagnostic_note(note.c_str());
         return;
     }
-    if (name == "_CIatan2" || name == "_CIpow") {
-        require_x87(&state, 2);
-        state.fpu[1] = name == "_CIpow" ? std::pow(state.fpu[1], state.fpu[0]) : std::atan2(state.fpu[1], state.fpu[0]);
-        lift_x87_pop(&state);
-        return;
-    }
+    if (name == "_CIatan2" || name == "_CIpow") { require_x87(&state, 2); state.fpu[1] = name == "_CIpow" ? std::pow(state.fpu[1], state.fpu[0]) : std::atan2(state.fpu[1], state.fpu[0]); lift_x87_pop(&state); return; }
     if (name == "_CIacos" || name == "_CIasin" || name == "_CIatan" || name == "_CIcos" || name == "_CIexp" || name == "_CIsin" || name == "_CIsqrt" || name == "_CItan") {
         require_x87(&state, 1);
         const double value = state.fpu[0];
-        if (name == "_CIacos") { state.fpu[0] = std::acos(value); }
-        else if (name == "_CIasin") { state.fpu[0] = std::asin(value); }
-        else if (name == "_CIatan") { state.fpu[0] = std::atan(value); }
-        else if (name == "_CIcos") { state.fpu[0] = std::cos(value); }
-        else if (name == "_CIexp") { state.fpu[0] = std::exp(value); }
-        else if (name == "_CIsin") { state.fpu[0] = std::sin(value); }
-        else if (name == "_CIsqrt") { state.fpu[0] = std::sqrt(value); }
-        else { state.fpu[0] = std::tan(value); }
+        if (name == "_CIacos") { state.fpu[0] = std::acos(value); } else if (name == "_CIasin") { state.fpu[0] = std::asin(value); } else if (name == "_CIatan") { state.fpu[0] = std::atan(value); } else if (name == "_CIcos") { state.fpu[0] = std::cos(value); } else if (name == "_CIexp") { state.fpu[0] = std::exp(value); } else if (name == "_CIsin") { state.fpu[0] = std::sin(value); } else if (name == "_CIsqrt") { state.fpu[0] = std::sqrt(value); } else { state.fpu[0] = std::tan(value); }
         return;
     }
     NativeCallArguments arguments(state.esp);
-    if (name == "memcpy" || name == "memmove") {
-        const std::uint32_t destination = arguments.read(0); const std::uint32_t source = arguments.read(1); const std::uint32_t size = arguments.read(2);
-        if (!memory_range_accessible(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(source)), size, false)) { diagnostic_memory_fault(source, size, false); throw std::runtime_error(std::string(name) + " source is not readable at " + hex_u32(source) + ", size=" + std::to_string(size) + ", callsite=" + hex_u32(callsite)); }
-        if (!memory_range_accessible(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(destination)), size, true)) { diagnostic_memory_fault(destination, size, true); throw std::runtime_error(std::string(name) + " destination is not writable at " + hex_u32(destination) + ", size=" + std::to_string(size) + ", callsite=" + hex_u32(callsite)); }
-    } else if (name == "memcpy_s") {
-        const std::uint32_t destination = arguments.read(0); const std::uint32_t destination_size = arguments.read(1); const std::uint32_t source = arguments.read(2); const std::uint32_t count = arguments.read(3);
-        if (count > destination_size) { throw std::runtime_error("memcpy_s count exceeds destination size at " + hex_u32(callsite)); }
-        if (!memory_range_accessible(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(source)), count, false)) { diagnostic_memory_fault(source, count, false); throw std::runtime_error("memcpy_s source is not readable at " + hex_u32(source) + ", count=" + std::to_string(count) + ", callsite=" + hex_u32(callsite)); }
-        if (!memory_range_accessible(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(destination)), count, true)) { diagnostic_memory_fault(destination, count, true); throw std::runtime_error("memcpy_s destination is not writable at " + hex_u32(destination) + ", count=" + std::to_string(count) + ", callsite=" + hex_u32(callsite)); }
-    }
-    std::string resource_note;
-    if (name == "_findfirst64i32") { resource_note = "resource enumeration callsite=" + hex_u32(callsite) + ", pattern=\"" + local_c_string(memory_read<std::uint32_t>(state.esp)) + "\""; }
-    else if (name == "fopen") { resource_note = "resource fopen callsite=" + hex_u32(callsite) + ", path=\"" + local_c_string(memory_read<std::uint32_t>(state.esp)) + "\", mode=\"" + local_c_string(memory_read<std::uint32_t>(state.esp + 4u)) + "\""; }
-    std::string module_note;
     if (descriptor && descriptor->process_module_argument >= 0) {
         const std::uint8_t argument = static_cast<std::uint8_t>(descriptor->process_module_argument);
         const std::uint32_t image_handle = arguments.read(argument);
         const std::uint32_t native_handle = process_module_handle();
         if (native_handle != image_handle) { arguments.alias(argument, image_handle, native_handle); }
-        module_note = "module identity import=" + std::string(name) + ", argument=" + std::to_string(argument) + ", image=" + hex_u32(image_handle) + ", process=" + hex_u32(native_handle);
-        if (name == "DirectInput8Create") { module_note += ", version=" + hex_u32(arguments.read(1)) + ", iid=" + hex_u32(arguments.read(2)) + ", output=" + hex_u32(arguments.read(3)) + ", outer=" + hex_u32(arguments.read(4)); }
     }
-    const bool normalize_hostent = is_legacy_hostent_import(descriptor);
     NativeCallFrame frame{&state, reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0};
-    native_call_bridge(&frame);
-    if (normalize_hostent && state.eax != 0u) { state.eax = normalize_legacy_hostent(state.eax, descriptor->ordinal, callsite); }
-    if (name == "_findnext64i32" && state.eax == 0xFFFFFFFFu) { resource_note = "resource enumeration complete"; }
-    if (!resource_note.empty()) { resource_note += ", result=" + hex_u32(state.eax); diagnostic_note(resource_note.c_str()); }
-    if (!module_note.empty()) { module_note += ", result=" + hex_u32(state.eax); diagnostic_note(module_note.c_str()); }
-    if (descriptor && is_float_return(name)) { lift_x87_push(&state, frame.native_st0); }
+    const bool float_return = is_float_return(name);
+    if (float_return) { native_call_bridge(&frame); lift_x87_push(&state, frame.native_st0); } else { native_call_bridge_fast(&frame); }
 }
 
 extern "C" void __cdecl lift_import_call(LiftCpu* cpu, std::uint32_t import_index, std::uint32_t callsite) {
     if (!g_runtime || !cpu) { throw std::runtime_error("Import call without an active native runtime"); }
-    g_runtime->call_native(*cpu, g_runtime->import_address(import_index), callsite);
+    g_runtime->call_import(*cpu, import_index, callsite);
 }
 
 extern "C" void __cdecl lift_native_call(LiftCpu* cpu, std::uint32_t target, std::uint32_t callsite) {
@@ -1137,13 +1141,7 @@ extern "C" void __cdecl lift_native_call(LiftCpu* cpu, std::uint32_t target, std
     g_runtime->call_native(*cpu, target, callsite);
 }
 
-extern "C" void __cdecl lift_note_config_lookup(std::uint32_t key_address, std::uint32_t value_address) {
-    const std::string key = local_c_string(key_address, 160u);
-    if (key.rfind("NEW_FONT_", 0) != 0) { return; }
-    std::string note = "normalized config lookup key=\"" + key + "\"";
-    note += value_address == 0 ? ", result=missing" : ", value=\"" + local_c_string(value_address, 160u) + "\"";
-    diagnostic_note(note.c_str());
-}
+
 
 int NativeRuntime::execute() {
     DiagnosticPhaseScope phase(RuntimePhase::execution_setup);
@@ -1178,42 +1176,37 @@ int NativeRuntime::execute() {
 }
 
 void NativeRuntime::dispatch_callback(CallbackRegisters& registers) {
-    DiagnosticPhaseScope phase(RuntimePhase::callback);
-    const std::uint32_t target = registers.stub_return - 5u;
-    const std::uint32_t original_esp = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&registers.stub_return) + sizeof(registers.stub_return));
-    const std::uint32_t api_return = memory_read<std::uint32_t>(original_esp);
+    const std::uint32_t target = registers.callback_target;
+    const std::uint32_t original_esp = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&registers.callback_target) + sizeof(registers.callback_target));
+    const std::uint32_t api_return = *reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(original_esp));
+#if !defined(SFERA_PORTABLE_CHECK) && defined(_M_IX86)
+    const std::uintptr_t stack_base = __readfsdword(4);
+    const std::size_t available = stack_base > original_esp ? stack_base - original_esp : 0u;
+#else
     MEMORY_BASIC_INFORMATION region{};
     if (VirtualQuery(reinterpret_cast<void*>(static_cast<std::uintptr_t>(original_esp)), &region, sizeof(region)) == 0 || region.State != MEM_COMMIT) { throw std::runtime_error("Unable to inspect native callback stack"); }
     const std::uintptr_t region_end = reinterpret_cast<std::uintptr_t>(region.BaseAddress) + region.RegionSize;
-    const std::size_t available = region_end > original_esp ? region_end - original_esp : 0;
+    const std::size_t available = region_end > original_esp ? region_end - original_esp : 0u;
+#endif
     const std::size_t copy_size = std::min(kCallbackStackCopy, available);
     if (copy_size < 64u) { throw std::runtime_error("Native callback stack window is too small"); }
-    LocalStack clone(std::max<std::size_t>(kStackReserve, 1024u * 1024u));
+    CallbackStackLease lease;
+    LocalStack& clone = lease.stack();
     const std::uint32_t clone_esp = clone.top() - static_cast<std::uint32_t>(copy_size);
-    if (!safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(clone_esp)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(original_esp)), copy_size)) { throw std::runtime_error("Unable to clone native callback arguments"); }
-    memory_write(clone_esp, LIFT_CALLBACK_SENTINEL);
+    std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(clone_esp)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(original_esp)), copy_size);
+    *reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(clone_esp)) = LIFT_CALLBACK_SENTINEL;
     LiftCpu state{};
     state.eax = registers.eax; state.ecx = registers.ecx; state.edx = registers.edx; state.ebx = registers.ebx; state.esp = clone_esp; state.ebp = registers.ebp; state.esi = registers.esi; state.edi = registers.edi; state.eip = target; state.eflags = registers.eflags;
     state.fpu_control = 0x027Fu;
     state.stack_base = clone.base(); state.stack_limit = clone.limit();
     initialize_fs(state);
-    DiagnosticRunScope run_scope(&state);
-    DiagnosticExecutionScope execution_scope(target, LIFT_CALLBACK_SENTINEL, state.esp);
-    try {
-        lift_dispatch(&state, target, LIFT_CALLBACK_SENTINEL);
-    } catch (const std::exception& error) {
-        diagnostic_failure(state, error.what());
-        throw;
-    } catch (...) {
-        diagnostic_failure(state, "Unknown failure in generated callback code");
-        throw;
-    }
+    lift_dispatch(&state, target, LIFT_CALLBACK_SENTINEL);
     const std::uint32_t stack_delta = state.esp - clone_esp;
     if (stack_delta < 4u || stack_delta > copy_size) { throw std::runtime_error("Lifted callback returned an invalid stack delta"); }
-    if (copy_size > 4u) { safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(original_esp + 4u)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(clone_esp + 4u)), copy_size - 4u); }
+    if (copy_size > 4u) { std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(original_esp + 4u)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(clone_esp + 4u)), copy_size - 4u); }
     const std::uint32_t destination = original_esp + stack_delta;
-    memory_write(destination - 8u, state.eax);
-    memory_write(destination - 4u, api_return);
+    *reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(destination - 8u)) = state.eax;
+    *reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(destination - 4u)) = api_return;
     registers.eax = destination - 8u; registers.ecx = state.ecx; registers.edx = state.edx; registers.ebx = state.ebx; registers.ebp = state.ebp; registers.esi = state.esi; registers.edi = state.edi; registers.eflags = state.eflags;
 }
 
@@ -1231,14 +1224,15 @@ extern "C" void __cdecl dispatch_native_callback(CallbackRegisters* registers) {
 #if defined(SFERA_PORTABLE_CHECK)
 
 extern "C" void __cdecl native_call_bridge(NativeCallFrame*) {}
+extern "C" void __cdecl native_call_bridge_fast(NativeCallFrame*) {}
 extern "C" void callback_bridge() {}
 
 #elif defined(_M_IX86)
 
 static_assert(offsetof(LiftCpu, eax) == 0 && offsetof(LiftCpu, eflags) == 36 && offsetof(LiftCpu, fpu_control) == 114);
-static_assert(offsetof(LiftCpu, fs_data) == 248);
+static_assert(offsetof(LiftCpu, fs_data) == 120);
 static_assert(offsetof(NativeCallFrame, state) == 0 && offsetof(NativeCallFrame, native_st0) == 40);
-static_assert(offsetof(CallbackRegisters, edi) == 0 && offsetof(CallbackRegisters, eax) == 28 && offsetof(CallbackRegisters, eflags) == 32 && offsetof(CallbackRegisters, stub_return) == 36);
+static_assert(offsetof(CallbackRegisters, edi) == 0 && offsetof(CallbackRegisters, eax) == 28 && offsetof(CallbackRegisters, eflags) == 32 && offsetof(CallbackRegisters, callback_target) == 36);
 static_assert(sizeof(CallbackRegisters) == 40);
 
 extern "C" __declspec(naked) void __cdecl native_call_bridge(NativeCallFrame*) {
@@ -1258,7 +1252,7 @@ extern "C" __declspec(naked) void __cdecl native_call_bridge(NativeCallFrame*) {
         fninit
         mov eax, [edx]
         fldcw word ptr [eax + 114]
-        mov ecx, [eax + 248]
+        mov ecx, [eax + 120]
         mov fs:[0], ecx
         mov ecx, [eax + 40]
         mov fs:[4], ecx
@@ -1320,6 +1314,80 @@ extern "C" __declspec(naked) void __cdecl native_call_bridge(NativeCallFrame*) {
     }
 }
 
+extern "C" __declspec(naked) void __cdecl native_call_bridge_fast(NativeCallFrame*) {
+    __asm {
+        mov edx, [esp + 4]
+        mov [edx + 8], esp
+        mov [edx + 12], ebp
+        mov [edx + 16], ebx
+        mov [edx + 20], esi
+        mov [edx + 24], edi
+        mov eax, fs:[0]
+        mov [edx + 28], eax
+        mov eax, fs:[4]
+        mov [edx + 32], eax
+        mov eax, fs:[8]
+        mov [edx + 36], eax
+        mov eax, [edx]
+        mov ecx, [eax + 120]
+        mov fs:[0], ecx
+        mov ecx, [eax + 40]
+        mov fs:[4], ecx
+        mov ecx, [eax + 44]
+        mov fs:[8], ecx
+        mov ecx, [eax + 16]
+        sub ecx, 8
+        mov ebx, [edx + 4]
+        mov [ecx], ebx
+        mov ebx, offset native_bridge_fast_return
+        mov [ecx + 4], ebx
+        mov esp, ecx
+        mov edi, [eax + 28]
+        mov esi, [eax + 24]
+        mov ebp, edx
+        mov ebx, [eax + 12]
+        mov edx, [eax + 8]
+        mov ecx, [eax + 4]
+        mov eax, [eax]
+        cld
+        ret
+    native_bridge_fast_return:
+        pushfd
+        pushad
+        mov edx, [esp + 8]
+        mov ecx, [edx]
+        mov eax, [esp + 28]
+        mov [ecx], eax
+        mov eax, [esp + 24]
+        mov [ecx + 4], eax
+        mov eax, [esp + 20]
+        mov [ecx + 8], eax
+        mov eax, [esp + 16]
+        mov [ecx + 12], eax
+        mov eax, [esp + 12]
+        add eax, 4
+        mov [ecx + 16], eax
+        mov eax, [esp + 4]
+        mov [ecx + 24], eax
+        mov eax, [esp]
+        mov [ecx + 28], eax
+        mov eax, [esp + 32]
+        mov [ecx + 36], eax
+        mov eax, [edx + 28]
+        mov fs:[0], eax
+        mov eax, [edx + 32]
+        mov fs:[4], eax
+        mov eax, [edx + 36]
+        mov fs:[8], eax
+        mov esp, [edx + 8]
+        mov ebp, [edx + 12]
+        mov ebx, [edx + 16]
+        mov esi, [edx + 20]
+        mov edi, [edx + 24]
+        ret
+    }
+}
+
 extern "C" __declspec(naked) void callback_bridge() {
     __asm {
         pushfd
@@ -1342,8 +1410,7 @@ extern "C" __declspec(naked) void callback_bridge() {
 
 int run_native_program() {
     configure_process_environment();
-    g_deep_diagnostics = GetEnvironmentVariableW(kDeepDiagnosticsEnvironment, nullptr, 0) != 0;
-    diagnostic_note(g_deep_diagnostics ? "generated C execution: deep diagnostics" : "generated C execution: fast");
+    diagnostic_note("generated C execution: optimized");
     NativeRuntime runtime;
     return runtime.execute();
 }

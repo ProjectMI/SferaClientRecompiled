@@ -1,13 +1,20 @@
 #pragma once
 
 #include "lifted_abi.h"
-#include "source.h"
+#include "semantic_native.h"
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 
 #include <cstddef>
 #include <cstdint>
-#include <span>
 #include <string>
-#include <unordered_map>
+#include <array>
 #include <vector>
 
 namespace lifted {
@@ -36,7 +43,7 @@ struct CallbackRegisters {
     std::uint32_t ecx;
     std::uint32_t eax;
     std::uint32_t eflags;
-    std::uint32_t stub_return;
+    std::uint32_t callback_target;
 };
 
 struct ResolvedImport {
@@ -66,10 +73,9 @@ public:
     ~ProcessMemory();
     std::uint32_t load_base() const noexcept;
     std::uint32_t entry_va() const noexcept;
-    std::uint32_t image_address(std::uint32_t rva) const;
+    std::uint32_t static_address(std::uint32_t rva) const;
     std::uint32_t source_address(std::uint32_t source_va) const;
-    bool image_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
-    std::uint8_t* data() noexcept;
+    bool source_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
     const std::vector<ResolvedImport>& resolved_imports() const noexcept;
     bool try_read(std::uint32_t address, void* value, std::size_t size) const noexcept;
     bool try_write(std::uint32_t address, const void* value, std::size_t size) noexcept;
@@ -77,18 +83,32 @@ public:
     void write(std::uint32_t address, const void* value, std::size_t size);
     void initialize_native();
 private:
-    std::uint8_t* image_ = nullptr;
+    struct StaticRegion { std::uint32_t rva = 0; std::uint32_t size = 0; std::uint8_t* memory = nullptr; std::uint8_t access = 0; const char* name = nullptr; bool protect = false; };
+    std::uint8_t* module_shell_ = nullptr;
+    std::uint32_t module_shell_size_ = 0;
+    std::uint8_t* callback_thunks_ = nullptr;
+    std::uint32_t callback_thunks_size_ = 0;
+    std::uint8_t* rdata_reservation_ = nullptr;
+    std::uint8_t* rdata_commit_base_ = nullptr;
+    std::uint32_t rdata_commit_size_ = 0;
+    std::uint8_t* data_compat_view_ = nullptr;
+    std::vector<std::uint8_t*> data_compat_segments_;
+    std::vector<StaticRegion> regions_;
+    std::vector<void*> owned_regions_;
     std::vector<HMODULE> loaded_modules_;
     std::vector<ResolvedImport> resolved_imports_;
-    void map();
-    void map_file();
+    void allocate_static_regions();
+    std::uint8_t* region_pointer(std::uint32_t rva, std::size_t size = 1u) const;
+    void install_initial_static_data();
     void resolve_imports();
-    void install_recovered_data();
-    void install_jump_tables();
-    void apply_relocations();
-    void patch_image_base();
-    void install_callback_stubs();
-    void protect_image();
+    void apply_static_pointer_fixups();
+    void verify_semantic_data_views() const;
+    void patch_module_shell();
+    void install_callback_thunks();
+    std::uint32_t callback_address(std::uint32_t rva) const noexcept;
+    bool callback_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
+    bool is_static_table_rva(std::uint32_t rva) const noexcept;
+    void protect_regions();
     void release() noexcept;
 };
 
@@ -99,25 +119,28 @@ public:
     NativeRuntime& operator=(const NativeRuntime&) = delete;
     int execute();
     void dispatch_callback(CallbackRegisters& registers);
-    ProcessMemory& memory() noexcept;
     const ImportDescriptor* find_import(std::uint32_t target) const;
     std::uint32_t import_address(std::uint32_t index) const;
+    void call_import(LiftCpu& state, std::uint32_t index, std::uint32_t callsite);
     void call_native(LiftCpu& state, std::uint32_t target, std::uint32_t callsite);
 private:
     ProcessMemory memory_;
-    std::unordered_map<std::uint32_t, const ImportDescriptor*> imports_by_address_;
-    std::vector<std::uint32_t> import_addresses_;
+    static constexpr std::size_t kImportLookupSize = 1024u;
+    std::array<std::uint32_t, kImportLookupSize> import_lookup_addresses_{};
+    std::array<const ImportDescriptor*, kImportLookupSize> import_lookup_descriptors_{};
+    std::array<std::uint32_t, kImports.size()> import_addresses_{};
+    void call_native_resolved(LiftCpu& state, std::uint32_t target, std::uint32_t callsite, const ImportDescriptor* descriptor);
 };
 
 extern NativeRuntime* g_runtime;
 extern ProcessMemory* g_process_memory;
 extern "C" void __cdecl native_call_bridge(NativeCallFrame* frame);
+extern "C" void __cdecl native_call_bridge_fast(NativeCallFrame* frame);
 extern "C" void __cdecl dispatch_native_callback(CallbackRegisters* registers);
 extern "C" void callback_bridge();
 
 std::string win32_error(const char* operation, DWORD error = GetLastError());
 std::string hex_u32(std::uint32_t value);
-void* checked_memory_copy(void* destination, const void* source, std::uint32_t size);
 const std::wstring& client_root_directory();
 void configure_process_environment();
 int run_native_program();
