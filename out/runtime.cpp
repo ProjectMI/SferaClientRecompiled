@@ -18,9 +18,6 @@
 #endif
 
 extern "C" {
-std::uint32_t g_lift_header_base = 0;
-std::uint32_t g_lift_rsrc_base = 0;
-std::uint32_t g_lift_callback_thunk_base = 0;
 }
 
 namespace lifted {
@@ -31,12 +28,17 @@ ProcessMemory* g_process_memory = nullptr;
 namespace {
 
 constexpr std::size_t kCallbackStackCopy = 16u * 1024u;
-constexpr std::uint32_t kCompactResourceRva = 0x00001000u;
 constexpr std::uint32_t kCallbackThunkSize = 10u;
+constexpr std::uint32_t kCallbackThunkCapacityBytes = 0x00010000u;
+constexpr std::uint32_t kCallbackThunkPageSize = 0x00001000u;
 constexpr std::uint32_t kCodeTokenBase = 0xE0000000u;
 constexpr wchar_t kClientRootEnvironment[] = L"SFERA_CLIENT_ROOT";
 thread_local std::vector<std::unique_ptr<LocalStack>> g_callback_stacks;
 thread_local std::size_t g_callback_stack_depth = 0;
+thread_local std::uint32_t g_last_native_callsite = 0u;
+thread_local std::uint32_t g_last_native_target = 0u;
+thread_local std::uint32_t g_last_native_esp_before = 0u;
+thread_local std::uint32_t g_last_native_esp_after = 0u;
 class CallbackStackLease {
 public:
     CallbackStackLease() { if (g_callback_stack_depth == g_callback_stacks.size()) { g_callback_stacks.push_back(std::make_unique<LocalStack>(kStackReserve)); } stack_ = g_callback_stacks[g_callback_stack_depth++].get(); }
@@ -249,25 +251,8 @@ std::uint32_t write_local_path(std::uint32_t address, std::uint32_t capacity, co
     return static_cast<std::uint32_t>(path.size());
 }
 
-std::uint32_t align_down(std::uint32_t value, std::uint32_t alignment) noexcept {
-    return value & ~(alignment - 1u);
-}
-
 std::uint32_t align_up(std::uint32_t value, std::uint32_t alignment) noexcept {
     return (value + alignment - 1u) & ~(alignment - 1u);
-}
-
-DWORD page_protection(std::uint8_t access) noexcept {
-    switch (access & (kRead | kWrite | kExecute)) {
-        case kExecute: return PAGE_EXECUTE;
-        case kRead | kExecute: return PAGE_EXECUTE_READ;
-        case kWrite | kExecute: return PAGE_EXECUTE_READWRITE;
-        case kRead | kWrite | kExecute: return PAGE_EXECUTE_READWRITE;
-        case kWrite: return PAGE_READWRITE;
-        case kRead | kWrite: return PAGE_READWRITE;
-        case kRead: return PAGE_READONLY;
-        default: return PAGE_NOACCESS;
-    }
 }
 
 std::uint64_t width_mask(std::uint16_t width) noexcept {
@@ -317,13 +302,13 @@ void set_sub_flags(LiftCpu& state, std::uint64_t left, std::uint64_t right, std:
     set_szp(state, truncated, width);
 }
 
-bool is_float_return(std::string_view name) {
-    return name == "atof" || name == "floor" || name == "ceil" || name == "frexp" || name == "ldexp" || name == "fmod";
-}
 
 } // namespace
 
 extern "C" std::uint32_t __cdecl lift_source_rva(std::uint32_t address) { std::uint32_t rva = 0; return g_process_memory && g_process_memory->source_rva(address, rva) ? rva : UINT32_MAX; }
+extern "C" std::uint32_t __cdecl lift_code_rva(std::uint32_t address) { std::uint32_t rva = 0; return g_process_memory && g_process_memory->code_rva(address, rva) ? rva : UINT32_MAX; }
+extern "C" std::uint32_t __cdecl lift_callback_address_rva(std::uint32_t rva) { return g_process_memory ? g_process_memory->callback_for_rva(rva) : 0u; }
+extern "C" std::uint32_t __cdecl lift_process_module_handle(void) { return process_module_handle(); }
 extern "C" std::uint8_t __cdecl lift_load8(std::uint32_t address) { return memory_read<std::uint8_t>(address); }
 extern "C" std::uint16_t __cdecl lift_load16(std::uint32_t address) { return memory_read<std::uint16_t>(address); }
 extern "C" std::uint32_t __cdecl lift_load32(std::uint32_t address) { return memory_read<std::uint32_t>(address); }
@@ -565,6 +550,19 @@ extern "C" void __cdecl lift_scas32(LiftCpu* cpu, std::uint32_t repeated, std::u
 
 extern "C" LIFT_NORETURN void __cdecl lift_trap(LiftCpu* cpu, std::uint32_t source_va, const char* reason) { if (cpu) { cpu->eip = source_va; } throw std::runtime_error(std::string("Lifted C trap at ") + hex_u32(source_va) + ": " + (reason ? reason : "unknown")); }
 
+extern "C" LIFT_NORETURN void __cdecl lift_trap_transfer(LiftCpu* cpu, std::uint32_t origin, std::uint32_t target, std::uint32_t esp_before, std::uint32_t stack_cleanup, std::uint32_t stop_address, const char* kind) {
+    auto classify = [](std::uint32_t value) -> std::string { const std::uint32_t rva = lift_source_rva(value); if (rva == UINT32_MAX) { return "non-code"; } if (lift_has_function_rva(rva)) { return "function@" + hex_u32(UINT32_C(0x00400000) + rva); } return "local-middle@" + hex_u32(UINT32_C(0x00400000) + rva); };
+    auto peek = [cpu](std::uint32_t address, std::uint32_t& value) -> bool { if (!cpu || address < cpu->stack_limit || address > cpu->stack_base - 4u) { return false; } value = *reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(address)); return true; };
+    std::string message = std::string("Invalid lifted control transfer kind=") + (kind ? kind : "unknown") + " origin=" + hex_u32(origin) + " target=" + hex_u32(target) + " target-class=" + classify(target) + " esp=" + hex_u32(esp_before) + " cleanup=" + std::to_string(stack_cleanup) + " stop=" + hex_u32(stop_address);
+    if (g_last_native_callsite != 0u) { message += " last-native-callsite=" + hex_u32(g_last_native_callsite) + " last-native-target=" + hex_u32(g_last_native_target) + " native-esp-before=" + hex_u32(g_last_native_esp_before) + " native-esp-after=" + hex_u32(g_last_native_esp_after) + " native-esp-delta=" + std::to_string(static_cast<std::int32_t>(g_last_native_esp_after - g_last_native_esp_before)); }
+    static constexpr int offsets[] = {-8, -4, 0, 4, 8, 12, 16};
+    for (int offset : offsets) { std::uint32_t value = 0u; const std::uint32_t address = static_cast<std::uint32_t>(esp_before + offset); if (peek(address, value)) { message += " [esp"; if (offset >= 0) { message += "+"; } message += std::to_string(offset); message += "]=" + hex_u32(value) + "{" + classify(value) + "}"; } }
+    std::uint32_t next = 0u; if (peek(esp_before + 4u, next) && target < UINT32_C(0x10000) && lift_source_rva(next) != UINT32_MAX && lift_has_function_rva(lift_source_rva(next))) { message += " probable-stack-skew=+4"; }
+    std::uint32_t prev = 0u; if (esp_before >= 4u && peek(esp_before - 4u, prev) && target < UINT32_C(0x10000) && lift_source_rva(prev) != UINT32_MAX && lift_has_function_rva(lift_source_rva(prev))) { message += " probable-stack-skew=-4"; }
+    if (cpu) { cpu->eip = origin; }
+    throw std::runtime_error(message);
+}
+
 const std::wstring& client_root_directory() {
     static const std::wstring root = [] {
         const std::wstring configured = environment_path(kClientRootEnvironment);
@@ -627,81 +625,68 @@ ProcessMemory::ProcessMemory() {
     DiagnosticPhaseScope phase(RuntimePhase::static_storage);
     try { allocate_static_regions(); install_initial_static_data(); } catch (...) { release(); throw; }
     g_process_memory = this;
-    const std::string note = "semantic static storage initialized; compact module=" + hex_u32(load_base()) + ", code-token=" + hex_u32(source_address(kSourceImageBase + 0x1000u)) + ", static-table-bytes=" + std::to_string(SFERA_STATIC_TABLE_STORAGE_SIZE) + ", callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata-bytes=" + std::to_string(SFERA_RDATA_SEMANTIC_SIZE) + ", data compatibility=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_data_compat_base))) + ", compatibility-segments=" + std::to_string(data_compat_segments_.size()) + ", semantic-spans=" + std::to_string(SFERA_DATA_SEMANTIC_SPAN_COUNT);
+    const std::string note = "semantic native storage initialized; module=" + hex_u32(load_base()) + ", callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata-bytes=" + std::to_string(SFERA_RDATA_SEMANTIC_SIZE) + ", data compatibility=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_data_compat_base)));
     diagnostic_note(note.c_str());
 }
 
 ProcessMemory::~ProcessMemory() { release(); }
 
-std::uint32_t ProcessMemory::load_base() const noexcept { return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(module_shell_)); }
+std::uint32_t ProcessMemory::load_base() const noexcept { return process_module_handle(); }
 
-std::uint32_t ProcessMemory::entry_va() const noexcept {
+std::uint32_t ProcessMemory::entry_va() noexcept {
     try { return source_address(kSourceImageBase + kEntryRva); } catch (...) { return 0; }
 }
 
 std::uint8_t* ProcessMemory::region_pointer(std::uint32_t rva, std::size_t size) const {
-    if (rva >= UINT32_C(0x000FD000) && rva < UINT32_C(0x0011FE00)) { const std::uint32_t source_va = kSourceImageBase + rva; const std::uint32_t first = sfera_rdata_mutable_semantic_address(source_va); const std::uint32_t last = size == 0u ? first : sfera_rdata_mutable_semantic_address(source_va + static_cast<std::uint32_t>(size - 1u)); if (first != 0u && (size == 0u || (last != 0u && last - first == size - 1u))) { return reinterpret_cast<std::uint8_t*>(static_cast<std::uintptr_t>(first)); } throw std::runtime_error("Source RVA targets immutable/dead semantic .rdata: " + hex_u32(rva) + ", size=" + std::to_string(size)); }
-    for (const StaticRegion& region : regions_) {
-        if (!region.memory || rva < region.rva) { continue; }
-        const std::uint64_t offset = static_cast<std::uint64_t>(rva) - region.rva;
-        if (offset + size <= region.size) { return reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uintptr_t>(region.memory) + static_cast<std::uintptr_t>(offset)); }
-    }
-    throw std::runtime_error("Source RVA is outside generated static regions: " + hex_u32(rva) + ", size=" + std::to_string(size));
+    if (rva >= UINT32_C(0x000FD6B4) && rva < UINT32_C(0x0011FE00)) { const std::uint32_t source_va = kSourceImageBase + rva; const std::uint32_t first = sfera_rdata_mutable_semantic_address(source_va); const std::uint32_t last = size == 0u ? first : sfera_rdata_mutable_semantic_address(source_va + static_cast<std::uint32_t>(size - 1u)); if (first != 0u && (size == 0u || (last != 0u && last - first == size - 1u))) { return reinterpret_cast<std::uint8_t*>(static_cast<std::uintptr_t>(first)); } throw std::runtime_error("Source RVA targets immutable/dead semantic .rdata: " + hex_u32(rva)); }
+    if (rva >= UINT32_C(0x00120000) && static_cast<std::uint64_t>(rva - UINT32_C(0x00120000)) + size <= SFERA_DATA_SOURCE_SIZE) { return g_sfera_data_compat_base + (rva - UINT32_C(0x00120000)); }
+    throw std::runtime_error("Source RVA is outside semantic static storage: " + hex_u32(rva));
 }
 
 std::uint32_t ProcessMemory::static_address(std::uint32_t rva) const { return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(region_pointer(rva))); }
 
-std::uint32_t ProcessMemory::source_address(std::uint32_t source_va) const {
+std::uint32_t ProcessMemory::source_address(std::uint32_t source_va) {
     if (source_va < kSourceImageBase || static_cast<std::uint64_t>(source_va) >= static_cast<std::uint64_t>(kSourceImageBase) + kImageSize) { throw std::runtime_error("Source image address is outside the generated address space: " + hex_u32(source_va)); }
     const std::uint32_t rva = source_va - kSourceImageBase;
     if (rva >= 0x00001000u && rva < 0x00001000u + 0x000FB200u) {
         const std::uint32_t callback = callback_address(rva);
         if (callback != 0u) { return callback; }
-        if (is_static_table_rva(rva)) { return static_address(rva); }
         return kCodeTokenBase + rva;
     }
     if (source_va >= SFERA_RDATA_SOURCE_BEGIN && source_va < SFERA_RDATA_SOURCE_BEGIN + SFERA_RDATA_SOURCE_SIZE) { const std::uint32_t semantic = sfera_rdata_semantic_address(source_va); if (semantic != 0u) { return semantic; } throw std::runtime_error(source_va < SFERA_RDATA_SEMANTIC_BEGIN ? "Eliminated source IAT address escaped into data flow: " + hex_u32(source_va) : "Source .rdata address is outside semantic storage: " + hex_u32(source_va)); }
     if (source_va >= SFERA_DATA_SOURCE_BEGIN && source_va < SFERA_DATA_SOURCE_BEGIN + SFERA_DATA_SOURCE_SIZE) { return static_address(rva); }
-    return static_address(rva);
+    throw std::runtime_error("Source address has no semantic storage: " + hex_u32(source_va));
+}
+
+bool ProcessMemory::code_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
+    if (address >= kSourceImageBase + UINT32_C(0x00001000) && address < kSourceImageBase + UINT32_C(0x000FC200)) { rva = address - kSourceImageBase; return true; }
+    const std::uint32_t token_rva = address - kCodeTokenBase;
+    if (token_rva >= UINT32_C(0x00001000) && token_rva < UINT32_C(0x000FC200)) { rva = token_rva; return true; }
+    return callback_rva(address, rva);
 }
 
 bool ProcessMemory::source_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
-    const std::uint32_t token_rva = address - kCodeTokenBase;
-    if (token_rva >= 0x00001000u && token_rva < 0x00001000u + 0x000FB200u) { rva = token_rva; return true; }
-    if (callback_rva(address, rva)) { return true; }
+    if (code_rva(address, rva)) { return true; }
     { const std::uint32_t rdata_rva = sfera_rdata_source_rva(address); if (rdata_rva != UINT32_MAX) { rva = rdata_rva; return true; } }
     { const std::uint32_t data_rva = sfera_data_source_rva(address); if (data_rva != UINT32_MAX) { rva = data_rva; return true; } }
-    for (const StaticRegion& region : regions_) {
-        if (!region.memory) { continue; }
-        const std::uint32_t begin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(region.memory));
-        if (address >= begin && static_cast<std::uint64_t>(address - begin) < region.size) { rva = region.rva + (address - begin); return true; }
-    }
     return false;
 }
 
-bool ProcessMemory::is_static_table_rva(std::uint32_t rva) const noexcept {
-    for (const StaticTableRegionDescriptor& region : kStaticTableRegions) { if (rva >= region.rva && static_cast<std::uint64_t>(rva - region.rva) < region.size) { return true; } }
-    return false;
-}
 
-std::uint32_t ProcessMemory::callback_address(std::uint32_t rva) const noexcept {
-    if (!callback_thunks_) { return 0u; }
-    const auto found = std::lower_bound(kCallbacks.begin(), kCallbacks.end(), rva, [](const CallbackDescriptor& callback, std::uint32_t value) { return callback.rva < value; });
-    if (found == kCallbacks.end() || found->rva != rva) { return 0u; }
-    const std::size_t index = static_cast<std::size_t>(found - kCallbacks.begin());
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_ + index * kCallbackThunkSize));
+std::uint32_t ProcessMemory::callback_address(std::uint32_t rva) {
+    if (!lift_has_function_rva(rva)) { return 0u; }
+    const auto found = callback_addresses_.find(rva); if (found != callback_addresses_.end()) { return found->second; }
+    const std::uint32_t offset = callback_thunk_count_ * kCallbackThunkSize;
+    if (!callback_thunks_ || offset + kCallbackThunkSize > callback_thunks_size_) { throw std::runtime_error("Callback thunk pool exhausted"); }
+    const std::uint32_t first_page = offset / kCallbackThunkPageSize;
+    const std::uint32_t last_page = (offset + kCallbackThunkSize - 1u) / kCallbackThunkPageSize;
+    while (callback_committed_pages_ <= last_page) { std::uint8_t* page = callback_thunks_ + callback_committed_pages_ * kCallbackThunkPageSize; if (!VirtualAlloc(page, kCallbackThunkPageSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE)) { throw std::runtime_error(win32_error("VirtualAlloc(callback thunk page)")); } ++callback_committed_pages_; }
+    while (callback_rx_pages_ < first_page) { DWORD old = 0; std::uint8_t* page = callback_thunks_ + callback_rx_pages_ * kCallbackThunkPageSize; if (!VirtualProtect(page, kCallbackThunkPageSize, PAGE_EXECUTE_READ, &old)) { throw std::runtime_error(win32_error("VirtualProtect(callback thunk page RX)")); } ++callback_rx_pages_; }
+    std::uint8_t* const thunk = callback_thunks_ + offset; ++callback_thunk_count_; thunk[0] = 0x68u; const std::uint32_t target = kCodeTokenBase + rva; std::memcpy(thunk + 1, &target, sizeof(target)); thunk[5] = 0xE9u; const std::uintptr_t bridge = reinterpret_cast<std::uintptr_t>(&callback_bridge); const std::intptr_t delta = static_cast<std::intptr_t>(bridge - reinterpret_cast<std::uintptr_t>(thunk + kCallbackThunkSize)); if (delta < std::numeric_limits<std::int32_t>::min() || delta > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("Callback bridge is outside rel32 range"); } const std::int32_t relative = static_cast<std::int32_t>(delta); std::memcpy(thunk + 6, &relative, sizeof(relative)); FlushInstructionCache(GetCurrentProcess(), thunk, kCallbackThunkSize); const std::uint32_t address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(thunk)); callback_addresses_.emplace(rva, address); return address;
 }
 
 bool ProcessMemory::callback_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
-    if (!callback_thunks_) { return false; }
-    const std::uint32_t begin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_));
-    if (address < begin || address - begin >= callback_thunks_size_) { return false; }
-    const std::uint32_t offset = address - begin;
-    if ((offset % kCallbackThunkSize) != 0u) { return false; }
-    const std::size_t index = offset / kCallbackThunkSize;
-    if (index >= kCallbacks.size()) { return false; }
-    rva = kCallbacks[index].rva;
-    return true;
+    if (!callback_thunks_) { return false; } const std::uint32_t begin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_)); if (address < begin || address - begin >= callback_thunk_count_ * kCallbackThunkSize) { return false; } const std::uint32_t offset = address - begin; if ((offset % kCallbackThunkSize) != 0u) { return false; } const std::uint8_t* thunk = callback_thunks_ + offset; if (thunk[0] != 0x68u) { return false; } std::uint32_t token = 0u; std::memcpy(&token, thunk + 1, sizeof(token)); rva = token - kCodeTokenBase; return lift_has_function_rva(rva) != 0;
 }
 
 const std::vector<ResolvedImport>& ProcessMemory::resolved_imports() const noexcept { return resolved_imports_; }
@@ -723,259 +708,505 @@ void ProcessMemory::write(std::uint32_t address, const void* value, std::size_t 
 
 void ProcessMemory::allocate_static_regions() {
     if (sizeof(void*) != 4 || kMachine != IMAGE_FILE_MACHINE_I386) { throw std::runtime_error("Generated runtime requires Win32/x86"); }
-    const std::uint32_t resource_size = align_up(std::max(kResourceVirtualSize, kResourceRawSize), 0x1000u);
-    module_shell_size_ = kCompactResourceRva + resource_size;
-    module_shell_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, module_shell_size_, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
-    if (!module_shell_) { throw std::runtime_error(win32_error("VirtualAlloc(compact module shell)")); }
-    callback_thunks_size_ = static_cast<std::uint32_t>(kCallbacks.size()) * kCallbackThunkSize;
-    callback_thunks_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, callback_thunks_size_, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
-    if (!callback_thunks_) { throw std::runtime_error(win32_error("VirtualAlloc(callback thunk pool)")); }
-    owned_regions_.push_back(callback_thunks_);
-    g_lift_callback_thunk_base = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_));
-    {
-        constexpr std::uint32_t kPage = 0x1000u;
-        const std::uint32_t prefix = (kPage - (SFERA_RDATA_SEMANTIC_SIZE & (kPage - 1u))) & (kPage - 1u);
-        rdata_commit_size_ = align_up(prefix + SFERA_RDATA_SEMANTIC_SIZE, kPage);
-        const std::uint32_t reserve_size = rdata_commit_size_ + 2u * kPage;
-        rdata_reservation_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, reserve_size, MEM_RESERVE, PAGE_NOACCESS));
-        if (!rdata_reservation_) { throw std::runtime_error(win32_error("VirtualAlloc(rdata reserve)")); }
-        rdata_commit_base_ = rdata_reservation_ + kPage;
-        if (!VirtualAlloc(rdata_commit_base_, rdata_commit_size_, MEM_COMMIT, PAGE_READWRITE)) { throw std::runtime_error(win32_error("VirtualAlloc(rdata commit)")); }
-        sfera_rdata_bind_storage(rdata_commit_base_ + prefix);
-    }
-    struct DataMappingPlan { std::uint32_t offset; std::uint32_t size; std::int32_t semantic_index; HANDLE backing; };
-    std::vector<DataMappingPlan> data_plans;
-    std::uint32_t data_cursor = 0u;
-    for (std::uint32_t index = 0u; index < SFERA_DATA_SEMANTIC_SPAN_COUNT; ++index) {
-        const std::uint32_t offset = g_sfera_data_semantic_span_source_begin[index] - SFERA_DATA_SOURCE_BEGIN;
-        const std::uint32_t size = g_sfera_data_semantic_span_size[index];
-        if (offset < data_cursor || offset + size > SFERA_DATA_STORAGE_SIZE) { throw std::runtime_error("Invalid semantic data-span layout"); }
-        if (data_cursor < offset) { data_plans.push_back({data_cursor, offset - data_cursor, -1, nullptr}); }
-        data_plans.push_back({offset, size, static_cast<std::int32_t>(index), nullptr});
-        data_cursor = offset + size;
-    }
-    if (data_cursor < SFERA_DATA_STORAGE_SIZE) { data_plans.push_back({data_cursor, SFERA_DATA_STORAGE_SIZE - data_cursor, -1, nullptr}); }
-    auto close_data_backings = [&]() noexcept { for (DataMappingPlan& plan : data_plans) { if (plan.backing) { CloseHandle(plan.backing); plan.backing = nullptr; } } };
-    for (DataMappingPlan& plan : data_plans) {
-        plan.backing = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0u, plan.size, nullptr);
-        if (!plan.backing) { close_data_backings(); throw std::runtime_error(win32_error("CreateFileMappingW(data segment)")); }
-    }
-    for (std::uint32_t attempt = 0u; attempt < 8u && !data_compat_view_; ++attempt) {
-        void* candidate = VirtualAlloc(nullptr, SFERA_DATA_STORAGE_SIZE, MEM_RESERVE, PAGE_NOACCESS);
-        if (!candidate) { break; }
-        VirtualFree(candidate, 0u, MEM_RELEASE);
-        data_compat_segments_.clear();
-        bool mapped = true;
-        for (DataMappingPlan& plan : data_plans) {
-            std::uint8_t* const target = reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uintptr_t>(candidate) + plan.offset);
-            std::uint8_t* const view = static_cast<std::uint8_t*>(MapViewOfFileEx(plan.backing, FILE_MAP_ALL_ACCESS, 0u, 0u, plan.size, target));
-            if (!view) { mapped = false; break; }
-            data_compat_segments_.push_back(view);
-        }
-        if (!mapped) { for (std::uint8_t* view : data_compat_segments_) { if (view) { UnmapViewOfFile(view); } } data_compat_segments_.clear(); continue; }
-        data_compat_view_ = static_cast<std::uint8_t*>(candidate);
-    }
-    if (!data_compat_view_) { close_data_backings(); throw std::runtime_error(win32_error("MapViewOfFileEx(data compatibility mosaic)")); }
-    g_sfera_data_compat_base = data_compat_view_;
-    for (DataMappingPlan& plan : data_plans) {
-        if (plan.semantic_index < 0) { continue; }
-        const std::uint32_t index = static_cast<std::uint32_t>(plan.semantic_index);
-        g_sfera_data_semantic_spans[index] = static_cast<std::uint8_t*>(MapViewOfFile(plan.backing, FILE_MAP_ALL_ACCESS, 0u, 0u, plan.size));
-        if (!g_sfera_data_semantic_spans[index]) { close_data_backings(); throw std::runtime_error(win32_error("MapViewOfFile(data semantic span)")); }
-        const std::uint32_t first_page = (g_sfera_data_semantic_span_source_begin[index] - SFERA_DATA_SOURCE_BEGIN) >> SFERA_DATA_PAGE_SHIFT;
-        const std::uint32_t page_count = g_sfera_data_semantic_span_size[index] >> SFERA_DATA_PAGE_SHIFT;
-        for (std::uint32_t page = 0u; page < page_count; ++page) { g_sfera_data_semantic_page_alias[first_page + page] = g_sfera_data_semantic_spans[index] + page * SFERA_DATA_PAGE_SIZE; }
-    }
-    close_data_backings();
-    regions_.clear();
-    regions_.reserve(kStaticTableRegions.size() + 4u);
-    regions_.push_back({0u, kHeadersSize, module_shell_, kRead, "headers", true});
-    for (const StaticTableRegionDescriptor& region : kStaticTableRegions) { regions_.push_back({region.rva, region.size, g_sfera_static_table_storage + region.storage_offset, kRead, "semantic static table", false}); }
-    regions_.push_back({SFERA_DATA_SOURCE_BEGIN - kSourceImageBase, SFERA_DATA_SOURCE_SIZE, data_compat_view_, kRead | kWrite, ".data compatibility view", false});
-    regions_.push_back({kResourceSourceRva, std::max(kResourceVirtualSize, kResourceRawSize), module_shell_ + kCompactResourceRva, kRead, ".rsrc shell", true});
-    g_lift_header_base = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(module_shell_));
-    g_lift_rsrc_base = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(module_shell_ + kCompactResourceRva));
+    callback_thunks_size_ = kCallbackThunkCapacityBytes; callback_thunks_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, callback_thunks_size_, MEM_RESERVE, PAGE_NOACCESS)); if (!callback_thunks_) { throw std::runtime_error(win32_error("VirtualAlloc(callback thunk pool reserve)")); }
+    { constexpr std::uint32_t kPage = 0x1000u; const std::uint32_t prefix = (kPage - (SFERA_RDATA_SEMANTIC_SIZE & (kPage - 1u))) & (kPage - 1u); rdata_commit_size_ = align_up(prefix + SFERA_RDATA_SEMANTIC_SIZE, kPage); const std::uint32_t reserve_size = rdata_commit_size_ + 2u * kPage; rdata_reservation_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, reserve_size, MEM_RESERVE, PAGE_NOACCESS)); if (!rdata_reservation_) { throw std::runtime_error(win32_error("VirtualAlloc(rdata reserve)")); } rdata_commit_base_ = rdata_reservation_ + kPage; if (!VirtualAlloc(rdata_commit_base_, rdata_commit_size_, MEM_COMMIT, PAGE_READWRITE)) { throw std::runtime_error(win32_error("VirtualAlloc(rdata commit)")); } sfera_rdata_bind_storage(rdata_commit_base_ + prefix); }
+    HANDLE data_backing = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0u, SFERA_DATA_STORAGE_SIZE, nullptr); if (!data_backing) { throw std::runtime_error(win32_error("CreateFileMappingW(data storage)")); }
+    data_compat_view_ = static_cast<std::uint8_t*>(MapViewOfFile(data_backing, FILE_MAP_ALL_ACCESS, 0u, 0u, SFERA_DATA_STORAGE_SIZE)); if (!data_compat_view_) { CloseHandle(data_backing); throw std::runtime_error(win32_error("MapViewOfFile(data compatibility)")); } g_sfera_data_compat_base = data_compat_view_;
+    auto map_semantic_range = [&](std::uint32_t source_begin, std::uint32_t size) { const std::uint32_t offset = source_begin - SFERA_DATA_SOURCE_BEGIN; if ((offset & (SFERA_DATA_PAGE_SIZE - 1u)) != 0u || (size & (SFERA_DATA_PAGE_SIZE - 1u)) != 0u || offset + size > SFERA_DATA_STORAGE_SIZE) { throw std::runtime_error("Invalid semantic data range"); } const std::uint32_t first_page = offset >> SFERA_DATA_PAGE_SHIFT; const std::uint32_t pages = size >> SFERA_DATA_PAGE_SHIFT; for (std::uint32_t page = 0u; page < pages; ++page) { const std::uint32_t storage_offset = offset + page * SFERA_DATA_PAGE_SIZE; std::uint8_t* alias = static_cast<std::uint8_t*>(MapViewOfFile(data_backing, FILE_MAP_ALL_ACCESS, 0u, storage_offset, SFERA_DATA_PAGE_SIZE)); if (!alias) { throw std::runtime_error(win32_error("MapViewOfFile(data semantic page)")); } g_sfera_data_semantic_page_alias[first_page + page] = alias; } };
+    map_semantic_range(UINT32_C(0x00520000), UINT32_C(0x00010000));
+    map_semantic_range(UINT32_C(0x00660000), UINT32_C(0x00010000));
+    map_semantic_range(UINT32_C(0x006B0000), UINT32_C(0x00010000));
+    map_semantic_range(UINT32_C(0x00910000), UINT32_C(0x00010000));
+    map_semantic_range(UINT32_C(0x00B60000), UINT32_C(0x00010000));
+    map_semantic_range(UINT32_C(0x03FE0000), UINT32_C(0x00010000));
+    map_semantic_range(UINT32_C(0x04000000), UINT32_C(0x00020000));
+    map_semantic_range(UINT32_C(0x048F0000), UINT32_C(0x00020000));
+    map_semantic_range(UINT32_C(0x04B50000), UINT32_C(0x00020000));
+    map_semantic_range(UINT32_C(0x04DB0000), UINT32_C(0x00040000));
+    map_semantic_range(UINT32_C(0x04E00000), UINT32_C(0x00030000));
+    map_semantic_range(UINT32_C(0x04E50000), UINT32_C(0x00010000));
+    map_semantic_range(UINT32_C(0x04E70000), UINT32_C(0x00010000));
+    map_semantic_range(UINT32_C(0x04EB0000), UINT32_C(0x00040000));
+    map_semantic_range(UINT32_C(0x04F10000), UINT32_C(0x00010000));
+    map_semantic_range(UINT32_C(0x04F30000), UINT32_C(0x00020000));
+    map_semantic_range(UINT32_C(0x04F80000), UINT32_C(0x00020000));
+    CloseHandle(data_backing);
 }
-void ProcessMemory::install_initial_static_data() {
-    for (const InitialStaticChunk& chunk : kInitialStaticChunks) {
-        if ((chunk.hex.size() & 1u) != 0u) { throw std::runtime_error("Odd generated static-data chunk length"); }
-        std::uint8_t* const destination = region_pointer(chunk.rva, chunk.hex.size() / 2u);
-        for (std::size_t index = 0; index < chunk.hex.size(); index += 2u) { destination[index / 2u] = static_cast<std::uint8_t>((decode_hex_digit(chunk.hex[index]) << 4u) | decode_hex_digit(chunk.hex[index + 1u])); }
-    }
-}
+void ProcessMemory::install_initial_static_data() { sfera_initialize_data_storage(g_sfera_data_compat_base); }
 
 void ProcessMemory::initialize_native() {
     try {
-        install_callback_thunks(); apply_static_pointer_fixups(); verify_semantic_data_views(); patch_module_shell();
+        resolve_static_references(); verify_semantic_data_views();
         { DiagnosticPhaseScope phase(RuntimePhase::load_imports); resolve_imports(); diagnostic_note("native imports resolved in the current process"); }
-        { DiagnosticPhaseScope phase(RuntimePhase::protect_static_storage); protect_regions(); diagnostic_note("independent static-region protections applied"); }
-        FlushInstructionCache(GetCurrentProcess(), callback_thunks_, callback_thunks_size_);
+        { DiagnosticPhaseScope phase(RuntimePhase::protect_static_storage); protect_regions(); diagnostic_note("semantic static-region protections applied"); }
+        FlushInstructionCache(GetCurrentProcess(), callback_thunks_, callback_thunk_count_ * kCallbackThunkSize);
     } catch (...) { release(); throw; }
 }
 
 void ProcessMemory::resolve_imports() {
-    std::unordered_map<std::string, HMODULE> modules;
-    std::size_t import_index = 0u;
-    for (const ImportDescriptor& item : kImports) {
-        const std::string dll(item.dll); HMODULE module = nullptr; const auto found = modules.find(dll);
-        if (found != modules.end()) { module = found->second; } else { module = LoadLibraryA(dll.c_str()); if (!module) { throw std::runtime_error(win32_error(("LoadLibraryA(" + dll + ")").c_str())); } modules.emplace(dll, module); loaded_modules_.push_back(module); }
-        const char* symbol = item.by_ordinal ? reinterpret_cast<const char*>(static_cast<std::uintptr_t>(item.ordinal)) : item.name.data();
-        FARPROC address = GetProcAddress(module, symbol);
-        if (!address) { const std::string label = item.by_ordinal ? "ordinal " + std::to_string(item.ordinal) : std::string(item.name); throw std::runtime_error(win32_error(("GetProcAddress(" + dll + ", " + label + ")").c_str())); }
-        const std::uint32_t value = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(address));
-        if (import_index >= kImports.size()) { throw std::runtime_error("Resolved import index exceeds generated import table"); }
-        g_sfera_import_addresses[import_index++] = value;
-        resolved_imports_.push_back({&item, value});
-    }
-    if (import_index != kImports.size()) { throw std::runtime_error("Resolved import count does not match generated import table"); }
+    std::unordered_map<std::string, HMODULE> modules; resolved_imports_.clear();
+    auto module = [&](const char* dll) -> HMODULE { auto it = modules.find(dll); if (it != modules.end()) { return it->second; } HMODULE value = LoadLibraryA(dll); if (!value) { throw std::runtime_error(win32_error((std::string("LoadLibraryA(") + dll + ")").c_str())); } modules.emplace(dll, value); loaded_modules_.push_back(value); return value; };
+    auto bind = [&](std::uint32_t& import_symbol, HMODULE dll, const char* name, std::uint16_t ordinal, bool by_ordinal, ImportBehavior behavior) { const char* symbol = by_ordinal ? reinterpret_cast<const char*>(static_cast<std::uintptr_t>(ordinal)) : name; FARPROC proc = GetProcAddress(dll, symbol); if (!proc) { throw std::runtime_error(win32_error("GetProcAddress")); } import_symbol = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(proc)); resolved_imports_.push_back({import_symbol, behavior}); };
+    HMODULE mod_WINMM_dll = module("WINMM.dll");
+    bind(SFERA_IMPORT_WINMM_timeGetTime, mod_WINMM_dll, "timeGetTime", 0u, false, ImportBehavior::generic);
+    HMODULE mod_DINPUT8_dll = module("DINPUT8.dll");
+    bind(SFERA_IMPORT_DINPUT8_DirectInput8Create, mod_DINPUT8_dll, "DirectInput8Create", 0u, false, ImportBehavior::process_module_argument0);
+    HMODULE mod_COMCTL32_dll = module("COMCTL32.dll");
+    bind(SFERA_IMPORT_COMCTL32_ordinal_17, mod_COMCTL32_dll, "", 17u, true, ImportBehavior::generic);
+    HMODULE mod_WS2_32_dll = module("WS2_32.dll");
+    bind(SFERA_IMPORT_WS2_32_ordinal_19, mod_WS2_32_dll, "", 19u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_16, mod_WS2_32_dll, "", 16u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_151, mod_WS2_32_dll, "", 151u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_18, mod_WS2_32_dll, "", 18u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_116, mod_WS2_32_dll, "", 116u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_3, mod_WS2_32_dll, "", 3u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_111, mod_WS2_32_dll, "", 111u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_4, mod_WS2_32_dll, "", 4u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_52, mod_WS2_32_dll, "", 52u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_12, mod_WS2_32_dll, "", 12u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_11, mod_WS2_32_dll, "", 11u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_9, mod_WS2_32_dll, "", 9u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_115, mod_WS2_32_dll, "", 115u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_2, mod_WS2_32_dll, "", 2u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_10, mod_WS2_32_dll, "", 10u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_51, mod_WS2_32_dll, "", 51u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_23, mod_WS2_32_dll, "", 23u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_WS2_32_ordinal_21, mod_WS2_32_dll, "", 21u, true, ImportBehavior::generic);
+    HMODULE mod_d3dx9_26_dll = module("d3dx9_26.dll");
+    bind(SFERA_IMPORT_d3dx9_26_D3DXCreateTexture, mod_d3dx9_26_dll, "D3DXCreateTexture", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_d3dx9_26_D3DXGetShaderConstantTable, mod_d3dx9_26_dll, "D3DXGetShaderConstantTable", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_d3dx9_26_D3DXMatrixLookAtRH, mod_d3dx9_26_dll, "D3DXMatrixLookAtRH", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_d3dx9_26_D3DXMatrixRotationQuaternion, mod_d3dx9_26_dll, "D3DXMatrixRotationQuaternion", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_d3dx9_26_D3DXCreateCubeTextureFromFileInMemory, mod_d3dx9_26_dll, "D3DXCreateCubeTextureFromFileInMemory", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_d3dx9_26_D3DXMatrixPerspectiveFovRH, mod_d3dx9_26_dll, "D3DXMatrixPerspectiveFovRH", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_d3dx9_26_D3DXCreateTextureFromFileInMemoryEx, mod_d3dx9_26_dll, "D3DXCreateTextureFromFileInMemoryEx", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_d3dx9_26_D3DXMatrixMultiply, mod_d3dx9_26_dll, "D3DXMatrixMultiply", 0u, false, ImportBehavior::generic);
+    HMODULE mod_d3d9_dll = module("d3d9.dll");
+    bind(SFERA_IMPORT_d3d9_Direct3DCreate9, mod_d3d9_dll, "Direct3DCreate9", 0u, false, ImportBehavior::generic);
+    HMODULE mod_KERNEL32_dll = module("KERNEL32.dll");
+    bind(SFERA_IMPORT_KERNEL32_IsDebuggerPresent, mod_KERNEL32_dll, "IsDebuggerPresent", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_IsProcessorFeaturePresent, mod_KERNEL32_dll, "IsProcessorFeaturePresent", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_UnhandledExceptionFilter, mod_KERNEL32_dll, "UnhandledExceptionFilter", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetStartupInfoW, mod_KERNEL32_dll, "GetStartupInfoW", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_HeapSetInformation, mod_KERNEL32_dll, "HeapSetInformation", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_InterlockedCompareExchange, mod_KERNEL32_dll, "InterlockedCompareExchange", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_InterlockedExchange, mod_KERNEL32_dll, "InterlockedExchange", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_DecodePointer, mod_KERNEL32_dll, "DecodePointer", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_EncodePointer, mod_KERNEL32_dll, "EncodePointer", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_TryEnterCriticalSection, mod_KERNEL32_dll, "TryEnterCriticalSection", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_LocalFree, mod_KERNEL32_dll, "LocalFree", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_SetFilePointer, mod_KERNEL32_dll, "SetFilePointer", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_SetUnhandledExceptionFilter, mod_KERNEL32_dll, "SetUnhandledExceptionFilter", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_Sleep, mod_KERNEL32_dll, "Sleep", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetLocalTime, mod_KERNEL32_dll, "GetLocalTime", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_EnterCriticalSection, mod_KERNEL32_dll, "EnterCriticalSection", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_LeaveCriticalSection, mod_KERNEL32_dll, "LeaveCriticalSection", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_CloseHandle, mod_KERNEL32_dll, "CloseHandle", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_TerminateThread, mod_KERNEL32_dll, "TerminateThread", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_WaitForSingleObject, mod_KERNEL32_dll, "WaitForSingleObject", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetTickCount, mod_KERNEL32_dll, "GetTickCount", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_SetThreadPriority, mod_KERNEL32_dll, "SetThreadPriority", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetLastError, mod_KERNEL32_dll, "GetLastError", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_CreateThread, mod_KERNEL32_dll, "CreateThread", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_UnmapViewOfFile, mod_KERNEL32_dll, "UnmapViewOfFile", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetExitCodeThread, mod_KERNEL32_dll, "GetExitCodeThread", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetCurrentProcess, mod_KERNEL32_dll, "GetCurrentProcess", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetCurrentThread, mod_KERNEL32_dll, "GetCurrentThread", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_InitializeCriticalSection, mod_KERNEL32_dll, "InitializeCriticalSection", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_DeleteCriticalSection, mod_KERNEL32_dll, "DeleteCriticalSection", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GlobalFree, mod_KERNEL32_dll, "GlobalFree", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_WideCharToMultiByte, mod_KERNEL32_dll, "WideCharToMultiByte", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GlobalAlloc, mod_KERNEL32_dll, "GlobalAlloc", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_MultiByteToWideChar, mod_KERNEL32_dll, "MultiByteToWideChar", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_ExitProcess, mod_KERNEL32_dll, "ExitProcess", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetFileSize, mod_KERNEL32_dll, "GetFileSize", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_ReadFile, mod_KERNEL32_dll, "ReadFile", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_CreateFileA, mod_KERNEL32_dll, "CreateFileA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_FindClose, mod_KERNEL32_dll, "FindClose", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_FindNextFileA, mod_KERNEL32_dll, "FindNextFileA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_FindFirstFileA, mod_KERNEL32_dll, "FindFirstFileA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_Process32Next, mod_KERNEL32_dll, "Process32Next", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_Process32First, mod_KERNEL32_dll, "Process32First", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_CreateToolhelp32Snapshot, mod_KERNEL32_dll, "CreateToolhelp32Snapshot", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetVolumeInformationA, mod_KERNEL32_dll, "GetVolumeInformationA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_MapViewOfFile, mod_KERNEL32_dll, "MapViewOfFile", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_CreateFileMappingA, mod_KERNEL32_dll, "CreateFileMappingA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_CreateDirectoryA, mod_KERNEL32_dll, "CreateDirectoryA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_SetThreadAffinityMask, mod_KERNEL32_dll, "SetThreadAffinityMask", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetExitCodeProcess, mod_KERNEL32_dll, "GetExitCodeProcess", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_TerminateProcess, mod_KERNEL32_dll, "TerminateProcess", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_CreateProcessA, mod_KERNEL32_dll, "CreateProcessA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetSystemDirectoryA, mod_KERNEL32_dll, "GetSystemDirectoryA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_QueryPerformanceCounter, mod_KERNEL32_dll, "QueryPerformanceCounter", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_QueryPerformanceFrequency, mod_KERNEL32_dll, "QueryPerformanceFrequency", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetModuleHandleA, mod_KERNEL32_dll, "GetModuleHandleA", 0u, false, ImportBehavior::module_handle_a);
+    bind(SFERA_IMPORT_KERNEL32_GlobalUnlock, mod_KERNEL32_dll, "GlobalUnlock", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GlobalLock, mod_KERNEL32_dll, "GlobalLock", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_WriteFile, mod_KERNEL32_dll, "WriteFile", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_lstrlenA, mod_KERNEL32_dll, "lstrlenA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetVersionExA, mod_KERNEL32_dll, "GetVersionExA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetCurrentThreadId, mod_KERNEL32_dll, "GetCurrentThreadId", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_RaiseException, mod_KERNEL32_dll, "RaiseException", 0u, false, ImportBehavior::raise_exception);
+    bind(SFERA_IMPORT_KERNEL32_OutputDebugStringA, mod_KERNEL32_dll, "OutputDebugStringA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_FileTimeToDosDateTime, mod_KERNEL32_dll, "FileTimeToDosDateTime", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_FileTimeToLocalFileTime, mod_KERNEL32_dll, "FileTimeToLocalFileTime", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GlobalMemoryStatus, mod_KERNEL32_dll, "GlobalMemoryStatus", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetSystemInfo, mod_KERNEL32_dll, "GetSystemInfo", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_lstrcpyA, mod_KERNEL32_dll, "lstrcpyA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetModuleFileNameA, mod_KERNEL32_dll, "GetModuleFileNameA", 0u, false, ImportBehavior::module_filename_a);
+    bind(SFERA_IMPORT_KERNEL32_GetSystemTimeAsFileTime, mod_KERNEL32_dll, "GetSystemTimeAsFileTime", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_lstrcatA, mod_KERNEL32_dll, "lstrcatA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_GetCurrentProcessId, mod_KERNEL32_dll, "GetCurrentProcessId", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_KERNEL32_VirtualQuery, mod_KERNEL32_dll, "VirtualQuery", 0u, false, ImportBehavior::generic);
+    HMODULE mod_USER32_dll = module("USER32.dll");
+    bind(SFERA_IMPORT_USER32_BringWindowToTop, mod_USER32_dll, "BringWindowToTop", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_DestroyWindow, mod_USER32_dll, "DestroyWindow", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_GetSystemMetrics, mod_USER32_dll, "GetSystemMetrics", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_SendMessageA, mod_USER32_dll, "SendMessageA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_UpdateWindow, mod_USER32_dll, "UpdateWindow", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_InvalidateRect, mod_USER32_dll, "InvalidateRect", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_ShowWindow, mod_USER32_dll, "ShowWindow", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_ReleaseDC, mod_USER32_dll, "ReleaseDC", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_GetDC, mod_USER32_dll, "GetDC", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_GetWindowLongA, mod_USER32_dll, "GetWindowLongA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_GetClientRect, mod_USER32_dll, "GetClientRect", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_SetWindowLongA, mod_USER32_dll, "SetWindowLongA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_DefWindowProcA, mod_USER32_dll, "DefWindowProcA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_MessageBeep, mod_USER32_dll, "MessageBeep", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_TranslateMessage, mod_USER32_dll, "TranslateMessage", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_DispatchMessageA, mod_USER32_dll, "DispatchMessageA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_PeekMessageA, mod_USER32_dll, "PeekMessageA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_MessageBoxA, mod_USER32_dll, "MessageBoxA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_ShowCursor, mod_USER32_dll, "ShowCursor", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_SetCursorPos, mod_USER32_dll, "SetCursorPos", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_GetCursorPos, mod_USER32_dll, "GetCursorPos", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_ScreenToClient, mod_USER32_dll, "ScreenToClient", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_SetCursor, mod_USER32_dll, "SetCursor", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_ClipCursor, mod_USER32_dll, "ClipCursor", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_DestroyCursor, mod_USER32_dll, "DestroyCursor", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_CreateIconIndirect, mod_USER32_dll, "CreateIconIndirect", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_wsprintfA, mod_USER32_dll, "wsprintfA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_wvsprintfA, mod_USER32_dll, "wvsprintfA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_CreateDialogParamA, mod_USER32_dll, "CreateDialogParamA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_SetClassLongA, mod_USER32_dll, "SetClassLongA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_GetDlgCtrlID, mod_USER32_dll, "GetDlgCtrlID", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_GetWindowTextA, mod_USER32_dll, "GetWindowTextA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_SetWindowTextA, mod_USER32_dll, "SetWindowTextA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_EnableWindow, mod_USER32_dll, "EnableWindow", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_IsDialogMessageA, mod_USER32_dll, "IsDialogMessageA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_GetDlgItem, mod_USER32_dll, "GetDlgItem", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_IsClipboardFormatAvailable, mod_USER32_dll, "IsClipboardFormatAvailable", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_OpenClipboard, mod_USER32_dll, "OpenClipboard", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_GetClipboardData, mod_USER32_dll, "GetClipboardData", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_CloseClipboard, mod_USER32_dll, "CloseClipboard", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_SetFocus, mod_USER32_dll, "SetFocus", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_ClientToScreen, mod_USER32_dll, "ClientToScreen", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_CallWindowProcA, mod_USER32_dll, "CallWindowProcA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_FindWindowA, mod_USER32_dll, "FindWindowA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_LoadIconA, mod_USER32_dll, "LoadIconA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_LoadCursorA, mod_USER32_dll, "LoadCursorA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_RegisterClassExA, mod_USER32_dll, "RegisterClassExA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_PostQuitMessage, mod_USER32_dll, "PostQuitMessage", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_SetRect, mod_USER32_dll, "SetRect", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_AdjustWindowRect, mod_USER32_dll, "AdjustWindowRect", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_CreateWindowExA, mod_USER32_dll, "CreateWindowExA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_USER32_UnregisterClassA, mod_USER32_dll, "UnregisterClassA", 0u, false, ImportBehavior::generic);
+    HMODULE mod_GDI32_dll = module("GDI32.dll");
+    bind(SFERA_IMPORT_GDI32_GetObjectType, mod_GDI32_dll, "GetObjectType", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_GDI32_CreateBitmap, mod_GDI32_dll, "CreateBitmap", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_GDI32_GetStockObject, mod_GDI32_dll, "GetStockObject", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_GDI32_CreateCompatibleDC, mod_GDI32_dll, "CreateCompatibleDC", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_GDI32_CreateCompatibleBitmap, mod_GDI32_dll, "CreateCompatibleBitmap", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_GDI32_GetDIBits, mod_GDI32_dll, "GetDIBits", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_GDI32_SelectObject, mod_GDI32_dll, "SelectObject", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_GDI32_DeleteDC, mod_GDI32_dll, "DeleteDC", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_GDI32_SetPixel, mod_GDI32_dll, "SetPixel", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_GDI32_DeleteObject, mod_GDI32_dll, "DeleteObject", 0u, false, ImportBehavior::generic);
+    HMODULE mod_ADVAPI32_dll = module("ADVAPI32.dll");
+    bind(SFERA_IMPORT_ADVAPI32_GetUserNameA, mod_ADVAPI32_dll, "GetUserNameA", 0u, false, ImportBehavior::generic);
+    HMODULE mod_SHELL32_dll = module("SHELL32.dll");
+    bind(SFERA_IMPORT_SHELL32_ShellExecuteA, mod_SHELL32_dll, "ShellExecuteA", 0u, false, ImportBehavior::generic);
+    HMODULE mod_ole32_dll = module("ole32.dll");
+    bind(SFERA_IMPORT_ole32_CoInitialize, mod_ole32_dll, "CoInitialize", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_ole32_CoCreateInstance, mod_ole32_dll, "CoCreateInstance", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_ole32_CoUninitialize, mod_ole32_dll, "CoUninitialize", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_ole32_OleCreate, mod_ole32_dll, "OleCreate", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_ole32_OleSetContainedObject, mod_ole32_dll, "OleSetContainedObject", 0u, false, ImportBehavior::generic);
+    HMODULE mod_OLEAUT32_dll = module("OLEAUT32.dll");
+    bind(SFERA_IMPORT_OLEAUT32_ordinal_6, mod_OLEAUT32_dll, "", 6u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_OLEAUT32_ordinal_9, mod_OLEAUT32_dll, "", 9u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_OLEAUT32_ordinal_2, mod_OLEAUT32_dll, "", 2u, true, ImportBehavior::generic);
+    bind(SFERA_IMPORT_OLEAUT32_ordinal_8, mod_OLEAUT32_dll, "", 8u, true, ImportBehavior::generic);
+    HMODULE mod_dbghelp_dll = module("dbghelp.dll");
+    bind(SFERA_IMPORT_dbghelp_SymFromAddr, mod_dbghelp_dll, "SymFromAddr", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_dbghelp_SymGetModuleBase, mod_dbghelp_dll, "SymGetModuleBase", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_dbghelp_SymFunctionTableAccess, mod_dbghelp_dll, "SymFunctionTableAccess", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_dbghelp_StackWalk, mod_dbghelp_dll, "StackWalk", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_dbghelp_SymGetLineFromAddr, mod_dbghelp_dll, "SymGetLineFromAddr", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_dbghelp_SymSetOptions, mod_dbghelp_dll, "SymSetOptions", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_dbghelp_SymInitialize, mod_dbghelp_dll, "SymInitialize", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_dbghelp_MiniDumpWriteDump, mod_dbghelp_dll, "MiniDumpWriteDump", 0u, false, ImportBehavior::generic);
+    HMODULE mod_Sound_dll = module("Sound.dll");
+    bind(SFERA_IMPORT_Sound_SI_SetHardwareMixing_YAX_N_Z, mod_Sound_dll, "?SI_SetHardwareMixing@@YAX_N@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundListener_GetOrientation, mod_Sound_dll, "?GetOrientation@CSoundListener@@QBEXPAU_D3DVECTOR@@0@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundListener_SetPosition, mod_Sound_dll, "?SetPosition@CSoundListener@@QAEHMMMH@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundListener_SetVelocity, mod_Sound_dll, "?SetVelocity@CSoundListener@@QAEHMMMH@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundListener_SetOrientation, mod_Sound_dll, "?SetOrientation@CSoundListener@@QAEHABU_D3DVECTOR@@0H@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundInterface_UpdateSettings, mod_Sound_dll, "?UpdateSettings@CSoundInterface@@QAEHXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_SetAllParameters, mod_Sound_dll, "?SetAllParameters@CSound@@QAEHPBU_DS3DBUFFER@@H@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_LoadSound, mod_Sound_dll, "?LoadSound@CSound@@QAEHPBDK@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_SetVolume, mod_Sound_dll, "?SetVolume@CSound@@QAEHM@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_SI_GetStreamVolume_YAHXZ, mod_Sound_dll, "?SI_GetStreamVolume@@YAHXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_Rewind, mod_Sound_dll, "?Rewind@CSound@@UAEHXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_Stop, mod_Sound_dll, "?Stop@CSound@@UAEXXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_ctor, mod_Sound_dll, "??0CSound@@QAE@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_SI_CreateInterface_YAPAVCSoundInterface_PAUHWND_HKK_Z, mod_Sound_dll, "?SI_CreateInterface@@YAPAVCSoundInterface@@PAUHWND__@@HKK@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_SetPosition, mod_Sound_dll, "?SetPosition@CSound@@QAEHMMMH@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_GetPlayTimepos, mod_Sound_dll, "?GetPlayTimepos@CSound@@QBEMXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_IsSoundPlaying, mod_Sound_dll, "?IsSoundPlaying@CSound@@QBEHXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_SetPlayTimepos, mod_Sound_dll, "?SetPlayTimepos@CSound@@QAEXM@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_Play, mod_Sound_dll, "?Play@CSound@@UAEHH@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_SI_GetInterface_YAPAVCSoundInterface_XZ, mod_Sound_dll, "?SI_GetInterface@@YAPAVCSoundInterface@@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundStream_SetDecodeSignal, mod_Sound_dll, "?SetDecodeSignal@CSoundStream@@QAEXM@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundStream_SeekToTime, mod_Sound_dll, "?SeekToTime@CSoundStream@@QAEHM@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundStream_SetPlaySignal, mod_Sound_dll, "?SetPlaySignal@CSoundStream@@QAEXM@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundStream_Stop, mod_Sound_dll, "?Stop@CSoundStream@@QAEXXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundStream_IsStreamPlaying, mod_Sound_dll, "?IsStreamPlaying@CSoundStream@@QBEHXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSoundStream_PlayEx, mod_Sound_dll, "?PlayEx@CSoundStream@@QAEHMH@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_SI_Close_YAXXZ, mod_Sound_dll, "?SI_Close@@YAXXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_SI_SetLogFile_YAXPBD_Z, mod_Sound_dll, "?SI_SetLogFile@@YAXPBD@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_SetVelocity, mod_Sound_dll, "?SetVelocity@CSound@@QAEHMMMH@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_SI_SetStreamVolume_YAXH_Z, mod_Sound_dll, "?SI_SetStreamVolume@@YAXH@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_SI_StreamCreateFile_YAKPBDK_Z, mod_Sound_dll, "?SI_StreamCreateFile@@YAKPBDK@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_SI_StreamFree_YAXK_Z, mod_Sound_dll, "?SI_StreamFree@@YAXK@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_SI_GetHardwareMixing_YA_NXZ, mod_Sound_dll, "?SI_GetHardwareMixing@@YA_NXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_Sound_CSound_dtor, mod_Sound_dll, "??1CSound@@QAE@XZ", 0u, false, ImportBehavior::generic);
+    HMODULE mod_MSVCR100_dll = module("MSVCR100.dll");
+    bind(SFERA_IMPORT_MSVCR100_initterm, mod_MSVCR100_dll, "_initterm", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_acmdln, mod_MSVCR100_dll, "_acmdln", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_ismbblead, mod_MSVCR100_dll, "_ismbblead", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_XcptFilter, mod_MSVCR100_dll, "_XcptFilter", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_exit, mod_MSVCR100_dll, "_exit", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_cexit, mod_MSVCR100_dll, "_cexit", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_getmainargs, mod_MSVCR100_dll, "__getmainargs", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_amsg_exit, mod_MSVCR100_dll, "_amsg_exit", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_except_handler4_common, mod_MSVCR100_dll, "_except_handler4_common", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_terminate_YAXXZ, mod_MSVCR100_dll, "?terminate@@YAXXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_onexit, mod_MSVCR100_dll, "_onexit", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_lock, mod_MSVCR100_dll, "_lock", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_dllonexit, mod_MSVCR100_dll, "__dllonexit", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_initterm_e, mod_MSVCR100_dll, "_initterm_e", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_configthreadlocale, mod_MSVCR100_dll, "_configthreadlocale", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_setusermatherr, mod_MSVCR100_dll, "__setusermatherr", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_commode, mod_MSVCR100_dll, "_commode", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fmode, mod_MSVCR100_dll, "_fmode", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_set_app_type, mod_MSVCR100_dll, "__set_app_type", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_crt_debugger_hook, mod_MSVCR100_dll, "_crt_debugger_hook", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_type_info_type_info_dtor_internal_method, mod_MSVCR100_dll, "?_type_info_dtor_internal_method@type_info@@QAEXXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_invoke_watson, mod_MSVCR100_dll, "_invoke_watson", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_isalnum, mod_MSVCR100_dll, "isalnum", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_atoi, mod_MSVCR100_dll, "atoi", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_atof, mod_MSVCR100_dll, "atof", 0u, false, ImportBehavior::float_return);
+    bind(SFERA_IMPORT_MSVCR100_utime64, mod_MSVCR100_dll, "_utime64", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_stat64i32, mod_MSVCR100_dll, "_stat64i32", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_strnicmp, mod_MSVCR100_dll, "_strnicmp", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_controlfp_s, mod_MSVCR100_dll, "_controlfp_s", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_toupper, mod_MSVCR100_dll, "toupper", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_unlock, mod_MSVCR100_dll, "_unlock", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_printf, mod_MSVCR100_dll, "printf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_calloc, mod_MSVCR100_dll, "calloc", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_isdigit, mod_MSVCR100_dll, "isdigit", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fsetpos, mod_MSVCR100_dll, "fsetpos", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fseeki64, mod_MSVCR100_dll, "_fseeki64", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_CIasin, mod_MSVCR100_dll, "_CIasin", 0u, false, ImportBehavior::ci_asin);
+    bind(SFERA_IMPORT_MSVCR100_isalpha, mod_MSVCR100_dll, "isalpha", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_unlink, mod_MSVCR100_dll, "_unlink", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_execl, mod_MSVCR100_dll, "_execl", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fflush, mod_MSVCR100_dll, "fflush", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_floor, mod_MSVCR100_dll, "floor", 0u, false, ImportBehavior::float_return);
+    bind(SFERA_IMPORT_MSVCR100_CIatan, mod_MSVCR100_dll, "_CIatan", 0u, false, ImportBehavior::ci_atan);
+    bind(SFERA_IMPORT_MSVCR100_CIacos, mod_MSVCR100_dll, "_CIacos", 0u, false, ImportBehavior::ci_acos);
+    bind(SFERA_IMPORT_MSVCR100_fgetpos, mod_MSVCR100_dll, "fgetpos", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_memcpy_s, mod_MSVCR100_dll, "memcpy_s", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_setvbuf, mod_MSVCR100_dll, "setvbuf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_unlock_file, mod_MSVCR100_dll, "_unlock_file", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_lock_file, mod_MSVCR100_dll, "_lock_file", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_ungetc, mod_MSVCR100_dll, "ungetc", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fputc, mod_MSVCR100_dll, "fputc", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_bad_cast_ctor, mod_MSVCR100_dll, "??0bad_cast@std@@QAE@ABV01@@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_bad_cast_dtor, mod_MSVCR100_dll, "??1bad_cast@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_bad_cast_ctor_272, mod_MSVCR100_dll, "??0bad_cast@std@@QAE@PBD@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_strtok, mod_MSVCR100_dll, "strtok", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fgetc, mod_MSVCR100_dll, "fgetc", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_feof, mod_MSVCR100_dll, "feof", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_CItan, mod_MSVCR100_dll, "_CItan", 0u, false, ImportBehavior::ci_tan);
+    bind(SFERA_IMPORT_MSVCR100_spawnl, mod_MSVCR100_dll, "_spawnl", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_mkdir, mod_MSVCR100_dll, "_mkdir", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_getenv, mod_MSVCR100_dll, "getenv", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_atoi64, mod_MSVCR100_dll, "_atoi64", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_rename, mod_MSVCR100_dll, "rename", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_chsize, mod_MSVCR100_dll, "_chsize", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fstat64i32, mod_MSVCR100_dll, "_fstat64i32", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_locking, mod_MSVCR100_dll, "_locking", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_sopen_YAHPBDHHH_Z, mod_MSVCR100_dll, "?_sopen@@YAHPBDHHH@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_vscprintf, mod_MSVCR100_dll, "_vscprintf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_vsnprintf, mod_MSVCR100_dll, "_vsnprintf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_exit_288, mod_MSVCR100_dll, "exit", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_msize, mod_MSVCR100_dll, "_msize", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_strtime, mod_MSVCR100_dll, "_strtime", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fputs, mod_MSVCR100_dll, "fputs", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_strrchr, mod_MSVCR100_dll, "strrchr", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_futime64, mod_MSVCR100_dll, "_futime64", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_mktime64, mod_MSVCR100_dll, "_mktime64", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_difftime64, mod_MSVCR100_dll, "_difftime64", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_CIexp, mod_MSVCR100_dll, "_CIexp", 0u, false, ImportBehavior::ci_exp);
+    bind(SFERA_IMPORT_MSVCR100_CIatan2, mod_MSVCR100_dll, "_CIatan2", 0u, false, ImportBehavior::ci_atan2);
+    bind(SFERA_IMPORT_MSVCR100_strstr, mod_MSVCR100_dll, "strstr", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_vswprintf, mod_MSVCR100_dll, "_vswprintf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_memchr, mod_MSVCR100_dll, "memchr", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_access, mod_MSVCR100_dll, "_access", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_strerror, mod_MSVCR100_dll, "strerror", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_remove, mod_MSVCR100_dll, "remove", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fread, mod_MSVCR100_dll, "fread", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fwrite, mod_MSVCR100_dll, "fwrite", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_asctime, mod_MSVCR100_dll, "asctime", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_vsprintf, mod_MSVCR100_dll, "vsprintf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_stricmp, mod_MSVCR100_dll, "_stricmp", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_purecall, mod_MSVCR100_dll, "_purecall", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_close, mod_MSVCR100_dll, "_close", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_read, mod_MSVCR100_dll, "_read", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_open_YAHPBDHH_Z, mod_MSVCR100_dll, "?_open@@YAHPBDHH@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_write, mod_MSVCR100_dll, "_write", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_lseek, mod_MSVCR100_dll, "_lseek", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_memcpy, mod_MSVCR100_dll, "memcpy", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_memset, mod_MSVCR100_dll, "memset", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_sprintf, mod_MSVCR100_dll, "sprintf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_chmod, mod_MSVCR100_dll, "_chmod", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_sscanf, mod_MSVCR100_dll, "sscanf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_exception_ctor, mod_MSVCR100_dll, "??0exception@std@@QAE@ABQBD@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_exception_what, mod_MSVCR100_dll, "?what@exception@std@@UBEPBDXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_exception_dtor, mod_MSVCR100_dll, "??1exception@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_memmove, mod_MSVCR100_dll, "memmove", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_CxxThrowException, mod_MSVCR100_dll, "_CxxThrowException", 0u, false, ImportBehavior::cxx_throw);
+    bind(SFERA_IMPORT_MSVCR100_exception_ctor_325, mod_MSVCR100_dll, "??0exception@std@@QAE@ABV01@@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_CxxFrameHandler3, mod_MSVCR100_dll, "__CxxFrameHandler3", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_ldiv, mod_MSVCR100_dll, "ldiv", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_vfprintf, mod_MSVCR100_dll, "vfprintf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fprintf, mod_MSVCR100_dll, "fprintf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_ftell, mod_MSVCR100_dll, "ftell", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fseek, mod_MSVCR100_dll, "fseek", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fclose, mod_MSVCR100_dll, "fclose", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fopen, mod_MSVCR100_dll, "fopen", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_snprintf, mod_MSVCR100_dll, "_snprintf", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_rand, mod_MSVCR100_dll, "rand", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_errno, mod_MSVCR100_dll, "_errno", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_CIsqrt, mod_MSVCR100_dll, "_CIsqrt", 0u, false, ImportBehavior::ci_sqrt);
+    bind(SFERA_IMPORT_MSVCR100_CIcos, mod_MSVCR100_dll, "_CIcos", 0u, false, ImportBehavior::ci_cos);
+    bind(SFERA_IMPORT_MSVCR100_CIsin, mod_MSVCR100_dll, "_CIsin", 0u, false, ImportBehavior::ci_sin);
+    bind(SFERA_IMPORT_MSVCR100_CIpow, mod_MSVCR100_dll, "_CIpow", 0u, false, ImportBehavior::ci_pow);
+    bind(SFERA_IMPORT_MSVCR100_findclose, mod_MSVCR100_dll, "_findclose", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_findnext64i32, mod_MSVCR100_dll, "_findnext64i32", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_findfirst64i32, mod_MSVCR100_dll, "_findfirst64i32", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_localtime64, mod_MSVCR100_dll, "_localtime64", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_time64, mod_MSVCR100_dll, "_time64", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_strncpy, mod_MSVCR100_dll, "strncpy", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_strftime, mod_MSVCR100_dll, "strftime", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_strchr, mod_MSVCR100_dll, "strchr", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_filelength, mod_MSVCR100_dll, "_filelength", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_malloc, mod_MSVCR100_dll, "malloc", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_free, mod_MSVCR100_dll, "free", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_tolower, mod_MSVCR100_dll, "tolower", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_strncmp, mod_MSVCR100_dll, "strncmp", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_qsort, mod_MSVCR100_dll, "qsort", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_realloc, mod_MSVCR100_dll, "realloc", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_srand, mod_MSVCR100_dll, "srand", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCR100_fgets, mod_MSVCR100_dll, "fgets", 0u, false, ImportBehavior::generic);
+    HMODULE mod_MSVCP100_dll = module("MSVCP100.dll");
+    bind(SFERA_IMPORT_MSVCP100_6_basic_ostream_DU_char_traits_D_std_std_QAEAAV01_I_Z, mod_MSVCP100_dll, "??6?$basic_ostream@DU?$char_traits@D@std@@@std@@QAEAAV01@I@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_sgetc, mod_MSVCP100_dll, "?sgetc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QAEHXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_std_BADOFF, mod_MSVCP100_dll, "?_BADOFF@std@@3_JB", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_imbue, mod_MSVCP100_dll, "?imbue@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAEXABVlocale@2@@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_sync, mod_MSVCP100_dll, "?sync@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAEHXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_ostream_dtor, mod_MSVCP100_dll, "??1?$basic_ostream@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_ios_dtor, mod_MSVCP100_dll, "??1?$basic_ios@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_ostream_ctor, mod_MSVCP100_dll, "??0?$basic_ostream@DU?$char_traits@D@std@@@std@@QAE@PAV?$basic_streambuf@DU?$char_traits@D@std@@@1@_N@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_ios_vftable, mod_MSVCP100_dll, "??_7?$basic_ios@DU?$char_traits@D@std@@@std@@6B@", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_ios_base_vftable, mod_MSVCP100_dll, "??_7ios_base@std@@6B@", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_sbumpc, mod_MSVCP100_dll, "?sbumpc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QAEHXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_snextc, mod_MSVCP100_dll, "?snextc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QAEHXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_codecvt_unshift, mod_MSVCP100_dll, "?unshift@?$codecvt@DDH@std@@QBEHAAHPAD1AAPAD@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_codecvt_in, mod_MSVCP100_dll, "?in@?$codecvt@DDH@std@@QBEHAAHPBD1AAPBDPAD3AAPAD@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_setg, mod_MSVCP100_dll, "?setg@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IAEXPAD00@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_codecvt_out, mod_MSVCP100_dll, "?out@?$codecvt@DDH@std@@QBEHAAHPBD1AAPBDPAD3AAPAD@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_ios_clear, mod_MSVCP100_dll, "?clear@?$basic_ios@DU?$char_traits@D@std@@@std@@QAEXH_N@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_sputc, mod_MSVCP100_dll, "?sputc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QAEHD@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_sputn, mod_MSVCP100_dll, "?sputn@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QAE_JPBD_J@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_ios_setstate, mod_MSVCP100_dll, "?setstate@?$basic_ios@DU?$char_traits@D@std@@@std@@QAEXH_N@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_std_uncaught_exception, mod_MSVCP100_dll, "?uncaught_exception@std@@YA_NXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_ostream_Osfx, mod_MSVCP100_dll, "?_Osfx@?$basic_ostream@DU?$char_traits@D@std@@@std@@QAEXXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_ostream_flush, mod_MSVCP100_dll, "?flush@?$basic_ostream@DU?$char_traits@D@std@@@std@@QAEAAV12@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_std_Fiopen, mod_MSVCP100_dll, "?_Fiopen@std@@YAPAU_iobuf@@PBDHH@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_getloc, mod_MSVCP100_dll, "?getloc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QBE?AVlocale@2@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_xsputn, mod_MSVCP100_dll, "?xsputn@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAE_JPBD_J@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_xsgetn, mod_MSVCP100_dll, "?xsgetn@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAE_JPAD_J@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_showmanyc, mod_MSVCP100_dll, "?showmanyc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAE_JXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_ctor, mod_MSVCP100_dll, "??0?$basic_streambuf@DU?$char_traits@D@std@@@std@@IAE@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_dtor, mod_MSVCP100_dll, "??1?$basic_streambuf@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_istream_Ipfx, mod_MSVCP100_dll, "?_Ipfx@?$basic_istream@DU?$char_traits@D@std@@@std@@QAE_N_N@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_Lockit_ctor, mod_MSVCP100_dll, "??0_Lockit@std@@QAE@H@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_codecvt_id, mod_MSVCP100_dll, "?id@?$codecvt@DDH@std@@2V0locale@2@A", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_Lockit_dtor, mod_MSVCP100_dll, "??1_Lockit@std@@QAE@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_id_Id_cnt, mod_MSVCP100_dll, "?_Id_cnt@id@locale@std@@0HA", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_codecvt_Getcat, mod_MSVCP100_dll, "?_Getcat@?$codecvt@DDH@std@@SAIPAPBVfacet@locale@2@PBV42@@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_facet_Incref, mod_MSVCP100_dll, "?_Incref@facet@locale@std@@QAEXXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_codecvt_base_always_noconv, mod_MSVCP100_dll, "?always_noconv@codecvt_base@std@@QBE_NXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_Init, mod_MSVCP100_dll, "?_Init@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IAEXXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_locale_Getgloballocale, mod_MSVCP100_dll, "?_Getgloballocale@locale@std@@CAPAV_Locimp@12@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_facet_Decref, mod_MSVCP100_dll, "?_Decref@facet@locale@std@@QAEPAV123@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_Container_base12_dtor, mod_MSVCP100_dll, "??1_Container_base12@std@@QAE@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_std_Xlength_error, mod_MSVCP100_dll, "?_Xlength_error@std@@YAXPBD@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_std_Xout_of_range, mod_MSVCP100_dll, "?_Xout_of_range@std@@YAXPBD@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_Pninc, mod_MSVCP100_dll, "?_Pninc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IAEPADXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_setbuf, mod_MSVCP100_dll, "?setbuf@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAEPAV12@PAD_J@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_uflow, mod_MSVCP100_dll, "?uflow@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAEHXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_Unlock, mod_MSVCP100_dll, "?_Unlock@?$basic_streambuf@DU?$char_traits@D@std@@@std@@UAEXXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_Lock, mod_MSVCP100_dll, "?_Lock@?$basic_streambuf@DU?$char_traits@D@std@@@std@@UAEXXZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_istream_vftable, mod_MSVCP100_dll, "??_7?$basic_istream@DU?$char_traits@D@std@@@std@@6B@", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_istream_ctor, mod_MSVCP100_dll, "??0?$basic_istream@DU?$char_traits@D@std@@@std@@QAE@PAV?$basic_streambuf@DU?$char_traits@D@std@@@1@_N@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_istream_dtor, mod_MSVCP100_dll, "??1?$basic_istream@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_ios_base_Ios_base_dtor, mod_MSVCP100_dll, "?_Ios_base_dtor@ios_base@std@@CAXPAV12@@Z", 0u, false, ImportBehavior::generic);
+    bind(SFERA_IMPORT_MSVCP100_basic_ostream_vftable, mod_MSVCP100_dll, "??_7?$basic_ostream@DU?$char_traits@D@std@@@std@@6B@", 0u, false, ImportBehavior::generic);
+    if (resolved_imports_.size() != kExpectedImportCount) { throw std::runtime_error("Resolved import count mismatch"); }
 }
 
-
-void ProcessMemory::apply_static_pointer_fixups() {
-    for (const CallbackPointerFixup& fixup : kCallbackPointerFixups) {
-        const std::uint32_t value = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_ + static_cast<std::uint32_t>(fixup.callback_index) * kCallbackThunkSize));
-        std::memcpy(region_pointer(fixup.slot_rva, sizeof(value)), &value, sizeof(value));
-    }
-    for (const RdataPointerFixup& fixup : kRdataPointerFixups) {
-        const std::uint32_t value = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_rdata_semantic_storage + fixup.target_offset));
-        std::memcpy(region_pointer(fixup.slot_rva, sizeof(value)), &value, sizeof(value));
-    }
-    for (const DataPointerFixup& fixup : kDataPointerFixups) {
-        const std::uint32_t value = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_data_compat_base + fixup.target_offset));
-        std::memcpy(region_pointer(fixup.slot_rva, sizeof(value)), &value, sizeof(value));
-    }
+void ProcessMemory::resolve_static_references() {
+    auto is_text_slot = [](const std::uint8_t* storage, std::uint32_t size, std::uint32_t offset) noexcept { auto printable = [](std::uint8_t value) noexcept { return (value >= 0x20u && value <= 0x7Eu) || value == '\t' || value == '\n' || value == '\r'; }; std::uint32_t begin = offset; while (begin != 0u && printable(storage[begin - 1u])) { --begin; } std::uint32_t end = offset; while (end < size && printable(storage[end])) { ++end; } return end - begin >= 4u && end < size && storage[end] == 0u && begin <= offset && offset < end; };
+    auto is_data_target = [](std::uint32_t value) noexcept { if ((value & 3u) != 0u) { return false; } return (value >= UINT32_C(0x00520000) && value < UINT32_C(0x00525600)) || (value >= UINT32_C(0x04F30000) && value < UINT32_C(0x04F50000)) || (value >= UINT32_C(0x04F80000) && value < UINT32_C(0x04FA0000)); };
+    auto resolve_graph = [&](std::uint8_t* storage, std::uint32_t size) { for (std::uint32_t offset = 0u; offset + 4u <= size; offset += 4u) { std::uint32_t value = 0u; std::memcpy(&value, storage + offset, sizeof(value)); std::uint32_t resolved = 0u; if (value >= UINT32_C(0x00401000) && value < UINT32_C(0x004FC200) && lift_has_function_rva(value - kSourceImageBase)) { resolved = callback_address(value - kSourceImageBase); } else if ((value & 3u) == 0u && value >= SFERA_RDATA_SEMANTIC_BEGIN && value < SFERA_RDATA_SEMANTIC_BEGIN + SFERA_RDATA_SEMANTIC_SIZE) { resolved = sfera_rdata_semantic_address(value); } else if (is_data_target(value) && !is_text_slot(storage, size, offset)) { resolved = source_address(value); } if (resolved != 0u) { std::memcpy(storage + offset, &resolved, sizeof(resolved)); } } };
+    resolve_graph(g_sfera_rdata_semantic_storage, SFERA_RDATA_SEMANTIC_SIZE);
+    resolve_graph(g_sfera_data_compat_base, UINT32_C(0x00005600));
 }
 
+void ProcessMemory::verify_semantic_data_views() const { if (!g_sfera_data_compat_base) { throw std::runtime_error("Data compatibility view is not initialized"); } for (std::uint32_t page = 0u; page < SFERA_DATA_PAGE_COUNT; ++page) { const std::uint8_t* semantic = g_sfera_data_semantic_page_alias[page]; if (!semantic) { continue; } const std::uint8_t* compatibility = g_sfera_data_compat_base + page * SFERA_DATA_PAGE_SIZE; if (std::memcmp(semantic, compatibility, SFERA_DATA_PAGE_SIZE) != 0) { throw std::runtime_error("Semantic data page is not coherent with compatibility backing"); } } }
 
-void ProcessMemory::verify_semantic_data_views() const {
-    if (!g_sfera_data_compat_base) { throw std::runtime_error("Data compatibility view is not initialized"); }
-    for (std::uint32_t index = 0u; index < SFERA_DATA_SEMANTIC_SPAN_COUNT; ++index) {
-        const std::uint8_t* const semantic = g_sfera_data_semantic_spans[index];
-        if (!semantic) { throw std::runtime_error("Data semantic span is not initialized"); }
-        const std::uint32_t source_begin = g_sfera_data_semantic_span_source_begin[index];
-        const std::uint32_t size = g_sfera_data_semantic_span_size[index];
-        const std::uint8_t* const compatibility = reinterpret_cast<const std::uint8_t*>(reinterpret_cast<std::uintptr_t>(g_sfera_data_compat_base) + (source_begin - SFERA_DATA_SOURCE_BEGIN));
-        const std::uintptr_t semantic_begin = reinterpret_cast<std::uintptr_t>(semantic);
-        const std::uintptr_t semantic_end = semantic_begin + size;
-        const std::uintptr_t compatibility_begin = reinterpret_cast<std::uintptr_t>(compatibility);
-        const std::uintptr_t compatibility_end = compatibility_begin + size;
-        if (semantic_begin < compatibility_end && compatibility_begin < semantic_end) { throw std::runtime_error("Semantic and compatibility data views unexpectedly overlap"); }
-        if (std::memcmp(semantic, compatibility, size) != 0) { throw std::runtime_error("Semantic data view is not coherent with compatibility backing"); }
-    }
-}
-
-void ProcessMemory::patch_module_shell() {
-    if (kHeadersSize < sizeof(IMAGE_DOS_HEADER) || module_shell_[0] != 'M' || module_shell_[1] != 'Z') { throw std::runtime_error("Invalid generated DOS header"); }
-    auto* dos = reinterpret_cast<IMAGE_DOS_HEADER*>(module_shell_);
-    if (dos->e_lfanew <= 0 || static_cast<std::uint32_t>(dos->e_lfanew) + sizeof(IMAGE_NT_HEADERS32) > kHeadersSize) { throw std::runtime_error("Invalid generated PE header offset"); }
-    auto* nt = reinterpret_cast<IMAGE_NT_HEADERS32*>(module_shell_ + dos->e_lfanew);
-    if (nt->Signature != IMAGE_NT_SIGNATURE || nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC) { throw std::runtime_error("Invalid generated PE optional header"); }
-    const std::uint32_t old_resource_rva = kResourceSourceRva;
-    const std::uint32_t resource_size = std::max(kResourceVirtualSize, kResourceRawSize);
-    std::uint8_t* const resource_root = module_shell_ + kCompactResourceRva;
-    auto rebase_directory = [&](auto&& self, std::uint32_t directory_offset, std::uint32_t depth) -> void {
-        if (depth > 16u || directory_offset > resource_size || resource_size - directory_offset < sizeof(IMAGE_RESOURCE_DIRECTORY)) { throw std::runtime_error("Invalid generated resource directory"); }
-        auto* directory = reinterpret_cast<IMAGE_RESOURCE_DIRECTORY*>(resource_root + directory_offset);
-        const std::uint32_t count = static_cast<std::uint32_t>(directory->NumberOfNamedEntries) + static_cast<std::uint32_t>(directory->NumberOfIdEntries);
-        const std::uint64_t entries_end = static_cast<std::uint64_t>(directory_offset) + sizeof(IMAGE_RESOURCE_DIRECTORY) + static_cast<std::uint64_t>(count) * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY);
-        if (entries_end > resource_size) { throw std::runtime_error("Generated resource directory entries are outside .rsrc"); }
-        auto* entries = reinterpret_cast<IMAGE_RESOURCE_DIRECTORY_ENTRY*>(directory + 1);
-        for (std::uint32_t index = 0; index < count; ++index) {
-            const std::uint32_t raw = entries[index].OffsetToData;
-            const std::uint32_t child = raw & 0x7FFFFFFFu;
-            if ((raw & 0x80000000u) != 0u) { self(self, child, depth + 1u); continue; }
-            if (child > resource_size || resource_size - child < sizeof(IMAGE_RESOURCE_DATA_ENTRY)) { throw std::runtime_error("Generated resource data entry is outside .rsrc"); }
-            auto* data = reinterpret_cast<IMAGE_RESOURCE_DATA_ENTRY*>(resource_root + child);
-            if (data->OffsetToData >= old_resource_rva && data->OffsetToData < old_resource_rva + resource_size) { data->OffsetToData = kCompactResourceRva + (data->OffsetToData - old_resource_rva); }
-        }
-    };
-    rebase_directory(rebase_directory, 0u, 0u);
-    IMAGE_SECTION_HEADER* const first_section = IMAGE_FIRST_SECTION(nt);
-    IMAGE_SECTION_HEADER* resource_section = nullptr;
-    for (std::uint16_t index = 0; index < nt->FileHeader.NumberOfSections; ++index) {
-        IMAGE_SECTION_HEADER* const section = first_section + index;
-        char name[9]{}; std::memcpy(name, section->Name, 8u);
-        if (std::string_view(name) == ".rsrc") { resource_section = section; break; }
-    }
-    if (!resource_section) { throw std::runtime_error("Generated PE resource section header is missing"); }
-    IMAGE_SECTION_HEADER compact_resource = *resource_section;
-    compact_resource.VirtualAddress = kCompactResourceRva;
-    compact_resource.Misc.VirtualSize = kResourceVirtualSize;
-    compact_resource.SizeOfRawData = kResourceRawSize;
-    compact_resource.PointerToRawData = 0u;
-    *first_section = compact_resource;
-    nt->FileHeader.NumberOfSections = 1u;
-    nt->OptionalHeader.ImageBase = load_base();
-    nt->OptionalHeader.AddressOfEntryPoint = 0u;
-    nt->OptionalHeader.BaseOfCode = 0u;
-    nt->OptionalHeader.BaseOfData = kCompactResourceRva;
-    nt->OptionalHeader.SizeOfCode = 0u;
-    nt->OptionalHeader.SizeOfInitializedData = resource_size;
-    nt->OptionalHeader.SizeOfUninitializedData = 0u;
-    nt->OptionalHeader.SizeOfImage = module_shell_size_;
-    for (std::uint32_t index = 0; index < IMAGE_NUMBEROF_DIRECTORY_ENTRIES; ++index) { nt->OptionalHeader.DataDirectory[index] = {}; }
-    nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress = kCompactResourceRva;
-    nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].Size = resource_size;
-}
-
-void ProcessMemory::install_callback_thunks() {
-    if (!callback_thunks_ || callback_thunks_size_ != kCallbacks.size() * kCallbackThunkSize) { throw std::runtime_error("Callback thunk pool is not initialized"); }
-    const std::uintptr_t bridge = reinterpret_cast<std::uintptr_t>(&callback_bridge);
-    for (std::size_t index = 0; index < kCallbacks.size(); ++index) {
-        std::uint8_t* const thunk = callback_thunks_ + index * kCallbackThunkSize;
-        thunk[0] = 0x68u;
-        const std::uint32_t target = kCodeTokenBase + kCallbacks[index].rva;
-        std::memcpy(thunk + 1, &target, sizeof(target));
-        thunk[5] = 0xE9u;
-        const std::intptr_t delta = static_cast<std::intptr_t>(bridge - reinterpret_cast<std::uintptr_t>(thunk + kCallbackThunkSize));
-        if (delta < std::numeric_limits<std::int32_t>::min() || delta > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("Callback bridge is outside rel32 range"); }
-        const std::int32_t relative = static_cast<std::int32_t>(delta);
-        std::memcpy(thunk + 6, &relative, sizeof(relative));
-    }
-    DWORD old_protection = 0;
-    if (!VirtualProtect(callback_thunks_, callback_thunks_size_, PAGE_EXECUTE_READ, &old_protection)) { throw std::runtime_error(win32_error("VirtualProtect(callback thunk pool)")); }
-}
-
-void ProcessMemory::protect_regions() {
-    for (const StaticRegion& region : regions_) {
-        if (!region.protect) { continue; }
-        DWORD old_protection = 0;
-        DWORD protection = page_protection(region.access);
-        if (!VirtualProtect(region.memory, region.size, protection, &old_protection)) { throw std::runtime_error(win32_error(("VirtualProtect(" + std::string(region.name ? region.name : "region") + ")").c_str())); }
-    }
-    if (rdata_commit_base_ && rdata_commit_size_) {
-        DWORD old_protection = 0;
-        if (!VirtualProtect(rdata_commit_base_, rdata_commit_size_, PAGE_READONLY, &old_protection)) { throw std::runtime_error(win32_error("VirtualProtect(semantic rdata)")); }
-    }
-}
+void ProcessMemory::protect_regions() { if (rdata_commit_base_ && rdata_commit_size_) { DWORD old_protection = 0; if (!VirtualProtect(rdata_commit_base_, rdata_commit_size_, PAGE_READONLY, &old_protection)) { throw std::runtime_error(win32_error("VirtualProtect(semantic rdata)")); } } }
 
 void ProcessMemory::release() noexcept {
     if (g_process_memory == this) { g_process_memory = nullptr; }
-    resolved_imports_.clear(); for (auto iterator = loaded_modules_.rbegin(); iterator != loaded_modules_.rend(); ++iterator) { if (*iterator) { FreeLibrary(*iterator); } } loaded_modules_.clear();
-    for (std::uint32_t page = 0u; page < SFERA_DATA_PAGE_COUNT; ++page) { g_sfera_data_semantic_page_alias[page] = nullptr; }
-    for (std::uint32_t index = 0u; index < SFERA_DATA_SEMANTIC_SPAN_COUNT; ++index) {
-        if (g_sfera_data_semantic_spans[index]) { UnmapViewOfFile(g_sfera_data_semantic_spans[index]); g_sfera_data_semantic_spans[index] = nullptr; }
-    }
-    for (std::uint8_t* view : data_compat_segments_) { if (view) { UnmapViewOfFile(view); } }
-    data_compat_segments_.clear();
-    data_compat_view_ = nullptr;
-    g_sfera_data_compat_base = nullptr;
-    callback_thunks_ = nullptr; callback_thunks_size_ = 0;
-    sfera_rdata_bind_storage(nullptr);
-    if (rdata_reservation_) { VirtualFree(rdata_reservation_, 0, MEM_RELEASE); rdata_reservation_ = nullptr; rdata_commit_base_ = nullptr; rdata_commit_size_ = 0; }
-    for (void* memory : owned_regions_) { if (memory) { VirtualFree(memory, 0, MEM_RELEASE); } } owned_regions_.clear();
-    if (module_shell_) { VirtualFree(module_shell_, 0, MEM_RELEASE); module_shell_ = nullptr; }
-    regions_.clear(); module_shell_size_ = 0;
-    g_lift_header_base = 0; g_lift_rsrc_base = 0; g_lift_callback_thunk_base = 0;
+    resolved_imports_.clear(); loaded_modules_.clear();
+    for (std::uint32_t page = 0u; page < SFERA_DATA_PAGE_COUNT; ++page) { if (g_sfera_data_semantic_page_alias[page]) { UnmapViewOfFile(g_sfera_data_semantic_page_alias[page]); g_sfera_data_semantic_page_alias[page] = nullptr; } }
+    if (data_compat_view_) { UnmapViewOfFile(data_compat_view_); data_compat_view_ = nullptr; } g_sfera_data_compat_base = nullptr;
+    callback_addresses_.clear(); callback_thunk_count_ = 0u; callback_committed_pages_ = 0u; callback_rx_pages_ = 0u; if (callback_thunks_) { VirtualFree(callback_thunks_, 0, MEM_RELEASE); callback_thunks_ = nullptr; } callback_thunks_size_ = 0u;
+    sfera_rdata_bind_storage(nullptr); if (rdata_reservation_) { VirtualFree(rdata_reservation_, 0, MEM_RELEASE); rdata_reservation_ = nullptr; rdata_commit_base_ = nullptr; rdata_commit_size_ = 0; }
 }
 
 namespace {
 
-void initialize_fs(LiftCpu& state) {
-    const std::uint32_t end_of_chain = 0xFFFFFFFFu;
+void initialize_fs(LiftCpu& state, bool inherit_exception_chain = false) {
+    const std::uint32_t exception_list = inherit_exception_chain ? __readfsdword(0) : UINT32_C(0xFFFFFFFF);
     const std::uint32_t teb = __readfsdword(0x18);
     const std::uint32_t peb = __readfsdword(0x30);
-    std::memcpy(state.fs_data, &end_of_chain, sizeof(end_of_chain));
+    std::memcpy(state.fs_data, &exception_list, sizeof(exception_list));
     std::memcpy(state.fs_data + 0x18u, &teb, sizeof(teb));
     std::memcpy(state.fs_data + 0x30u, &peb, sizeof(peb));
 }
@@ -1065,75 +1296,39 @@ NativeRuntime::NativeRuntime() {
     memory_.initialize_native();
     verify_native_bridge();
     DiagnosticPhaseScope phase(RuntimePhase::function_map);
-    std::size_t import_index = 0u;
-    for (const ResolvedImport& item : memory_.resolved_imports()) {
-        if (import_index >= import_addresses_.size()) { throw std::runtime_error("Resolved import table is larger than generated import metadata"); }
-        std::size_t slot = ((item.address >> 4u) * UINT32_C(2654435761)) & (kImportLookupSize - 1u);
-        while (import_lookup_addresses_[slot] != 0u && import_lookup_addresses_[slot] != item.address) { slot = (slot + 1u) & (kImportLookupSize - 1u); }
-        if (import_lookup_addresses_[slot] == 0u) { import_lookup_addresses_[slot] = item.address; import_lookup_descriptors_[slot] = item.descriptor; }
-        import_addresses_[import_index++] = item.address;
-    }
-    if (import_index != import_addresses_.size()) { throw std::runtime_error("Generated import table and loaded import table disagree: resolved=" + std::to_string(import_index) + ", generated=" + std::to_string(import_addresses_.size())); }
+    for (const ResolvedImport& item : memory_.resolved_imports()) { std::size_t slot = ((item.address >> 4u) * UINT32_C(2654435761)) & (kImportLookupSize - 1u); while (import_lookup_addresses_[slot] != 0u && import_lookup_addresses_[slot] != item.address) { slot = (slot + 1u) & (kImportLookupSize - 1u); } if (import_lookup_addresses_[slot] == 0u) { import_lookup_addresses_[slot] = item.address; import_lookup_behaviors_[slot] = item.behavior; } }
     lift_initialize_dispatch();
     diagnostic_note("native C function map initialized");
 }
 
-
-const ImportDescriptor* NativeRuntime::find_import(std::uint32_t target) const {
+ImportBehavior NativeRuntime::find_import(std::uint32_t target) const {
     std::size_t slot = ((target >> 4u) * UINT32_C(2654435761)) & (kImportLookupSize - 1u);
-    for (std::size_t probe = 0u; probe != kImportLookupSize; ++probe) { const std::uint32_t address = import_lookup_addresses_[slot]; if (address == target) { return import_lookup_descriptors_[slot]; } if (address == 0u) { return nullptr; } slot = (slot + 1u) & (kImportLookupSize - 1u); }
-    return nullptr;
+    for (std::size_t probe = 0u; probe != kImportLookupSize; ++probe) { const std::uint32_t address = import_lookup_addresses_[slot]; if (address == target) { return import_lookup_behaviors_[slot]; } if (address == 0u) { return ImportBehavior::generic; } slot = (slot + 1u) & (kImportLookupSize - 1u); }
+    return ImportBehavior::generic;
 }
 
-std::uint32_t NativeRuntime::import_address(std::uint32_t index) const {
-    if (index >= import_addresses_.size()) { throw std::runtime_error("Generated import index " + std::to_string(index) + " is outside fixed import table size " + std::to_string(import_addresses_.size())); }
-    return import_addresses_[index];
-}
-
-void NativeRuntime::call_import(LiftCpu& state, std::uint32_t index, std::uint32_t callsite) {
-    if (index >= import_addresses_.size()) { throw std::runtime_error("Generated import index " + std::to_string(index) + " is outside fixed import table size " + std::to_string(import_addresses_.size()) + " at " + hex_u32(callsite)); }
-    call_native_resolved(state, import_addresses_[index], callsite, &kImports[index]);
-}
 
 void NativeRuntime::call_native(LiftCpu& state, std::uint32_t target, std::uint32_t callsite) {
     call_native_resolved(state, target, callsite, find_import(target));
 }
 
-void NativeRuntime::call_native_resolved(LiftCpu& state, std::uint32_t target, std::uint32_t callsite, const ImportDescriptor* descriptor) {
-    if (target == 0u) { throw std::runtime_error("Invalid native call target 0x00000000"); }
-    if (!descriptor) { NativeCallFrame frame{&state, reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0}; native_call_bridge_fast(&frame); return; }
-    const std::string_view name = descriptor->name;
-    if (name == "_CxxThrowException" || name == "RaiseException") { throw std::runtime_error("SEH/C++ exception crossed the lifted/native ABI boundary at " + hex_u32(callsite)); }
-    if ((name == "GetModuleHandleA" || name == "GetModuleHandleW") && memory_read<std::uint32_t>(state.esp) == 0u) { state.eax = memory_.load_base(); state.esp += 4u; return; }
-    if ((name == "GetModuleFileNameA" || name == "GetModuleFileNameW") && (memory_read<std::uint32_t>(state.esp) == 0u || memory_read<std::uint32_t>(state.esp) == memory_.load_base())) {
-        const std::uint32_t buffer = memory_read<std::uint32_t>(state.esp + 4u);
-        const std::uint32_t capacity = memory_read<std::uint32_t>(state.esp + 8u);
-        state.eax = name == "GetModuleFileNameW" ? write_local_path(buffer, capacity, client_executable_path()) : write_local_path(buffer, capacity, client_executable_path_ansi());
-        state.esp += 12u;
-        return;
-    }
-    if (name == "_CIatan2" || name == "_CIpow") { require_x87(&state, 2); state.fpu[1] = name == "_CIpow" ? std::pow(state.fpu[1], state.fpu[0]) : std::atan2(state.fpu[1], state.fpu[0]); lift_x87_pop(&state); return; }
-    if (name == "_CIacos" || name == "_CIasin" || name == "_CIatan" || name == "_CIcos" || name == "_CIexp" || name == "_CIsin" || name == "_CIsqrt" || name == "_CItan") {
-        require_x87(&state, 1);
-        const double value = state.fpu[0];
-        if (name == "_CIacos") { state.fpu[0] = std::acos(value); } else if (name == "_CIasin") { state.fpu[0] = std::asin(value); } else if (name == "_CIatan") { state.fpu[0] = std::atan(value); } else if (name == "_CIcos") { state.fpu[0] = std::cos(value); } else if (name == "_CIexp") { state.fpu[0] = std::exp(value); } else if (name == "_CIsin") { state.fpu[0] = std::sin(value); } else if (name == "_CIsqrt") { state.fpu[0] = std::sqrt(value); } else { state.fpu[0] = std::tan(value); }
-        return;
-    }
+void NativeRuntime::call_native_resolved(LiftCpu& state, std::uint32_t target, std::uint32_t callsite, ImportBehavior behavior) {
+    struct NativeEspTrace { LiftCpu& state; NativeEspTrace(LiftCpu& value, std::uint32_t native_target, std::uint32_t native_callsite) : state(value) { g_last_native_target = native_target; g_last_native_callsite = native_callsite; g_last_native_esp_before = value.esp; g_last_native_esp_after = value.esp; } ~NativeEspTrace() { g_last_native_esp_after = state.esp; } } native_esp_trace(state, target, callsite);
+    if (target < 0x10000u) { throw std::runtime_error("Invalid native call target " + hex_u32(target) + " at " + hex_u32(callsite)); }
+    if (behavior == ImportBehavior::cxx_throw) { const std::string note = std::string("passing client C++ exception through native SEH; callsite=") + hex_u32(callsite) + " object=" + hex_u32(memory_read<std::uint32_t>(state.esp)) + " throw-info=" + hex_u32(memory_read<std::uint32_t>(state.esp + 4u)) + " fs0=" + hex_u32(*reinterpret_cast<const std::uint32_t*>(state.fs_data)); diagnostic_note(note.c_str()); } else if (behavior == ImportBehavior::raise_exception) { const std::string note = std::string("passing client SEH exception through native runtime; callsite=") + hex_u32(callsite) + " code=" + hex_u32(memory_read<std::uint32_t>(state.esp)) + " fs0=" + hex_u32(*reinterpret_cast<const std::uint32_t*>(state.fs_data)); diagnostic_note(note.c_str()); }
+    if ((behavior == ImportBehavior::module_handle_a || behavior == ImportBehavior::module_handle_w) && memory_read<std::uint32_t>(state.esp) == 0u) { state.eax = memory_.load_base(); state.esp += 4u; return; }
+    if ((behavior == ImportBehavior::module_filename_a || behavior == ImportBehavior::module_filename_w) && (memory_read<std::uint32_t>(state.esp) == 0u || memory_read<std::uint32_t>(state.esp) == memory_.load_base())) { const std::uint32_t buffer = memory_read<std::uint32_t>(state.esp + 4u); const std::uint32_t capacity = memory_read<std::uint32_t>(state.esp + 8u); state.eax = behavior == ImportBehavior::module_filename_w ? write_local_path(buffer, capacity, client_executable_path()) : write_local_path(buffer, capacity, client_executable_path_ansi()); state.esp += 12u; return; }
+    if (behavior == ImportBehavior::ci_atan2 || behavior == ImportBehavior::ci_pow) { require_x87(&state, 2); state.fpu[1] = behavior == ImportBehavior::ci_pow ? std::pow(state.fpu[1], state.fpu[0]) : std::atan2(state.fpu[1], state.fpu[0]); lift_x87_pop(&state); return; }
+    if (behavior >= ImportBehavior::ci_acos && behavior <= ImportBehavior::ci_tan) { require_x87(&state, 1); const double value = state.fpu[0]; switch (behavior) { case ImportBehavior::ci_acos: state.fpu[0] = std::acos(value); break; case ImportBehavior::ci_asin: state.fpu[0] = std::asin(value); break; case ImportBehavior::ci_atan: state.fpu[0] = std::atan(value); break; case ImportBehavior::ci_cos: state.fpu[0] = std::cos(value); break; case ImportBehavior::ci_exp: state.fpu[0] = std::exp(value); break; case ImportBehavior::ci_sin: state.fpu[0] = std::sin(value); break; case ImportBehavior::ci_sqrt: state.fpu[0] = std::sqrt(value); break; default: state.fpu[0] = std::tan(value); break; } return; }
     NativeCallArguments arguments(state.esp);
-    if (descriptor && descriptor->process_module_argument >= 0) {
-        const std::uint8_t argument = static_cast<std::uint8_t>(descriptor->process_module_argument);
-        const std::uint32_t image_handle = arguments.read(argument);
-        const std::uint32_t native_handle = process_module_handle();
-        if (native_handle != image_handle) { arguments.alias(argument, image_handle, native_handle); }
-    }
+    if (behavior == ImportBehavior::process_module_argument0) { const std::uint32_t image_handle = arguments.read(0u); const std::uint32_t native_handle = process_module_handle(); if (native_handle != image_handle) { arguments.alias(0u, image_handle, native_handle); } }
     NativeCallFrame frame{&state, reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0};
-    const bool float_return = is_float_return(name);
-    if (float_return) { native_call_bridge(&frame); lift_x87_push(&state, frame.native_st0); } else { native_call_bridge_fast(&frame); }
+    if (behavior == ImportBehavior::float_return) { native_call_bridge(&frame); lift_x87_push(&state, frame.native_st0); } else { native_call_bridge_fast(&frame); }
 }
 
-extern "C" void __cdecl lift_import_call(LiftCpu* cpu, std::uint32_t import_index, std::uint32_t callsite) {
+extern "C" void __cdecl lift_import_call(LiftCpu* cpu, std::uint32_t import_address, std::uint32_t callsite) {
     if (!g_runtime || !cpu) { throw std::runtime_error("Import call without an active native runtime"); }
-    g_runtime->call_import(*cpu, import_index, callsite);
+    g_runtime->call_native(*cpu, import_address, callsite);
 }
 
 extern "C" void __cdecl lift_native_call(LiftCpu* cpu, std::uint32_t target, std::uint32_t callsite) {
@@ -1199,7 +1394,7 @@ void NativeRuntime::dispatch_callback(CallbackRegisters& registers) {
     state.eax = registers.eax; state.ecx = registers.ecx; state.edx = registers.edx; state.ebx = registers.ebx; state.esp = clone_esp; state.ebp = registers.ebp; state.esi = registers.esi; state.edi = registers.edi; state.eip = target; state.eflags = registers.eflags;
     state.fpu_control = 0x027Fu;
     state.stack_base = clone.base(); state.stack_limit = clone.limit();
-    initialize_fs(state);
+    initialize_fs(state, true);
     lift_dispatch(&state, target, LIFT_CALLBACK_SENTINEL);
     const std::uint32_t stack_delta = state.esp - clone_esp;
     if (stack_delta < 4u || stack_delta > copy_size) { throw std::runtime_error("Lifted callback returned an invalid stack delta"); }
@@ -1216,7 +1411,6 @@ extern "C" void __cdecl dispatch_native_callback(CallbackRegisters* registers) {
         g_runtime->dispatch_callback(*registers);
     } catch (const std::exception& error) {
         diagnostic_note(error.what());
-        MessageBoxA(nullptr, error.what(), "Native C callback failure", MB_OK | MB_ICONERROR);
         TerminateProcess(GetCurrentProcess(), 0xE0000002u);
     }
 }

@@ -11,7 +11,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
         return lifted::run_native_program();
     } catch (const std::exception& error) {
         lifted::diagnostic_note(error.what());
-        MessageBoxA(nullptr, error.what(), "Compiled native C runtime failure", MB_OK | MB_ICONERROR);
+        TerminateProcess(GetCurrentProcess(), 1u);
         return 1;
+    } catch (...) {
+        lifted::diagnostic_note("unknown host runtime failure");
+        TerminateProcess(GetCurrentProcess(), 2u);
+        return 2;
     }
 }

@@ -4903,6 +4903,8 @@ static const LiftFunctionEntry kLiftedFunctions[4893] = {
 
 static LiftFunction kFastLiftedFunctions[LIFT_SOURCE_TEXT_SIZE];
 
+int LIFT_CDECL lift_has_function_rva(uint32_t rva) { size_t lo = 0u; size_t hi = sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0]); while (lo < hi) { size_t mid = lo + (hi - lo) / 2u; uint32_t value = kLiftedFunctions[mid].rva; if (value < rva) { lo = mid + 1u; } else { hi = mid; } } return lo < sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0]) && kLiftedFunctions[lo].rva == rva; }
+
 void LIFT_CDECL lift_initialize_dispatch(void) {
     size_t index;
     for (index = 0u; index < sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0]); ++index) {
@@ -4912,19 +4914,28 @@ void LIFT_CDECL lift_initialize_dispatch(void) {
 }
 
 static LiftFunction resolve_lifted_function(uint32_t target) {
-    uint32_t rva = lift_source_rva(target);
+    uint32_t rva = lift_code_rva(target);
     if (rva < UINT32_C(0x00001000) || rva - UINT32_C(0x00001000) >= LIFT_SOURCE_TEXT_SIZE) { return (LiftFunction)0; }
     return kFastLiftedFunctions[rva - UINT32_C(0x00001000)];
 }
 
-static int target_is_local(uint32_t target) { return lift_source_rva(target) != UINT32_MAX; }
+static int target_is_local(uint32_t target) { return lift_code_rva(target) != UINT32_MAX; }
+
+static int target_is_recovered_function(uint32_t target) { uint32_t rva = lift_code_rva(target); return rva != UINT32_MAX && lift_has_function_rva(rva); }
+
+static void dispatch_return_target(LiftCpu* cpu, uint32_t target, uint32_t stop_address, uint32_t origin, uint32_t esp_before, uint32_t stack_cleanup, const char* kind) {
+    cpu->eip = target;
+    if (target == stop_address) { return; }
+    if (!resolve_lifted_function(target)) { lift_trap_transfer(cpu, origin, target, esp_before, stack_cleanup, stop_address, kind); }
+    lift_dispatch(cpu, target, stop_address);
+}
 
 void LIFT_CDECL lift_dispatch(LiftCpu* cpu, uint32_t target, uint32_t stop_address) {
     LiftFunction function = resolve_lifted_function(target);
     if (!function) {
-        uint32_t rva = lift_source_rva(target);
-        uint32_t source = rva != UINT32_MAX ? UINT32_C(0x00400000) + rva : UINT32_C(0x00400000);
-        lift_trap(cpu, source, "unresolved native C function target");
+        uint32_t origin = cpu ? cpu->eip : 0u;
+        uint32_t esp_before = cpu ? cpu->esp : 0u;
+        lift_trap_transfer(cpu, origin, target, esp_before, 0u, stop_address, "dispatch");
     }
     cpu->eip = target;
     function(cpu, stop_address);
@@ -4938,7 +4949,7 @@ int LIFT_CDECL lift_call_indirect(LiftCpu* cpu, uint32_t target, uint32_t return
         return cpu->eip == return_address;
     }
     if (target_is_local(target)) {
-        lift_trap(cpu, UINT32_C(0x00400000) + lift_source_rva(target), "indirect call targets the middle of no recovered function");
+        lift_trap_transfer(cpu, callsite, target, cpu ? cpu->esp : 0u, 0u, return_address, "indirect-call-middle");
     }
     lift_native_call(cpu, target, callsite);
     cpu->eip = return_address;
@@ -4949,17 +4960,27 @@ void LIFT_CDECL lift_tail_indirect(LiftCpu* cpu, uint32_t target, uint32_t stop_
     LiftFunction function = resolve_lifted_function(target);
     if (function) { function(cpu, stop_address); return; }
     if (target_is_local(target)) {
-        lift_trap(cpu, UINT32_C(0x00400000) + lift_source_rva(target), "indirect jump targets the middle of no recovered function");
+        lift_trap_transfer(cpu, callsite, target, cpu ? cpu->esp : 0u, 0u, stop_address, "indirect-jump-middle");
     }
+    uint32_t origin = cpu->eip;
+    uint32_t esp_before = cpu->esp;
     uint32_t return_address = lift_pop32(cpu);
     lift_native_call(cpu, target, callsite);
-    cpu->eip = return_address;
-    if (return_address != stop_address) { lift_dispatch(cpu, return_address, stop_address); }
+    dispatch_return_target(cpu, return_address, stop_address, origin, esp_before, 0u, "native-tail-return");
 }
 
 void LIFT_CDECL lift_return(LiftCpu* cpu, uint32_t stack_cleanup, uint32_t stop_address) {
+    uint32_t origin = cpu->eip;
+    uint32_t esp_before = cpu->esp;
     uint32_t target = lift_pop32(cpu);
     cpu->esp += stack_cleanup;
-    cpu->eip = target;
-    if (target != stop_address) { lift_dispatch(cpu, target, stop_address); }
+    dispatch_return_target(cpu, target, stop_address, origin, esp_before, stack_cleanup, "ret");
+}
+
+void LIFT_CDECL lift_import_call_return(LiftCpu* cpu, uint32_t import_address, uint32_t callsite, uint32_t stop_address) {
+    uint32_t origin = cpu->eip;
+    uint32_t esp_before = cpu->esp;
+    uint32_t return_address = lift_pop32(cpu);
+    lift_import_call(cpu, import_address, callsite);
+    dispatch_return_target(cpu, return_address, stop_address, origin, esp_before, 0u, "import-tail-return");
 }

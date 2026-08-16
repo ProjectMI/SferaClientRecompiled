@@ -9,30 +9,18 @@
 #define LIFT_FORCEINLINE static inline __attribute__((always_inline))
 #endif
 
-#define LIFT_SOURCE_HEADER_BEGIN UINT32_C(0x00400000)
-#define LIFT_SOURCE_HEADER_SIZE UINT32_C(0x00000400)
-#define LIFT_HEADER_ADDR(source_va) (g_lift_header_base + ((uint32_t)(source_va) - LIFT_SOURCE_HEADER_BEGIN))
 #define LIFT_SOURCE_TEXT_BEGIN UINT32_C(0x00401000)
 #define LIFT_SOURCE_TEXT_SIZE UINT32_C(0x000FB200)
 #define LIFT_CODE_TOKEN_BASE UINT32_C(0xE0000000)
 #define LIFT_CODE_TOKEN_RVA(rva) (LIFT_CODE_TOKEN_BASE + (uint32_t)(rva))
 #define LIFT_CODE_TOKEN_VA(source_va) LIFT_CODE_TOKEN_RVA((uint32_t)(source_va) - UINT32_C(0x00400000))
-#define LIFT_CALLBACK_INDEX(index) (g_lift_callback_thunk_base + (uint32_t)(index) * UINT32_C(10))
+#define LIFT_CALLBACK_RVA(rva) lift_callback_address_rva((uint32_t)(rva))
 #define LIFT_SOURCE_RDATA_BEGIN UINT32_C(0x004FD000)
 #define LIFT_SOURCE_RDATA_SIZE UINT32_C(0x00022E00)
 #define LIFT_SOURCE_DATA_BEGIN UINT32_C(0x00520000)
 #define LIFT_SOURCE_DATA_SIZE UINT32_C(0x04A70790)
-#define LIFT_SOURCE_RSRC_BEGIN UINT32_C(0x04F91000)
-#define LIFT_SOURCE_RSRC_SIZE UINT32_C(0x00083A00)
 
-LIFT_FORCEINLINE uint32_t lift_fast_source_rva(uint32_t address) {
-    uint32_t offset = address - g_lift_header_base; if (offset < LIFT_SOURCE_HEADER_SIZE) { return offset; }
-    offset = address - LIFT_CODE_TOKEN_BASE; if (offset >= UINT32_C(0x00001000) && offset < UINT32_C(0x00001000) + LIFT_SOURCE_TEXT_SIZE) { return offset; }
-    { uint32_t rdata_rva = sfera_rdata_source_rva(address); if (rdata_rva != UINT32_MAX) { return rdata_rva; } }
-    { uint32_t data_rva = sfera_data_source_rva(address); if (data_rva != UINT32_MAX) { return data_rva; } }
-    offset = address - g_lift_rsrc_base; if (offset < LIFT_SOURCE_RSRC_SIZE) { return UINT32_C(0x04B91000) + offset; }
-    return lift_source_rva(address);
-}
+LIFT_FORCEINLINE uint32_t lift_fast_source_rva(uint32_t address) { uint32_t offset = address - LIFT_CODE_TOKEN_BASE; if (offset >= UINT32_C(0x00001000) && offset < UINT32_C(0x00001000) + LIFT_SOURCE_TEXT_SIZE) { return offset; } { uint32_t rdata_rva = sfera_rdata_source_rva(address); if (rdata_rva != UINT32_MAX) { return rdata_rva; } } { uint32_t data_rva = sfera_data_source_rva(address); if (data_rva != UINT32_MAX) { return data_rva; } } return lift_source_rva(address); }
 
 LIFT_FORCEINLINE uint8_t lift_fast_load8(uint32_t address) { address = sfera_data_deref_address(address); return *(const uint8_t*)(uintptr_t)address; }
 LIFT_FORCEINLINE uint16_t lift_fast_load16(uint32_t address) { address = sfera_data_deref_address(address); return *(const uint16_t*)(uintptr_t)address; }

@@ -4,17 +4,15 @@
 #include "semantic_native.h"
 
 #define LIFT_ENTER(address) do { cpu->eip = LIFT_CODE_TOKEN_VA((address)); } while (0)
-#define LIFT_BLOCK(label, address) label: (void)0
+#define LIFT_BLOCK(label, address) label: cpu->eip = LIFT_CODE_TOKEN_VA(address)
 #define LIFT_CALL(function, return_address) do { lift_push32(cpu, (return_address)); function(cpu, (return_address)); if (cpu->eip != (return_address)) return; } while (0)
 #define LIFT_CALL_ENTER(function, image_address) do { LIFT_CALL(function, LIFT_CODE_TOKEN_VA(image_address)); } while (0)
-#define LIFT_IMPORT_CALL(function, callsite, next_address) do { function(cpu, LIFT_CODE_TOKEN_VA(callsite)); cpu->eip = LIFT_CODE_TOKEN_VA(next_address); } while (0)
-#define LIFT_IMPORT_INDEX(index, callsite, next_address) do { lift_import_call(cpu, (index), LIFT_CODE_TOKEN_VA(callsite)); cpu->eip = LIFT_CODE_TOKEN_VA(next_address); } while (0)
-#define LIFT_IMPORT_RETURN(function, callsite) do { uint32_t return_address = lift_pop32(cpu); function(cpu, LIFT_CODE_TOKEN_VA(callsite)); cpu->eip = return_address; if (return_address != stop_address) { lift_dispatch(cpu, return_address, stop_address); } return; } while (0)
-#define LIFT_IMPORT_INDEX_RETURN(index, callsite) do { uint32_t return_address = lift_pop32(cpu); lift_import_call(cpu, (index), LIFT_CODE_TOKEN_VA(callsite)); cpu->eip = return_address; if (return_address != stop_address) { lift_dispatch(cpu, return_address, stop_address); } return; } while (0)
+#define LIFT_IMPORT_CALL(import_address, callsite, next_address) do { lift_import_call(cpu, (uint32_t)(import_address), LIFT_CODE_TOKEN_VA(callsite)); cpu->eip = LIFT_CODE_TOKEN_VA(next_address); } while (0)
+#define LIFT_IMPORT_CALL_RETURN(import_address, callsite) do { lift_import_call_return(cpu, (uint32_t)(import_address), LIFT_CODE_TOKEN_VA(callsite), stop_address); return; } while (0)
 #define LIFT_TAIL(function) do { function(cpu, stop_address); return; } while (0)
 #define LIFT_TAIL_INDIRECT(target, callsite) do { lift_tail_indirect(cpu, (target), stop_address, (callsite)); return; } while (0)
 #define LIFT_TRAP_RETURN(address, reason) do { lift_trap(cpu, (address), (reason)); return; } while (0)
-#define LIFT_RET(pop_bytes) do { uint32_t return_address = lift_pop32(cpu); cpu->esp += (uint32_t)(pop_bytes); cpu->eip = return_address; if (return_address != stop_address) { lift_dispatch(cpu, return_address, stop_address); } return; } while (0)
+#define LIFT_RET(pop_bytes) do { lift_return(cpu, (uint32_t)(pop_bytes), stop_address); return; } while (0)
 #define LIFT_ADD(left_expression, right_expression, carry_expression, width, writeback) do { uint64_t left = (uint64_t)(left_expression); uint64_t right = (uint64_t)(right_expression); uint64_t carry = (carry_expression); uint64_t result = left + right + carry; lift_flags_add(cpu, left, right, carry, result, (width)); writeback; } while (0)
 #define LIFT_SUB(left_expression, right_expression, borrow_expression, width, writeback) do { uint64_t left = (uint64_t)(left_expression); uint64_t right = (uint64_t)(right_expression); uint64_t borrow = (borrow_expression); uint64_t result = left - right - borrow; lift_flags_sub(cpu, left, right, borrow, result, (width)); writeback; } while (0)
 #define LIFT_SUB_FLAGS(left_expression, right_expression, borrow_expression, width) do { uint64_t left = (uint64_t)(left_expression); uint64_t right = (uint64_t)(right_expression); uint64_t borrow = (borrow_expression); uint64_t result = left - right - borrow; lift_flags_sub(cpu, left, right, borrow, result, (width)); } while (0)

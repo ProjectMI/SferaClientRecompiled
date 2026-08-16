@@ -72,10 +72,10 @@ _Static_assert(sizeof(LiftCpu) == 184, "LiftCpu ABI size changed");
 
 typedef void (LIFT_CDECL *LiftFunction)(LiftCpu* cpu, uint32_t stop_address);
 
-extern uint32_t g_lift_header_base;
-extern uint32_t g_lift_rsrc_base;
-extern uint32_t g_lift_callback_thunk_base;
 
+uint32_t LIFT_CDECL lift_callback_address_rva(uint32_t rva);
+uint32_t LIFT_CDECL lift_process_module_handle(void);
+int LIFT_CDECL lift_has_function_rva(uint32_t rva);
 uint8_t LIFT_CDECL lift_load8(uint32_t address);
 uint16_t LIFT_CDECL lift_load16(uint32_t address);
 uint32_t LIFT_CDECL lift_load32(uint32_t address);
@@ -133,16 +133,19 @@ void LIFT_CDECL lift_scas8(LiftCpu* cpu, uint32_t repeated, uint32_t repeat_not_
 void LIFT_CDECL lift_scas16(LiftCpu* cpu, uint32_t repeated, uint32_t repeat_not_equal);
 void LIFT_CDECL lift_scas32(LiftCpu* cpu, uint32_t repeated, uint32_t repeat_not_equal);
 
-void LIFT_CDECL lift_import_call(LiftCpu* cpu, uint32_t import_index, uint32_t callsite);
+void LIFT_CDECL lift_import_call(LiftCpu* cpu, uint32_t import_address, uint32_t callsite);
 void LIFT_CDECL lift_native_call(LiftCpu* cpu, uint32_t target, uint32_t callsite);
 uint32_t LIFT_CDECL lift_source_rva(uint32_t address);
+uint32_t LIFT_CDECL lift_code_rva(uint32_t address);
 LIFT_NORETURN void LIFT_CDECL lift_trap(LiftCpu* cpu, uint32_t source_va, const char* reason);
+LIFT_NORETURN void LIFT_CDECL lift_trap_transfer(LiftCpu* cpu, uint32_t origin, uint32_t target, uint32_t esp_before, uint32_t stack_cleanup, uint32_t stop_address, const char* kind);
 
 void LIFT_CDECL lift_initialize_dispatch(void);
 void LIFT_CDECL lift_dispatch(LiftCpu* cpu, uint32_t target, uint32_t stop_address);
 int LIFT_CDECL lift_call_indirect(LiftCpu* cpu, uint32_t target, uint32_t return_address, uint32_t callsite);
 void LIFT_CDECL lift_tail_indirect(LiftCpu* cpu, uint32_t target, uint32_t stop_address, uint32_t callsite);
 void LIFT_CDECL lift_return(LiftCpu* cpu, uint32_t stack_cleanup, uint32_t stop_address);
+void LIFT_CDECL lift_import_call_return(LiftCpu* cpu, uint32_t import_address, uint32_t callsite, uint32_t stop_address);
 
 #ifdef __cplusplus
 }
