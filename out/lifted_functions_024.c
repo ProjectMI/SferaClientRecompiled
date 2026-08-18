@@ -5118,18 +5118,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EF088(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->eax, cpu->ecx);
     LIFT_CALL_ENTER(sfera_sub_004EF33C, UINT32_C(0x004EF10E));
     LIFT_CALL_ENTER(sfera_sub_004EF510, UINT32_C(0x004EF113));
-    LIFT_CMP(lift_load32(((uint32_t)(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x005254BC))))), UINT32_C(0x00000000), 32u);
-    LIFT_JNZ(label_000EF128, UINT32_C(0x004EF11C));
-    lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000EF510))));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_setusermatherr, UINT32_C(0x004EF121), UINT32_C(0x004EF127));
-    cpu->ecx = (uint32_t)(lift_pop32(cpu));
     LIFT_BLOCK(label_000EF128, UINT32_C(0x004EF128));
     LIFT_CALL_ENTER(sfera_sub_004EF4E8, UINT32_C(0x004EF12D));
-    LIFT_CMP(lift_load32(((uint32_t)(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x005254B8))))), UINT32_C(0xFFFFFFFF), 32u);
-    LIFT_JNZ(label_000EF13F, UINT32_C(0x004EF136));
-    lift_push32(cpu, (uint32_t)(UINT32_C(0xFFFFFFFF)));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_configthreadlocale, UINT32_C(0x004EF138), UINT32_C(0x004EF13E));
-    cpu->ecx = (uint32_t)(lift_pop32(cpu));
     LIFT_BLOCK(label_000EF13F, UINT32_C(0x004EF13F));
     LIFT_ZERO(cpu->eax, 32u);
     LIFT_RET(0u);

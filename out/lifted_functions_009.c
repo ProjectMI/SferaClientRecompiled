@@ -3,6 +3,10 @@
 
 #include <math.h>
 
+static uint32_t sfera_window_class_name(void) { return (uint32_t)(uintptr_t)"SphereWclName"; }
+static SferaDIObjectDataFormat32 sfera_di_object_format(uint32_t object_guid, uint32_t offset, uint32_t type) { SferaDIObjectDataFormat32 value = {object_guid, offset, type, 0u}; return value; }
+static uint32_t sfera_mouse_axis_guid(uint32_t index) { switch (index) { case 0u: return (uint32_t)(uintptr_t)&g_sfera_guid_direct_input_x_axis; case 1u: return (uint32_t)(uintptr_t)&g_sfera_guid_direct_input_y_axis; default: return (uint32_t)(uintptr_t)&g_sfera_guid_direct_input_z_axis; } }
+
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00457E80(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00457E80));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
@@ -354,7 +358,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00457E80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_X87_RDIV_POP(1u);
     lift_x87_set(cpu, 0u, (((double)SFERA_STATIC_04EDD34C_F32)) - (lift_x87_get(cpu, 0u)));
     LIFT_X87_STORE_F32_POP(SFERA_STATIC_04EDD34C_ADDR);
-    LIFT_X87_LOAD_F32_DUP(SFERA_STATIC_0052130C_ADDR);
+    lift_x87_push(cpu, 0.00390625); lift_x87_push(cpu, lift_x87_get(cpu, 0u));
     LIFT_X87_MUL_POP(3u);
     { double temporary = lift_x87_get(cpu, 0u); lift_x87_set(cpu, 0u, lift_x87_get(cpu, 2u)); lift_x87_set(cpu, 2u, temporary); }
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000010));
@@ -969,7 +973,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00457E80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000008), cpu->eax);
     cpu->eax = (uint32_t)(SFERA_STATIC_04EB9E8C_U32);
     LIFT_X87_STORE_F32(((uint32_t)(cpu->edi) * 4u) + SFERA_STATIC_04DD52C8_ADDR);
-    LIFT_X87_LOAD_F32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x00521230)));
+    lift_x87_push(cpu, (double)1.5099999904632568f);
     cpu->ecx = (uint32_t)(cpu->eax);
     LIFT_LOGIC(cpu->eax, UINT32_C(0xFFFFFF00), |, 32u, cpu->eax = (uint32_t)(result););
     lift_x87_compare(cpu, lift_x87_get(cpu, 0u), lift_x87_get(cpu, 1u));
@@ -1880,7 +1884,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_addres
     SFERA_STATIC_04E792F4_U32 = (uint32_t)(cpu->edi);
     LIFT_BLOCK(label_000598A3, UINT32_C(0x004598A3));
     cpu->ecx = (uint32_t)(SFERA_STATIC_04E2C8DC_U32);
-    LIFT_PUSH2(cpu->ecx, SFERA_STATIC_005211B4_ADDR);
+    LIFT_PUSH2(cpu->ecx, sfera_window_class_name());
     LIFT_IMPORT_CALL(SFERA_IMPORT_USER32_UnregisterClassA, UINT32_C(0x004598AF), UINT32_C(0x004598B5));
     LIFT_IMPORT_CALL(SFERA_IMPORT_ole32_CoUninitialize, UINT32_C(0x004598B5), UINT32_C(0x004598BB));
     LIFT_ZERO(cpu->ecx, 32u);
@@ -2453,7 +2457,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00459E40(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00059EF8, UINT32_C(0x00459EF8));
     cpu->edx = (uint32_t)(SFERA_STATIC_04E2C8DC_U32);
     LIFT_PUSH8(UINT32_C(0x00000000), cpu->edx, UINT32_C(0x00000000), UINT32_C(0x00000000), cpu->ecx, cpu->esi, cpu->ebx, cpu->edi);
-    LIFT_PUSH4(cpu->ebp, ((uint32_t)(uintptr_t)"Sphere"), SFERA_STATIC_005211B4_ADDR, UINT32_C(0x00000000));
+    LIFT_PUSH4(cpu->ebp, ((uint32_t)(uintptr_t)"Sphere"), sfera_window_class_name(), UINT32_C(0x00000000));
     LIFT_IMPORT_CALL(SFERA_IMPORT_USER32_CreateWindowExA, UINT32_C(0x00459F16), UINT32_C(0x00459F1C));
     LIFT_POP3(cpu->edi, cpu->esi, cpu->ebp);
     SFERA_STATIC_04E792F4_U32 = (uint32_t)(cpu->eax);
@@ -3374,8 +3378,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0045AA50(LiftCpu* cpu, uint32_t stop_addres
     const SferaGuid32 iid_direct_input8a = {UINT32_C(0xBF798030), UINT16_C(0x483A), UINT16_C(0x4DA2), {UINT8_C(0xAA), UINT8_C(0x99), UINT8_C(0x5D), UINT8_C(0x64), UINT8_C(0xED), UINT8_C(0x36), UINT8_C(0x97), UINT8_C(0x00)}};
     const SferaGuid32 guid_sys_keyboard = {UINT32_C(0x6F1D2B61), UINT16_C(0xD5A0), UINT16_C(0x11CF), {UINT8_C(0xBF), UINT8_C(0xC7), UINT8_C(0x44), UINT8_C(0x45), UINT8_C(0x53), UINT8_C(0x54), UINT8_C(0x00), UINT8_C(0x00)}};
     const SferaGuid32 guid_sys_mouse = {UINT32_C(0x6F1D2B60), UINT16_C(0xD5A0), UINT16_C(0x11CF), {UINT8_C(0xBF), UINT8_C(0xC7), UINT8_C(0x44), UINT8_C(0x45), UINT8_C(0x53), UINT8_C(0x54), UINT8_C(0x00), UINT8_C(0x00)}};
-    const SferaDIDataFormat32 keyboard_format = {UINT32_C(0x18), UINT32_C(0x10), UINT32_C(0x02), UINT32_C(0x100), UINT32_C(0x100), SFERA_DATA_SEMANTIC_VA(UINT32_C(0x00524418))};
-    const SferaDIDataFormat32 mouse_format = {UINT32_C(0x18), UINT32_C(0x10), UINT32_C(0x02), UINT32_C(0x10), UINT32_C(0x07), SFERA_DATA_SEMANTIC_VA(UINT32_C(0x005243A8))};
+    SferaDIObjectDataFormat32 keyboard_objects[256];
+    SferaDIObjectDataFormat32 mouse_objects[7];
+    for (uint32_t index = 0u; index < 3u; ++index) { mouse_objects[index] = sfera_di_object_format(sfera_mouse_axis_guid(index), index * 4u, UINT32_C(0x00FFFF03) | (index == 2u ? UINT32_C(0x80000000) : 0u)); }
+    for (uint32_t index = 3u; index < 7u; ++index) { mouse_objects[index] = sfera_di_object_format(0u, index + 9u, UINT32_C(0x00FFFF0C) | (index >= 5u ? UINT32_C(0x80000000) : 0u)); }
+    for (uint32_t index = 0u; index < 256u; ++index) { keyboard_objects[index] = sfera_di_object_format((uint32_t)(uintptr_t)&g_sfera_guid_direct_input_key, index, UINT32_C(0x8000000C) | (index << 8u)); }
+    const SferaDIDataFormat32 keyboard_format = {UINT32_C(0x18), UINT32_C(0x10), UINT32_C(0x02), UINT32_C(0x100), UINT32_C(0x100), (uint32_t)(uintptr_t)keyboard_objects};
+    const SferaDIDataFormat32 mouse_format = {UINT32_C(0x18), UINT32_C(0x10), UINT32_C(0x02), UINT32_C(0x10), UINT32_C(0x07), (uint32_t)(uintptr_t)mouse_objects};
     LIFT_SP_SUB(UINT32_C(0x00000018));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
@@ -3697,7 +3706,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0045AE50(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->eax, cpu->esp + ((uint32_t)(cpu->edx) * 4u) + UINT32_C(0x00000014));
     LIFT_CMP((cpu->ecx & UINT32_C(0xFF)), UINT32_C(0x0000000A), 8u);
     LIFT_JNZ(label_0005AEF0, UINT32_C(0x0045AEC0));
-    LIFT_IMUL32(cpu->eax, SFERA_STATIC_005211F8_U32);
     LIFT_IMUL32(cpu->eax, lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x000004CC)))));
     LIFT_STORE32(cpu->esp + ((uint32_t)(cpu->edx) * 4u) + UINT32_C(0x00000014), cpu->eax);
     LIFT_CMP(cpu->eax, lift_load32(((uint32_t)(cpu->esi))), 32u);
@@ -3746,7 +3754,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0045AE50(LiftCpu* cpu, uint32_t stop_addres
     LIFT_IMUL32(cpu->edx, lift_load32(((uint32_t)(((uint32_t)(cpu->edi) * 4u) + SFERA_STATIC_04E2DC60_ADDR))));
     LIFT_SUB(cpu->edx, lift_load32(((uint32_t)(((uint32_t)(cpu->edi) * 4u) + SFERA_STATIC_04EB9CD8_ADDR))), 0u, 32u, cpu->edx = (uint32_t)(result););
     cpu->eax = (uint32_t)(((uint32_t)(cpu->edx + cpu->ecx + UINT32_C(0x00000002))));
-    LIFT_IMUL32(cpu->eax, SFERA_STATIC_005211F8_U32);
     LIFT_IMUL32(cpu->eax, lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x000004CC)))));
     LIFT_STORE32(cpu->ebx, cpu->eax);
     LIFT_CMP(cpu->edi, UINT32_C(0x00000001), 32u);
@@ -7566,7 +7573,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0045DCD0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->esi, cpu->ebx + UINT32_C(0x00000028));
     LIFT_X87_LOAD_F32(cpu->esp + UINT32_C(0x0000001C));
     LIFT_LOAD32(cpu->eax, cpu->ebx + UINT32_C(0x00000E40));
-    LIFT_IMUL32(cpu->eax, SFERA_STATIC_005211F8_U32);
     LIFT_LOAD32(cpu->edx, cpu->ebx + UINT32_C(0x00000E44));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->ecx = (uint32_t)(cpu->esi);
@@ -12268,7 +12274,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00462690(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->edx));
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000024), cpu->eax);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000028), UINT32_C(0x00000000));
-    LIFT_STORE32(cpu->esp + UINT32_C(0x0000002C), SFERA_STATIC_005211B4_ADDR);
+    LIFT_STORE32(cpu->esp + UINT32_C(0x0000002C), sfera_window_class_name());
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000030), cpu->ecx);
     LIFT_IMPORT_CALL(SFERA_IMPORT_USER32_RegisterClassExA, UINT32_C(0x0046271B), UINT32_C(0x00462721));
     LIFT_TEST((cpu->eax & UINT32_C(0xFFFF)), 16u);

@@ -11209,7 +11209,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00437BF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_X87_RDIV_POP(1u);
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x0000000C));
     LIFT_X87_LOAD_F32(cpu->esp + UINT32_C(0x0000000C));
-    LIFT_X87_LOAD_F32_DUP(SFERA_STATIC_00521090_ADDR);
+    lift_x87_push(cpu, (double)0.0062500000931322575f); lift_x87_push(cpu, lift_x87_get(cpu, 0u));
     LIFT_X87_SUB_POP(2u);
     LIFT_STORE16(cpu->esp + UINT32_C(0x0000000C), cpu->fpu_control);
     lift_x87_set(cpu, 0u, (((double)SFERA_STATIC_04DC051C_F32)) - (lift_x87_get(cpu, 0u)));
@@ -11374,7 +11374,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00437CB0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00037D9A, UINT32_C(0x00437D9A));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000008));
     LIFT_X87_LOAD_F32(SFERA_STATIC_04DC051C_ADDR);
-    LIFT_X87_LOAD_F32(SFERA_STATIC_00521090_ADDR);
+    lift_x87_push(cpu, (double)0.0062500000931322575f);
     cpu->ecx = (uint32_t)(cpu->eax);
     lift_x87_push(cpu, lift_x87_get(cpu, 0u));
     LIFT_LOGIC(cpu->ecx, UINT32_C(0x000007FF), &, 32u, cpu->ecx = (uint32_t)(result););

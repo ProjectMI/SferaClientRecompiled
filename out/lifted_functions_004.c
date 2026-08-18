@@ -3,6 +3,11 @@
 
 #include <math.h>
 
+static uint8_t sfera_ascii_lower(uint8_t value) { return value >= 'A' && value <= 'Z' ? (uint8_t)(value + ('a' - 'A')) : value; }
+static uint32_t sfera_ascii_hash_ci(uint32_t address) { uint32_t hash = UINT32_C(2166136261); for (;;) { const uint8_t value = lift_load8(address++); if (value == 0u) { return hash; } hash = (hash ^ sfera_ascii_lower(value)) * UINT32_C(16777619); } }
+static int sfera_ascii_iequals(uint32_t address, const char* literal) { for (;;) { const uint8_t left = sfera_ascii_lower(lift_load8(address++)); const uint8_t right = sfera_ascii_lower((uint8_t)*literal++); if (left != right) { return 0; } if (left == 0u) { return 1; } } }
+static int sfera_process_name_is_ignored(uint32_t address) { switch (sfera_ascii_hash_ci(address)) { case UINT32_C(0xCB320621): return sfera_ascii_iequals(address, "[System Process]"); case UINT32_C(0xC301CF93): return sfera_ascii_iequals(address, "idle"); case UINT32_C(0xF84B2A97): return sfera_ascii_iequals(address, "csrss.exe"); case UINT32_C(0xDE6F2DFE): return sfera_ascii_iequals(address, "winlogon.exe"); case UINT32_C(0x86049695): return sfera_ascii_iequals(address, "smss.exe"); case UINT32_C(0x28FDCADB): return sfera_ascii_iequals(address, "services.exe"); case UINT32_C(0x523B71BA): return sfera_ascii_iequals(address, "service.exe"); case UINT32_C(0x6105AD4F): return sfera_ascii_iequals(address, "lsass.exe"); case UINT32_C(0x82611D84): return sfera_ascii_iequals(address, "taskmgr.exe"); case UINT32_C(0x491E0A9C): return sfera_ascii_iequals(address, "system"); case UINT32_C(0x2453F3B9): return sfera_ascii_iequals(address, "svchost.exe"); case UINT32_C(0xC979C6AE): return sfera_ascii_iequals(address, "cdantsrv.exe"); case UINT32_C(0x6369D323): return sfera_ascii_iequals(address, "spoolsv.exe"); case UINT32_C(0xA162EC55): return sfera_ascii_iequals(address, "mdm.exe"); case UINT32_C(0x48545BE6): return sfera_ascii_iequals(address, "nvsvc32.exe"); case UINT32_C(0x708EA5E0): return sfera_ascii_iequals(address, "far.exe"); case UINT32_C(0x130CD4F6): return sfera_ascii_iequals(address, "regsvc32.exe"); case UINT32_C(0x0A11E0AE): return sfera_ascii_iequals(address, "mstask.exe"); case UINT32_C(0xABDAFF7E): return sfera_ascii_iequals(address, "winmgmt.exe"); case UINT32_C(0x8AE4CC97): return sfera_ascii_iequals(address, "stisvc.exe"); case UINT32_C(0xDB3A61B5): return sfera_ascii_iequals(address, "rundll32.exe"); case UINT32_C(0xE566D06E): return sfera_ascii_iequals(address, "wcescoomm.exe"); case UINT32_C(0xA062BD36): return sfera_ascii_iequals(address, "internat.exe"); case UINT32_C(0x5037C1B7): return sfera_ascii_iequals(address, "winword.exe"); case UINT32_C(0x399460A4): return sfera_ascii_iequals(address, "explorer.exe"); case UINT32_C(0xB884A32C): return sfera_ascii_iequals(address, "notepad.exe"); case UINT32_C(0x82407190): return sfera_ascii_iequals(address, "ctfmon.exe"); case UINT32_C(0xFFB78D72): return sfera_ascii_iequals(address, "icq.exe"); case UINT32_C(0x3BC05E55): return sfera_ascii_iequals(address, "iexplore.exe"); case UINT32_C(0x8C6DE00A): return sfera_ascii_iequals(address, "srvany.exe"); case UINT32_C(0x47785D4C): return sfera_ascii_iequals(address, "spidernt.exe"); case UINT32_C(0xF7D48DE3): return sfera_ascii_iequals(address, "winamp.exe"); case UINT32_C(0xD391162B): return sfera_ascii_iequals(address, "kav.exe"); case UINT32_C(0x83888858): return sfera_ascii_iequals(address, "winrar.exe"); case UINT32_C(0x4FB24653): return sfera_ascii_iequals(address, "kavsvc.exe"); case UINT32_C(0x73D09132): return sfera_ascii_iequals(address, "ati2evxx.exe"); case UINT32_C(0x0796F943): return sfera_ascii_iequals(address, "regsvc.exe"); case UINT32_C(0x51E34A6E): return sfera_ascii_iequals(address, "mspmspsv.exe"); case UINT32_C(0x94FF76AD): return sfera_ascii_iequals(address, "resetservice.exe"); case UINT32_C(0x17B4BBA5): return sfera_ascii_iequals(address, "directcd.exe"); case UINT32_C(0x5AB899A3): return sfera_ascii_iequals(address, "qttask.exe"); case UINT32_C(0x91BFD53C): return sfera_ascii_iequals(address, "atiptaxx.exe"); case UINT32_C(0x681423EE): return sfera_ascii_iequals(address, "SOUNDMAN.EXE"); case UINT32_C(0x4DF48812): return sfera_ascii_iequals(address, "wuauclt.exe"); case UINT32_C(0x5ECB2F2C): return sfera_ascii_iequals(address, "miranda32.exe"); case UINT32_C(0xB7110726): return sfera_ascii_iequals(address, "sphere.exe"); case UINT32_C(0xBB309AE5): return sfera_ascii_iequals(address, "cmd.exe"); case UINT32_C(0xEDFBE74A): return sfera_ascii_iequals(address, "calc.exe"); case UINT32_C(0x5D2A3611): return sfera_ascii_iequals(address, "thebat.exe"); default: return 0; } }
+
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004266D0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004266D0));
     LIFT_ZERO(cpu->edx, 32u);
@@ -9691,52 +9696,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042E080(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000010), cpu->esi);
     cpu->edi = (uint32_t)(cpu->edi);
     LIFT_BLOCK(label_0002E0E0, UINT32_C(0x0042E0E0));
-    LIFT_CMP(SFERA_STATIC_00520338_U8, UINT32_C(0x00000000), 8u);
-    cpu->edi = (uint32_t)(SFERA_STATIC_00520338_ADDR);
-    LIFT_JZ(label_0002E15E, UINT32_C(0x0042E0EE));
-    cpu->edi = (uint32_t)(cpu->edi);
-    LIFT_BLOCK(label_0002E0F0, UINT32_C(0x0042E0F0));
-    cpu->eax = (uint32_t)(cpu->edi);
-    cpu->edx = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0x00000001))));
-    LIFT_BLOCK(label_0002E0F5, UINT32_C(0x0042E0F5));
-    cpu->ecx = (cpu->ecx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(lift_load8(((uint32_t)(cpu->eax)))) & UINT32_C(0xFF));
-    LIFT_INC(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
-    LIFT_TEST((cpu->ecx & UINT32_C(0xFF)), 8u);
-    LIFT_JNZ(label_0002E0F5, UINT32_C(0x0042E0FC));
-    LIFT_SUB(cpu->eax, cpu->edx, 0u, 32u, cpu->eax = (uint32_t)(result););
-    cpu->esi = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000013C))));
-    cpu->edx = (uint32_t)(cpu->eax);
-    cpu->eax = (uint32_t)(cpu->edi);
-    LIFT_SUB(cpu->esi, cpu->edi, 0u, 32u, cpu->esi = (uint32_t)(result););
-    LIFT_BLOCK(label_0002E110, UINT32_C(0x0042E110));
-    cpu->ecx = (cpu->ecx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(lift_load8(((uint32_t)(cpu->eax)))) & UINT32_C(0xFF));
-    LIFT_STORE8(cpu->esi + cpu->eax, (cpu->ecx & UINT32_C(0xFF)));
-    LIFT_INC(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
-    LIFT_TEST((cpu->ecx & UINT32_C(0xFF)), 8u);
-    LIFT_JNZ(label_0002E110, UINT32_C(0x0042E11A));
-    LIFT_ZERO(cpu->eax, 32u);
-    cpu->edi = (uint32_t)(((uint32_t)(cpu->edi + cpu->edx + UINT32_C(0x00000001))));
-    cpu->ecx = (uint32_t)(UINT32_C(0x00000043));
-    LIFT_TEST(cpu->edx, 32u);
-    LIFT_JLE(label_0002E13F, UINT32_C(0x0042E129));
-    cpu->esp = (uint32_t)(((uint32_t)(cpu->esp)));
-    LIFT_BLOCK(label_0002E130, UINT32_C(0x0042E130));
-    LIFT_LOGIC(lift_load8(((uint32_t)(cpu->esp + cpu->eax + UINT32_C(0x0000013C)))), (cpu->ecx & UINT32_C(0xFF)), ^, 8u, lift_store8(((uint32_t)(cpu->esp + cpu->eax + UINT32_C(0x0000013C))), (uint8_t)(result)););
-    LIFT_INC(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
-    LIFT_ADD(cpu->ecx, UINT32_C(0x0000003B), 0u, 32u, cpu->ecx = (uint32_t)(result););
-    LIFT_CMP(cpu->eax, cpu->edx, 32u);
-    LIFT_JL_GOTO(label_0002E130);
-    LIFT_BLOCK(label_0002E13F, UINT32_C(0x0042E13F));
-    cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000038))));
-    lift_push32(cpu, (uint32_t)(cpu->ecx));
-    cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000140))));
-    lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_stricmp, UINT32_C(0x0042E14C), UINT32_C(0x0042E152));
-    LIFT_SP_ADD(UINT32_C(0x00000008));
-    LIFT_TEST(cpu->eax, 32u);
-    LIFT_JZ(label_0002E180, UINT32_C(0x0042E159));
-    LIFT_CMP(lift_load8(((uint32_t)(cpu->edi))), UINT32_C(0x00000000), 8u);
-    LIFT_JNZ_GOTO(label_0002E0F0);
+    if (sfera_process_name_is_ignored(cpu->esp + UINT32_C(0x00000038))) { goto label_0002E180; }
     LIFT_BLOCK(label_0002E15E, UINT32_C(0x0042E15E));
     LIFT_LOAD32(cpu->esi, cpu->esp + UINT32_C(0x00000010));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFFF))));

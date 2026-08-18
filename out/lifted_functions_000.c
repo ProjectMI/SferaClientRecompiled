@@ -3,6 +3,8 @@
 
 #include <math.h>
 
+static void sfera_prepare_msvc_string_storage(uint32_t address) { if (lift_load32(address + UINT32_C(0x10)) == 0u && lift_load32(address + UINT32_C(0x14)) == 0u) { lift_store8(address, 0u); lift_store32(address + UINT32_C(0x14), 15u); } }
+
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00401000(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00401000));
     cpu->eax = (uint32_t)(cpu->ecx);
@@ -8716,6 +8718,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00406820(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->ebx, cpu->esp + UINT32_C(0x00000008));
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->esi = (uint32_t)(cpu->ecx);
+    sfera_prepare_msvc_string_storage(cpu->esi);
     LIFT_TEST(cpu->ebx, 32u);
     LIFT_JZ(label_00006885, UINT32_C(0x0040682C));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000014));

@@ -3,6 +3,9 @@
 
 #include <math.h>
 
+static uint8_t sfera_string_obfuscation_primary_shift(uint32_t index) { switch (index % 13u) { case 0u: return 1u; case 1u: return 2u; case 2u: return 3u; case 3u: return UINT8_C(0xFE); case 4u: return 1u; case 5u: return UINT8_C(0xFF); case 6u: return UINT8_C(0xFE); case 7u: return UINT8_C(0xFD); case 8u: return 2u; case 9u: return UINT8_C(0xFF); case 10u: return 0u; case 11u: return UINT8_C(0xFE); default: return 2u; } }
+static uint8_t sfera_string_obfuscation_secondary_shift(uint32_t index) { switch (index % 7u) { case 0u: return 0u; case 1u: return UINT8_C(0xFF); case 2u: return UINT8_C(0xFE); case 3u: return 2u; case 4u: return UINT8_C(0xFF); case 5u: return 0u; default: return 1u; } }
+
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004AFD50(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004AFD50));
     LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
@@ -6788,8 +6791,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004B4AB0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->eax, 0u, 32u, cpu->edx = (uint32_t)(result););
     cpu->eax = (uint32_t)(cpu->ecx);
     LIFT_SUB(cpu->eax, cpu->edx, 0u, 32u, cpu->eax = (uint32_t)(result););
-    cpu->edx = (cpu->edx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(lift_load8(((uint32_t)(((uint32_t)(cpu->ebp) * 4u) + SFERA_STATIC_00521D9C_ADDR)))) & UINT32_C(0xFF));
-    LIFT_ADD((cpu->edx & UINT32_C(0xFF)), lift_load8(((uint32_t)(((uint32_t)(cpu->eax) * 4u) + SFERA_STATIC_00521DD0_ADDR))), 0u, 8u, cpu->edx = (cpu->edx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(result) & UINT32_C(0xFF)););
+    cpu->edx = (cpu->edx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(sfera_string_obfuscation_primary_shift(cpu->ebp)) & UINT32_C(0xFF));
+    LIFT_ADD((cpu->edx & UINT32_C(0xFF)), sfera_string_obfuscation_secondary_shift(cpu->eax), 0u, 8u, cpu->edx = (cpu->edx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(result) & UINT32_C(0xFF)););
     LIFT_INC(cpu->ecx, 32u, cpu->ecx = (uint32_t)(result););
     LIFT_ADD((cpu->edx & UINT32_C(0xFF)), lift_load8(((uint32_t)(cpu->ebx + cpu->ecx + UINT32_C(0xFFFFFFFF)))), 0u, 8u, cpu->edx = (cpu->edx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(result) & UINT32_C(0xFF)););
     LIFT_STORE8(cpu->edi + cpu->ecx + UINT32_C(0xFFFFFFFF), (cpu->edx & UINT32_C(0xFF)));
@@ -6845,7 +6848,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004B4B60(LiftCpu* cpu, uint32_t stop_addres
     LIFT_IMUL32(cpu->eax, UINT32_C(0x0000000D));
     cpu->edx = (uint32_t)(cpu->esi);
     LIFT_SUB(cpu->edx, cpu->eax, 0u, 32u, cpu->edx = (uint32_t)(result););
-    LIFT_SUB((cpu->ecx & UINT32_C(0xFF)), lift_load8(((uint32_t)(((uint32_t)(cpu->edx) * 4u) + SFERA_STATIC_00521D9C_ADDR))), 0u, 8u, cpu->ecx = (cpu->ecx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(result) & UINT32_C(0xFF)););
+    LIFT_SUB((cpu->ecx & UINT32_C(0xFF)), sfera_string_obfuscation_primary_shift(cpu->edx), 0u, 8u, cpu->ecx = (cpu->ecx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(result) & UINT32_C(0xFF)););
     cpu->eax = (uint32_t)(UINT32_C(0x92492493));
     lift_multiply_accumulator(cpu, cpu->esi, 32u, 1u);
     LIFT_ADD(cpu->edx, cpu->esi, 0u, 32u, cpu->edx = (uint32_t)(result););
@@ -6857,7 +6860,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004B4B60(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->eax, 0u, 32u, cpu->edx = (uint32_t)(result););
     cpu->eax = (uint32_t)(cpu->esi);
     LIFT_SUB(cpu->eax, cpu->edx, 0u, 32u, cpu->eax = (uint32_t)(result););
-    LIFT_SUB((cpu->ecx & UINT32_C(0xFF)), lift_load8(((uint32_t)(((uint32_t)(cpu->eax) * 4u) + SFERA_STATIC_00521DD0_ADDR))), 0u, 8u, cpu->ecx = (cpu->ecx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(result) & UINT32_C(0xFF)););
+    LIFT_SUB((cpu->ecx & UINT32_C(0xFF)), sfera_string_obfuscation_secondary_shift(cpu->eax), 0u, 8u, cpu->ecx = (cpu->ecx & UINT32_C(0xFFFFFF00)) | ((uint32_t)(result) & UINT32_C(0xFF)););
     LIFT_INC(cpu->esi, 32u, cpu->esi = (uint32_t)(result););
     LIFT_STORE8(cpu->esi + cpu->ebp + UINT32_C(0xFFFFFFFF), (cpu->ecx & UINT32_C(0xFF)));
     LIFT_CMP(cpu->esi, lift_load32(((uint32_t)(cpu->edi + UINT32_C(0x00000010)))), 32u);

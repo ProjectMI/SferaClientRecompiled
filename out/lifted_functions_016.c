@@ -3,6 +3,8 @@
 
 #include <math.h>
 
+static uint32_t sfera_zoning_config_error_context(void) { return (uint32_t)(uintptr_t)"Wrong format of \"Landscape\\zoning.cfg\""; }
+
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x0049DF00));
     LIFT_SP_SUB(UINT32_C(0x0000015C));
@@ -40,7 +42,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000018), cpu->edi);
     LIFT_TEST(cpu->edi, 32u);
     LIFT_JNZ(label_0009DF8F, UINT32_C(0x0049DF7C));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : zoneParamsCfg is NULL"));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : zoneParamsCfg is NULL"));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049DF8C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009DF8F, UINT32_C(0x0049DF8F));
@@ -51,7 +53,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481150, UINT32_C(0x0049DFA0));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009DFB7, UINT32_C(0x0049DFA4));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"xPatchMin\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"xPatchMin\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049DFB4));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009DFB7, UINT32_C(0x0049DFB7));
@@ -62,7 +64,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481150, UINT32_C(0x0049DFC8));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009DFDF, UINT32_C(0x0049DFCC));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"zPatchMin\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"zPatchMin\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049DFDC));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009DFDF, UINT32_C(0x0049DFDF));
@@ -73,7 +75,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481150, UINT32_C(0x0049DFF0));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E007, UINT32_C(0x0049DFF4));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"xMin\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"xMin\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E004));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009E007, UINT32_C(0x0049E007));
@@ -84,7 +86,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481150, UINT32_C(0x0049E018));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E02F, UINT32_C(0x0049E01C));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"xMax\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"xMax\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E02C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009E02F, UINT32_C(0x0049E02F));
@@ -95,7 +97,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481150, UINT32_C(0x0049E040));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E057, UINT32_C(0x0049E044));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"zMin\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"zMin\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E054));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009E057, UINT32_C(0x0049E057));
@@ -106,7 +108,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481150, UINT32_C(0x0049E068));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E07F, UINT32_C(0x0049E06C));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"zMax\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"zMax\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E07C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009E07F, UINT32_C(0x0049E07F));
@@ -117,7 +119,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481150, UINT32_C(0x0049E090));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E0A7, UINT32_C(0x0049E094));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"borderFadeDist\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"borderFadeDist\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E0A4));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009E0A7, UINT32_C(0x0049E0A7));
@@ -128,7 +130,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481150, UINT32_C(0x0049E0B8));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E0CF, UINT32_C(0x0049E0BC));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"skyFogAlpha\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"skyFogAlpha\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E0CC));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009E0CF, UINT32_C(0x0049E0CF));
@@ -139,7 +141,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481150, UINT32_C(0x0049E0E0));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E0F7, UINT32_C(0x0049E0E4));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"fogNear\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"fogNear\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E0F4));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009E0F7, UINT32_C(0x0049E0F7));
@@ -150,7 +152,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481150, UINT32_C(0x0049E108));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E11F, UINT32_C(0x0049E10C));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"fogFar\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"fogFar\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E11C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009E11F, UINT32_C(0x0049E11F));
@@ -159,7 +161,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_004811B0, UINT32_C(0x0049E12B));
     LIFT_CMP(cpu->eax, UINT32_C(0x00000008), 32u);
     LIFT_JZ(label_0009E143, UINT32_C(0x0049E130));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : wrong size of \"dayColors\""));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : wrong size of \"dayColors\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E140));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009E143, UINT32_C(0x0049E143));
@@ -176,7 +178,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     cpu->edi = (uint32_t)(cpu->eax);
     LIFT_TEST(cpu->edi, 32u);
     LIFT_JNZ(label_0009E17A, UINT32_C(0x0049E167));
-    LIFT_PUSH3(cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : dayColorCfg is NULL"));
+    LIFT_PUSH3(cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : dayColorCfg is NULL"));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E177));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_0009E17A, UINT32_C(0x0049E17A));
@@ -187,7 +189,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481250, UINT32_C(0x0049E18C));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E1A4, UINT32_C(0x0049E190));
-    LIFT_PUSH4(cpu->esi, cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"fogColor[%d].r\""));
+    LIFT_PUSH4(cpu->esi, cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"fogColor[%d].r\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E1A1));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_0009E1A4, UINT32_C(0x0049E1A4));
@@ -197,7 +199,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481250, UINT32_C(0x0049E1B3));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E1CB, UINT32_C(0x0049E1B7));
-    LIFT_PUSH4(cpu->esi, cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"fogColor[%d].g\""));
+    LIFT_PUSH4(cpu->esi, cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"fogColor[%d].g\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E1C8));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_0009E1CB, UINT32_C(0x0049E1CB));
@@ -208,7 +210,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481250, UINT32_C(0x0049E1DD));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E1F5, UINT32_C(0x0049E1E1));
-    LIFT_PUSH4(cpu->esi, cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"fogColor[%d].b\""));
+    LIFT_PUSH4(cpu->esi, cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"fogColor[%d].b\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E1F2));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_0009E1F5, UINT32_C(0x0049E1F5));
@@ -219,7 +221,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481250, UINT32_C(0x0049E207));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E21F, UINT32_C(0x0049E20B));
-    LIFT_PUSH4(cpu->esi, cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"ambientColor[%d].r\""));
+    LIFT_PUSH4(cpu->esi, cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"ambientColor[%d].r\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E21C));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_0009E21F, UINT32_C(0x0049E21F));
@@ -230,7 +232,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481250, UINT32_C(0x0049E231));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E249, UINT32_C(0x0049E235));
-    LIFT_PUSH4(cpu->esi, cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"ambientColor[%d].g\""));
+    LIFT_PUSH4(cpu->esi, cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"ambientColor[%d].g\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E246));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_0009E249, UINT32_C(0x0049E249));
@@ -241,7 +243,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481250, UINT32_C(0x0049E25B));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E273, UINT32_C(0x0049E25F));
-    LIFT_PUSH4(cpu->esi, cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"ambientColor[%d].b\""));
+    LIFT_PUSH4(cpu->esi, cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"ambientColor[%d].b\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E270));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_0009E273, UINT32_C(0x0049E273));
@@ -252,7 +254,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481250, UINT32_C(0x0049E288));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E2A0, UINT32_C(0x0049E28C));
-    LIFT_PUSH4(cpu->esi, cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"sunColor[%d].r\""));
+    LIFT_PUSH4(cpu->esi, cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"sunColor[%d].r\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E29D));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_0009E2A0, UINT32_C(0x0049E2A0));
@@ -263,7 +265,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481250, UINT32_C(0x0049E2B5));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E2CD, UINT32_C(0x0049E2B9));
-    LIFT_PUSH4(cpu->esi, cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"sunColor[%d].g\""));
+    LIFT_PUSH4(cpu->esi, cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"sunColor[%d].g\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E2CA));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_0009E2CD, UINT32_C(0x0049E2CD));
@@ -274,7 +276,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049DF00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00481250, UINT32_C(0x0049E2E2));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0009E2FA, UINT32_C(0x0049E2E6));
-    LIFT_PUSH4(cpu->esi, cpu->ebp, SFERA_STATIC_005219BC_ADDR, ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"sunColor[%d].b\""));
+    LIFT_PUSH4(cpu->esi, cpu->ebp, sfera_zoning_config_error_context(), ((uint32_t)(uintptr_t)"%s : zonesParams[%d] : param \"sunColor[%d].b\""));
     LIFT_CALL_ENTER(sfera_sub_004623C0, UINT32_C(0x0049E2F7));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_0009E2FA, UINT32_C(0x0049E2FA));

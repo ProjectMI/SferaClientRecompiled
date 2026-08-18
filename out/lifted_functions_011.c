@@ -3,6 +3,8 @@
 
 #include <math.h>
 
+static int sfera_world_type_has_spatial_extent(uint32_t type) { switch (type) { case 7u: case 8u: case 9u: case 10u: case 11u: case 14u: case 21u: case 23u: case 24u: case 25u: case 28u: case 32u: case 35u: case 39u: return 1; default: return 0; } }
+
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0046D8B0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x0046D8B0));
     LIFT_SP_SUB(UINT32_C(0x00000014));
@@ -4285,7 +4287,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004710A0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = (uint32_t)(((uint32_t)(((uint32_t)(cpu->eax) * 8u))));
     LIFT_SUB(cpu->edx, cpu->eax, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_ADD(cpu->edx, lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000038)))), 0u, 32u, cpu->edx = (uint32_t)(result););
-    LIFT_CMP(lift_load32(((uint32_t)(((uint32_t)(cpu->edx) * 4u) + SFERA_DATA_TABLE_BASE_005213C0_ADDR))), UINT32_C(0x00000000), 32u);
+    LIFT_CMP((uint32_t)sfera_world_type_has_spatial_extent(cpu->edx), UINT32_C(0x00000000), 32u);
     LIFT_JZ(label_00071AF7, UINT32_C(0x00471241));
     cpu->ecx = (uint32_t)(cpu->edi);
     LIFT_CALL_ENTER(sfera_sub_0045DA60, UINT32_C(0x00471248));
@@ -5289,7 +5291,7 @@ label_00071EFC: ;
     LIFT_JNZ_GOTO(label_00072043);
     LIFT_BLOCK(label_00071FC4, UINT32_C(0x00471FC4));
     LIFT_X87_LOAD_F32(cpu->esi + UINT32_C(0x00000040));
-    LIFT_X87_LOAD_F32_DUP(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x00521244)));
+    lift_x87_push(cpu, (double)1.2000000476837158f); lift_x87_push(cpu, lift_x87_get(cpu, 0u));
     LIFT_X87_SUB_POP(2u);
     { double temporary = lift_x87_get(cpu, 0u); lift_x87_set(cpu, 0u, lift_x87_get(cpu, 1u)); lift_x87_set(cpu, 1u, temporary); }
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000034));
@@ -10741,7 +10743,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00476DE0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_004634E0, UINT32_C(0x00476F51));
     LIFT_CALL_ENTER(sfera_sub_00463EC0, UINT32_C(0x00476F56));
     LIFT_X87_LOAD_F32(SFERA_STATIC_04DDF9EC_ADDR);
-    LIFT_X87_LOAD_F32_DUP(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x005211D8)));
+    lift_x87_push(cpu, (double)0.972000002861023f); lift_x87_push(cpu, lift_x87_get(cpu, 0u));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000424));
     LIFT_X87_MUL_POP(2u);
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -10753,7 +10755,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00476DE0(LiftCpu* cpu, uint32_t stop_addres
     lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) * (((double)SFERA_STATIC_04DDF9F4_F32)));
     LIFT_X87_STORE_F32_POP(SFERA_STATIC_04DDF9F4_ADDR);
     LIFT_X87_LOAD_F32(SFERA_STATIC_04DDF9F8_ADDR);
-    LIFT_X87_LOAD_F32_DUP(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x005211D4)));
+    lift_x87_push(cpu, (double)0.972000002861023f); lift_x87_push(cpu, lift_x87_get(cpu, 0u));
     LIFT_X87_MUL_POP(2u);
     { double temporary = lift_x87_get(cpu, 0u); lift_x87_set(cpu, 0u, lift_x87_get(cpu, 1u)); lift_x87_set(cpu, 1u, temporary); }
     LIFT_X87_STORE_F32_POP(SFERA_STATIC_04DDF9F8_ADDR);

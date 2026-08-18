@@ -2,6 +2,7 @@
 #include "lifted_normalized_ops.h"
 
 #include <math.h>
+#include <string.h>
 
 static uint8_t sfera_key_ascii_fold(uint8_t value) { return value >= 'a' && value <= 'z' ? (uint8_t)(value - ('a' - 'A')) : value; }
 static int sfera_key_name_equals(uint32_t address, const char* literal) { if (!address || !literal) { return 0; } for (uint32_t index = 0;; ++index) { const uint8_t lhs = sfera_key_ascii_fold(lift_load8(address + index)); const uint8_t rhs = sfera_key_ascii_fold((uint8_t)literal[index]); if (lhs != rhs) { return 0; } if (!rhs) { return 1; } } }
@@ -103,6 +104,20 @@ case UINT32_C(0x00000011): return "CTRL";
 case UINT32_C(0x00000010): return "SHIFT";
 default: return (const char*)0; } }
 static uint32_t sfera_key_code_from_name(uint32_t address) { if (!address) { return 0u; } for (uint32_t code = 0; code <= UINT32_C(0xFF); ++code) { const char* name = sfera_key_name_from_code(code); if (name && sfera_key_name_equals(address, name)) { return code; } } return 0u; }
+static uint32_t sfera_key_dik_from_virtual_key(uint32_t key) {
+    if (key >= UINT32_C(0x70) && key <= UINT32_C(0x79)) { return UINT32_C(0x3B) + key - UINT32_C(0x70); }
+    if (key == UINT32_C(0x7A)) { return UINT32_C(0x57); }
+    if (key == UINT32_C(0x7B)) { return UINT32_C(0x58); }
+    if (key >= '1' && key <= '9') { return UINT32_C(0x02) + key - '1'; }
+    if (key == '0') { return UINT32_C(0x0B); }
+    if (key >= UINT32_C(0x61) && key <= UINT32_C(0x69)) { const uint32_t digit = key - UINT32_C(0x60); return UINT32_C(0x53) - UINT32_C(4) * ((digit + UINT32_C(2)) / UINT32_C(3)) + ((digit - UINT32_C(1)) % UINT32_C(3)); }
+    if (key == UINT32_C(0x60)) { return UINT32_C(0x52); }
+    const char* position = strchr("QWERTYUIOP", (int)key); if (position) { return UINT32_C(0x10) + (uint32_t)(position - "QWERTYUIOP"); }
+    position = strchr("ASDFGHJKL", (int)key); if (position) { return UINT32_C(0x1E) + (uint32_t)(position - "ASDFGHJKL"); }
+    position = strchr("ZXCVBNM", (int)key); if (position) { return UINT32_C(0x2C) + (uint32_t)(position - "ZXCVBNM"); }
+    switch (key) { case UINT32_C(0x1B): return UINT32_C(0x01); case UINT32_C(0x91): return UINT32_C(0x46); case UINT32_C(0x13): return UINT32_C(0xC5); case UINT32_C(0x08): return UINT32_C(0x0E); case UINT32_C(0x20): return UINT32_C(0x39); case UINT32_C(0x23): return UINT32_C(0xCF); case UINT32_C(0x24): return UINT32_C(0xC7); case UINT32_C(0x25): return UINT32_C(0xCB); case UINT32_C(0x26): return UINT32_C(0xC8); case UINT32_C(0x27): return UINT32_C(0xCD); case UINT32_C(0x28): return UINT32_C(0xD0); case UINT32_C(0x2D): return UINT32_C(0xD2); case UINT32_C(0x2E): return UINT32_C(0xD3); case UINT32_C(0x0D): return UINT32_C(0x1C); case UINT32_C(0x14): return UINT32_C(0x3A); case UINT32_C(0x6A): return UINT32_C(0x37); case UINT32_C(0x6B): return UINT32_C(0x4E); case UINT32_C(0x90): return UINT32_C(0x45); case UINT32_C(0x6D): return UINT32_C(0x4A); case UINT32_C(0x6F): return UINT32_C(0xB5); case UINT32_C(0x6E): return UINT32_C(0x53); case UINT32_C(0x21): return UINT32_C(0xC9); case UINT32_C(0x22): return UINT32_C(0xD1); case UINT32_C(0xC0): return UINT32_C(0x29); case UINT32_C(0xBD): return UINT32_C(0x0C); case UINT32_C(0xBB): return UINT32_C(0x0D); case UINT32_C(0xDC): return UINT32_C(0x2B); case UINT32_C(0xDB): return UINT32_C(0x1A); case UINT32_C(0xDD): return UINT32_C(0x1B); case UINT32_C(0xBA): return UINT32_C(0x27); case UINT32_C(0xDE): return UINT32_C(0x28); case UINT32_C(0xBC): return UINT32_C(0x33); case UINT32_C(0xBE): return UINT32_C(0x34); case UINT32_C(0xBF): return UINT32_C(0x35); case UINT32_C(0x09): return UINT32_C(0x0F); case UINT32_C(0x11): return UINT32_C(0x1D); case UINT32_C(0x10): return UINT32_C(0x2A); default: return 0u; }
+}
+static uint32_t sfera_key_virtual_key_from_dik(uint32_t dik) { for (uint32_t key = 0u; key <= UINT32_C(0xFF); ++key) { if (sfera_key_dik_from_virtual_key(key) == dik) { return key; } } return 0u; }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004B9A10(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004B9A10));
@@ -6707,33 +6722,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004BE8C0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004BEB80(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004BEB80));
-    LIFT_ZERO(cpu->eax, 32u);
-    LIFT_BLOCK(label_000BEB82, UINT32_C(0x004BEB82));
-    LIFT_CMP(lift_load32(((uint32_t)(((uint32_t)(cpu->eax) * 8u) + SFERA_STATIC_005221F8_ADDR))), cpu->ecx, 32u);
-    LIFT_JZ(label_000BEB94, UINT32_C(0x004BEB8B));
-    LIFT_INC(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
-    LIFT_CMP(cpu->eax, UINT32_C(0x0000005F), 32u);
-    LIFT_JB(label_000BEB82, UINT32_C(0x004BEB91));
-    LIFT_ZERO(cpu->eax, 32u);
-    LIFT_RET(0u);
-    LIFT_BLOCK(label_000BEB94, UINT32_C(0x004BEB94));
-    LIFT_LOAD32(cpu->eax, ((uint32_t)(cpu->eax) * 8u) + SFERA_STATIC_005221FC_ADDR);
+    cpu->eax = sfera_key_dik_from_virtual_key(cpu->ecx);
     LIFT_RET(0u);
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004BEBA0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004BEBA0));
-    LIFT_ZERO(cpu->eax, 32u);
-    LIFT_BLOCK(label_000BEBA2, UINT32_C(0x004BEBA2));
-    LIFT_CMP(lift_load32(((uint32_t)(((uint32_t)(cpu->eax) * 8u) + SFERA_STATIC_005221FC_ADDR))), cpu->ecx, 32u);
-    LIFT_JZ(label_000BEBB4, UINT32_C(0x004BEBAB));
-    LIFT_INC(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
-    LIFT_CMP(cpu->eax, UINT32_C(0x0000005F), 32u);
-    LIFT_JB(label_000BEBA2, UINT32_C(0x004BEBB1));
-    LIFT_ZERO(cpu->eax, 32u);
-    LIFT_RET(0u);
-    LIFT_BLOCK(label_000BEBB4, UINT32_C(0x004BEBB4));
-    LIFT_LOAD32(cpu->eax, ((uint32_t)(cpu->eax) * 8u) + SFERA_STATIC_005221F8_ADDR);
+    cpu->eax = sfera_key_virtual_key_from_dik(cpu->ecx);
     LIFT_RET(0u);
 }
 

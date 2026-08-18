@@ -3,6 +3,10 @@
 
 #include <math.h>
 
+static uint32_t sfera_texture_time_key_digit(uint32_t index) { const char* key = "05185514038799035566164306887187530785282430311941"; return index < 50u ? (uint32_t)(key[index] - '0') : 0u; }
+static float sfera_zoning_lower_bound(uint32_t band) { switch (band) { case 0u: return 0.0f; case 1u: return 0.19f; case 2u: return 0.27f; case 3u: return 0.34f; case 4u: return 0.50f; case 5u: return 0.66f; case 6u: return 0.73f; default: return 0.81f; } }
+static float sfera_zoning_upper_bound(uint32_t band) { return band == 7u ? 1.0f : sfera_zoning_lower_bound(band + 1u); }
+
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00494A10(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00494A10));
     LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
@@ -6629,8 +6633,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00499730(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000010))));
     (void)0; /* source SEH registration eliminated */
     cpu->edi = (uint32_t)(cpu->ecx);
-    LIFT_CMP(SFERA_STATIC_00521888_U32, UINT32_C(0x00000000), 32u);
-    LIFT_JZ(label_000997D3, UINT32_C(0x0049975E));
     LIFT_IMPORT_CALL(SFERA_IMPORT_Sound_SI_GetInterface_YAPAVCSoundInterface_XZ, UINT32_C(0x0049975E), UINT32_C(0x00499764));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_000997D3, UINT32_C(0x00499768));
@@ -6688,8 +6690,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00499730(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00499810(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00499810));
-    LIFT_CMP(SFERA_STATIC_00521888_U32, UINT32_C(0x00000000), 32u);
-    LIFT_JZ(label_0009988F, UINT32_C(0x00499819));
     LIFT_IMPORT_CALL(SFERA_IMPORT_Sound_SI_GetInterface_YAPAVCSoundInterface_XZ, UINT32_C(0x00499819), UINT32_C(0x0049981F));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_0009988F, UINT32_C(0x00499823));
@@ -9409,7 +9409,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049BAC0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = ((int32_t)cpu->eax < 0) ? UINT32_C(0xFFFFFFFF) : 0u;
     cpu->ebp = (uint32_t)(UINT32_C(0x00000032));
     lift_divide_accumulator(cpu, cpu->ebp, 32u, 1u);
-    LIFT_LOAD32(cpu->eax, ((uint32_t)(cpu->edx) * 4u) + SFERA_STATIC_005218B0_ADDR);
+    cpu->eax = sfera_texture_time_key_digit(cpu->edx);
     LIFT_ADD(lift_load32(((uint32_t)(cpu->edi))), cpu->eax, 0u, 32u, lift_store32(((uint32_t)(cpu->edi)), (uint32_t)(result)););
     LIFT_CMP(cpu->ecx, cpu->ebx, 32u);
     LIFT_JZ_GOTO(label_0009BF51);
@@ -9645,7 +9645,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049BAC0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = ((int32_t)cpu->eax < 0) ? UINT32_C(0xFFFFFFFF) : 0u;
     cpu->ebx = (uint32_t)(UINT32_C(0x00000032));
     lift_divide_accumulator(cpu, cpu->ebx, 32u, 1u);
-    LIFT_LOAD32(cpu->eax, ((uint32_t)(cpu->edx) * 4u) + SFERA_STATIC_005218B0_ADDR);
+    cpu->eax = sfera_texture_time_key_digit(cpu->edx);
     LIFT_ADD(lift_load32(((uint32_t)(cpu->edi))), cpu->eax, 0u, 32u, lift_store32(((uint32_t)(cpu->edi)), (uint32_t)(result)););
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JNZ_GOTO(label_0009BBE9);
@@ -11765,14 +11765,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0049D780(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ZERO(cpu->ecx, 32u);
     lift_x87_push(cpu, 1.0);
     LIFT_BLOCK(label_0009D7A6, UINT32_C(0x0049D7A6));
-    LIFT_X87_LOAD_F32(((uint32_t)(cpu->ecx) * 4u) + SFERA_DATA_TABLE_BASE_0052199C_ADDR);
+    lift_x87_push(cpu, (double)sfera_zoning_lower_bound(cpu->ecx));
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000014));
     LIFT_CMP(cpu->ecx, UINT32_C(0x00000007), 32u);
     LIFT_JNZ(label_0009D7BC, UINT32_C(0x0049D7B6));
     LIFT_X87_STORE_F32(cpu->esp + UINT32_C(0x00000010));
     goto label_0009D7C7;
     LIFT_BLOCK(label_0009D7BC, UINT32_C(0x0049D7BC));
-    LIFT_X87_LOAD_F32(((uint32_t)(cpu->ecx) * 4u) + SFERA_DATA_TABLE_BASE_005219A0_ADDR);
+    lift_x87_push(cpu, (double)sfera_zoning_upper_bound(cpu->ecx));
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000010));
     LIFT_BLOCK(label_0009D7C7, UINT32_C(0x0049D7C7));
     LIFT_X87_LOAD_F32(cpu->esp + UINT32_C(0x00000014));
