@@ -625,7 +625,7 @@ ProcessMemory::ProcessMemory() {
     DiagnosticPhaseScope phase(RuntimePhase::static_storage);
     try { allocate_static_regions(); install_initial_static_data(); } catch (...) { release(); throw; }
     g_process_memory = this;
-    const std::string note = "semantic native storage initialized; module=" + hex_u32(load_base()) + ", callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata-bytes=" + std::to_string(SFERA_RDATA_SEMANTIC_SIZE) + ", data compatibility=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_data_compat_base)));
+    const std::string note = "semantic native storage initialized; module=" + hex_u32(load_base()) + ", callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata=eliminated, data compatibility=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_data_compat_base)));
     diagnostic_note(note.c_str());
 }
 
@@ -638,7 +638,7 @@ std::uint32_t ProcessMemory::entry_va() noexcept {
 }
 
 std::uint8_t* ProcessMemory::region_pointer(std::uint32_t rva, std::size_t size) const {
-    if (rva >= UINT32_C(0x000FD6B4) && rva < UINT32_C(0x0011FE00)) { const std::uint32_t source_va = kSourceImageBase + rva; const std::uint32_t first = sfera_rdata_mutable_semantic_address(source_va); const std::uint32_t last = size == 0u ? first : sfera_rdata_mutable_semantic_address(source_va + static_cast<std::uint32_t>(size - 1u)); if (first != 0u && (size == 0u || (last != 0u && last - first == size - 1u))) { return reinterpret_cast<std::uint8_t*>(static_cast<std::uintptr_t>(first)); } throw std::runtime_error("Source RVA targets immutable/dead semantic .rdata: " + hex_u32(rva)); }
+    if (rva >= UINT32_C(0x000FD000) && rva < UINT32_C(0x0011FE00)) { throw std::runtime_error("Source RVA targets eliminated .rdata: " + hex_u32(rva)); }
     if (rva >= UINT32_C(0x00120000) && static_cast<std::uint64_t>(rva - UINT32_C(0x00120000)) + size <= SFERA_DATA_SOURCE_SIZE) { return g_sfera_data_compat_base + (rva - UINT32_C(0x00120000)); }
     throw std::runtime_error("Source RVA is outside semantic static storage: " + hex_u32(rva));
 }
@@ -653,7 +653,7 @@ std::uint32_t ProcessMemory::source_address(std::uint32_t source_va) {
         if (callback != 0u) { return callback; }
         return kCodeTokenBase + rva;
     }
-    if (source_va >= SFERA_RDATA_SOURCE_BEGIN && source_va < SFERA_RDATA_SOURCE_BEGIN + SFERA_RDATA_SOURCE_SIZE) { const std::uint32_t semantic = sfera_rdata_semantic_address(source_va); if (semantic != 0u) { return semantic; } throw std::runtime_error(source_va < SFERA_RDATA_SEMANTIC_BEGIN ? "Eliminated source IAT address escaped into data flow: " + hex_u32(source_va) : "Source .rdata address is outside semantic storage: " + hex_u32(source_va)); }
+    if (source_va >= SFERA_ELIMINATED_RDATA_BEGIN && source_va < SFERA_ELIMINATED_RDATA_BEGIN + SFERA_ELIMINATED_RDATA_SIZE) { throw std::runtime_error("Eliminated source .rdata address escaped into data flow: " + hex_u32(source_va)); }
     if (source_va >= SFERA_DATA_SOURCE_BEGIN && source_va < SFERA_DATA_SOURCE_BEGIN + SFERA_DATA_SOURCE_SIZE) { return static_address(rva); }
     throw std::runtime_error("Source address has no semantic storage: " + hex_u32(source_va));
 }
@@ -667,7 +667,6 @@ bool ProcessMemory::code_rva(std::uint32_t address, std::uint32_t& rva) const no
 
 bool ProcessMemory::source_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
     if (code_rva(address, rva)) { return true; }
-    { const std::uint32_t rdata_rva = sfera_rdata_source_rva(address); if (rdata_rva != UINT32_MAX) { rva = rdata_rva; return true; } }
     { const std::uint32_t data_rva = sfera_data_source_rva(address); if (data_rva != UINT32_MAX) { rva = data_rva; return true; } }
     return false;
 }
@@ -691,17 +690,19 @@ bool ProcessMemory::callback_rva(std::uint32_t address, std::uint32_t& rva) cons
 
 const std::vector<ResolvedImport>& ProcessMemory::resolved_imports() const noexcept { return resolved_imports_; }
 
-bool ProcessMemory::try_read(std::uint32_t address, void* value, std::size_t size) const noexcept { address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size)); return value && safe_copy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size); }
-bool ProcessMemory::try_write(std::uint32_t address, const void* value, std::size_t size) noexcept { address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size)); return value && safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size); }
+bool ProcessMemory::try_read(std::uint32_t address, void* value, std::size_t size) const noexcept { if (!value) { return false; } if (size == sizeof(std::uint32_t)) { std::uint32_t semantic = 0u; try { if (sfera_vtable_try_load32(address, &semantic)) { std::memcpy(value, &semantic, sizeof(semantic)); return true; } } catch (...) { return false; } } address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size)); return safe_copy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size); }
+bool ProcessMemory::try_write(std::uint32_t address, const void* value, std::size_t size) noexcept { if (!value || sfera_vtable_token_address(address)) { return false; } address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size)); return safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size); }
 
 void ProcessMemory::read(std::uint32_t address, void* value, std::size_t size) const {
     if (!value) { throw std::runtime_error("Local memory read has a null destination"); }
+    if (size == sizeof(std::uint32_t)) { std::uint32_t semantic = 0u; if (sfera_vtable_try_load32(address, &semantic)) { std::memcpy(value, &semantic, sizeof(semantic)); return; } }
     address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size));
     std::memcpy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size);
 }
 
 void ProcessMemory::write(std::uint32_t address, const void* value, std::size_t size) {
     if (!value) { throw std::runtime_error("Local memory write has a null source"); }
+    if (sfera_vtable_token_address(address)) { throw std::runtime_error("Attempted write through semantic vtable token"); }
     address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size));
     std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size);
 }
@@ -709,7 +710,6 @@ void ProcessMemory::write(std::uint32_t address, const void* value, std::size_t 
 void ProcessMemory::allocate_static_regions() {
     if (sizeof(void*) != 4 || kMachine != IMAGE_FILE_MACHINE_I386) { throw std::runtime_error("Generated runtime requires Win32/x86"); }
     callback_thunks_size_ = kCallbackThunkCapacityBytes; callback_thunks_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, callback_thunks_size_, MEM_RESERVE, PAGE_NOACCESS)); if (!callback_thunks_) { throw std::runtime_error(win32_error("VirtualAlloc(callback thunk pool reserve)")); }
-    { constexpr std::uint32_t kPage = 0x1000u; const std::uint32_t prefix = (kPage - (SFERA_RDATA_SEMANTIC_SIZE & (kPage - 1u))) & (kPage - 1u); rdata_commit_size_ = align_up(prefix + SFERA_RDATA_SEMANTIC_SIZE, kPage); const std::uint32_t reserve_size = rdata_commit_size_ + 2u * kPage; rdata_reservation_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, reserve_size, MEM_RESERVE, PAGE_NOACCESS)); if (!rdata_reservation_) { throw std::runtime_error(win32_error("VirtualAlloc(rdata reserve)")); } rdata_commit_base_ = rdata_reservation_ + kPage; if (!VirtualAlloc(rdata_commit_base_, rdata_commit_size_, MEM_COMMIT, PAGE_READWRITE)) { throw std::runtime_error(win32_error("VirtualAlloc(rdata commit)")); } sfera_rdata_bind_storage(rdata_commit_base_ + prefix); }
     HANDLE data_backing = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0u, SFERA_DATA_STORAGE_SIZE, nullptr); if (!data_backing) { throw std::runtime_error(win32_error("CreateFileMappingW(data storage)")); }
     data_compat_view_ = static_cast<std::uint8_t*>(MapViewOfFile(data_backing, FILE_MAP_ALL_ACCESS, 0u, 0u, SFERA_DATA_STORAGE_SIZE)); if (!data_compat_view_) { CloseHandle(data_backing); throw std::runtime_error(win32_error("MapViewOfFile(data compatibility)")); } g_sfera_data_compat_base = data_compat_view_;
     auto map_semantic_range = [&](std::uint32_t source_begin, std::uint32_t size) { const std::uint32_t offset = source_begin - SFERA_DATA_SOURCE_BEGIN; if ((offset & (SFERA_DATA_PAGE_SIZE - 1u)) != 0u || (size & (SFERA_DATA_PAGE_SIZE - 1u)) != 0u || offset + size > SFERA_DATA_STORAGE_SIZE) { throw std::runtime_error("Invalid semantic data range"); } const std::uint32_t first_page = offset >> SFERA_DATA_PAGE_SHIFT; const std::uint32_t pages = size >> SFERA_DATA_PAGE_SHIFT; for (std::uint32_t page = 0u; page < pages; ++page) { const std::uint32_t storage_offset = offset + page * SFERA_DATA_PAGE_SIZE; std::uint8_t* alias = static_cast<std::uint8_t*>(MapViewOfFile(data_backing, FILE_MAP_ALL_ACCESS, 0u, storage_offset, SFERA_DATA_PAGE_SIZE)); if (!alias) { throw std::runtime_error(win32_error("MapViewOfFile(data semantic page)")); } g_sfera_data_semantic_page_alias[first_page + page] = alias; } };
@@ -990,7 +990,6 @@ void ProcessMemory::resolve_imports() {
     bind(SFERA_IMPORT_MSVCR100_cexit, mod_MSVCR100_dll, "_cexit", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_getmainargs, mod_MSVCR100_dll, "__getmainargs", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_amsg_exit, mod_MSVCR100_dll, "_amsg_exit", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_except_handler4_common, mod_MSVCR100_dll, "_except_handler4_common", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_terminate_YAXXZ, mod_MSVCR100_dll, "?terminate@@YAXXZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_onexit, mod_MSVCR100_dll, "_onexit", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_lock, mod_MSVCR100_dll, "_lock", 0u, false, ImportBehavior::generic);
@@ -1087,9 +1086,7 @@ void ProcessMemory::resolve_imports() {
     bind(SFERA_IMPORT_MSVCR100_exception_what, mod_MSVCR100_dll, "?what@exception@std@@UBEPBDXZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_exception_dtor, mod_MSVCR100_dll, "??1exception@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_memmove, mod_MSVCR100_dll, "memmove", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_CxxThrowException, mod_MSVCR100_dll, "_CxxThrowException", 0u, false, ImportBehavior::cxx_throw);
     bind(SFERA_IMPORT_MSVCR100_exception_ctor_325, mod_MSVCR100_dll, "??0exception@std@@QAE@ABV01@@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_CxxFrameHandler3, mod_MSVCR100_dll, "__CxxFrameHandler3", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_ldiv, mod_MSVCR100_dll, "ldiv", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_vfprintf, mod_MSVCR100_dll, "vfprintf", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_fprintf, mod_MSVCR100_dll, "fprintf", 0u, false, ImportBehavior::generic);
@@ -1180,16 +1177,83 @@ void ProcessMemory::resolve_imports() {
 }
 
 void ProcessMemory::resolve_static_references() {
-    auto is_text_slot = [](const std::uint8_t* storage, std::uint32_t size, std::uint32_t offset) noexcept { auto printable = [](std::uint8_t value) noexcept { return (value >= 0x20u && value <= 0x7Eu) || value == '\t' || value == '\n' || value == '\r'; }; std::uint32_t begin = offset; while (begin != 0u && printable(storage[begin - 1u])) { --begin; } std::uint32_t end = offset; while (end < size && printable(storage[end])) { ++end; } return end - begin >= 4u && end < size && storage[end] == 0u && begin <= offset && offset < end; };
-    auto is_data_target = [](std::uint32_t value) noexcept { if ((value & 3u) != 0u) { return false; } return (value >= UINT32_C(0x00520000) && value < UINT32_C(0x00525600)) || (value >= UINT32_C(0x04F30000) && value < UINT32_C(0x04F50000)) || (value >= UINT32_C(0x04F80000) && value < UINT32_C(0x04FA0000)); };
-    auto resolve_graph = [&](std::uint8_t* storage, std::uint32_t size) { for (std::uint32_t offset = 0u; offset + 4u <= size; offset += 4u) { std::uint32_t value = 0u; std::memcpy(&value, storage + offset, sizeof(value)); std::uint32_t resolved = 0u; if (value >= UINT32_C(0x00401000) && value < UINT32_C(0x004FC200) && lift_has_function_rva(value - kSourceImageBase)) { resolved = callback_address(value - kSourceImageBase); } else if ((value & 3u) == 0u && value >= SFERA_RDATA_SEMANTIC_BEGIN && value < SFERA_RDATA_SEMANTIC_BEGIN + SFERA_RDATA_SEMANTIC_SIZE) { resolved = sfera_rdata_semantic_address(value); } else if (is_data_target(value) && !is_text_slot(storage, size, offset)) { resolved = source_address(value); } if (resolved != 0u) { std::memcpy(storage + offset, &resolved, sizeof(resolved)); } } };
-    resolve_graph(g_sfera_rdata_semantic_storage, SFERA_RDATA_SEMANTIC_SIZE);
-    resolve_graph(g_sfera_data_compat_base, UINT32_C(0x00005600));
+    if (!sfera_bind_native_std_stream_vtables()) { throw std::runtime_error("Failed to bind native MSVCP stream vtables"); }
+    enum class ComAbiInterface : std::uint32_t { storage, inplace_frame, client_site, inplace_site, doc_host_ui_handler };
+    auto data_slot = [&](std::uint32_t source_va) -> std::uint8_t* { if (source_va < SFERA_DATA_SOURCE_BEGIN || source_va + sizeof(std::uint32_t) > SFERA_DATA_SOURCE_BEGIN + SFERA_DATA_SOURCE_SIZE) { throw std::runtime_error("Explicit .data relocation is outside semantic storage: " + hex_u32(source_va)); } return g_sfera_data_compat_base + (source_va - SFERA_DATA_SOURCE_BEGIN); };
+    auto write32 = [&](std::uint32_t source_va, std::uint32_t value) { std::memcpy(data_slot(source_va), &value, sizeof(value)); };
+    auto com_method_rva = [](ComAbiInterface interface_id, std::uint32_t slot) noexcept -> std::uint32_t {
+        switch (interface_id) {
+        case ComAbiInterface::storage:
+            if (slot == 0u || slot == 13u || slot == 16u || slot == 17u) { return UINT32_C(0x00021A80); }
+            if (slot == 1u || slot == 2u) { return UINT32_C(0x00021980); }
+            if (slot >= 3u && slot <= 5u) { return UINT32_C(0x00021820); }
+            if (slot == 6u) { return UINT32_C(0x00021830); }
+            if (slot == 7u || slot == 8u || slot == 11u || slot == 14u) { return UINT32_C(0x00021840); }
+            if (slot == 9u || slot == 12u) { return UINT32_C(0x00021A70); }
+            if (slot == 10u) { return UINT32_C(0x00021A00); }
+            if (slot == 15u) { return UINT32_C(0x000219E0); }
+            return 0u;
+        case ComAbiInterface::inplace_frame:
+            if (slot == 0u || slot == 9u || slot == 14u) { return UINT32_C(0x00021A80); }
+            if (slot == 1u || slot == 2u) { return UINT32_C(0x00021980); }
+            if (slot == 3u) { return UINT32_C(0x00021A50); }
+            if ((slot >= 4u && slot <= 7u) || slot == 11u) { return UINT32_C(0x00021A70); }
+            if (slot == 8u) { return UINT32_C(0x0003B130); }
+            if (slot == 10u) { return UINT32_C(0x00021790); }
+            if (slot == 12u || slot == 13u) { return UINT32_C(0x000219E0); }
+            return 0u;
+        case ComAbiInterface::client_site:
+            if (slot == 0u) { return UINT32_C(0x00021850); }
+            if (slot == 1u || slot == 2u) { return UINT32_C(0x00021980); }
+            if (slot == 3u || slot == 8u) { return UINT32_C(0x00021A00); }
+            if (slot == 4u) { return UINT32_C(0x00021940); }
+            if (slot == 5u) { return UINT32_C(0x00021950); }
+            if (slot == 6u) { return UINT32_C(0x000219F0); }
+            if (slot == 7u) { return UINT32_C(0x00021A70); }
+            return 0u;
+        case ComAbiInterface::inplace_site:
+            if (slot == 0u) { return UINT32_C(0x00021970); }
+            if (slot == 1u || slot == 2u) { return UINT32_C(0x00021980); }
+            if (slot == 3u) { return UINT32_C(0x00021990); }
+            if (slot == 4u) { return UINT32_C(0x00021A70); }
+            if ((slot >= 5u && slot <= 7u) || slot == 11u) { return UINT32_C(0x000219F0); }
+            if (slot == 8u) { return UINT32_C(0x000219B0); }
+            if (slot == 9u) { return UINT32_C(0x00021A80); }
+            if (slot == 10u) { return UINT32_C(0x000219E0); }
+            if (slot == 12u || slot == 13u) { return UINT32_C(0x00021A00); }
+            if (slot == 14u) { return UINT32_C(0x00021A10); }
+            return 0u;
+        case ComAbiInterface::doc_host_ui_handler:
+            if (slot == 0u) { return UINT32_C(0x00021FB0); }
+            if (slot == 1u || slot == 2u) { return UINT32_C(0x00021980); }
+            if (slot == 3u) { return UINT32_C(0x00021750); }
+            if (slot == 4u) { return UINT32_C(0x00021760); }
+            if (slot == 5u) { return UINT32_C(0x00021780); }
+            if (slot == 6u || slot == 7u) { return UINT32_C(0x000219F0); }
+            if (slot >= 8u && slot <= 10u) { return UINT32_C(0x000219E0); }
+            if (slot == 11u) { return UINT32_C(0x00021790); }
+            if (slot == 12u) { return UINT32_C(0x000217A0); }
+            if (slot == 13u || slot == 14u) { return UINT32_C(0x000217B0); }
+            if (slot == 15u) { return UINT32_C(0x000217C0); }
+            if (slot == 16u) { return UINT32_C(0x000217E0); }
+            if (slot == 17u) { return UINT32_C(0x00021800); }
+            return 0u;
+        }
+        return 0u;
+    };
+    auto bind_com_vtable = [&](std::uint32_t source_va, std::uint32_t slot_count, ComAbiInterface interface_id, const char* interface_name) { for (std::uint32_t slot = 0u; slot < slot_count; ++slot) { const std::uint32_t rva = com_method_rva(interface_id, slot); const std::uint32_t callback = callback_address(rva); if (rva == 0u || callback == 0u) { throw std::runtime_error(std::string("Missing lifted ") + interface_name + " vtable handler at slot " + std::to_string(slot)); } write32(source_va + slot * sizeof(std::uint32_t), callback); } };
+    bind_com_vtable(UINT32_C(0x005200E0), 18u, ComAbiInterface::storage, "IStorage");
+    bind_com_vtable(UINT32_C(0x0052012C), 15u, ComAbiInterface::inplace_frame, "IOleInPlaceFrame");
+    bind_com_vtable(UINT32_C(0x00520168), 9u, ComAbiInterface::client_site, "IOleClientSite");
+    bind_com_vtable(UINT32_C(0x0052018C), 15u, ComAbiInterface::inplace_site, "IOleInPlaceSite");
+    bind_com_vtable(UINT32_C(0x005201C8), 18u, ComAbiInterface::doc_host_ui_handler, "IDocHostUIHandler");
+    write32(UINT32_C(0x00520128), source_address(UINT32_C(0x005200E0)));
+    write32(UINT32_C(0x0052544C), callback_address(UINT32_C(0x000EBF30)));
 }
 
 void ProcessMemory::verify_semantic_data_views() const { if (!g_sfera_data_compat_base) { throw std::runtime_error("Data compatibility view is not initialized"); } for (std::uint32_t page = 0u; page < SFERA_DATA_PAGE_COUNT; ++page) { const std::uint8_t* semantic = g_sfera_data_semantic_page_alias[page]; if (!semantic) { continue; } const std::uint8_t* compatibility = g_sfera_data_compat_base + page * SFERA_DATA_PAGE_SIZE; if (std::memcmp(semantic, compatibility, SFERA_DATA_PAGE_SIZE) != 0) { throw std::runtime_error("Semantic data page is not coherent with compatibility backing"); } } }
 
-void ProcessMemory::protect_regions() { if (rdata_commit_base_ && rdata_commit_size_) { DWORD old_protection = 0; if (!VirtualProtect(rdata_commit_base_, rdata_commit_size_, PAGE_READONLY, &old_protection)) { throw std::runtime_error(win32_error("VirtualProtect(semantic rdata)")); } } }
+void ProcessMemory::protect_regions() {}
 
 void ProcessMemory::release() noexcept {
     if (g_process_memory == this) { g_process_memory = nullptr; }
@@ -1197,7 +1261,6 @@ void ProcessMemory::release() noexcept {
     for (std::uint32_t page = 0u; page < SFERA_DATA_PAGE_COUNT; ++page) { if (g_sfera_data_semantic_page_alias[page]) { UnmapViewOfFile(g_sfera_data_semantic_page_alias[page]); g_sfera_data_semantic_page_alias[page] = nullptr; } }
     if (data_compat_view_) { UnmapViewOfFile(data_compat_view_); data_compat_view_ = nullptr; } g_sfera_data_compat_base = nullptr;
     callback_addresses_.clear(); callback_thunk_count_ = 0u; callback_committed_pages_ = 0u; callback_rx_pages_ = 0u; if (callback_thunks_) { VirtualFree(callback_thunks_, 0, MEM_RELEASE); callback_thunks_ = nullptr; } callback_thunks_size_ = 0u;
-    sfera_rdata_bind_storage(nullptr); if (rdata_reservation_) { VirtualFree(rdata_reservation_, 0, MEM_RELEASE); rdata_reservation_ = nullptr; rdata_commit_base_ = nullptr; rdata_commit_size_ = 0; }
 }
 
 namespace {
@@ -1315,7 +1378,7 @@ void NativeRuntime::call_native(LiftCpu& state, std::uint32_t target, std::uint3
 void NativeRuntime::call_native_resolved(LiftCpu& state, std::uint32_t target, std::uint32_t callsite, ImportBehavior behavior) {
     struct NativeEspTrace { LiftCpu& state; NativeEspTrace(LiftCpu& value, std::uint32_t native_target, std::uint32_t native_callsite) : state(value) { g_last_native_target = native_target; g_last_native_callsite = native_callsite; g_last_native_esp_before = value.esp; g_last_native_esp_after = value.esp; } ~NativeEspTrace() { g_last_native_esp_after = state.esp; } } native_esp_trace(state, target, callsite);
     if (target < 0x10000u) { throw std::runtime_error("Invalid native call target " + hex_u32(target) + " at " + hex_u32(callsite)); }
-    if (behavior == ImportBehavior::cxx_throw) { const std::string note = std::string("passing client C++ exception through native SEH; callsite=") + hex_u32(callsite) + " object=" + hex_u32(memory_read<std::uint32_t>(state.esp)) + " throw-info=" + hex_u32(memory_read<std::uint32_t>(state.esp + 4u)) + " fs0=" + hex_u32(*reinterpret_cast<const std::uint32_t*>(state.fs_data)); diagnostic_note(note.c_str()); } else if (behavior == ImportBehavior::raise_exception) { const std::string note = std::string("passing client SEH exception through native runtime; callsite=") + hex_u32(callsite) + " code=" + hex_u32(memory_read<std::uint32_t>(state.esp)) + " fs0=" + hex_u32(*reinterpret_cast<const std::uint32_t*>(state.fs_data)); diagnostic_note(note.c_str()); }
+    if (behavior == ImportBehavior::raise_exception) { const std::string note = std::string("passing client SEH exception through native runtime; callsite=") + hex_u32(callsite) + " code=" + hex_u32(memory_read<std::uint32_t>(state.esp)) + " fs0=" + hex_u32(*reinterpret_cast<const std::uint32_t*>(state.fs_data)); diagnostic_note(note.c_str()); }
     if ((behavior == ImportBehavior::module_handle_a || behavior == ImportBehavior::module_handle_w) && memory_read<std::uint32_t>(state.esp) == 0u) { state.eax = memory_.load_base(); state.esp += 4u; return; }
     if ((behavior == ImportBehavior::module_filename_a || behavior == ImportBehavior::module_filename_w) && (memory_read<std::uint32_t>(state.esp) == 0u || memory_read<std::uint32_t>(state.esp) == memory_.load_base())) { const std::uint32_t buffer = memory_read<std::uint32_t>(state.esp + 4u); const std::uint32_t capacity = memory_read<std::uint32_t>(state.esp + 8u); state.eax = behavior == ImportBehavior::module_filename_w ? write_local_path(buffer, capacity, client_executable_path()) : write_local_path(buffer, capacity, client_executable_path_ansi()); state.esp += 12u; return; }
     if (behavior == ImportBehavior::ci_atan2 || behavior == ImportBehavior::ci_pow) { require_x87(&state, 2); state.fpu[1] = behavior == ImportBehavior::ci_pow ? std::pow(state.fpu[1], state.fpu[0]) : std::atan2(state.fpu[1], state.fpu[0]); lift_x87_pop(&state); return; }

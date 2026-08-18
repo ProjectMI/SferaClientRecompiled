@@ -201,14 +201,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040A310(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0040A470(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x0040A470));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EF8D8)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     LIFT_PUSH2(cpu->eax, cpu->esi);
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000008))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->esi, cpu->esp + UINT32_C(0x00000018));
     LIFT_ADD(cpu->esi, UINT32_C(0x00000008), 0u, 32u, cpu->esi = (uint32_t)(result););
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000018), cpu->esi);
@@ -216,7 +216,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040A470(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000010), UINT32_C(0x00000000));
     LIFT_JZ(label_0000A4C5, UINT32_C(0x0040A4AA));
     cpu->edx = (uint32_t)(UINT32_C(0x00000027));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0040A4B9));
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x00000020));
     lift_push32(cpu, (uint32_t)(cpu->eax));
@@ -234,7 +234,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040A470(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000010), UINT32_C(0x00000000));
     LIFT_STORE8(cpu->esi, UINT32_C(0x00000000));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000008));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP2(cpu->ecx, cpu->esi);
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_RET(4u);
@@ -772,21 +772,21 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040ACE0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0040AD30(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x0040AD30));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000F2238)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     LIFT_PUSH3(cpu->eax, cpu->ecx, cpu->esi);
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000000C))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     cpu->esi = (uint32_t)(cpu->edx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->esi);
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000020)))), UINT32_C(0x00000000), 32u);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000014), UINT32_C(0x00000000));
     LIFT_JZ(label_0000AD81, UINT32_C(0x0040AD66));
     cpu->edx = (uint32_t)(UINT32_C(0x00000027));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0040AD75));
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x00000020));
     lift_push32(cpu, (uint32_t)(cpu->eax));
@@ -804,7 +804,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040AD30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000010), UINT32_C(0x00000000));
     LIFT_STORE8(cpu->esi, UINT32_C(0x00000000));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000000C));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP2(cpu->ecx, cpu->esi);
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -831,7 +831,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040ADC0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE8(cpu->esi + UINT32_C(0x0000000C), (cpu->ebx & UINT32_C(0xFF)));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x0040ADF7));
     LIFT_SP_ADD(UINT32_C(0x00000004));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF44_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"map/set<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000ADFF)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000AE05));
     LIFT_BLOCK(label_0000AE05, UINT32_C(0x0040AE05));
@@ -1067,7 +1067,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040B010(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE8(cpu->esi + UINT32_C(0x00000010), (cpu->ebx & UINT32_C(0xFF)));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x0040B047));
     LIFT_SP_ADD(UINT32_C(0x00000004));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF44_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"map/set<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000B04F)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000B055));
     LIFT_BLOCK(label_0000B055, UINT32_C(0x0040B055));
@@ -1315,7 +1315,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040B260(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE8(cpu->esi + UINT32_C(0x0000000C), (cpu->ebx & UINT32_C(0xFF)));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x0040B2B8));
     LIFT_SP_ADD(UINT32_C(0x00000004));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF44_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"map/set<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000B2C0)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000B2C6));
     LIFT_BLOCK(label_0000B2C6, UINT32_C(0x0040B2C6));
@@ -1541,7 +1541,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040B4D0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->esi));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x0040B4F0));
     LIFT_SP_ADD(UINT32_C(0x00000004));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF44_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"map/set<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000B4F8)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000B4FE));
     LIFT_BLOCK(label_0000B4FE, UINT32_C(0x0040B4FE));
@@ -1899,8 +1899,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040B810(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0040B850(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x0040B850));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EF910)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -1908,7 +1908,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040B850(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000024))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
     LIFT_LOAD32(cpu->eax, cpu->ecx + UINT32_C(0x00000004));
@@ -1960,7 +1960,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040B850(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(cpu->edi, cpu->ebx, 32u);
     LIFT_JZ(label_0000B910, UINT32_C(0x0040B8F8));
     cpu->edx = (uint32_t)(UINT32_C(0x00000027));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0040B907));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x0040B90D));
@@ -1968,14 +1968,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040B850(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0000B910, UINT32_C(0x0040B910));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x00000010))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000024));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_SP_ADD(UINT32_C(0x00000020));
     LIFT_RET(4u);
     LIFT_BLOCK(label_0000B928, UINT32_C(0x0040B928));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->edi + UINT32_C(0x00000010))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000024));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_SP_ADD(UINT32_C(0x00000020));
     LIFT_RET(4u);
@@ -2105,14 +2105,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040BA00(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0040BA80(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x0040BA80));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EF938)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     LIFT_PUSH6(cpu->eax, cpu->ecx, cpu->ebx, cpu->ebp, cpu->esi, cpu->edi);
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000018))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000014), cpu->ecx);
     LIFT_LOAD32(cpu->ebp, cpu->esp + UINT32_C(0x00000028));
     LIFT_ZERO(cpu->ebx, 32u);
@@ -2131,7 +2131,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040BA80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000020)))), cpu->ebx, 32u);
     LIFT_JZ(label_0000BAF0, UINT32_C(0x0040BAD5));
     cpu->edx = (uint32_t)(UINT32_C(0x00000027));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0040BAE4));
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x00000020));
     lift_push32(cpu, (uint32_t)(cpu->eax));
@@ -2157,7 +2157,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040BA80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JZ_GOTO(label_0000BAB6);
     LIFT_BLOCK(label_0000BB25, UINT32_C(0x0040BB25));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000018));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP5(cpu->ecx, cpu->edi, cpu->esi, cpu->ebp, cpu->ebx);
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(4u);
@@ -2251,14 +2251,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040BBA0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0040BC20(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x0040BC20));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EF968)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     LIFT_PUSH6(cpu->eax, cpu->ecx, cpu->ebx, cpu->ebp, cpu->esi, cpu->edi);
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000018))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     cpu->ebx = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->eax, cpu->ebx);
     LIFT_LOAD32(cpu->edi, cpu->eax);
@@ -2276,7 +2276,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040BC20(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000020), UINT32_C(0x00000000));
     LIFT_JZ(label_0000BC8F, UINT32_C(0x0040BC74));
     cpu->edx = (uint32_t)(UINT32_C(0x00000027));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0040BC83));
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x00000020));
     lift_push32(cpu, (uint32_t)(cpu->eax));
@@ -2302,7 +2302,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040BC20(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JNZ_GOTO(label_0000BC5D);
     LIFT_BLOCK(label_0000BCC8, UINT32_C(0x0040BCC8));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000018));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP5(cpu->ecx, cpu->edi, cpu->esi, cpu->ebp, cpu->ebx);
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2317,7 +2317,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040BCE0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ebx = (uint32_t)(cpu->ecx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000004), cpu->ebx);
     LIFT_JZ(label_0000BCFD, UINT32_C(0x0040BCF2));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF5C_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"invalid map/set<T> iterator")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xout_of_range, LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000BCF7)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000BCFD));
     LIFT_BLOCK(label_0000BCFD, UINT32_C(0x0040BCFD));
@@ -2564,7 +2564,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040BF50(LiftCpu* cpu, uint32_t stop_addres
     cpu->ebx = (uint32_t)(cpu->ecx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000004), cpu->ebx);
     LIFT_JZ(label_0000BF6D, UINT32_C(0x0040BF62));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF5C_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"invalid map/set<T> iterator")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xout_of_range, LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000BF67)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000BF6D));
     LIFT_BLOCK(label_0000BF6D, UINT32_C(0x0040BF6D));
@@ -2810,7 +2810,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C1C0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ebx = (uint32_t)(cpu->ecx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ebx);
     LIFT_JZ(label_0000C1DE, UINT32_C(0x0040C1D3));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF5C_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"invalid map/set<T> iterator")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xout_of_range, LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000C1D8)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000C1DE));
     LIFT_BLOCK(label_0000C1DE, UINT32_C(0x0040C1DE));
@@ -3063,8 +3063,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C1C0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C440(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x0040C440));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EF998)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000008));
     LIFT_PUSH4(cpu->ebx, cpu->ebp, cpu->esi, cpu->edi);
@@ -3072,13 +3072,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C440(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000001C))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     cpu->ebx = (uint32_t)(cpu->ecx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000014), cpu->ebx);
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000030));
     LIFT_CMP(lift_load8(((uint32_t)(cpu->eax + UINT32_C(0x00000031)))), UINT32_C(0x00000000), 8u);
     LIFT_JZ(label_0000C482, UINT32_C(0x0040C477));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF5C_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"invalid map/set<T> iterator")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xout_of_range, LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000C47C)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x0000C482));
     LIFT_BLOCK(label_0000C482, UINT32_C(0x0040C482));
@@ -3296,7 +3296,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C440(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000020)))), cpu->edi, 32u);
     LIFT_JZ(label_0000C6AA, UINT32_C(0x0040C691));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->edi + UINT32_C(0x00000027))));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0040C69E));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000020));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
@@ -3327,7 +3327,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C440(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000030));
     LIFT_STORE32(cpu->eax, cpu->ecx);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000001C));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP5(cpu->ecx, cpu->edi, cpu->esi, cpu->ebp, cpu->ebx);
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_RET(8u);
@@ -3462,8 +3462,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C840(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x0040C840));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EF9D1)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x0000001C));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -3471,7 +3471,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C840(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     cpu->edi = (uint32_t)(cpu->ecx);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000002C)));
@@ -3505,7 +3505,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C840(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0000C8C0, UINT32_C(0x0040C8C0));
     cpu->eax = (uint32_t)(cpu->esi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(4u, cpu->ebp);
@@ -3515,10 +3515,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C840(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x0040C8F5), UINT32_C(0x0040C8FB));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0040C910));
     LIFT_TRAP_RETURN(UINT32_C(0x0040C910), "INT3");
 }
@@ -3538,10 +3538,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C8D6(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x0040C8F5), UINT32_C(0x0040C8FB));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0040C910));
     LIFT_TRAP_RETURN(UINT32_C(0x0040C910), "INT3");
 }
@@ -3550,8 +3550,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C920(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x0040C920));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFA01)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -3559,7 +3559,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C920(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000024)));
     LIFT_CALL_ENTER(sfera_sub_004EBEA0, UINT32_C(0x0040C952));
@@ -3589,7 +3589,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C920(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0000C994, UINT32_C(0x0040C994));
     cpu->eax = (uint32_t)(cpu->esi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(12u, cpu->ebp);
@@ -3599,10 +3599,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C920(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x0040C9C9), UINT32_C(0x0040C9CF));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->eax));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0040C9E4));
     LIFT_TRAP_RETURN(UINT32_C(0x0040C9E4), "INT3");
 }
@@ -3622,10 +3622,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040C9AA(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x0040C9C9), UINT32_C(0x0040C9CF));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->eax));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0040C9E4));
     LIFT_TRAP_RETURN(UINT32_C(0x0040C9E4), "INT3");
 }
@@ -4278,8 +4278,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040CE70(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0040D020(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x0040D020));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFA31)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000008));
     LIFT_PUSH4(cpu->ebx, cpu->ebp, cpu->esi, cpu->edi);
@@ -4287,7 +4287,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040D020(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000001C))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000018), cpu->edx);
     LIFT_LOAD32(cpu->esi, cpu->esp + UINT32_C(0x0000002C));
     LIFT_ZERO(cpu->ebx, 32u);
@@ -4342,7 +4342,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040D020(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0000D0C3, UINT32_C(0x0040D0C3));
     cpu->eax = (uint32_t)(cpu->esi);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000001C));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP5(cpu->ecx, cpu->edi, cpu->esi, cpu->ebp, cpu->ebx);
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_RET(16u);
@@ -4497,7 +4497,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040D3B0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(cpu->esi, cpu->edi, 32u);
     LIFT_JZ(label_0000D3FB, UINT32_C(0x0040D3C9));
     cpu->edx = (uint32_t)(UINT32_C(0x00000046));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0040D3D8));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
@@ -4867,7 +4867,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040D740(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x0000000C)))), cpu->ebx, 32u);
     LIFT_JZ(label_0000D7A1, UINT32_C(0x0040D786));
     cpu->edx = (uint32_t)(UINT32_C(0x00000027));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0040D795));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
@@ -5075,7 +5075,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040D950(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x0000000C)))), cpu->eax, 32u);
     LIFT_JZ(label_0000D9B0, UINT32_C(0x0040D997));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0x00000027))));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0040D9A4));
     LIFT_LOAD32(cpu->edx, cpu->esi + UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(cpu->edx));
@@ -5727,14 +5727,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040E070(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->esi, cpu->ebx + UINT32_C(0x00000024));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNS(label_0000E08B, UINT32_C(0x0040E085));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E08B, UINT32_C(0x0040E08B));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ecx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000008))))))));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JNS(label_0000E09F, UINT32_C(0x0040E099));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E09F, UINT32_C(0x0040E09F));
     LIFT_X87_DIV_POP(1u);
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000008));
@@ -5804,14 +5804,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040E120(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->esi, cpu->ebx + UINT32_C(0x00000024));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNS(label_0000E13B, UINT32_C(0x0040E135));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E13B, UINT32_C(0x0040E13B));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ecx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000008))))))));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JNS(label_0000E14F, UINT32_C(0x0040E149));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E14F, UINT32_C(0x0040E14F));
     LIFT_X87_DIV_POP(1u);
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000008));
@@ -5881,14 +5881,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040E1D0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->esi, cpu->ebx + UINT32_C(0x00000024));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNS(label_0000E1EB, UINT32_C(0x0040E1E5));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E1EB, UINT32_C(0x0040E1EB));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ecx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000008))))))));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JNS(label_0000E1FF, UINT32_C(0x0040E1F9));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E1FF, UINT32_C(0x0040E1FF));
     LIFT_X87_DIV_POP(1u);
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000008));
@@ -5958,14 +5958,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040E280(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->esi, cpu->ebx + UINT32_C(0x00000024));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNS(label_0000E29B, UINT32_C(0x0040E295));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E29B, UINT32_C(0x0040E29B));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ecx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000008))))))));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JNS(label_0000E2AF, UINT32_C(0x0040E2A9));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E2AF, UINT32_C(0x0040E2AF));
     LIFT_X87_DIV_POP(1u);
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000008));
@@ -6035,14 +6035,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040E330(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->esi, cpu->ebx + UINT32_C(0x00000024));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNS(label_0000E34B, UINT32_C(0x0040E345));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E34B, UINT32_C(0x0040E34B));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ecx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000008))))))));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JNS(label_0000E35F, UINT32_C(0x0040E359));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E35F, UINT32_C(0x0040E35F));
     LIFT_X87_DIV_POP(1u);
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000008));
@@ -6112,14 +6112,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040E3E0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->esi, cpu->ebx + UINT32_C(0x00000024));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNS(label_0000E3FB, UINT32_C(0x0040E3F5));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E3FB, UINT32_C(0x0040E3FB));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ecx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000008))))))));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JNS(label_0000E40F, UINT32_C(0x0040E409));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E40F, UINT32_C(0x0040E40F));
     LIFT_X87_DIV_POP(1u);
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000008));
@@ -6189,14 +6189,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040E490(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->esi, cpu->ebx + UINT32_C(0x00000024));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNS(label_0000E4AB, UINT32_C(0x0040E4A5));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E4AB, UINT32_C(0x0040E4AB));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ecx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000008))))))));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JNS(label_0000E4BF, UINT32_C(0x0040E4B9));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E4BF, UINT32_C(0x0040E4BF));
     LIFT_X87_DIV_POP(1u);
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000008));
@@ -6266,14 +6266,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040E540(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->esi, cpu->ebx + UINT32_C(0x00000024));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNS(label_0000E55B, UINT32_C(0x0040E555));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E55B, UINT32_C(0x0040E55B));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ecx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000008))))))));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JNS(label_0000E56F, UINT32_C(0x0040E569));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E56F, UINT32_C(0x0040E56F));
     LIFT_X87_DIV_POP(1u);
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000008));
@@ -6343,14 +6343,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040E5F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->esi, cpu->ebx + UINT32_C(0x00000024));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNS(label_0000E60B, UINT32_C(0x0040E605));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E60B, UINT32_C(0x0040E60B));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ecx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000008))))))));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JNS(label_0000E61F, UINT32_C(0x0040E619));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)SFERA_STATIC_004FDF58_F32)));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)4294967296.0f)));
     LIFT_BLOCK(label_0000E61F, UINT32_C(0x0040E61F));
     LIFT_X87_DIV_POP(1u);
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000008));
@@ -8592,8 +8592,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FD90(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x0040FD90));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFA91)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -8601,7 +8601,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FD90(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000028)));
     LIFT_CALL_ENTER(sfera_sub_004EBEA0, UINT32_C(0x0040FDC2));
@@ -8634,7 +8634,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FD90(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0000FE0C, UINT32_C(0x0040FE0C));
     cpu->eax = (uint32_t)(cpu->edi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(12u, cpu->ebp);
@@ -8644,10 +8644,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FD90(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x0040FE41), UINT32_C(0x0040FE47));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->eax));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0040FE5C));
     LIFT_TRAP_RETURN(UINT32_C(0x0040FE5C), "INT3");
 }
@@ -8667,10 +8667,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FE22(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x0040FE41), UINT32_C(0x0040FE47));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->eax));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0040FE5C));
     LIFT_TRAP_RETURN(UINT32_C(0x0040FE5C), "INT3");
 }
@@ -8679,8 +8679,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FE60(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x0040FE60));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFAC1)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -8688,7 +8688,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FE60(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000028)));
     LIFT_CALL_ENTER(sfera_sub_004EBEA0, UINT32_C(0x0040FE92));
@@ -8721,7 +8721,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FE60(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0000FEDC, UINT32_C(0x0040FEDC));
     cpu->eax = (uint32_t)(cpu->edi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(12u, cpu->ebp);
@@ -8731,10 +8731,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FE60(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x0040FF11), UINT32_C(0x0040FF17));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0040FF2C));
     LIFT_TRAP_RETURN(UINT32_C(0x0040FF2C), "INT3");
 }
@@ -8754,10 +8754,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FEF2(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x0040FF11), UINT32_C(0x0040FF17));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0040FF2C));
     LIFT_TRAP_RETURN(UINT32_C(0x0040FF2C), "INT3");
 }
@@ -8766,8 +8766,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FF30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x0040FF30));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFAF1)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -8775,7 +8775,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FF30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000028)));
     LIFT_CALL_ENTER(sfera_sub_004EBEA0, UINT32_C(0x0040FF62));
@@ -8809,7 +8809,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FF30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0000FFAE, UINT32_C(0x0040FFAE));
     cpu->eax = (uint32_t)(cpu->esi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(12u, cpu->ebp);
@@ -8819,10 +8819,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FF30(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->ebx);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x0040FFE3), UINT32_C(0x0040FFE9));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0040FFFE));
     LIFT_TRAP_RETURN(UINT32_C(0x0040FFFE), "INT3");
 }
@@ -8842,10 +8842,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040FFC4(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->ebx);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x0040FFE3), UINT32_C(0x0040FFE9));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0040FFFE));
     LIFT_TRAP_RETURN(UINT32_C(0x0040FFFE), "INT3");
 }
@@ -8854,8 +8854,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410000(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x00410000));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFB29)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -8863,7 +8863,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410000(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000040)));
     LIFT_CALL_ENTER(sfera_sub_004EBEA0, UINT32_C(0x00410032));
@@ -8902,7 +8902,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410000(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0001009B, UINT32_C(0x0041009B));
     cpu->eax = (uint32_t)(cpu->edi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(12u, cpu->ebp);
@@ -8912,10 +8912,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410000(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x004100D0), UINT32_C(0x004100D6));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x004100EB));
     LIFT_TRAP_RETURN(UINT32_C(0x004100EB), "INT3");
 }
@@ -8934,10 +8934,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004100B1(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x004100D0), UINT32_C(0x004100D6));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x004100EB));
     LIFT_TRAP_RETURN(UINT32_C(0x004100EB), "INT3");
 }
@@ -8946,8 +8946,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004100F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x004100F0));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFB61)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -8955,7 +8955,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004100F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000002C)));
     LIFT_CALL_ENTER(sfera_sub_004EBEA0, UINT32_C(0x00410122));
@@ -8993,7 +8993,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004100F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0001017A, UINT32_C(0x0041017A));
     cpu->eax = (uint32_t)(cpu->ebx);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(12u, cpu->ebp);
@@ -9003,10 +9003,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004100F0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x004101AF), UINT32_C(0x004101B5));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x004101CA));
     LIFT_TRAP_RETURN(UINT32_C(0x004101CA), "INT3");
 }
@@ -9025,10 +9025,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410190(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x004101AF), UINT32_C(0x004101B5));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x004101CA));
     LIFT_TRAP_RETURN(UINT32_C(0x004101CA), "INT3");
 }
@@ -9048,7 +9048,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410390(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_000103C3, UINT32_C(0x004103B8));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x000103BD)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x000103C3));
     LIFT_BLOCK(label_000103C3, UINT32_C(0x004103C3));
@@ -9078,7 +9078,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004103E0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_00010415, UINT32_C(0x0041040A));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x0001040F)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00010415));
     LIFT_BLOCK(label_00010415, UINT32_C(0x00410415));
@@ -9295,7 +9295,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410710(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_00010746, UINT32_C(0x0041073B));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x00010740)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00010746));
     LIFT_BLOCK(label_00010746, UINT32_C(0x00410746));
@@ -9334,7 +9334,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410770(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_000107A6, UINT32_C(0x0041079B));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x000107A0)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x000107A6));
     LIFT_BLOCK(label_000107A6, UINT32_C(0x004107A6));
@@ -9373,7 +9373,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004107D0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_00010806, UINT32_C(0x004107FB));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x00010800)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00010806));
     LIFT_BLOCK(label_00010806, UINT32_C(0x00410806));
@@ -9412,7 +9412,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410830(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_00010866, UINT32_C(0x0041085B));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x00010860)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00010866));
     LIFT_BLOCK(label_00010866, UINT32_C(0x00410866));
@@ -9451,7 +9451,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410890(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_000108C6, UINT32_C(0x004108BB));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x000108C0)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x000108C6));
     LIFT_BLOCK(label_000108C6, UINT32_C(0x004108C6));
@@ -9490,7 +9490,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004108F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_00010926, UINT32_C(0x0041091B));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x00010920)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00010926));
     LIFT_BLOCK(label_00010926, UINT32_C(0x00410926));
@@ -9516,8 +9516,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410950(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x00410950));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFC01)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x0000001C));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -9525,7 +9525,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410950(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     cpu->esi = (uint32_t)(cpu->ecx);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000030)));
@@ -9562,7 +9562,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410950(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_000109D8, UINT32_C(0x004109D8));
     cpu->eax = (uint32_t)(cpu->edi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(4u, cpu->ebp);
@@ -9572,10 +9572,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410950(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410A0D), UINT32_C(0x00410A13));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410A28));
     LIFT_TRAP_RETURN(UINT32_C(0x00410A28), "INT3");
 }
@@ -9595,10 +9595,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004109EE(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410A0D), UINT32_C(0x00410A13));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410A28));
     LIFT_TRAP_RETURN(UINT32_C(0x00410A28), "INT3");
 }
@@ -9607,8 +9607,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410A30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x00410A30));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFC31)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x0000001C));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -9616,7 +9616,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410A30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     cpu->esi = (uint32_t)(cpu->ecx);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000030)));
@@ -9653,7 +9653,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410A30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00010AB8, UINT32_C(0x00410AB8));
     cpu->eax = (uint32_t)(cpu->edi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(4u, cpu->ebp);
@@ -9663,10 +9663,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410A30(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410AED), UINT32_C(0x00410AF3));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410B08));
     LIFT_TRAP_RETURN(UINT32_C(0x00410B08), "INT3");
 }
@@ -9686,10 +9686,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410ACE(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410AED), UINT32_C(0x00410AF3));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410B08));
     LIFT_TRAP_RETURN(UINT32_C(0x00410B08), "INT3");
 }
@@ -9698,8 +9698,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410B10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x00410B10));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFC61)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x0000001C));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -9707,7 +9707,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410B10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     cpu->edi = (uint32_t)(cpu->ecx);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000030)));
@@ -9745,7 +9745,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410B10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00010B9A, UINT32_C(0x00410B9A));
     cpu->eax = (uint32_t)(cpu->esi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(4u, cpu->ebp);
@@ -9755,10 +9755,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410B10(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->ebx);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410BCF), UINT32_C(0x00410BD5));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410BEA));
     LIFT_TRAP_RETURN(UINT32_C(0x00410BEA), "INT3");
 }
@@ -9778,10 +9778,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410BB0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->ebx);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410BCF), UINT32_C(0x00410BD5));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410BEA));
     LIFT_TRAP_RETURN(UINT32_C(0x00410BEA), "INT3");
 }
@@ -9790,8 +9790,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410BF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x00410BF0));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFC99)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x0000001C));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -9799,7 +9799,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410BF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     cpu->esi = (uint32_t)(cpu->ecx);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000048)));
@@ -9843,7 +9843,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410BF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00010C95, UINT32_C(0x00410C95));
     cpu->eax = (uint32_t)(cpu->edi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(4u, cpu->ebp);
@@ -9853,10 +9853,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410BF0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->ebx);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410CCA), UINT32_C(0x00410CD0));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410CE5));
     LIFT_TRAP_RETURN(UINT32_C(0x00410CE5), "INT3");
 }
@@ -9876,10 +9876,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410CAB(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->ebx);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410CCA), UINT32_C(0x00410CD0));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410CE5));
     LIFT_TRAP_RETURN(UINT32_C(0x00410CE5), "INT3");
 }
@@ -9888,8 +9888,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410CF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x00410CF0));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFCD1)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x0000001C));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -9897,7 +9897,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410CF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     cpu->esi = (uint32_t)(cpu->ecx);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000034)));
@@ -9939,7 +9939,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410CF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00010D86, UINT32_C(0x00410D86));
     cpu->eax = (uint32_t)(cpu->edi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(4u, cpu->ebp);
@@ -9949,10 +9949,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410CF0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410DBB), UINT32_C(0x00410DC1));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->eax));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410DD6));
     LIFT_TRAP_RETURN(UINT32_C(0x00410DD6), "INT3");
 }
@@ -9971,10 +9971,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410D9C(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410DBB), UINT32_C(0x00410DC1));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFD8))));
     lift_push32(cpu, (uint32_t)(cpu->eax));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFD8), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410DD6));
     LIFT_TRAP_RETURN(UINT32_C(0x00410DD6), "INT3");
 }
@@ -9983,8 +9983,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410DE0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x00410DE0));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFD09)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -9992,7 +9992,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410DE0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000002C)));
     LIFT_CALL_ENTER(sfera_sub_004EBEA0, UINT32_C(0x00410E12));
@@ -10031,7 +10031,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410DE0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00010E6D, UINT32_C(0x00410E6D));
     cpu->eax = (uint32_t)(cpu->esi);
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(12u, cpu->ebp);
@@ -10041,10 +10041,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410DE0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->ebx);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410EA2), UINT32_C(0x00410EA8));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410EBD));
     LIFT_TRAP_RETURN(UINT32_C(0x00410EBD), "INT3");
 }
@@ -10064,10 +10064,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00410E83(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000008), cpu->ebx);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_exception_ctor, UINT32_C(0x00410EA2), UINT32_C(0x00410EA8));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_00517CB8_ADDR));
+    lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFE0))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_STATIC_004FDEB4_ADDR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFE0), SFERA_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x00410EBD));
     LIFT_TRAP_RETURN(UINT32_C(0x00410EBD), "INT3");
 }
@@ -10077,8 +10077,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411060(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00010430, UINT32_C(0x00410430));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ebp = (uint32_t)(cpu->esp);
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFBD0)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000008));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -10086,13 +10086,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411060(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->ebp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF4))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), cpu->esp);
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->ebx, cpu->ebp + UINT32_C(0x00000008));
     LIFT_CMP(cpu->ebx, UINT32_C(0x09249249), 32u);
     LIFT_JBE(label_00010473, UINT32_C(0x00410468));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF1C_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"vector<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x0001046D)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00010473));
     LIFT_BLOCK(label_00010473, UINT32_C(0x00410473));
@@ -10155,7 +10155,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411060(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esi, cpu->eax);
     LIFT_BLOCK(label_0001051A, UINT32_C(0x0041051A));
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0xFFFFFFF4));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     cpu->esp = (uint32_t)(cpu->ebp);
     LIFT_EPILOGUE1(4u, cpu->ebp);
@@ -10177,7 +10177,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411060(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->eax, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, cpu->esi, 32u);
     LIFT_JAE(label_00011096, UINT32_C(0x0041108B));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF1C_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"vector<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x00011090)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00011096));
     LIFT_BLOCK(label_00011096, UINT32_C(0x00411096));
@@ -10482,8 +10482,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411320(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00411370(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00411370));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFD78)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH2(cpu->esi, cpu->edi);
@@ -10491,7 +10491,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411370(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000020))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     cpu->edi = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->esi, cpu->esp + UINT32_C(0x00000030));
     lift_push32(cpu, (uint32_t)(cpu->esi));
@@ -10521,7 +10521,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411370(LiftCpu* cpu, uint32_t stop_addres
     LIFT_TEST(cpu->edi, 32u);
     LIFT_JZ(label_00011414, UINT32_C(0x004113FC));
     cpu->edx = (uint32_t)(UINT32_C(0x00000027));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0041140B));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x00411411));
@@ -10529,14 +10529,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411370(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00011414, UINT32_C(0x00411414));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x00000010))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000020));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP3(cpu->ecx, cpu->edi, cpu->esi);
     LIFT_SP_ADD(UINT32_C(0x00000020));
     LIFT_RET(4u);
     LIFT_BLOCK(label_0001142B, UINT32_C(0x0041142B));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ecx + UINT32_C(0x00000010))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000020));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP3(cpu->ecx, cpu->edi, cpu->esi);
     LIFT_SP_ADD(UINT32_C(0x00000020));
     LIFT_RET(4u);
@@ -10544,8 +10544,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411370(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00411450(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00411450));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFD78)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH2(cpu->esi, cpu->edi);
@@ -10553,7 +10553,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411450(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000020))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     cpu->edi = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->esi, cpu->esp + UINT32_C(0x00000030));
     lift_push32(cpu, (uint32_t)(cpu->esi));
@@ -10584,7 +10584,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411450(LiftCpu* cpu, uint32_t stop_addres
     LIFT_TEST(cpu->edi, 32u);
     LIFT_JZ(label_000114F2, UINT32_C(0x004114DA));
     cpu->edx = (uint32_t)(UINT32_C(0x00000027));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x004114E9));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x004114EF));
@@ -10592,14 +10592,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411450(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_000114F2, UINT32_C(0x004114F2));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x00000010))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000020));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP3(cpu->ecx, cpu->edi, cpu->esi);
     LIFT_SP_ADD(UINT32_C(0x00000020));
     LIFT_RET(4u);
     LIFT_BLOCK(label_00011509, UINT32_C(0x00411509));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ecx + UINT32_C(0x00000010))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000020));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP3(cpu->ecx, cpu->edi, cpu->esi);
     LIFT_SP_ADD(UINT32_C(0x00000020));
     LIFT_RET(4u);
@@ -10607,8 +10607,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411450(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00411520(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00411520));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFDB0)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x0000001C));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -10616,7 +10616,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411520(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000002C))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x0000003C));
     lift_push32(cpu, (uint32_t)(cpu->edi));
@@ -10647,7 +10647,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411520(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(cpu->edi, cpu->ebx, 32u);
     LIFT_JZ(label_000115B6, UINT32_C(0x004115A0));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000027))));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x004115AD));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x004115B3));
@@ -10655,14 +10655,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411520(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_000115B6, UINT32_C(0x004115B6));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x0000000C))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000002C));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_SP_ADD(UINT32_C(0x00000028));
     LIFT_RET(4u);
     LIFT_BLOCK(label_000115CE, UINT32_C(0x004115CE));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ecx + UINT32_C(0x0000000C))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000002C));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_SP_ADD(UINT32_C(0x00000028));
     LIFT_RET(4u);
@@ -10670,8 +10670,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411520(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004115F0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004115F0));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFDE0)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000020));
     LIFT_PUSH3(cpu->ebx, cpu->esi, cpu->edi);
@@ -10679,7 +10679,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004115F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000030))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     cpu->edi = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->esi, cpu->esp + UINT32_C(0x00000040));
     lift_push32(cpu, (uint32_t)(cpu->esi));
@@ -10714,14 +10714,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004115F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00402D20, UINT32_C(0x0041167D));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x00000010))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000030));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_SP_ADD(UINT32_C(0x0000002C));
     LIFT_RET(4u);
     LIFT_BLOCK(label_00011695, UINT32_C(0x00411695));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ecx + UINT32_C(0x00000010))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000030));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_SP_ADD(UINT32_C(0x0000002C));
     LIFT_RET(4u);
@@ -10729,14 +10729,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004115F0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004116F0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004116F0));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000F3F32)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     LIFT_PUSH4(cpu->eax, cpu->ecx, cpu->esi, cpu->edi);
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000010))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     cpu->edi = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->ecx, cpu->edi + UINT32_C(0x00000004));
     LIFT_LOAD32(cpu->esi, cpu->esp + UINT32_C(0x00000020));
@@ -10795,7 +10795,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004116F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_000117A8, UINT32_C(0x004117A8));
     LIFT_ADD(lift_load32(((uint32_t)(cpu->edi + UINT32_C(0x00000004)))), UINT32_C(0x0000001C), 0u, 32u, lift_store32(((uint32_t)(cpu->edi + UINT32_C(0x00000004))), (uint32_t)(result)););
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000010));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP3(cpu->ecx, cpu->edi, cpu->esi);
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(4u);
@@ -10921,7 +10921,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004118E0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(cpu->esi, cpu->edi, 32u);
     LIFT_JZ(label_0001192B, UINT32_C(0x004118F9));
     cpu->edx = (uint32_t)(UINT32_C(0x00000046));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x00411908));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
@@ -10948,7 +10948,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411930(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(cpu->esi, cpu->edi, 32u);
     LIFT_JZ(label_0001197B, UINT32_C(0x00411949));
     cpu->edx = (uint32_t)(UINT32_C(0x00000046));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x00411958));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
@@ -10966,8 +10966,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411930(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00411980(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00411980));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFE08)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000028));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -10978,7 +10978,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411980(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000003C))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x0000004C));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->esi = (uint32_t)(cpu->ecx);
@@ -11032,7 +11032,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411980(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0x00000028))));
     LIFT_BLOCK(label_00011A43, UINT32_C(0x00411A43));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000003C));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP5(cpu->ecx, cpu->edi, cpu->esi, cpu->ebp, cpu->ebx);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000024));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -11043,8 +11043,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411980(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00411A70(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00411A70));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFE38)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000028));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -11055,7 +11055,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411A70(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000038))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x00000048));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->esi = (uint32_t)(cpu->ecx);
@@ -11109,7 +11109,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411A70(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0x00000028))));
     LIFT_BLOCK(label_00011B3C, UINT32_C(0x00411B3C));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000038));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebp);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000024));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -11120,8 +11120,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411A70(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00411B60(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00411B60));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFE70)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000044));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -11132,7 +11132,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411B60(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000054))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->edx, cpu->esp + UINT32_C(0x00000064));
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
@@ -11208,7 +11208,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411B60(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->edi + UINT32_C(0x00000010))));
     LIFT_BLOCK(label_00011C69, UINT32_C(0x00411C69));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000054));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000040));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -11219,8 +11219,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411B60(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00411C90(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00411C90));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFEB8)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x0000005C));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -11231,7 +11231,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411C90(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000070))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x00000080));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->esi = (uint32_t)(cpu->ecx);
@@ -11315,7 +11315,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411C90(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00011DC6, UINT32_C(0x00411DC6));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0x00000028))));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000070));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP5(cpu->ecx, cpu->edi, cpu->esi, cpu->ebp, cpu->ebx);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000058));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -11326,8 +11326,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411C90(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00411DF0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00411DF0));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFEF8)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000034));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -11338,7 +11338,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411DF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000048))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x00000058));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->esi = (uint32_t)(cpu->ecx);
@@ -11389,7 +11389,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411DF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000040)))), cpu->ebx, 32u);
     LIFT_JZ(label_00011EDB, UINT32_C(0x00411EBF));
     cpu->edx = (uint32_t)(UINT32_C(0x00000027));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x00411ECE));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000040));
     lift_push32(cpu, (uint32_t)(cpu->eax));
@@ -11409,7 +11409,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411DF0(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0x00000028))));
     LIFT_BLOCK(label_00011EF7, UINT32_C(0x00411EF7));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000048));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP5(cpu->ecx, cpu->edi, cpu->esi, cpu->ebp, cpu->ebx);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000030));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -11435,7 +11435,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411F20(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_00011F56, UINT32_C(0x00411F4B));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x00011F50)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00011F56));
     LIFT_BLOCK(label_00011F56, UINT32_C(0x00411F56));
@@ -11474,7 +11474,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411F80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_00011FB6, UINT32_C(0x00411FAB));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x00011FB0)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00011FB6));
     LIFT_BLOCK(label_00011FB6, UINT32_C(0x00411FB6));
@@ -11513,7 +11513,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00411FE0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_00012016, UINT32_C(0x0041200B));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x00012010)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00012016));
     LIFT_BLOCK(label_00012016, UINT32_C(0x00412016));
@@ -11552,7 +11552,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412040(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_00012076, UINT32_C(0x0041206B));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x00012070)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x00012076));
     LIFT_BLOCK(label_00012076, UINT32_C(0x00412076));
@@ -11591,7 +11591,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004120A0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_000120D6, UINT32_C(0x004120CB));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x000120D0)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x000120D6));
     LIFT_BLOCK(label_000120D6, UINT32_C(0x004120D6));
@@ -11661,7 +11661,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412B70(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(cpu->esi, cpu->edi, 32u);
     LIFT_JZ(label_00012BBB, UINT32_C(0x00412B89));
     cpu->edx = (uint32_t)(UINT32_C(0x00000046));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x00412B98));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
@@ -11679,8 +11679,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412B70(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00412BC0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00412BC0));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000EFFD8)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000030));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -11691,7 +11691,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412BC0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000040))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x00000050));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000014))));
@@ -11730,7 +11730,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412BC0(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ecx + UINT32_C(0x00000024))));
     LIFT_BLOCK(label_00012C5E, UINT32_C(0x00412C5E));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000040));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000002C));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -11741,8 +11741,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412BC0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00412C80(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00412C80));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000F0008)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000030));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -11753,7 +11753,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412C80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000003C))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x0000004C));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000010))));
@@ -11792,7 +11792,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412C80(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ecx + UINT32_C(0x00000024))));
     LIFT_BLOCK(label_00012D26, UINT32_C(0x00412D26));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000003C));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP3(cpu->ecx, cpu->edi, cpu->esi);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000002C));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -11803,8 +11803,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412C80(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00412D50(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00412D50));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000F0040)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000048));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -11815,7 +11815,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412D50(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000058))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x00000068));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000014))));
@@ -11871,7 +11871,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412D50(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ecx + UINT32_C(0x0000000C))));
     LIFT_BLOCK(label_00012E34, UINT32_C(0x00412E34));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000058));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000044));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -11882,8 +11882,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412D50(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00412E60(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00412E60));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000F0088)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000064));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -11894,7 +11894,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412E60(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000078))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x00000088));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000018))));
@@ -11966,7 +11966,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412E60(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ecx + UINT32_C(0x00000024))));
     LIFT_BLOCK(label_00012F7E, UINT32_C(0x00412F7E));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000078));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP5(cpu->ecx, cpu->edi, cpu->esi, cpu->ebp, cpu->ebx);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000060));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -11977,8 +11977,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412E60(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00412FA0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00412FA0));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000F00C8)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x00000038));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -11989,7 +11989,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412FA0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000048))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x00000058));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000014))));
@@ -12025,7 +12025,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412FA0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000040)))), cpu->ebx, 32u);
     LIFT_JZ(label_00013064, UINT32_C(0x0041304A));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000027))));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x00413057));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000040));
     lift_push32(cpu, (uint32_t)(cpu->eax));
@@ -12045,7 +12045,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00412FA0(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ecx + UINT32_C(0x00000024))));
     LIFT_BLOCK(label_00013080, UINT32_C(0x00413080));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000048));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000034));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););
@@ -12071,7 +12071,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004130A0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SUB(cpu->edx, cpu->ecx, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_CMP(cpu->edx, UINT32_C(0x00000001), 32u);
     LIFT_JAE(label_000130D6, UINT32_C(0x004130CB));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_004FDF30_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"list<T> too long")));
     lift_import_call(cpu, SFERA_IMPORT_MSVCP100_std_Xlength_error, LIFT_CODE_TOKEN_RVA(UINT32_C(0x000130D0)));
     cpu->eip = LIFT_CODE_TOKEN_RVA(UINT32_C(0x000130D6));
     LIFT_BLOCK(label_000130D6, UINT32_C(0x004130D6));
@@ -12104,7 +12104,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00413B30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(cpu->esi, cpu->edi, 32u);
     LIFT_JZ(label_00013B7B, UINT32_C(0x00413B49));
     cpu->edx = (uint32_t)(UINT32_C(0x00000046));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x00413B58));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
@@ -12122,8 +12122,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00413B30(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00413B80(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00413B80));
-    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), LIFT_CALLBACK_RVA(UINT32_C(0x000F0188)));
-    cpu->eax = (uint32_t)(lift_fs_load32(cpu, ((uint32_t)(UINT32_C(0x00000000)))));
+    LIFT_PUSH2(UINT32_C(0xFFFFFFFF), UINT32_C(0x00000000));
+    cpu->eax = (uint32_t)(UINT32_C(0x00000000));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_SP_SUB(UINT32_C(0x0000004C));
     cpu->eax = (uint32_t)(SFERA_STATIC_00525490_U32);
@@ -12134,7 +12134,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00413B80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000005C))));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->eax));
+    (void)0; /* source SEH registration eliminated */
     LIFT_LOAD32(cpu->esi, cpu->esp + UINT32_C(0x0000006C));
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000014))));
@@ -12186,7 +12186,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00413B80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x0000001C)))), cpu->ebx, 32u);
     LIFT_JZ(label_00013C80, UINT32_C(0x00413C64));
     cpu->edx = (uint32_t)(UINT32_C(0x00000027));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_004FDEBC_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\DataCont\\sDataContainers.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x00413C73));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000001C));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
@@ -12206,7 +12206,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00413B80(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ecx + UINT32_C(0x00000010))));
     LIFT_BLOCK(label_00013C9B, UINT32_C(0x00413C9B));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000005C));
-    lift_fs_store32(cpu, ((uint32_t)(UINT32_C(0x00000000))), (uint32_t)(cpu->ecx));
+    (void)0; /* source SEH registration eliminated */
     LIFT_POP4(cpu->ecx, cpu->edi, cpu->esi, cpu->ebx);
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000048));
     LIFT_LOGIC(cpu->ecx, cpu->esp, ^, 32u, cpu->ecx = (uint32_t)(result););

@@ -85,9 +85,6 @@ public:
 private:
     std::uint8_t* callback_thunks_ = nullptr;
     std::uint32_t callback_thunks_size_ = 0;
-    std::uint8_t* rdata_reservation_ = nullptr;
-    std::uint8_t* rdata_commit_base_ = nullptr;
-    std::uint32_t rdata_commit_size_ = 0;
     std::uint8_t* data_compat_view_ = nullptr;
     std::uint32_t callback_thunk_count_ = 0u;
     std::uint32_t callback_committed_pages_ = 0u;

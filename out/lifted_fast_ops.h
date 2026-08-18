@@ -15,16 +15,14 @@
 #define LIFT_CODE_TOKEN_RVA(rva) (LIFT_CODE_TOKEN_BASE + (uint32_t)(rva))
 #define LIFT_CODE_TOKEN_VA(source_va) LIFT_CODE_TOKEN_RVA((uint32_t)(source_va) - UINT32_C(0x00400000))
 #define LIFT_CALLBACK_RVA(rva) lift_callback_address_rva((uint32_t)(rva))
-#define LIFT_SOURCE_RDATA_BEGIN UINT32_C(0x004FD000)
-#define LIFT_SOURCE_RDATA_SIZE UINT32_C(0x00022E00)
 #define LIFT_SOURCE_DATA_BEGIN UINT32_C(0x00520000)
 #define LIFT_SOURCE_DATA_SIZE UINT32_C(0x04A70790)
 
-LIFT_FORCEINLINE uint32_t lift_fast_source_rva(uint32_t address) { uint32_t offset = address - LIFT_CODE_TOKEN_BASE; if (offset >= UINT32_C(0x00001000) && offset < UINT32_C(0x00001000) + LIFT_SOURCE_TEXT_SIZE) { return offset; } { uint32_t rdata_rva = sfera_rdata_source_rva(address); if (rdata_rva != UINT32_MAX) { return rdata_rva; } } { uint32_t data_rva = sfera_data_source_rva(address); if (data_rva != UINT32_MAX) { return data_rva; } } return lift_source_rva(address); }
+LIFT_FORCEINLINE uint32_t lift_fast_source_rva(uint32_t address) { uint32_t offset = address - LIFT_CODE_TOKEN_BASE; if (offset >= UINT32_C(0x00001000) && offset < UINT32_C(0x00001000) + LIFT_SOURCE_TEXT_SIZE) { return offset; } { uint32_t data_rva = sfera_data_source_rva(address); if (data_rva != UINT32_MAX) { return data_rva; } } return lift_source_rva(address); }
 
 LIFT_FORCEINLINE uint8_t lift_fast_load8(uint32_t address) { address = sfera_data_deref_address(address); return *(const uint8_t*)(uintptr_t)address; }
 LIFT_FORCEINLINE uint16_t lift_fast_load16(uint32_t address) { address = sfera_data_deref_address(address); return *(const uint16_t*)(uintptr_t)address; }
-LIFT_FORCEINLINE uint32_t lift_fast_load32(uint32_t address) { address = sfera_data_deref_address(address); return *(const uint32_t*)(uintptr_t)address; }
+LIFT_FORCEINLINE uint32_t lift_fast_load32(uint32_t address) { uint32_t value; if (sfera_vtable_try_load32(address, &value)) { return value; } address = sfera_data_deref_address(address); return *(const uint32_t*)(uintptr_t)address; }
 LIFT_FORCEINLINE uint64_t lift_fast_load64(uint32_t address) { address = sfera_data_deref_range(address, 8u); return *(const uint64_t*)(uintptr_t)address; }
 LIFT_FORCEINLINE float lift_fast_load_f32(uint32_t address) { address = sfera_data_deref_address(address); return *(const float*)(uintptr_t)address; }
 LIFT_FORCEINLINE double lift_fast_load_f64(uint32_t address) { address = sfera_data_deref_range(address, 8u); return *(const double*)(uintptr_t)address; }

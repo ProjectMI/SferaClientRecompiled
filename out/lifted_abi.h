@@ -30,6 +30,11 @@ extern "C" {
 #define LIFT_FLAG_OF UINT32_C(0x00000800)
 #define LIFT_CALLBACK_SENTINEL UINT32_C(0xFFF0FFF0)
 
+typedef struct SferaGuid32 { uint32_t data1; uint16_t data2; uint16_t data3; uint8_t data4[8]; } SferaGuid32;
+typedef struct SferaDIDataFormat32 { uint32_t size; uint32_t object_size; uint32_t flags; uint32_t data_size; uint32_t object_count; uint32_t object_formats; } SferaDIDataFormat32;
+typedef struct SferaDIObjectDataFormat32 { uint32_t object_guid; uint32_t offset; uint32_t type; uint32_t flags; } SferaDIObjectDataFormat32;
+typedef struct SferaMsvcVbtable2 { int32_t self_offset; int32_t virtual_base_offset; } SferaMsvcVbtable2;
+
 typedef struct LiftCpu {
     uint32_t eax;
     uint32_t ecx;
