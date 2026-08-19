@@ -3,6 +3,10 @@
 #include "lifted_normalized_ops.h"
 
 #include <stddef.h>
+
+extern "C" uint32_t g_sfera_security_cookie = UINT32_C(0xBB40E64E);
+extern "C" uint32_t g_sfera_security_cookie_complement = UINT32_C(0x44BF19B1);
+extern "C" uint32_t g_sfera_log_first_write = 1u;
 #include <stdint.h>
 #include <string.h>
 
@@ -14,6 +18,40 @@
 #endif
 
 extern "C" {
+
+SferaItemArray g_sfera_effect_items = {};
+SferaItemArray g_sfera_sound_effect_items = {};
+SferaServerWall g_sfera_server_wall = {};
+SferaNetworkRuntime g_sfera_network_runtime = {};
+SferaGraphicsRuntime g_sfera_graphics_runtime = {};
+SferaWorldObjectRuntime g_sfera_world_objects = {};
+SferaControlOptionsRuntime g_sfera_control_options = {};
+SferaSpriteRuntime g_sfera_sprite_runtime = {};
+SferaCrashRuntime g_sfera_crash_runtime = {};
+SferaContoursRuntime g_sfera_contours_runtime = {};
+SferaDynGreenRuntime g_sfera_dyn_green_runtime = {};
+SferaExecutionMonitorRuntime g_sfera_execution_monitor_runtime = {};
+SferaErrorLogRuntime g_sfera_error_log_runtime = {};
+SferaPacketCodecRuntime g_sfera_packet_codec_runtime = {};
+SferaOleHostAbi g_sfera_ole_host_abi = {};
+uint32_t g_sfera_graphics_display_depth_bits = 32u;
+SferaInterfaceRuntime g_sfera_interface_runtime = {};
+SferaStdAllocator g_sfera_std_allocator = {};
+SferaMemoryRuntime g_sfera_memory_runtime = {};
+SferaRenderBufferCapacities g_sfera_render_buffer_capacities = {30000u, 30000u, 5000u, 5000u};
+uint32_t g_sfera_blood_effect_instance = 0u;
+SferaFileRuntime g_sfera_file_runtime = {};
+SferaEffectManagerRuntime g_sfera_effect_manager = {};
+char g_sfera_array_error_buffer[256] = {};
+SferaMsvcString32 g_sfera_shared_parser_whitespace = {};
+SferaMsvcString32 g_sfera_shared_parser_path_separators = {};
+SferaMsvcString32 g_sfera_server_parser_whitespace = {};
+SferaMsvcString32 g_sfera_server_parser_path_separators = {};
+SferaMsvcString32 g_sfera_menu_parser_whitespace = {};
+SferaMsvcString32 g_sfera_menu_parser_path_separators = {};
+SferaMsvcString32 g_sfera_menu_list_missing_parameter_message = {};
+SferaMsvcString32 g_sfera_menu_not_enough_arguments_message = {};
+SferaMsvcString32 g_sfera_menu_sprite_not_found_message = {};
 
 const SferaMsvcVbtable2 g_sfera_vbtable_basic_ofstream = {0, 0x60};
 const SferaMsvcVbtable2 g_sfera_vbtable_basic_ifstream = {0, 0x68};
@@ -1132,135 +1170,127 @@ namespace {
 template <typename T>
 static T& sfera_initial_data(uint8_t* storage, uint32_t source_va) { return *reinterpret_cast<T*>(storage + (source_va - SFERA_DATA_SOURCE_BEGIN)); }
 
-struct SferaGraphicsRuntimeDefaults32 {
-    float fog_distance;
-    float saved_fog_distance;
-    uint32_t lods_enabled;
-    uint32_t hardware_cursor_enabled;
-    float environment_factor;
-};
+static_assert(sizeof(SferaStdAllocator) == 4u, "StdAllocator state layout changed");
+static_assert(sizeof(SferaAutoBoundsArray) == 0x38u, "AutoBoundsArray state layout changed");
+static_assert(sizeof(SferaFileRuntime) == 0x84u, "file runtime state layout changed");
+static_assert(sizeof(SferaBoundCheckArray) == 0x2Cu, "BoundCheckArray state layout changed");
+static_assert(offsetof(SferaBoundCheckArray, debug_file) == 0x08u, "BoundCheckArray debug file moved");
+static_assert(offsetof(SferaBoundCheckArray, debug_line) == 0x28u, "BoundCheckArray debug line moved");
+static_assert(sizeof(SferaEffectListenerMap) == 0x0Cu, "effect-listener map layout changed");
+static_assert(offsetof(SferaEffectListenerMap, head) == 0x04u, "effect-listener map head moved");
+static_assert(offsetof(SferaEffectListenerMap, size) == 0x08u, "effect-listener map size moved");
+static_assert(offsetof(SferaFileRuntime, search_paths) == 0x14u, "file search-path array moved");
+static_assert(offsetof(SferaFileRuntime, open_files) == 0x4Cu, "file open-record array moved");
+static_assert(sizeof(SferaItemArray) == 28u, "ItemArray state layout changed");
+static_assert(offsetof(SferaItemArray, growth_count) == 0x18u, "ItemArray growth field moved");
+static_assert(sizeof(SferaServerWall) == 28u, "ServerWall state layout changed");
+static_assert(sizeof(SferaNetworkRuntime) == 0x13B8A4u, "NetworkRuntime state layout changed");
+static_assert(sizeof(SferaExecutionMonitorRuntime) == 0x64u, "ExecutionMonitor ABI layout changed");
+static_assert(offsetof(SferaExecutionMonitorRuntime, stop_requested) == 0x0Cu, "ExecutionMonitor stop flag moved");
+static_assert(offsetof(SferaExecutionMonitorRuntime, log_path) == 0x0Eu, "ExecutionMonitor log path moved");
+static_assert(offsetof(SferaExecutionMonitorRuntime, critical_section) == 0x44u, "ExecutionMonitor critical section moved");
+static_assert(offsetof(SferaExecutionMonitorRuntime, current_value_a) == 0x5Cu, "ExecutionMonitor value A moved");
+static_assert(offsetof(SferaExecutionMonitorRuntime, current_value_b) == 0x60u, "ExecutionMonitor value B moved");
+static_assert(offsetof(SferaServerWall, effect_handle) == 0x18u, "ServerWall effect handle moved");
 
-struct SferaSecurityCookieState32 {
-    uint32_t cookie;
-    uint32_t complement;
-};
-
-struct SferaStdAllocatorState32 {
-    uint32_t vptr;
-};
-
-struct SferaItemArrayState32 {
-    uint32_t block_vector_begin;
-    uint32_t block_vector_end;
-    uint32_t block_vector_capacity_end;
-    uint32_t reserved;
-    uint32_t free_items;
-    uint32_t free_count;
-    uint32_t growth_count;
-};
-
-struct SferaServerWallState32 {
-    uint32_t wall_data;
-    uint32_t reserved_04;
-    uint32_t wall_count;
-    uint32_t generated_data;
-    uint32_t generated_points;
-    uint32_t segment_count;
-    uint32_t effect_handle;
-};
-
-static_assert(sizeof(SferaGraphicsRuntimeDefaults32) == 20u, "graphics runtime defaults layout changed");
-static_assert(sizeof(SferaSecurityCookieState32) == 8u, "security cookie layout changed");
-static_assert(sizeof(SferaStdAllocatorState32) == 4u, "StdAllocator state layout changed");
-static_assert(sizeof(SferaItemArrayState32) == 28u, "ItemArray state layout changed");
-static_assert(offsetof(SferaItemArrayState32, growth_count) == 0x18u, "ItemArray growth field moved");
-static_assert(sizeof(SferaServerWallState32) == 28u, "ServerWall state layout changed");
-static_assert(offsetof(SferaServerWallState32, effect_handle) == 0x18u, "ServerWall effect handle moved");
-
-static void sfera_initialize_network_defaults(uint8_t* storage) {
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x0052073C)) = UINT32_MAX;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00520740)) = UINT32_C(25858);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00520758)) = UINT32_C(26860);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00520760)) = UINT32_MAX;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00520764)) = UINT32_MAX;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00520768)) = UINT32_MAX;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x0052076C)) = UINT32_MAX;
+static void sfera_initialize_network_defaults(void) {
+    memset(&g_sfera_network_runtime, 0, sizeof(g_sfera_network_runtime));
+    g_sfera_network_runtime.initialization_result = UINT32_MAX;
+    g_sfera_network_runtime.server_port = UINT32_C(25858);
+    g_sfera_network_runtime.local_port_candidate = UINT32_C(26860);
+    g_sfera_network_runtime.connection_slot = UINT32_MAX;
+    g_sfera_network_runtime.pending_slot = UINT32_MAX;
+    g_sfera_network_runtime.active_slot = UINT32_MAX;
+    g_sfera_network_runtime.shutdown_state = UINT32_MAX;
 }
 
-static void sfera_initialize_graphics_defaults(uint8_t* storage) {
-    sfera_initial_data<uint8_t>(storage, UINT32_C(0x005211C2)) = UINT8_C(1);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005211C4)) = UINT32_C(32);
-    sfera_initial_data<float>(storage, UINT32_C(0x00521224)) = 0.6460000276565552f;
-    sfera_initial_data<float>(storage, UINT32_C(0x00521228)) = 1.0f;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x0052122C)) = 1u;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x0052123C)) = UINT32_MAX;
-    SferaGraphicsRuntimeDefaults32& graphics = sfera_initial_data<SferaGraphicsRuntimeDefaults32>(storage, UINT32_C(0x005212C0));
-    graphics.fog_distance = 100.0f;
-    graphics.saved_fog_distance = 50.0f;
-    graphics.lods_enabled = 1u;
-    graphics.hardware_cursor_enabled = 1u;
-    graphics.environment_factor = 0.8500000238418579f;
+static void sfera_initialize_graphics_defaults(void) {
+    g_sfera_graphics_display_depth_bits = UINT32_C(32);
+    g_sfera_graphics_runtime = {};
+    g_sfera_graphics_runtime.fog_distance = 100.0f;
+    g_sfera_graphics_runtime.saved_fog_distance = 50.0f;
+    g_sfera_graphics_runtime.lods_enabled = 1u;
+    g_sfera_graphics_runtime.hardware_cursor_enabled = 1u;
+    g_sfera_graphics_runtime.environment_factor = 0.8500000238418579f;
+    g_sfera_graphics_runtime.render_mode_enabled = UINT8_C(1);
+    g_sfera_graphics_runtime.base_microtexture_id = UINT32_MAX;
+    g_sfera_graphics_runtime.view_parameter = 0.6460000276565552f;
+    g_sfera_graphics_runtime.view_scale = 1.0f;
+    g_sfera_graphics_runtime.post_effects_enabled = 1u;
+    g_sfera_graphics_runtime.rebuild_percent = UINT32_MAX;
+    g_sfera_graphics_runtime.runtime_counter = UINT32_C(2000);
+    g_sfera_graphics_runtime.texture_runtime_id = UINT32_C(1000000);
 }
 
-static void sfera_initialize_interface_defaults(uint8_t* storage) {
-    sfera_initial_data<uint8_t>(storage, UINT32_C(0x005220A4)) = UINT8_C(1);
-    sfera_initial_data<uint8_t>(storage, UINT32_C(0x005220A5)) = UINT8_C(1);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005220A8)) = 1u;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005220AC)) = 1u;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005220B4)) = 1u;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005220B8)) = 1u;
+static void sfera_initialize_interface_defaults(void) {
+    g_sfera_interface_runtime = {};
+    g_sfera_interface_runtime.primary_gate = UINT8_C(1);
+    g_sfera_interface_runtime.secondary_gate = UINT8_C(1);
+    g_sfera_interface_runtime.cross_enabled = 1u;
+    g_sfera_interface_runtime.sounds_enabled = 1u;
+    g_sfera_interface_runtime.description_auto_popup = 1u;
+    g_sfera_interface_runtime.invite_messages = 1u;
 }
 
-static void sfera_initialize_object_runtime(uint8_t* storage) {
-    SferaItemArrayState32& effect_items = sfera_initial_data<SferaItemArrayState32>(storage, UINT32_C(0x00520244));
-    effect_items.growth_count = UINT32_C(6000);
-    SferaServerWallState32& server_wall = sfera_initial_data<SferaServerWallState32>(storage, UINT32_C(0x005217D8));
-    server_wall.effect_handle = UINT32_MAX;
-    SferaItemArrayState32& sound_effects = sfera_initial_data<SferaItemArrayState32>(storage, UINT32_C(0x0052183C));
-    sound_effects.growth_count = UINT32_C(128);
+static void sfera_initialize_object_runtime(void) {
+    g_sfera_effect_items = {};
+    g_sfera_effect_items.growth_count = UINT32_C(6000);
+    g_sfera_server_wall = {};
+    g_sfera_server_wall.effect_handle = UINT32_MAX;
+    g_sfera_sound_effect_items = {};
+    g_sfera_sound_effect_items.growth_count = UINT32_C(128);
 }
 
-static void sfera_initialize_runtime_sentinels(uint8_t* storage) {
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005200C8)) = UINT32_MAX;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00520230)) = 1u;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005202A0)) = UINT32_MAX;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005202A4)) = UINT32_C(31);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00520F28)) = 1u;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005211E4)) = UINT32_C(30000);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005211E8)) = UINT32_C(30000);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005211EC)) = UINT32_C(5000);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005211F0)) = UINT32_C(5000);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005211F4)) = UINT32_MAX;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005211FC)) = UINT32_MAX;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x0052120C)) = UINT32_MAX;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x005215F0)) = UINT32_C(2000);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00521890)) = UINT32_C(1000000);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00522BDC)) = UINT32_MAX;
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00522C74)) = UINT32_MAX;
-    sfera_initial_data<uint8_t>(storage, UINT32_C(0x00522DA4)) = UINT8_C(1);
+static void sfera_initialize_runtime_sentinels(void) {
+    g_sfera_world_objects = {UINT32_MAX, UINT32_MAX, UINT32_MAX};
+    g_sfera_control_options = {UINT32_MAX};
+    g_sfera_sprite_runtime = {UINT32_MAX};
+    g_sfera_crash_runtime = {UINT8_C(1)};
+    g_sfera_contours_runtime = {};
+    g_sfera_dyn_green_runtime = {};
+    g_sfera_execution_monitor_runtime = {};
+    g_sfera_error_log_runtime = {};
+    g_sfera_packet_codec_runtime = {};
+    g_sfera_ole_host_abi = {};
+    g_sfera_render_buffer_capacities = {30000u, 30000u, 5000u, 5000u};
+    g_sfera_effect_manager.deferred_lifecycle = 1u;
+    g_sfera_effect_manager.render_cycle = UINT32_C(31);
 }
 
-static void sfera_initialize_memory_runtime(uint8_t* storage) {
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00525430)) = UINT32_C(1000000000);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00525440)) = UINT32_C(1000000000);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00525444)) = UINT32_C(1000000000);
-    sfera_initial_data<uint32_t>(storage, UINT32_C(0x00525438)) = (uint32_t)(uintptr_t)"Unknown";
-    sfera_initial_data<SferaStdAllocatorState32>(storage, UINT32_C(0x0052548C)).vptr = SFERA_VPTR_STDALLOCATOR;
-    SferaSecurityCookieState32& security = sfera_initial_data<SferaSecurityCookieState32>(storage, UINT32_C(0x00525490));
-    security.cookie = UINT32_C(0xBB40E64E);
-    security.complement = UINT32_C(0x44BF19B1);
+static void sfera_initialize_memory_runtime(void) {
+    g_sfera_memory_runtime = {};
+    g_sfera_memory_runtime.allocation_source_file = (uint32_t)(uintptr_t)"Unknown";
+    g_sfera_memory_runtime.tracker_primary = UINT32_C(1000000000);
+    g_sfera_memory_runtime.tracker_floor = UINT32_C(1000000000);
+    g_sfera_memory_runtime.tracker_ceiling = UINT32_C(1000000000);
+    g_sfera_std_allocator.vptr = SFERA_VPTR_STDALLOCATOR;
 }
 }
 
 extern "C" void sfera_initialize_data_storage(uint8_t* storage) {
     if (!storage) { return; }
     memset(storage, 0, UINT32_C(0x00005600));
-    sfera_initialize_network_defaults(storage);
-    sfera_initialize_graphics_defaults(storage);
-    sfera_initialize_interface_defaults(storage);
-    sfera_initialize_object_runtime(storage);
-    sfera_initialize_runtime_sentinels(storage);
-    sfera_initialize_memory_runtime(storage);
+    memset(g_sfera_array_error_buffer, 0, sizeof(g_sfera_array_error_buffer));
+    g_sfera_shared_parser_whitespace = {};
+    g_sfera_shared_parser_path_separators = {};
+    g_sfera_server_parser_whitespace = {};
+    g_sfera_server_parser_path_separators = {};
+    g_sfera_menu_parser_whitespace = {};
+    g_sfera_menu_parser_path_separators = {};
+    g_sfera_menu_list_missing_parameter_message = {};
+    g_sfera_menu_not_enough_arguments_message = {};
+    g_sfera_menu_sprite_not_found_message = {};
+    g_sfera_std_allocator = {};
+    g_sfera_file_runtime = {};
+    g_sfera_effect_manager = {};
+    g_sfera_effect_manager.last_processed_generation = UINT32_MAX;
+    g_sfera_blood_effect_instance = 0u;
+    sfera_initialize_network_defaults();
+    sfera_initialize_graphics_defaults();
+    sfera_initialize_interface_defaults();
+    sfera_initialize_object_runtime();
+    sfera_initialize_runtime_sentinels();
+    sfera_initialize_memory_runtime();
 }
 
 /* ===== Recovered zlib 1.1.3 semantic core ===== */
@@ -1342,6 +1372,9 @@ static_assert(offsetof(SferaDeflateStatePrefix32, strstart) == 0x64u, "recovered
 static_assert(offsetof(SferaDeflateStatePrefix32, level) == 0x7Cu, "recovered deflate level offset changed");
 static_assert(sizeof(SferaDeflateStatePrefix32) == 0x8Cu, "recovered deflate prefix layout changed");
 static_assert(sizeof(SferaInflateHuft32) == 8u, "recovered inflate_huft layout changed");
+
+static SferaInflateHuft32 g_sfera_zlib_fixed_literal_pool[512] = {};
+static SferaInflateHuft32 g_sfera_zlib_fixed_distance_pool[512] = {};
 
 template <typename T>
 static T* sfera_zlib_pointer(uint32_t address) {
@@ -2113,10 +2146,10 @@ uint32_t sfera_zlib_inflate_fixed(uint32_t literal_bits_address, uint32_t distan
     uint32_t literal_root = 0u;
     uint32_t distance_root = 0u;
     uint32_t used = 0u;
-    uint32_t status = sfera_zlib_huft_build((uint32_t)(uintptr_t)literal_lengths, 288u, 257u, 0u, 0u, (uint32_t)(uintptr_t)&literal_root, (uint32_t)(uintptr_t)&literal_bits, SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x00523140)), (uint32_t)(uintptr_t)&used, (uint32_t)(uintptr_t)literal_work);
+    uint32_t status = sfera_zlib_huft_build((uint32_t)(uintptr_t)literal_lengths, 288u, 257u, 0u, 0u, (uint32_t)(uintptr_t)&literal_root, (uint32_t)(uintptr_t)&literal_bits, ((uint32_t)(uintptr_t)&g_sfera_zlib_fixed_literal_pool[0]), (uint32_t)(uintptr_t)&used, (uint32_t)(uintptr_t)literal_work);
     if (status != 0u) { return status; }
     used = 0u;
-    status = sfera_zlib_huft_build((uint32_t)(uintptr_t)distance_lengths, 30u, 0u, 0u, 0u, (uint32_t)(uintptr_t)&distance_root, (uint32_t)(uintptr_t)&distance_bits, SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x00524140)), (uint32_t)(uintptr_t)&used, (uint32_t)(uintptr_t)distance_work);
+    status = sfera_zlib_huft_build((uint32_t)(uintptr_t)distance_lengths, 30u, 0u, 0u, 0u, (uint32_t)(uintptr_t)&distance_root, (uint32_t)(uintptr_t)&distance_bits, ((uint32_t)(uintptr_t)&g_sfera_zlib_fixed_distance_pool[0]), (uint32_t)(uintptr_t)&used, (uint32_t)(uintptr_t)distance_work);
     const bool canonical_incomplete_distance_tree = status == static_cast<uint32_t>(-5);
     if (status != 0u && !canonical_incomplete_distance_tree) { return status; }
     *sfera_zlib_pointer<uint32_t>(literal_bits_address) = literal_bits;

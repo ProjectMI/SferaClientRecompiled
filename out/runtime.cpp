@@ -713,7 +713,7 @@ void ProcessMemory::allocate_static_regions() {
     HANDLE data_backing = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0u, SFERA_DATA_STORAGE_SIZE, nullptr); if (!data_backing) { throw std::runtime_error(win32_error("CreateFileMappingW(data storage)")); }
     data_compat_view_ = static_cast<std::uint8_t*>(MapViewOfFile(data_backing, FILE_MAP_ALL_ACCESS, 0u, 0u, SFERA_DATA_STORAGE_SIZE)); if (!data_compat_view_) { CloseHandle(data_backing); throw std::runtime_error(win32_error("MapViewOfFile(data compatibility)")); } g_sfera_data_compat_base = data_compat_view_;
     auto map_semantic_range = [&](std::uint32_t source_begin, std::uint32_t size) { const std::uint32_t offset = source_begin - SFERA_DATA_SOURCE_BEGIN; if ((offset & (SFERA_DATA_PAGE_SIZE - 1u)) != 0u || (size & (SFERA_DATA_PAGE_SIZE - 1u)) != 0u || offset + size > SFERA_DATA_STORAGE_SIZE) { throw std::runtime_error("Invalid semantic data range"); } const std::uint32_t first_page = offset >> SFERA_DATA_PAGE_SHIFT; const std::uint32_t pages = size >> SFERA_DATA_PAGE_SHIFT; for (std::uint32_t page = 0u; page < pages; ++page) { const std::uint32_t storage_offset = offset + page * SFERA_DATA_PAGE_SIZE; std::uint8_t* alias = static_cast<std::uint8_t*>(MapViewOfFile(data_backing, FILE_MAP_ALL_ACCESS, 0u, storage_offset, SFERA_DATA_PAGE_SIZE)); if (!alias) { throw std::runtime_error(win32_error("MapViewOfFile(data semantic page)")); } g_sfera_data_semantic_page_alias[first_page + page] = alias; } };
-    map_semantic_range(UINT32_C(0x00520000), UINT32_C(0x00010000));
+    map_semantic_range(SFERA_DATA_SOURCE_BEGIN, UINT32_C(0x00010000));
     map_semantic_range(UINT32_C(0x00660000), UINT32_C(0x00010000));
     map_semantic_range(UINT32_C(0x006B0000), UINT32_C(0x00010000));
     map_semantic_range(UINT32_C(0x00910000), UINT32_C(0x00010000));
@@ -1241,14 +1241,14 @@ void ProcessMemory::resolve_static_references() {
         }
         return 0u;
     };
-    auto bind_com_vtable = [&](std::uint32_t source_va, std::uint32_t slot_count, ComAbiInterface interface_id, const char* interface_name) { for (std::uint32_t slot = 0u; slot < slot_count; ++slot) { const std::uint32_t rva = com_method_rva(interface_id, slot); const std::uint32_t callback = callback_address(rva); if (rva == 0u || callback == 0u) { throw std::runtime_error(std::string("Missing lifted ") + interface_name + " vtable handler at slot " + std::to_string(slot)); } write32(source_va + slot * sizeof(std::uint32_t), callback); } };
-    bind_com_vtable(UINT32_C(0x005200E0), 18u, ComAbiInterface::storage, "IStorage");
-    bind_com_vtable(UINT32_C(0x0052012C), 15u, ComAbiInterface::inplace_frame, "IOleInPlaceFrame");
-    bind_com_vtable(UINT32_C(0x00520168), 9u, ComAbiInterface::client_site, "IOleClientSite");
-    bind_com_vtable(UINT32_C(0x0052018C), 15u, ComAbiInterface::inplace_site, "IOleInPlaceSite");
-    bind_com_vtable(UINT32_C(0x005201C8), 18u, ComAbiInterface::doc_host_ui_handler, "IDocHostUIHandler");
-    write32(UINT32_C(0x00520128), source_address(UINT32_C(0x005200E0)));
-    write32(UINT32_C(0x0052544C), callback_address(UINT32_C(0x000EBF30)));
+    auto bind_com_vtable = [&](std::uint32_t* vtable, std::uint32_t slot_count, ComAbiInterface interface_id, const char* interface_name) { for (std::uint32_t slot = 0u; slot < slot_count; ++slot) { const std::uint32_t rva = com_method_rva(interface_id, slot); const std::uint32_t callback = callback_address(rva); if (rva == 0u || callback == 0u) { throw std::runtime_error(std::string("Missing lifted ") + interface_name + " vtable handler at slot " + std::to_string(slot)); } vtable[slot] = callback; } };
+    bind_com_vtable(g_sfera_ole_host_abi.storage_vtable, 18u, ComAbiInterface::storage, "IStorage");
+    bind_com_vtable(g_sfera_ole_host_abi.inplace_frame_vtable, 15u, ComAbiInterface::inplace_frame, "IOleInPlaceFrame");
+    bind_com_vtable(g_sfera_ole_host_abi.client_site_vtable, 9u, ComAbiInterface::client_site, "IOleClientSite");
+    bind_com_vtable(g_sfera_ole_host_abi.inplace_site_vtable, 15u, ComAbiInterface::inplace_site, "IOleInPlaceSite");
+    bind_com_vtable(g_sfera_ole_host_abi.doc_host_ui_handler_vtable, 18u, ComAbiInterface::doc_host_ui_handler, "IDocHostUIHandler");
+    g_sfera_ole_host_abi.storage_object_vtable = (std::uint32_t)(uintptr_t)&g_sfera_ole_host_abi.storage_vtable[0];
+    g_sfera_memory_runtime.critical_error_callback = callback_address(UINT32_C(0x000EBF30));
 }
 
 void ProcessMemory::verify_semantic_data_views() const { if (!g_sfera_data_compat_base) { throw std::runtime_error("Data compatibility view is not initialized"); } for (std::uint32_t page = 0u; page < SFERA_DATA_PAGE_COUNT; ++page) { const std::uint8_t* semantic = g_sfera_data_semantic_page_alias[page]; if (!semantic) { continue; } const std::uint8_t* compatibility = g_sfera_data_compat_base + page * SFERA_DATA_PAGE_SIZE; if (std::memcmp(semantic, compatibility, SFERA_DATA_PAGE_SIZE) != 0) { throw std::runtime_error("Semantic data page is not coherent with compatibility backing"); } } }
