@@ -1733,7 +1733,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(SFERA_STATIC_04EC4EE9_U8, UINT32_C(0x00000000), 8u);
     LIFT_JZ(label_000596AB, UINT32_C(0x0045969E));
     LIFT_ZERO(cpu->ecx, 32u);
-    SFERA_STATIC_048F4688_U32 = (uint32_t)(cpu->ebx);
+    g_sfera_mbc_runtime->halt_all_requested = (uint32_t)(cpu->ebx);
     LIFT_CALL(sfera_sub_004496F0, LIFT_CODE_TOKEN_RVA(UINT32_C(0x000596AB)));
     LIFT_BLOCK(label_000596AB, UINT32_C(0x004596AB));
     cpu->ecx = (uint32_t)(SFERA_STATIC_04ECBA50_ADDR);

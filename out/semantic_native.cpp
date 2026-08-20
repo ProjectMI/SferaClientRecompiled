@@ -42,6 +42,10 @@ SferaRenderBufferCapacities g_sfera_render_buffer_capacities = {30000u, 30000u, 
 uint32_t g_sfera_blood_effect_instance = 0u;
 SferaFileRuntime g_sfera_file_runtime = {};
 SferaEffectManagerRuntime g_sfera_effect_manager = {};
+static SferaMbcRuntime g_sfera_mbc_runtime_storage = {};
+SferaMbcRuntime* g_sfera_mbc_runtime = &g_sfera_mbc_runtime_storage;
+SferaMbcInterpreterStorage g_sfera_mbc_interpreter_storage = {};
+SferaMbcModuleMemoryStats g_sfera_mbc_module_memory_stats[SFERA_MBC_MODULE_STATS_COUNT] = {};
 char g_sfera_array_error_buffer[256] = {};
 SferaMsvcString32 g_sfera_shared_parser_whitespace = {};
 SferaMsvcString32 g_sfera_shared_parser_path_separators = {};
@@ -1269,6 +1273,10 @@ static void sfera_initialize_memory_runtime(void) {
 
 extern "C" void sfera_initialize_data_storage(uint8_t* storage) {
     if (!storage) { return; }
+    memset(&g_sfera_mbc_runtime_storage, 0, sizeof(g_sfera_mbc_runtime_storage));
+    g_sfera_mbc_runtime = &g_sfera_mbc_runtime_storage;
+    memset(&g_sfera_mbc_interpreter_storage, 0, sizeof(g_sfera_mbc_interpreter_storage));
+    memset(g_sfera_mbc_module_memory_stats, 0, sizeof(g_sfera_mbc_module_memory_stats));
     memset(storage, 0, UINT32_C(0x00005600));
     memset(g_sfera_array_error_buffer, 0, sizeof(g_sfera_array_error_buffer));
     g_sfera_shared_parser_whitespace = {};

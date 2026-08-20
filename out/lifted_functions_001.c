@@ -247,7 +247,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0040A500(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), UINT32_C(0x00000000));
     LIFT_CALL_ENTER(sfera_sub_0043AE70, UINT32_C(0x0040A512));
     LIFT_LOAD32(cpu->ecx, cpu->eax);
-    LIFT_ADD(cpu->ecx, SFERA_STATIC_04B5FE78_U32, 0u, 32u, cpu->ecx = (uint32_t)(result););
+    LIFT_ADD(cpu->ecx, g_sfera_mbc_runtime->process_memory_base, 0u, 32u, cpu->ecx = (uint32_t)(result););
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000014), UINT32_C(0x0000000F));
     cpu->eax = (uint32_t)(cpu->ecx);
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000010), UINT32_C(0x00000000));
