@@ -2706,7 +2706,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004A8B30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000020), cpu->eax);
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->esi = (uint32_t)(cpu->ecx);
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04F4CC10_U32);
+    cpu->ecx = (uint32_t)(g_sfera_graphics_runtime.d3d9_device);
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x00000270))));
     lift_push32(cpu, (uint32_t)(cpu->eax));
@@ -2748,7 +2748,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004A8B30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000010), cpu->eax);
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x0000002C));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04F4CC10_U32);
+    cpu->ecx = (uint32_t)(g_sfera_graphics_runtime.d3d9_device);
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000001C), cpu->edx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000020), cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004D8970, UINT32_C(0x004A8BE3));
@@ -6359,7 +6359,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004AB430(LiftCpu* cpu, uint32_t stop_addres
     LIFT_TEST(cpu->edx, 32u);
     LIFT_JNZ_GOTO(label_000AB564);
     LIFT_BLOCK(label_000AB4EB, UINT32_C(0x004AB4EB));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04F4CC10_U32);
+    cpu->ecx = (uint32_t)(g_sfera_graphics_runtime.d3d9_device);
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000270))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
     LIFT_CALL_ENTER(sfera_sub_004D8970, UINT32_C(0x004AB4FD));
@@ -11553,20 +11553,20 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004AF040(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ZERO(cpu->ebx, 32u);
     LIFT_BLOCK(label_000AF11C, UINT32_C(0x004AF11C));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->eax + cpu->edi)));
-    cpu->eax = (uint32_t)(SFERA_STATIC_04E0168C_U32);
+    cpu->eax = (uint32_t)(g_sfera_graphics_runtime.display_width);
     LIFT_CMP(cpu->ecx, cpu->eax, 32u);
     LIFT_JLE(label_000AF12E, UINT32_C(0x004AF128));
     LIFT_SUB(cpu->eax, cpu->edi, 0u, 32u, cpu->eax = (uint32_t)(result););
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000014), cpu->eax);
     LIFT_BLOCK(label_000AF12E, UINT32_C(0x004AF12E));
-    cpu->eax = (uint32_t)(SFERA_STATIC_04E792E4_U32);
+    cpu->eax = (uint32_t)(g_sfera_graphics_runtime.display_height);
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebx + cpu->ebp)));
     LIFT_CMP(cpu->ecx, cpu->eax, 32u);
     LIFT_JLE(label_000AF13E, UINT32_C(0x004AF13A));
     LIFT_SUB(cpu->eax, cpu->ebx, 0u, 32u, cpu->eax = (uint32_t)(result););
     cpu->ebp = (uint32_t)(cpu->eax);
     LIFT_BLOCK(label_000AF13E, UINT32_C(0x004AF13E));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04F4CC10_U32);
+    cpu->ecx = (uint32_t)(g_sfera_graphics_runtime.d3d9_device);
     LIFT_ZERO(cpu->eax, 32u);
     cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000003C))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
@@ -11590,7 +11590,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004AF040(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000024))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x0000003C));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04F4CC10_U32);
+    cpu->ecx = (uint32_t)(g_sfera_graphics_runtime.d3d9_device);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000028), cpu->edi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000002C), cpu->ebx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000030), cpu->eax);
@@ -11677,7 +11677,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004AF040(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_000AF2C5, UINT32_C(0x004AF2C5));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000030))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04F4CC10_U32);
+    cpu->ecx = (uint32_t)(g_sfera_graphics_runtime.d3d9_device);
     LIFT_CALL_ENTER(sfera_sub_004D8970, UINT32_C(0x004AF2D5));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x000002D8));
     LIFT_TEST(cpu->ecx, 32u);

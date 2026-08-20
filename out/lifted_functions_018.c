@@ -2112,7 +2112,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004B14F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000020), cpu->eax);
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->esi = (uint32_t)(cpu->ecx);
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04F4CC10_U32);
+    cpu->ecx = (uint32_t)(g_sfera_graphics_runtime.d3d9_device);
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x0000025C))));
     lift_push32(cpu, (uint32_t)(cpu->eax));
@@ -2154,7 +2154,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004B14F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000010), cpu->eax);
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x0000002C));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04F4CC10_U32);
+    cpu->ecx = (uint32_t)(g_sfera_graphics_runtime.d3d9_device);
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000001C), cpu->edx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000020), cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004D8970, UINT32_C(0x004B15A3));
@@ -6723,7 +6723,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004B47D0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(cpu->ebx, lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x0000000C)))), 32u);
     LIFT_JBE_GOTO(label_000B4960);
     LIFT_BLOCK(label_000B4A56, UINT32_C(0x004B4A56));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04F4CC10_U32);
+    cpu->ecx = (uint32_t)(g_sfera_graphics_runtime.d3d9_device);
     LIFT_ADD(cpu->esi, UINT32_C(0x0000025C), 0u, 32u, cpu->esi = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->esi));
     LIFT_CALL(sfera_sub_004D8970, LIFT_CODE_TOKEN_RVA(UINT32_C(0x000B4A68)));
@@ -12465,8 +12465,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004B9620(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JZ(label_000B97D8, UINT32_C(0x004B96D2));
     LIFT_CMP(lift_load8(((uint32_t)(cpu->eax))), UINT32_C(0x00000000), 8u);
     LIFT_JZ(label_000B97D8, UINT32_C(0x004B96DB));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04E792E4_U32);
-    cpu->edx = (uint32_t)(SFERA_STATIC_04E0168C_U32);
+    cpu->ecx = (uint32_t)(g_sfera_graphics_runtime.display_height);
+    cpu->edx = (uint32_t)(g_sfera_graphics_runtime.display_width);
     LIFT_LOGIC(cpu->esi, UINT32_C(0xFFFFFFFF), |, 32u, cpu->esi = (uint32_t)(result););
     LIFT_LOGIC_FLAGS(SFERA_STATIC_04DC068C_U8, UINT32_C(0x00000001), &, 8u);
     SFERA_STATIC_04E78FA8_U32 = (uint32_t)(UINT32_C(0x00000000));

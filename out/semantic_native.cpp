@@ -23,8 +23,24 @@ SferaItemArray g_sfera_effect_items = {};
 SferaItemArray g_sfera_sound_effect_items = {};
 SferaServerWall g_sfera_server_wall = {};
 SferaNetworkRuntime g_sfera_network_runtime = {};
+SferaNetworkConnectionCheckerRuntime g_sfera_network_connection_checker = {};
 SferaGraphicsRuntime g_sfera_graphics_runtime = {};
+SferaSceneRenderRuntime g_sfera_scene_render_runtime = {};
+SferaScreenVertex g_sfera_sky_screen_vertices[SFERA_SKY_SCREEN_VERTEX_COUNT] = {};
+SferaScreenVertex g_sfera_landscape_screen_vertices[SFERA_LANDSCAPE_SCREEN_VERTEX_COUNT] = {};
+SferaBoundCheckArray g_sfera_character_index_map = {};
+SferaBoundCheckArray g_sfera_mesh_partition_indices = {};
+SferaGraphicsOptionsRuntime g_sfera_graphics_options_runtime = {};
+SferaViewGeometryRuntime g_sfera_view_geometry_runtime = {};
 SferaWorldObjectRuntime g_sfera_world_objects = {};
+SferaGrassRuntime g_sfera_grass_runtime = {};
+SferaLightRuntime g_sfera_light_runtime = {};
+SferaLandscapeRuntime g_sfera_landscape_runtime = {};
+SferaCollisionRuntime g_sfera_collision_runtime = {};
+SferaSceneArrayRuntime g_sfera_scene_array_runtime = {};
+SferaWeatherRuntime g_sfera_weather_runtime = {};
+SferaModelRuntime g_sfera_model_runtime = {};
+SferaWarningLogRuntime g_sfera_warning_log_runtime = {};
 SferaControlOptionsRuntime g_sfera_control_options = {};
 SferaSpriteRuntime g_sfera_sprite_runtime = {};
 SferaCrashRuntime g_sfera_crash_runtime = {};
@@ -42,6 +58,7 @@ SferaRenderBufferCapacities g_sfera_render_buffer_capacities = {30000u, 30000u, 
 uint32_t g_sfera_blood_effect_instance = 0u;
 SferaFileRuntime g_sfera_file_runtime = {};
 SferaEffectManagerRuntime g_sfera_effect_manager = {};
+SferaConfigParserRuntime g_sfera_config_parser_runtime = {};
 static SferaMbcRuntime g_sfera_mbc_runtime_storage = {};
 SferaMbcRuntime* g_sfera_mbc_runtime = &g_sfera_mbc_runtime_storage;
 SferaMbcInterpreterStorage g_sfera_mbc_interpreter_storage = {};
@@ -1199,6 +1216,7 @@ static_assert(offsetof(SferaServerWall, effect_handle) == 0x18u, "ServerWall eff
 
 static void sfera_initialize_network_defaults(void) {
     memset(&g_sfera_network_runtime, 0, sizeof(g_sfera_network_runtime));
+    g_sfera_network_connection_checker = {};
     g_sfera_network_runtime.initialization_result = UINT32_MAX;
     g_sfera_network_runtime.server_port = UINT32_C(25858);
     g_sfera_network_runtime.local_port_candidate = UINT32_C(26860);
@@ -1247,6 +1265,21 @@ static void sfera_initialize_object_runtime(void) {
 
 static void sfera_initialize_runtime_sentinels(void) {
     g_sfera_world_objects = {UINT32_MAX, UINT32_MAX, UINT32_MAX};
+    g_sfera_grass_runtime = {};
+    g_sfera_light_runtime = {};
+    g_sfera_landscape_runtime = {};
+    g_sfera_collision_runtime = {};
+    g_sfera_scene_array_runtime = {};
+    g_sfera_weather_runtime = {};
+    g_sfera_model_runtime = {};
+    g_sfera_warning_log_runtime = {};
+    g_sfera_scene_render_runtime = {};
+    memset(g_sfera_sky_screen_vertices, 0, sizeof(g_sfera_sky_screen_vertices));
+    memset(g_sfera_landscape_screen_vertices, 0, sizeof(g_sfera_landscape_screen_vertices));
+    g_sfera_character_index_map = {};
+    g_sfera_mesh_partition_indices = {};
+    g_sfera_graphics_options_runtime = {};
+    g_sfera_view_geometry_runtime = {};
     g_sfera_control_options = {UINT32_MAX};
     g_sfera_sprite_runtime = {UINT32_MAX};
     g_sfera_crash_runtime = {UINT8_C(1)};
@@ -1290,6 +1323,7 @@ extern "C" void sfera_initialize_data_storage(uint8_t* storage) {
     g_sfera_menu_sprite_not_found_message = {};
     g_sfera_std_allocator = {};
     g_sfera_file_runtime = {};
+    g_sfera_config_parser_runtime = {};
     g_sfera_effect_manager = {};
     g_sfera_effect_manager.last_processed_generation = UINT32_MAX;
     g_sfera_blood_effect_instance = 0u;

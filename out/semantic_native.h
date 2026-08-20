@@ -17,6 +17,9 @@
 #include "lifted_abi.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
+
+static inline uint32_t sfera_f32_bits(float value) { uint32_t bits; memcpy(&bits, &value, sizeof(bits)); return bits; }
 
 #if defined(__cplusplus)
 #define SFERA_STATIC_ASSERT(condition, message) static_assert(condition, message)
@@ -497,6 +500,8 @@ extern uint8_t* g_sfera_data_semantic_page_alias[SFERA_DATA_PAGE_COUNT];
 #define SFERA_DATA_CANONICAL_ADDR(source_va) ((uint32_t)(uintptr_t)(g_sfera_data_compat_base + ((uint32_t)(source_va) - SFERA_DATA_SOURCE_BEGIN)))
 
 
+
+
 /* ===== Resolved semantic native state ===== */
 /* Resolved state lives in native C storage. Source virtual addresses remain only for regions
  * whose semantics have not yet been lifted. */
@@ -506,8 +511,26 @@ typedef struct SferaServerWall { uint32_t wall_data; uint32_t reserved_04; uint3
 typedef struct SferaDirectPlayCaps32 { uint32_t words[12]; } SferaDirectPlayCaps32;
 typedef struct SferaNetworkMessageSlot { uint8_t bytes[0x1A8]; } SferaNetworkMessageSlot;
 typedef struct SferaNetworkRuntime { uint32_t initialization_result; uint32_t server_port; uint32_t local_port_candidate; uint32_t connection_slot; uint32_t pending_slot; uint32_t active_slot; uint32_t shutdown_state; uint8_t timeout_marker_pending; uint8_t net_log_has_error; uint8_t network_error_active; uint8_t initialized; uint32_t bytes_sent_delta; uint32_t bytes_retried_delta; uint32_t bytes_received_delta; uint32_t error_budget; SferaDirectPlayCaps32 directplay_caps; uint32_t message_call_scratch; SferaNetworkMessageSlot message_slots[3048]; } SferaNetworkRuntime;
-typedef struct SferaGraphicsRuntime { float fog_distance; float saved_fog_distance; uint32_t lods_enabled; uint32_t hardware_cursor_enabled; float environment_factor; uint8_t render_mode_enabled; uint32_t base_microtexture_id; float view_parameter; float view_scale; uint32_t post_effects_enabled; uint32_t rebuild_percent; uint32_t runtime_counter; uint32_t texture_runtime_id; float base_render_factor; } SferaGraphicsRuntime;
-typedef struct SferaWorldObjectRuntime { uint32_t max_occupied_object_handle; uint32_t controlled_object_handle; uint32_t contour_mode; } SferaWorldObjectRuntime;
+typedef struct SferaNetworkConnectionCheckerRuntime { uint32_t instance; } SferaNetworkConnectionCheckerRuntime;
+typedef struct SferaGraphicsRuntime { float fog_distance; float saved_fog_distance; uint32_t lods_enabled; uint32_t hardware_cursor_enabled; float environment_factor; uint8_t render_mode_enabled; uint32_t base_microtexture_id; float view_parameter; float view_scale; uint32_t post_effects_enabled; uint32_t rebuild_percent; uint32_t runtime_counter; uint32_t texture_runtime_id; float base_render_factor; uint32_t display_width; uint32_t display_height; uint32_t d3d9_device; } SferaGraphicsRuntime;
+typedef struct SferaBoundCheckArray { uint32_t data; uint32_t capacity; char debug_file[32]; uint32_t debug_line; } SferaBoundCheckArray;
+SFERA_STATIC_ASSERT(sizeof(SferaBoundCheckArray) == 0x2Cu, "SferaBoundCheckArray ABI size");
+SFERA_STATIC_ASSERT(offsetof(SferaBoundCheckArray, debug_file) == 0x08u, "SferaBoundCheckArray debug file offset");
+SFERA_STATIC_ASSERT(offsetof(SferaBoundCheckArray, debug_line) == 0x28u, "SferaBoundCheckArray debug line offset");
+typedef struct SferaWorldObjectRuntime { uint32_t max_occupied_object_handle; uint32_t controlled_object_handle; uint32_t contour_mode; SferaBoundCheckArray object_handles; SferaBoundCheckArray extended_object_handles; uint32_t extended_object_count; } SferaWorldObjectRuntime;
+typedef struct SferaGrassRuntime { SferaBoundCheckArray instance_offsets; SferaBoundCheckArray model_handles; SferaBoundCheckArray instance_indices; SferaBoundCheckArray type_records; } SferaGrassRuntime;
+typedef struct SferaLightRuntime { SferaBoundCheckArray cell_light_ids; SferaBoundCheckArray cell_records; SferaBoundCheckArray cell_indices; SferaBoundCheckArray handles; SferaBoundCheckArray visible_handles; SferaBoundCheckArray active_handles; } SferaLightRuntime;
+typedef struct SferaAutoBoundsArray { uint32_t data; uint32_t capacity; uint32_t maximum; uint32_t growth; uint32_t element_size; char debug_file[32]; uint32_t debug_line; } SferaAutoBoundsArray;
+SFERA_STATIC_ASSERT(sizeof(SferaAutoBoundsArray) == 0x38u, "SferaAutoBoundsArray ABI size");
+SFERA_STATIC_ASSERT(offsetof(SferaAutoBoundsArray, debug_file) == 0x14u, "SferaAutoBoundsArray debug file offset");
+SFERA_STATIC_ASSERT(offsetof(SferaAutoBoundsArray, debug_line) == 0x34u, "SferaAutoBoundsArray debug line offset");
+typedef struct SferaLandscapeRuntime { SferaBoundCheckArray file_records; SferaBoundCheckArray microtexture_handles; } SferaLandscapeRuntime;
+typedef struct SferaCollisionRuntime { SferaBoundCheckArray candidate_handles; SferaBoundCheckArray near_result_handles; SferaAutoBoundsArray contact_objects; } SferaCollisionRuntime;
+typedef struct SferaSceneArrayRuntime { SferaBoundCheckArray cloud_records; SferaBoundCheckArray surface_index_map; SferaBoundCheckArray scene_records; SferaBoundCheckArray render_pass_slots; SferaBoundCheckArray surface_handles; SferaBoundCheckArray clip_vectors; SferaBoundCheckArray surface_records; SferaBoundCheckArray scene_points; SferaBoundCheckArray object_positions; SferaBoundCheckArray model_matrices; SferaBoundCheckArray world_cell_records; SferaBoundCheckArray render_work_records; SferaBoundCheckArray reflection_targets; SferaBoundCheckArray object_sort_keys; SferaBoundCheckArray render_ranges; SferaBoundCheckArray object_draw_indices; SferaBoundCheckArray object_visibility_indices; SferaBoundCheckArray clip_points; SferaBoundCheckArray character_matrices; SferaBoundCheckArray object_sort_indices; SferaBoundCheckArray clip_indices; } SferaSceneArrayRuntime;
+typedef struct SferaWeatherRuntime { SferaBoundCheckArray sky_texture_handles; } SferaWeatherRuntime;
+typedef struct SferaModelRuntime { uint32_t repository; } SferaModelRuntime;
+typedef struct SferaWarningLogRuntime { uint8_t object[0x5320]; } SferaWarningLogRuntime;
+SFERA_STATIC_ASSERT(sizeof(SferaWarningLogRuntime) == 0x5320u, "warning log runtime ABI size");
 typedef struct SferaControlOptionsRuntime { uint32_t active_slot; } SferaControlOptionsRuntime;
 typedef struct SferaSpriteRuntime { uint32_t render_mode; } SferaSpriteRuntime;
 typedef struct SferaCrashRuntime { uint8_t report_pending; } SferaCrashRuntime;
@@ -517,14 +540,33 @@ typedef struct SferaExecutionMonitorRuntime { uint32_t thread_handle; uint8_t re
 typedef struct SferaErrorLogRuntime { uint8_t object[0x18]; uint8_t index_table[0x80]; } SferaErrorLogRuntime;
 typedef struct SferaPacketCodecRuntime { uint8_t substitution[256]; uint32_t initialized; uint16_t checksum[256]; } SferaPacketCodecRuntime;
 typedef struct SferaOleHostAbi { uint32_t storage_vtable[18]; uint32_t storage_object_vtable; uint32_t inplace_frame_vtable[15]; uint32_t client_site_vtable[9]; uint32_t inplace_site_vtable[15]; uint32_t doc_host_ui_handler_vtable[18]; } SferaOleHostAbi;
-typedef struct SferaInterfaceRuntime { uint32_t cursor_kind; uint8_t primary_gate; uint8_t secondary_gate; uint32_t cross_enabled; uint32_t sounds_enabled; uint32_t description_auto_popup; uint32_t invite_messages; } SferaInterfaceRuntime;
+typedef struct SferaInterfaceRuntime { uint32_t cursor_kind; uint8_t primary_gate; uint8_t secondary_gate; uint32_t cross_enabled; uint32_t sounds_enabled; uint32_t description_auto_popup; uint32_t invite_messages; SferaBoundCheckArray windows; SferaBoundCheckArray window_handle_table; } SferaInterfaceRuntime;
 typedef struct SferaStdAllocator { uint32_t vptr; } SferaStdAllocator;
 typedef struct SferaMemoryRuntime { uint32_t allocation_source_file; uint32_t allocation_source_line; uint32_t critical_error_callback; uint32_t tracker_primary; uint32_t tracker_auxiliary; uint32_t tracker_floor; uint32_t tracker_ceiling; } SferaMemoryRuntime;
 typedef struct SferaRenderBufferCapacities { uint32_t vertex32; uint32_t vertex28; uint32_t index_primary; uint32_t index_secondary; } SferaRenderBufferCapacities;
-typedef struct SferaAutoBoundsArray { uint32_t data; uint32_t capacity; uint32_t maximum; uint32_t growth; uint32_t element_size; char debug_file[32]; uint32_t debug_line; } SferaAutoBoundsArray;
 typedef struct SferaFileRuntime { uint32_t crash_report_instance; uint32_t callback_enabled; uint32_t search_path_count; uint32_t open_file_count; uint32_t callback; SferaAutoBoundsArray search_paths; SferaAutoBoundsArray open_files; } SferaFileRuntime;
 typedef struct SferaVec3F { float x; float y; float z; } SferaVec3F;
-typedef struct SferaBoundCheckArray { uint32_t data; uint32_t capacity; char debug_file[32]; uint32_t debug_line; } SferaBoundCheckArray;
+typedef struct SferaScreenVertex { float x; float y; float z; float rhw; uint32_t diffuse; uint32_t specular; float u; float v; } SferaScreenVertex;
+SFERA_STATIC_ASSERT(sizeof(SferaScreenVertex) == 0x20u, "screen vertex ABI size");
+SFERA_STATIC_ASSERT(offsetof(SferaScreenVertex, z) == 0x08u, "screen vertex z offset");
+SFERA_STATIC_ASSERT(offsetof(SferaScreenVertex, rhw) == 0x0Cu, "screen vertex rhw offset");
+SFERA_STATIC_ASSERT(offsetof(SferaScreenVertex, diffuse) == 0x10u, "screen vertex diffuse offset");
+SFERA_STATIC_ASSERT(offsetof(SferaScreenVertex, specular) == 0x14u, "screen vertex specular offset");
+SFERA_STATIC_ASSERT(offsetof(SferaScreenVertex, u) == 0x18u, "screen vertex u offset");
+SFERA_STATIC_ASSERT(offsetof(SferaScreenVertex, v) == 0x1Cu, "screen vertex v offset");
+#define SFERA_SKY_SCREEN_VERTEX_COUNT UINT32_C(120)
+#define SFERA_LANDSCAPE_SCREEN_VERTEX_COUNT UINT32_C(1200)
+SFERA_STATIC_ASSERT(sizeof(SferaScreenVertex) * SFERA_SKY_SCREEN_VERTEX_COUNT == 0x0F00u, "sky screen vertex scratch span");
+SFERA_STATIC_ASSERT(sizeof(SferaScreenVertex) * SFERA_LANDSCAPE_SCREEN_VERTEX_COUNT == 0x9600u, "landscape screen vertex scratch span");
+#define SFERA_SCREEN_VERTEX_ADDR(vertices, index, member) ((uint32_t)(uintptr_t)&(vertices)[(index)].member)
+#define SFERA_SCREEN_VERTEX_FIELD_END_ADDR(vertices, member) (SFERA_SCREEN_VERTEX_ADDR(vertices, 0u, member) + (uint32_t)sizeof(vertices))
+typedef struct SferaSceneRenderRuntime { SferaScreenVertex textured_quad[4]; SferaScreenVertex interface_quad[4]; } SferaSceneRenderRuntime;
+typedef struct SferaGraphicsOptionsRuntime { uint32_t dialog_state; uint32_t graphics_page; uint32_t interface_values[9]; uint32_t graphics_values[13]; uint32_t saved_interface_values[9]; } SferaGraphicsOptionsRuntime;
+SFERA_STATIC_ASSERT(sizeof(SferaGraphicsOptionsRuntime) == 0x84u, "graphics options lifted block size");
+typedef struct SferaIntBounds3 { uint32_t min_x; uint32_t max_x; uint32_t min_y; uint32_t max_y; uint32_t min_z; uint32_t max_z; } SferaIntBounds3;
+SFERA_STATIC_ASSERT(sizeof(SferaIntBounds3) == 0x18u, "integer bounds raw-dword ABI size");
+typedef struct SferaViewGeometryRuntime { SferaVec3F reference_points[5]; SferaIntBounds3 projected_bounds; SferaIntBounds3 clipping_bounds; } SferaViewGeometryRuntime;
+
 typedef struct SferaEffectListenerMap { uint8_t comparator; uint8_t _alignment[3]; uint32_t head; uint32_t size; } SferaEffectListenerMap;
 typedef struct SferaIntrusiveListHeader { uint32_t first; uint32_t last; } SferaIntrusiveListHeader;
 SFERA_STATIC_ASSERT(sizeof(SferaIntrusiveListHeader) == 8u, "SferaIntrusiveListHeader ABI layout");
@@ -611,6 +653,17 @@ SFERA_STATIC_ASSERT(sizeof(SferaMbcInterpreterStorage) == 0x8DE000u, "MBC interp
 SFERA_STATIC_ASSERT(SFERA_MBC_MODULE_STATS_COUNT * sizeof(SferaMbcModuleMemoryStats) == 0xBB80u, "MBC module memory stats storage size");
 SFERA_STATIC_ASSERT(SFERA_MBC_LINK_WORKSPACE_WORD_COUNT * sizeof(uint16_t) == 0xA0u, "MBC link workspace size");
 
+typedef struct SferaConfigParserFrame { uint32_t container_begin; uint32_t count_or_cursor; uint32_t payload_end; } SferaConfigParserFrame;
+SFERA_STATIC_ASSERT(sizeof(SferaConfigParserFrame) == 0x0Cu, "config parser frame ABI size");
+typedef struct SferaConfigParserRuntime { uint32_t current_value_type; uint32_t line_number; char token[256]; uint32_t frame_depth; uint32_t open_mode; SferaConfigParserFrame frames[20]; char error_message[256]; } SferaConfigParserRuntime;
+SFERA_STATIC_ASSERT(sizeof(SferaConfigParserRuntime) == 0x300u, "config parser runtime ABI size");
+SFERA_STATIC_ASSERT(offsetof(SferaConfigParserRuntime, line_number) == 0x04u, "config parser line offset");
+SFERA_STATIC_ASSERT(offsetof(SferaConfigParserRuntime, token) == 0x08u, "config parser token offset");
+SFERA_STATIC_ASSERT(offsetof(SferaConfigParserRuntime, frame_depth) == 0x108u, "config parser depth offset");
+SFERA_STATIC_ASSERT(offsetof(SferaConfigParserRuntime, open_mode) == 0x10Cu, "config parser mode offset");
+SFERA_STATIC_ASSERT(offsetof(SferaConfigParserRuntime, frames) == 0x110u, "config parser frame offset");
+SFERA_STATIC_ASSERT(offsetof(SferaConfigParserRuntime, error_message) == 0x200u, "config parser error offset");
+
 typedef struct SferaMbcRuntime { int32_t execution_chain_tail; int32_t execution_chain_head; uint32_t execution_chain_count; int32_t process_chain_first; int32_t process_chain_last; uint32_t program_table_base; uint32_t shared_buffer_size; uint32_t instruction_cursor; char file_search_pattern[0x40]; uint32_t named_vector_cursor; char diagnostic_context[0x5E8]; uint8_t module_link_stream[0x724]; uint16_t link_workspace_words[SFERA_MBC_LINK_WORKSPACE_WORD_COUNT]; uint32_t argument_count; uint32_t argument_end; uint32_t process_index; uint32_t current_instruction_address; uint32_t active_tag; SferaFindData64i32 file_find_data; SferaFindData64i32 script_find_data; char startup_option[SFERA_MBC_STARTUP_OPTION_CAPACITY]; uint8_t text_buffer[SFERA_MBC_TEXT_BUFFER_CAPACITY]; uint32_t call_frame_depth; uint32_t module_link_stream_size; SferaMbcProcessRecord processes[65536]; uint32_t process_search_cursor; uint32_t instruction_step_count; uint32_t link_relocation_offsets[24000]; uint32_t program_index; uint32_t pending_program_index; uint32_t dispatch_process_count; uint32_t resolved_position_pointer; uint32_t file_index_scan_prev; uint32_t execution_context_depth; uint32_t opcode_handlers[256]; uint32_t bytecode_base; uint32_t registered_object_count; SferaMbcExecutionContext execution_context_stack[100]; uint32_t file_crc32; uint32_t argument_cursor; uint32_t frame_stack_base[22]; uint32_t halt_all_requested; uint32_t link_relocation_count; uint8_t send_field_width[4096]; uint32_t active_program_record; uint32_t value_stack_size; uint32_t file_index_current; char file_path_buffer[0x40]; uint8_t file_io_buffer[0x10000]; uint32_t file_index_scan; uint32_t active_process; uint32_t registered_objects[2100]; uint32_t process_memory_base; uint32_t file_crc32_table[256]; char file_normalized_name[0x44]; uint32_t send_field_count; uint32_t execution_failed; uint32_t trace_steps_remaining; uint8_t current_opcode; uint8_t trace_program_header_pending; uint8_t trace_process_header_pending; uint8_t trace_reserved; SferaMbcNamedVectorRecord named_vectors[1000]; uint8_t shared_buffer[0x258240]; uint32_t named_vector_count; uint32_t file_index_head; SferaMbcSavedInvocationState saved_invocation; } SferaMbcRuntime;
 
 #undef SFERA_STATIC_ASSERT
@@ -622,8 +675,24 @@ extern SferaItemArray g_sfera_effect_items;
 extern SferaItemArray g_sfera_sound_effect_items;
 extern SferaServerWall g_sfera_server_wall;
 extern SferaNetworkRuntime g_sfera_network_runtime;
+extern SferaNetworkConnectionCheckerRuntime g_sfera_network_connection_checker;
 extern SferaGraphicsRuntime g_sfera_graphics_runtime;
+extern SferaSceneRenderRuntime g_sfera_scene_render_runtime;
+extern SferaScreenVertex g_sfera_sky_screen_vertices[SFERA_SKY_SCREEN_VERTEX_COUNT];
+extern SferaScreenVertex g_sfera_landscape_screen_vertices[SFERA_LANDSCAPE_SCREEN_VERTEX_COUNT];
+extern SferaBoundCheckArray g_sfera_character_index_map;
+extern SferaBoundCheckArray g_sfera_mesh_partition_indices;
+extern SferaGraphicsOptionsRuntime g_sfera_graphics_options_runtime;
+extern SferaViewGeometryRuntime g_sfera_view_geometry_runtime;
 extern SferaWorldObjectRuntime g_sfera_world_objects;
+extern SferaGrassRuntime g_sfera_grass_runtime;
+extern SferaLightRuntime g_sfera_light_runtime;
+extern SferaLandscapeRuntime g_sfera_landscape_runtime;
+extern SferaCollisionRuntime g_sfera_collision_runtime;
+extern SferaSceneArrayRuntime g_sfera_scene_array_runtime;
+extern SferaWeatherRuntime g_sfera_weather_runtime;
+extern SferaModelRuntime g_sfera_model_runtime;
+extern SferaWarningLogRuntime g_sfera_warning_log_runtime;
 extern SferaControlOptionsRuntime g_sfera_control_options;
 extern SferaSpriteRuntime g_sfera_sprite_runtime;
 extern SferaCrashRuntime g_sfera_crash_runtime;
@@ -641,6 +710,7 @@ extern SferaRenderBufferCapacities g_sfera_render_buffer_capacities;
 extern uint32_t g_sfera_blood_effect_instance;
 extern SferaFileRuntime g_sfera_file_runtime;
 extern SferaEffectManagerRuntime g_sfera_effect_manager;
+extern SferaConfigParserRuntime g_sfera_config_parser_runtime;
 extern SferaMbcRuntime* g_sfera_mbc_runtime;
 extern SferaMbcInterpreterStorage g_sfera_mbc_interpreter_storage;
 extern SferaMbcModuleMemoryStats g_sfera_mbc_module_memory_stats[SFERA_MBC_MODULE_STATS_COUNT];
@@ -941,23 +1011,12 @@ int sfera_vtable_token_address(uint32_t address);
 /* call argument root; sfera_sub_004F5A40 @ lifted_functions_025.c:2135; source=0x04ED1234 */
 #define SFERA_DATA_CALL_ARGUMENT_04ED1234_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1234))
 /* call argument root; sfera_sub_004F5BF0 @ lifted_functions_025.c:2216; source=0x04ED1304 */
-#define SFERA_DATA_CALL_ARGUMENT_04ED1304_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1304))
 /* indexed table base root; sfera_sub_00468750 @ lifted_functions_010.c:6796; source=0x04ED1328 */
 #define SFERA_DATA_TABLE_BASE_04ED1328_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1328))
 /* call argument root; sfera_sub_004F5C90 @ lifted_functions_025.c:2356; source=0x04ED1A44 */
 #define SFERA_DATA_CALL_ARGUMENT_04ED1A44_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1A44))
 /* call argument root; sfera_sub_004F5B60 @ lifted_functions_025.c:2189; source=0x04ED1A7C */
 #define SFERA_DATA_CALL_ARGUMENT_04ED1A7C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1A7C))
-/* arithmetic base root; sfera_sub_00457E80 @ lifted_functions_009.c:754; source=0x04ED1AAC */
-#define SFERA_DATA_ARITHMETIC_BASE_04ED1AAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1AAC))
-/* global object root; sfera_sub_00454BA0 @ lifted_functions_008.c:8468; source=0x04ED1AB0 */
-#define SFERA_DATA_GLOBAL_OBJECT_04ED1AB0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1AB0))
-/* global object root; sfera_sub_00454A40 @ lifted_functions_008.c:8352; source=0x04ED1AB4 */
-#define SFERA_DATA_GLOBAL_OBJECT_04ED1AB4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1AB4))
-/* arithmetic base root; sfera_sub_0044E480 @ lifted_functions_008.c:491; source=0x04ED1ABC */
-#define SFERA_DATA_ARITHMETIC_BASE_04ED1ABC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1ABC))
-/* pointer value root; sfera_sub_00454A40 @ lifted_functions_008.c:8398; source=0x04ED29B4 */
-#define SFERA_DATA_POINTER_VALUE_04ED29B4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED29B4))
 /* call argument root; sfera_sub_004F7010 @ lifted_functions_025.c:3481; source=0x04ED2A58 */
 #define SFERA_DATA_CALL_ARGUMENT_04ED2A58_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2A58))
 /* call argument root; sfera_sub_004F59B0 @ lifted_functions_025.c:2108; source=0x04ED2BBC */
@@ -987,13 +1046,9 @@ int sfera_vtable_token_address(uint32_t address);
 /* global object root; sfera_sub_004F77B0 @ lifted_functions_025.c:3899; source=0x04EE0518 */
 #define SFERA_DATA_GLOBAL_OBJECT_04EE0518_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EE0518))
 /* global object root; sfera_sub_0047DB70 @ lifted_functions_012.c:7263; source=0x04EE057C */
-#define SFERA_DATA_GLOBAL_OBJECT_04EE057C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EE057C))
 /* pointer value root; sfera_sub_0047DB70 @ lifted_functions_012.c:7290; source=0x04EE097C */
-#define SFERA_DATA_POINTER_VALUE_04EE097C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EE097C))
 /* global object root; sfera_sub_0047DB70 @ lifted_functions_012.c:7325; source=0x04EE0AAC */
-#define SFERA_DATA_GLOBAL_OBJECT_04EE0AAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EE0AAC))
 /* pointer value root; sfera_sub_0047DB70 @ lifted_functions_012.c:7352; source=0x04EE0EAC */
-#define SFERA_DATA_POINTER_VALUE_04EE0EAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EE0EAC))
 /* array base root; sfera_sub_0047E520 @ lifted_functions_012.c:7809; source=0x04EE6157 */
 #define SFERA_DATA_ARRAY_BASE_04EE6157_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EE6157))
 /* global object root; sfera_sub_004F77F0 @ lifted_functions_025.c:3910; source=0x04EE8570 */
@@ -1651,7 +1706,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_006BE110_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE110)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_006BE114_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE114))
 #define SFERA_STATIC_006BE114_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE114)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -1670,23 +1724,18 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_006BE158_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE158)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_006BE15C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE15C))
 #define SFERA_STATIC_006BE15C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE15C)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_006BE1B4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE1B4))
 #define SFERA_STATIC_006BE1B4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE1B4)))
 
 /* data refs=4 u8=4 */
-#define SFERA_STATIC_006BE1B8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE1B8))
 #define SFERA_STATIC_006BE1B8_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE1B8)))
 
 /* data refs=3 u8=3 */
-#define SFERA_STATIC_006BE1B9_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE1B9))
 #define SFERA_STATIC_006BE1B9_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE1B9)))
 
 /* data refs=4 u8=4 */
-#define SFERA_STATIC_006BE1BA_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE1BA))
 #define SFERA_STATIC_006BE1BA_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE1BA)))
 
 /* data refs=7 addr=1 u32=6 */
@@ -1714,7 +1763,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_006BE1D0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE1D0)))
 
 /* data refs=7 u32=7 */
-#define SFERA_STATIC_006BE1D4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE1D4))
 #define SFERA_STATIC_006BE1D4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE1D4)))
 
 /* data refs=2 u32=4 */
@@ -1726,7 +1774,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_006BE1DC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE1DC)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_006BE1E0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE1E0))
 #define SFERA_STATIC_006BE1E0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE1E0)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -1734,28 +1781,22 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_006BE1E8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE1E8)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_006BE2B8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE2B8))
 #define SFERA_STATIC_006BE2B8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE2B8)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_006BE2BC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE2BC))
 #define SFERA_STATIC_006BE2BC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE2BC)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_006BE2C0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE2C0))
 #define SFERA_STATIC_006BE2C0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE2C0)))
 
 /* data refs=5 u32=5 */
-
 
 
 /* data refs=147 u32=163 */
 
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_006BE408_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x006BE408))
 #define SFERA_STATIC_006BE408_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BE408)))
-
 
 
 /* data refs=6 addr=1 u32=3 u8=2 */
@@ -1763,7 +1804,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_006BEC00_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x006BEC00)))
 
 /* data refs=20 u32=19 */
-#define SFERA_STATIC_00916E40_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x00916E40))
 #define SFERA_STATIC_00916E40_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x00916E40)))
 
 /* data refs=8 addr=2 u8=6 */
@@ -1782,7 +1822,6 @@ int sfera_vtable_token_address(uint32_t address);
 /* data refs=9 u32=9 */
 
 /* data refs=25 u32=25 */
-
 
 
 /* data refs=12 u32=14 */
@@ -1824,16 +1863,9 @@ int sfera_vtable_token_address(uint32_t address);
 /* data refs=6 addr=3 u32=3 */
 
 
-
-
-
-
-
 /* data refs=10 u32=12 */
 #define SFERA_STATIC_04007638_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04007638))
 #define SFERA_STATIC_04007638_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04007638)))
-
-
 
 
 /* data refs=6 u32=6 */
@@ -1841,9 +1873,7 @@ int sfera_vtable_token_address(uint32_t address);
 /* data refs=8 u32=8 */
 
 
-
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04016618_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04016618))
 #define SFERA_STATIC_04016618_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04016618)))
 
 /* data refs=65 u32=71 */
@@ -1851,11 +1881,9 @@ int sfera_vtable_token_address(uint32_t address);
 /* data refs=8 u32=8 */
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04016680_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04016680))
 #define SFERA_STATIC_04016680_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04016680)))
 
 /* data refs=27 u32=27 */
-#define SFERA_STATIC_04016684_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04016684))
 #define SFERA_STATIC_04016684_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04016684)))
 
 
@@ -1900,7 +1928,6 @@ int sfera_vtable_token_address(uint32_t address);
 /* data refs=9 addr=3 u32=6 */
 
 
-
 /* data refs=22 u32=23 */
 #define SFERA_STATIC_048F5A98_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x048F5A98))
 #define SFERA_STATIC_048F5A98_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x048F5A98)))
@@ -1911,9 +1938,7 @@ int sfera_vtable_token_address(uint32_t address);
 /* data refs=8 u32=8 */
 
 
-
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04905B5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04905B5C))
 #define SFERA_STATIC_04905B5C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04905B5C)))
 
 
@@ -1923,12 +1948,9 @@ int sfera_vtable_token_address(uint32_t address);
 /* data refs=455 addr=1 u32=454 */
 
 
-
-
 /* data refs=12 u32=12 */
 
 /* data refs=413 u32=413 */
-
 
 
 /* data refs=3 u32=5 */
@@ -1936,37 +1958,29 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DBC430_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DBC430)))
 
 /* data refs=45 u32=45 */
-#define SFERA_STATIC_04DBC434_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DBC434))
 #define SFERA_STATIC_04DBC434_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DBC434)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04DBC438_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DBC438))
 #define SFERA_STATIC_04DBC438_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DBC438)))
 
 /* data refs=9 u32=9 */
-#define SFERA_STATIC_04DBC43C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DBC43C))
 #define SFERA_STATIC_04DBC43C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DBC43C)))
 
 /* data refs=9 u32=9 */
-#define SFERA_STATIC_04DBC440_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DBC440))
 #define SFERA_STATIC_04DBC440_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DBC440)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DBC444_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DBC444))
 #define SFERA_STATIC_04DBC444_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DBC444)))
 
 /* data refs=16 u32=16 */
-#define SFERA_STATIC_04DBC458_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DBC458))
 #define SFERA_STATIC_04DBC458_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DBC458)))
 
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04DBC470_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DBC470))
 #define SFERA_STATIC_04DBC470_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DBC470)))
 
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DBC48C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DBC48C))
 #define SFERA_STATIC_04DBC48C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DBC48C)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -1990,7 +2004,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DC0680_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DC0680))
 
 /* data refs=10 u32=10 */
-#define SFERA_STATIC_04DC0688_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DC0688))
 #define SFERA_STATIC_04DC0688_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DC0688)))
 
 /* data refs=34 u32=42 u8=8 */
@@ -2007,15 +2020,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DC069C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DC069C)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DC06A8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DC06A8))
 #define SFERA_STATIC_04DC06A8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DC06A8)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04DC06AC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DC06AC))
 #define SFERA_STATIC_04DC06AC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DC06AC)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04DC06B0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DC06B0))
 #define SFERA_STATIC_04DC06B0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DC06B0)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -2023,15 +2033,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD0A20_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD0A20)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD0AF8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD0AF8))
 #define SFERA_STATIC_04DD0AF8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD0AF8)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD0B24_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD0B24))
 #define SFERA_STATIC_04DD0B24_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD0B24)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD0B50_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD0B50))
 #define SFERA_STATIC_04DD0B50_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD0B50)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -2039,7 +2046,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD0B80_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD0B80)))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04DD0C50_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD0C50))
 #define SFERA_STATIC_04DD0C50_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD0C50)))
 
 /* data refs=3 u32=5 */
@@ -2047,23 +2053,18 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD0C54_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD0C54)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04DD0C5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD0C5C))
 #define SFERA_STATIC_04DD0C5C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD0C5C)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD0C60_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD0C60))
 #define SFERA_STATIC_04DD0C60_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD0C60)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04DD0C64_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD0C64))
 #define SFERA_STATIC_04DD0C64_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD0C64)))
 
 /* data refs=5 u8=5 */
-#define SFERA_STATIC_04DD1068_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD1068))
 #define SFERA_STATIC_04DD1068_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD1068)))
 
 /* data refs=3 u8=3 */
-#define SFERA_STATIC_04DD1069_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD1069))
 #define SFERA_STATIC_04DD1069_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD1069)))
 
 /* data refs=2 u32=2 */
@@ -2085,7 +2086,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD125C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD125C)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04DD1270_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD1270))
 #define SFERA_STATIC_04DD1270_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD1270)))
 
 /* data refs=3 addr=2 u32=1 */
@@ -2093,7 +2093,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD1274_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD1274)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD1288_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD1288))
 #define SFERA_STATIC_04DD1288_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD1288)))
 
 /* data refs=9 u32=15 */
@@ -2101,7 +2100,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD128C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD128C)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04DD1290_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD1290))
 #define SFERA_STATIC_04DD1290_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD1290)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -2113,11 +2111,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD1298_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD1298)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04DD129C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD129C))
 #define SFERA_STATIC_04DD129C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD129C)))
 
 /* data refs=7 u32=7 */
-#define SFERA_STATIC_04DD12A0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD12A0))
 #define SFERA_STATIC_04DD12A0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD12A0)))
 
 /* data refs=13 u32=19 */
@@ -2134,15 +2130,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD54A8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD54A8))
 
 /* data refs=4 u16=4 */
-#define SFERA_STATIC_04DD54AC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD54AC))
 #define SFERA_STATIC_04DD54AC_U16 (*(uint16_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD54AC)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04DD57D0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD57D0))
 #define SFERA_STATIC_04DD57D0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD57D0)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04DD57DC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD57DC))
 #define SFERA_STATIC_04DD57DC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD57DC)))
 
 /* data refs=16 addr=11 f32=16 */
@@ -2154,15 +2147,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD57E4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD57E4)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD57E8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD57E8))
 #define SFERA_STATIC_04DD57E8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD57E8)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04DD57EC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD57EC))
 #define SFERA_STATIC_04DD57EC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD57EC)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04DD57F0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD57F0))
 #define SFERA_STATIC_04DD57F0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD57F0)))
 
 /* data refs=7 addr=7 f32=7 */
@@ -2176,16 +2166,13 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD57FC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD57FC)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04DD5800_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5800))
 #define SFERA_STATIC_04DD5800_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5800)))
 
 /* data refs=7 u32=5 u8=2 */
-#define SFERA_STATIC_04DD5804_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5804))
 #define SFERA_STATIC_04DD5804_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5804)))
 #define SFERA_STATIC_04DD5804_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5804)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD5808_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5808))
 #define SFERA_STATIC_04DD5808_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5808)))
 
 /* data refs=3 addr=3 f32=3 */
@@ -2196,31 +2183,24 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD5810_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5810)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD5814_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5814))
 #define SFERA_STATIC_04DD5814_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5814)))
 
 /* data refs=19 u32=19 */
-#define SFERA_STATIC_04DD5818_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5818))
 #define SFERA_STATIC_04DD5818_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5818)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04DD581C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD581C))
 #define SFERA_STATIC_04DD581C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD581C)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04DD5828_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5828))
 #define SFERA_STATIC_04DD5828_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5828)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04DD582C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD582C))
 #define SFERA_STATIC_04DD582C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD582C)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04DD5830_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5830))
 #define SFERA_STATIC_04DD5830_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5830)))
 
 /* data refs=7 u32=7 */
-#define SFERA_STATIC_04DD5834_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5834))
 #define SFERA_STATIC_04DD5834_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5834)))
 
 /* data refs=2 u8=2 */
@@ -2230,22 +2210,18 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD5839_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5839))
 
 /* data refs=30 u32=30 */
-#define SFERA_STATIC_04DD5A38_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5A38))
 #define SFERA_STATIC_04DD5A38_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD5A38)))
 
 /* data refs=7 u32=7 */
-#define SFERA_STATIC_04DD7A40_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD7A40))
 #define SFERA_STATIC_04DD7A40_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD7A40)))
 
 /* data refs=2 u32=2 */
 #define SFERA_STATIC_04DD7A48_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD7A48))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD7C28_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD7C28))
 #define SFERA_STATIC_04DD7C28_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD7C28)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04DD7C30_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD7C30))
 #define SFERA_STATIC_04DD7C30_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD7C30)))
 
 /* data refs=15 addr=15 f32=15 */
@@ -2259,11 +2235,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD7C3C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD7C3C)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04DD7C40_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD7C40))
 #define SFERA_STATIC_04DD7C40_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD7C40)))
 
 /* data refs=14 u32=14 */
-#define SFERA_STATIC_04DD7C4C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD7C4C))
 #define SFERA_STATIC_04DD7C4C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD7C4C)))
 
 /* data refs=7 addr=1 u32=6 */
@@ -2284,7 +2258,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD8108_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD8108))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04DD8A2C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD8A2C))
 #define SFERA_STATIC_04DD8A2C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD8A2C)))
 
 /* data refs=16 addr=16 f32=16 */
@@ -2298,31 +2271,24 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD8B00_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD8B00)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04DD8B10_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD8B10))
 #define SFERA_STATIC_04DD8B10_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD8B10)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04DD8B14_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD8B14))
 #define SFERA_STATIC_04DD8B14_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD8B14)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04DD8B18_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD8B18))
 #define SFERA_STATIC_04DD8B18_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD8B18)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04DD8B1C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD8B1C))
 #define SFERA_STATIC_04DD8B1C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD8B1C)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04DD8B20_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD8B20))
 #define SFERA_STATIC_04DD8B20_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD8B20)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD8B24_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD8B24))
 #define SFERA_STATIC_04DD8B24_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD8B24)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04DD8B28_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD8B28))
 #define SFERA_STATIC_04DD8B28_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD8B28)))
 
 /* data refs=12 u32=12 */
@@ -2336,7 +2302,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD9170_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD9170)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DD93B8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD93B8))
 #define SFERA_STATIC_04DD93B8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD93B8)))
 
 /* data refs=16 u32=20 */
@@ -2344,7 +2309,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DD93BC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD93BC)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04DD93C0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD93C0))
 #define SFERA_STATIC_04DD93C0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DD93C0)))
 
 /* data refs=17 u32=19 */
@@ -2380,7 +2344,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DDF9E4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DDF9E4)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04DDF9E8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DDF9E8))
 #define SFERA_STATIC_04DDF9E8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DDF9E8)))
 
 /* data refs=4 addr=4 f32=4 */
@@ -2404,15 +2367,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DDFA00_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DDFA00)))
 
 /* data refs=26 u32=26 */
-#define SFERA_STATIC_04DDFA04_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DDFA04))
 #define SFERA_STATIC_04DDFA04_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DDFA04)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04DDFA08_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DDFA08))
 #define SFERA_STATIC_04DDFA08_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DDFA08)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04DDFA0C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DDFA0C))
 #define SFERA_STATIC_04DDFA0C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DDFA0C)))
 
 /* data refs=4 addr=1 u32=5 */
@@ -2430,18 +2390,15 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DDFE18_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DDFE18))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04DDFE1C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DDFE1C))
 #define SFERA_STATIC_04DDFE1C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DDFE1C)))
 
 /* data refs=2 addr=2 */
 #define SFERA_STATIC_04DDFE28_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DDFE28))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04DE04B8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DE04B8))
 #define SFERA_STATIC_04DE04B8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DE04B8)))
 
 /* data refs=13 u32=13 */
-#define SFERA_STATIC_04DE04BC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DE04BC))
 #define SFERA_STATIC_04DE04BC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DE04BC)))
 
 /* data refs=3 addr=1 u32=2 */
@@ -2459,22 +2416,18 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04DE1150_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DE1150)))
 
 /* data refs=7 u32=7 */
-#define SFERA_STATIC_04DE1154_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DE1154))
 #define SFERA_STATIC_04DE1154_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DE1154)))
 
 /* data refs=7 u32=7 */
-#define SFERA_STATIC_04DE1158_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DE1158))
 #define SFERA_STATIC_04DE1158_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04DE1158)))
 
 /* data refs=3 addr=3 */
 #define SFERA_STATIC_04DE1170_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DE1170))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E01170_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E01170))
 #define SFERA_STATIC_04E01170_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E01170)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E01174_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E01174))
 #define SFERA_STATIC_04E01174_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E01174)))
 
 /* data refs=10 addr=7 u32=1 u8=2 */
@@ -2483,7 +2436,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E0117C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E0117C)))
 
 /* data refs=15 u32=15 */
-#define SFERA_STATIC_04E01188_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E01188))
 #define SFERA_STATIC_04E01188_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E01188)))
 
 /* data refs=2 addr=2 */
@@ -2502,12 +2454,7 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E01670_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E01670)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04E01674_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E01674))
 #define SFERA_STATIC_04E01674_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E01674)))
-
-/* data refs=62 addr=1 u32=61 */
-#define SFERA_STATIC_04E0168C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E0168C))
-#define SFERA_STATIC_04E0168C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E0168C)))
 
 /* data refs=3 addr=3 */
 #define SFERA_STATIC_04E01690_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E01690))
@@ -2516,19 +2463,15 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E01694_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E01694))
 
 /* data refs=9 u32=9 */
-#define SFERA_STATIC_04E1CF30_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1CF30))
 #define SFERA_STATIC_04E1CF30_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1CF30)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E1CF34_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1CF34))
 #define SFERA_STATIC_04E1CF34_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1CF34)))
 
 /* data refs=13 u32=13 */
-#define SFERA_STATIC_04E1CF3C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1CF3C))
 #define SFERA_STATIC_04E1CF3C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1CF3C)))
 
 /* data refs=13 u32=13 */
-#define SFERA_STATIC_04E1CF44_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1CF44))
 #define SFERA_STATIC_04E1CF44_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1CF44)))
 
 /* data refs=2 addr=1 u8=1 */
@@ -2559,7 +2502,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E1DA5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DA5C))
 
 /* data refs=10 u32=10 */
-#define SFERA_STATIC_04E1DC00_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DC00))
 #define SFERA_STATIC_04E1DC00_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1DC00)))
 
 /* data refs=7 addr=7 f32=7 */
@@ -2570,11 +2512,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E1DC08_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1DC08)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04E1DC0C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DC0C))
 #define SFERA_STATIC_04E1DC0C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1DC0C)))
 
 /* data refs=9 u32=9 */
-#define SFERA_STATIC_04E1DD14_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DD14))
 #define SFERA_STATIC_04E1DD14_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1DD14)))
 
 /* data refs=6 u32=10 */
@@ -2582,16 +2522,7 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E1DD20_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1DD20)))
 
 /* data refs=26 u32=26 */
-#define SFERA_STATIC_04E1DD24_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DD24))
 #define SFERA_STATIC_04E1DD24_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1DD24)))
-
-/* data refs=100 u32=100 */
-#define SFERA_STATIC_04E1DD28_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DD28))
-#define SFERA_STATIC_04E1DD28_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1DD28)))
-
-/* data refs=10 u32=18 */
-#define SFERA_STATIC_04E1DD2C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DD2C))
-#define SFERA_STATIC_04E1DD2C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1DD2C)))
 
 /* data refs=3 addr=1 u32=2 */
 #define SFERA_STATIC_04E1DD30_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DD30))
@@ -2608,7 +2539,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E1DE14_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DE14))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E1DE1C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DE1C))
 #define SFERA_STATIC_04E1DE1C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E1DE1C)))
 
 /* data refs=3 addr=2 u8=1 */
@@ -2623,11 +2553,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E1DEA4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DEA4))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04E2BFA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2BFA8))
 #define SFERA_STATIC_04E2BFA8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2BFA8)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04E2C0B0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C0B0))
 #define SFERA_STATIC_04E2C0B0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C0B0)))
 
 /* data refs=2 u32=4 */
@@ -2638,18 +2566,15 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E2C0B8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C0B8))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04E2C130_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C130))
 #define SFERA_STATIC_04E2C130_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C130)))
 
 /* data refs=19 addr=19 f32=19 */
 #define SFERA_STATIC_04E2C134_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C134))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04E2C138_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C138))
 #define SFERA_STATIC_04E2C138_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C138)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E2C13C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C13C))
 #define SFERA_STATIC_04E2C13C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C13C)))
 
 /* data refs=7 u32=9 */
@@ -2657,30 +2582,24 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E2C140_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C140)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04E2C144_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C144))
 #define SFERA_STATIC_04E2C144_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C144)))
 
 /* data refs=23 u32=23 */
-#define SFERA_STATIC_04E2C550_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C550))
 #define SFERA_STATIC_04E2C550_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C550)))
 
 /* data refs=16 u32=16 */
-#define SFERA_STATIC_04E2C898_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C898))
 #define SFERA_STATIC_04E2C898_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C898)))
 
 /* data refs=4 addr=2 u8=2 */
 #define SFERA_STATIC_04E2C89C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C89C))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E2C8BC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C8BC))
 #define SFERA_STATIC_04E2C8BC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C8BC)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E2C8C0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C8C0))
 #define SFERA_STATIC_04E2C8C0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C8C0)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04E2C8C4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C8C4))
 #define SFERA_STATIC_04E2C8C4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C8C4)))
 
 /* data refs=6 addr=6 f32=6 */
@@ -2690,26 +2609,21 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E2C8D4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C8D4))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E2C8D8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C8D8))
 #define SFERA_STATIC_04E2C8D8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C8D8)))
 
 /* data refs=7 u32=7 */
-#define SFERA_STATIC_04E2C8DC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C8DC))
 #define SFERA_STATIC_04E2C8DC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C8DC)))
 
 /* data refs=18 addr=18 f32=1 */
 #define SFERA_STATIC_04E2C8E0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C8E0))
 
 /* data refs=10 u32=10 */
-#define SFERA_STATIC_04E2C940_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C940))
 #define SFERA_STATIC_04E2C940_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C940)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04E2C944_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C944))
 #define SFERA_STATIC_04E2C944_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C944)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E2C948_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C948))
 #define SFERA_STATIC_04E2C948_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2C948)))
 
 /* data refs=21 addr=6 f32=6 u32=15 */
@@ -2732,7 +2646,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E2C9F4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2C9F4))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04E2CA44_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2CA44))
 #define SFERA_STATIC_04E2CA44_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2CA44)))
 
 /* data refs=6 addr=4 u16=2 */
@@ -2760,7 +2673,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E2DC44_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2DC44))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E2DC5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2DC5C))
 #define SFERA_STATIC_04E2DC5C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2DC5C)))
 
 /* data refs=6 u32=6 */
@@ -2770,7 +2682,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E2DE08_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2DE08))
 
 /* data refs=19 u32=19 */
-#define SFERA_STATIC_04E2DE10_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2DE10))
 #define SFERA_STATIC_04E2DE10_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2DE10)))
 
 /* data refs=6 addr=3 u16=3 */
@@ -2783,7 +2694,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E2DE1C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2DE1C))
 
 /* data refs=13 u32=13 */
-#define SFERA_STATIC_04E2E2BC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2E2BC))
 #define SFERA_STATIC_04E2E2BC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2E2BC)))
 
 /* data refs=18 addr=6 f32=6 u32=12 */
@@ -2806,7 +2716,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E2E364_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2E364))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04E2E3B4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2E3B4))
 #define SFERA_STATIC_04E2E3B4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E2E3B4)))
 
 /* data refs=3 u32=5 */
@@ -2826,19 +2735,15 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E509C0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E509C0))
 
 /* data refs=2 u8=2 */
-#define SFERA_STATIC_04E509DD_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E509DD))
 #define SFERA_STATIC_04E509DD_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E509DD)))
 
 /* data refs=5 u8=5 */
-#define SFERA_STATIC_04E509EA_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E509EA))
 #define SFERA_STATIC_04E509EA_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E509EA)))
 
 /* data refs=5 u8=5 */
-#define SFERA_STATIC_04E509F6_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E509F6))
 #define SFERA_STATIC_04E509F6_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E509F6)))
 
 /* data refs=2 u8=2 */
-#define SFERA_STATIC_04E509F8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E509F8))
 #define SFERA_STATIC_04E509F8_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E509F8)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -2846,7 +2751,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E50AC0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E50AC0)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E50AC4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E50AC4))
 #define SFERA_STATIC_04E50AC4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E50AC4)))
 
 /* data refs=11 u32=13 */
@@ -2860,11 +2764,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E51480_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E51480))
 
 /* data refs=34 u32=34 */
-#define SFERA_STATIC_04E51ED0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E51ED0))
 #define SFERA_STATIC_04E51ED0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E51ED0)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04E51ED4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E51ED4))
 #define SFERA_STATIC_04E51ED4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E51ED4)))
 
 /* data refs=20 addr=10 u32=1 u8=9 */
@@ -2880,27 +2782,21 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E51F10_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E51F10)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E51F50_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E51F50))
 #define SFERA_STATIC_04E51F50_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E51F50)))
 
 /* data refs=9 u32=9 */
-#define SFERA_STATIC_04E5215C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E5215C))
 #define SFERA_STATIC_04E5215C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E5215C)))
 
 /* data refs=18 u32=18 */
-#define SFERA_STATIC_04E522F0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E522F0))
 #define SFERA_STATIC_04E522F0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E522F0)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E522F4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E522F4))
 #define SFERA_STATIC_04E522F4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E522F4)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E522FC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E522FC))
 #define SFERA_STATIC_04E522FC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E522FC)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04E52300_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E52300))
 #define SFERA_STATIC_04E52300_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E52300)))
 
 /* data refs=21 u32=25 */
@@ -2911,11 +2807,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E52308_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E52308))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04E72308_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E72308))
 #define SFERA_STATIC_04E72308_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E72308)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04E72310_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E72310))
 #define SFERA_STATIC_04E72310_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E72310)))
 
 /* data refs=21 addr=11 u16=5 u32=1 u8=4 */
@@ -2925,11 +2819,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E72314_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E72314)))
 
 /* data refs=5 u8=5 */
-#define SFERA_STATIC_04E72316_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E72316))
 #define SFERA_STATIC_04E72316_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E72316)))
 
 /* data refs=9 u32=9 */
-#define SFERA_STATIC_04E7231C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E7231C))
 #define SFERA_STATIC_04E7231C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E7231C)))
 
 /* data refs=3 u32=3 */
@@ -2945,7 +2837,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E7232C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E7232C))
 
 /* data refs=9 u32=9 */
-#define SFERA_STATIC_04E73320_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E73320))
 #define SFERA_STATIC_04E73320_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E73320)))
 
 /* data refs=4 u32=4 */
@@ -2953,22 +2844,18 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E73324_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E73324)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E769D8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E769D8))
 #define SFERA_STATIC_04E769D8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E769D8)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E769DC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E769DC))
 #define SFERA_STATIC_04E769DC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E769DC)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E769E0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E769E0))
 #define SFERA_STATIC_04E769E0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E769E0)))
 
 /* data refs=19 addr=19 f32=19 */
 #define SFERA_STATIC_04E769E4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E769E4))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E769FC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E769FC))
 #define SFERA_STATIC_04E769FC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E769FC)))
 
 /* data refs=4 u32=8 */
@@ -2976,12 +2863,10 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E76A00_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E76A00)))
 
 /* data refs=8 u32=7 u8=1 */
-#define SFERA_STATIC_04E76A04_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E76A04))
 #define SFERA_STATIC_04E76A04_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E76A04)))
 #define SFERA_STATIC_04E76A04_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E76A04)))
 
 /* data refs=30 u32=30 */
-#define SFERA_STATIC_04E78A08_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78A08))
 #define SFERA_STATIC_04E78A08_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78A08)))
 
 /* data refs=3 addr=1 u32=2 */
@@ -2993,11 +2878,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E78A18_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78A18)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04E78A90_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78A90))
 #define SFERA_STATIC_04E78A90_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78A90)))
 
 /* data refs=2 u32=1 u8=1 */
-#define SFERA_STATIC_04E78A94_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78A94))
 #define SFERA_STATIC_04E78A94_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78A94)))
 #define SFERA_STATIC_04E78A94_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78A94)))
 
@@ -3026,19 +2909,15 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E78D70_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78D70)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E78D8C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78D8C))
 #define SFERA_STATIC_04E78D8C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78D8C)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04E78D90_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78D90))
 #define SFERA_STATIC_04E78D90_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78D90)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04E78D94_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78D94))
 #define SFERA_STATIC_04E78D94_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78D94)))
 
 /* data refs=2 u16=1 u32=1 */
-#define SFERA_STATIC_04E78D98_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78D98))
 #define SFERA_STATIC_04E78D98_U16 (*(uint16_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78D98)))
 #define SFERA_STATIC_04E78D98_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78D98)))
 
@@ -3050,11 +2929,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E78DA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78DA8))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04E78F8C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78F8C))
 #define SFERA_STATIC_04E78F8C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78F8C)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04E78F90_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78F90))
 #define SFERA_STATIC_04E78F90_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78F90)))
 
 /* data refs=6 addr=6 f32=5 */
@@ -3068,39 +2945,31 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E78FA0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78FA0)))
 
 /* data refs=2 u32=1 u8=1 */
-#define SFERA_STATIC_04E78FA4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78FA4))
 #define SFERA_STATIC_04E78FA4_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78FA4)))
 #define SFERA_STATIC_04E78FA4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78FA4)))
 
 /* data refs=29 u32=29 */
-#define SFERA_STATIC_04E78FA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78FA8))
 #define SFERA_STATIC_04E78FA8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78FA8)))
 
 /* data refs=2 addr=2 f32=2 */
 #define SFERA_STATIC_04E78FAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78FAC))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04E78FB0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78FB0))
 #define SFERA_STATIC_04E78FB0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78FB0)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04E78FB4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78FB4))
 #define SFERA_STATIC_04E78FB4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E78FB4)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E79234_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E79234))
 #define SFERA_STATIC_04E79234_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E79234)))
 
 /* data refs=18 u32=18 */
-#define SFERA_STATIC_04E79238_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E79238))
 #define SFERA_STATIC_04E79238_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E79238)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E79244_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E79244))
 #define SFERA_STATIC_04E79244_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E79244)))
 
 /* data refs=15 u32=15 */
-#define SFERA_STATIC_04E79248_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E79248))
 #define SFERA_STATIC_04E79248_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E79248)))
 
 /* data refs=4 addr=4 f32=4 */
@@ -3113,19 +2982,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E79268_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E79268))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04E792E0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E792E0))
 #define SFERA_STATIC_04E792E0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E792E0)))
 
-/* data refs=61 addr=1 u32=60 */
-#define SFERA_STATIC_04E792E4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E792E4))
-#define SFERA_STATIC_04E792E4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E792E4)))
-
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04E792E8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E792E8))
 #define SFERA_STATIC_04E792E8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E792E8)))
 
 /* data refs=10 u32=10 */
-#define SFERA_STATIC_04E792EC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E792EC))
 #define SFERA_STATIC_04E792EC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E792EC)))
 
 /* data refs=12 addr=1 u32=11 */
@@ -3133,11 +2995,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E792F0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E792F0)))
 
 /* data refs=29 u32=29 */
-#define SFERA_STATIC_04E792F4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E792F4))
 #define SFERA_STATIC_04E792F4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E792F4)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04E792FC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E792FC))
 #define SFERA_STATIC_04E792FC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E792FC)))
 
 /* data refs=11 u32=15 */
@@ -3149,7 +3009,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E79304_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E79304)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04E7930C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E7930C))
 #define SFERA_STATIC_04E7930C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E7930C)))
 
 /* data refs=83 addr=44 u8=39 */
@@ -3157,7 +3016,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04E79310_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E79310)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04E79B14_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E79B14))
 #define SFERA_STATIC_04E79B14_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E79B14)))
 
 /* data refs=3 addr=3 */
@@ -3167,7 +3025,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EB9B28_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9B28))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04EB9C28_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9C28))
 #define SFERA_STATIC_04EB9C28_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EB9C28)))
 
 /* data refs=5 addr=5 f32=5 */
@@ -3180,15 +3037,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EB9C44_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9C44))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EB9C58_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9C58))
 #define SFERA_STATIC_04EB9C58_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EB9C58)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EB9C5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9C5C))
 #define SFERA_STATIC_04EB9C5C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EB9C5C)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04EB9CC4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9CC4))
 #define SFERA_STATIC_04EB9CC4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EB9CC4)))
 
 /* data refs=7 addr=7 f32=7 */
@@ -3198,32 +3052,27 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EB9CCC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9CCC))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04EB9CD0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9CD0))
 #define SFERA_STATIC_04EB9CD0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EB9CD0)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04EB9CD4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9CD4))
 #define SFERA_STATIC_04EB9CD4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EB9CD4)))
 
 /* data refs=4 u32=4 */
 #define SFERA_STATIC_04EB9CD8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9CD8))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EB9CEC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9CEC))
 #define SFERA_STATIC_04EB9CEC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EB9CEC)))
 
 /* data refs=2 addr=2 f32=2 */
 #define SFERA_STATIC_04EB9CF0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9CF0))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04EB9E80_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9E80))
 #define SFERA_STATIC_04EB9E80_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EB9E80)))
 
 /* data refs=19 addr=19 f32=19 */
 #define SFERA_STATIC_04EB9E84_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9E84))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EB9E8C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EB9E8C))
 #define SFERA_STATIC_04EB9E8C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EB9E8C)))
 
 /* data refs=3 addr=1 u32=2 */
@@ -3243,23 +3092,18 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EC4EE0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4EE0)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04EC4EE4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4EE4))
 #define SFERA_STATIC_04EC4EE4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4EE4)))
 
 /* data refs=2 u8=2 */
-#define SFERA_STATIC_04EC4EE9_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4EE9))
 #define SFERA_STATIC_04EC4EE9_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4EE9)))
 
 /* data refs=2 u8=2 */
-#define SFERA_STATIC_04EC4EEA_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4EEA))
 #define SFERA_STATIC_04EC4EEA_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4EEA)))
 
 /* data refs=3 u8=3 */
-#define SFERA_STATIC_04EC4EEB_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4EEB))
 #define SFERA_STATIC_04EC4EEB_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4EEB)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04EC4EEC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4EEC))
 #define SFERA_STATIC_04EC4EEC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4EEC)))
 
 /* data refs=14 u32=16 */
@@ -3267,11 +3111,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EC4EF0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4EF0)))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04EC4EF4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4EF4))
 #define SFERA_STATIC_04EC4EF4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4EF4)))
 
 /* data refs=23 u32=23 */
-#define SFERA_STATIC_04EC4EF8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4EF8))
 #define SFERA_STATIC_04EC4EF8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4EF8)))
 
 /* data refs=11 u32=13 */
@@ -3287,14 +3129,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EC4F04_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F04)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04EC4F08_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F08))
 #define SFERA_STATIC_04EC4F08_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F08)))
 
 /* data refs=4 addr=4 f32=4 */
 #define SFERA_STATIC_04EC4F0C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F0C))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04EC4F10_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F10))
 #define SFERA_STATIC_04EC4F10_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F10)))
 
 /* data refs=2 u32=2 */
@@ -3302,35 +3142,27 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EC4F14_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F14)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04EC4F18_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F18))
 #define SFERA_STATIC_04EC4F18_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F18)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EC4F24_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F24))
 #define SFERA_STATIC_04EC4F24_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F24)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EC4F30_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F30))
 #define SFERA_STATIC_04EC4F30_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F30)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EC4F40_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F40))
 #define SFERA_STATIC_04EC4F40_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F40)))
 
 /* data refs=10 u32=10 */
-#define SFERA_STATIC_04EC4F48_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F48))
 #define SFERA_STATIC_04EC4F48_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F48)))
 
 /* data refs=12 u32=12 */
-#define SFERA_STATIC_04EC4F4C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F4C))
 #define SFERA_STATIC_04EC4F4C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F4C)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04EC4F50_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F50))
 #define SFERA_STATIC_04EC4F50_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F50)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04EC4F54_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F54))
 #define SFERA_STATIC_04EC4F54_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F54)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -3338,15 +3170,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EC4F58_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F58)))
 
 /* data refs=16 u8=16 */
-#define SFERA_STATIC_04EC4F61_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F61))
 #define SFERA_STATIC_04EC4F61_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F61)))
 
 /* data refs=3 u8=3 */
-#define SFERA_STATIC_04EC4F62_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F62))
 #define SFERA_STATIC_04EC4F62_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F62)))
 
 /* data refs=10 u32=10 */
-#define SFERA_STATIC_04EC4F64_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F64))
 #define SFERA_STATIC_04EC4F64_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F64)))
 
 /* data refs=9 addr=1 u32=8 */
@@ -3358,22 +3187,18 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EC4F70_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F70)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04EC4F74_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F74))
 #define SFERA_STATIC_04EC4F74_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F74)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04EC4F80_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F80))
 #define SFERA_STATIC_04EC4F80_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F80)))
 
 /* data refs=10 u32=10 */
-#define SFERA_STATIC_04EC4F84_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4F84))
 #define SFERA_STATIC_04EC4F84_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4F84)))
 
 /* data refs=2 addr=2 */
 #define SFERA_STATIC_04EC4FB0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4FB0))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EC4FBC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4FBC))
 #define SFERA_STATIC_04EC4FBC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EC4FBC)))
 
 /* data refs=2 addr=2 f32=1 */
@@ -3386,15 +3211,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EC4FF8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EC4FF8))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04ECBA38_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ECBA38))
 #define SFERA_STATIC_04ECBA38_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ECBA38)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04ECBA3C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ECBA3C))
 #define SFERA_STATIC_04ECBA3C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ECBA3C)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04ECBA40_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ECBA40))
 #define SFERA_STATIC_04ECBA40_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ECBA40)))
 
 /* data refs=2 addr=2 f32=2 */
@@ -3408,105 +3230,13 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ECBA4C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ECBA4C))
 #define SFERA_STATIC_04ECBA4C_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ECBA4C)))
 
-/* data refs=124 addr=124 */
-#define SFERA_STATIC_04ECBA50_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ECBA50))
-
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED0D70_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0D70))
 #define SFERA_STATIC_04ED0D70_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0D70)))
 
 /* data refs=2 addr=1 u32=1 */
 #define SFERA_STATIC_04ED0DA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0DA8))
 #define SFERA_STATIC_04ED0DA8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0DA8)))
 
-/* data refs=4 addr=1 u32=3 */
-#define SFERA_STATIC_04ED0E14_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E14))
-#define SFERA_STATIC_04ED0E14_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E14)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED0E18_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E18))
-#define SFERA_STATIC_04ED0E18_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E18)))
-
-/* data refs=3 addr=3 */
-#define SFERA_STATIC_04ED0E1C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E1C))
-
-/* data refs=15 addr=7 f32=11 u32=2 */
-#define SFERA_STATIC_04ED0E40_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E40))
-#define SFERA_STATIC_04ED0E40_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E40)))
-#define SFERA_STATIC_04ED0E40_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E40)))
-
-/* data refs=13 addr=5 f32=11 u32=2 */
-#define SFERA_STATIC_04ED0E44_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E44))
-#define SFERA_STATIC_04ED0E44_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E44)))
-#define SFERA_STATIC_04ED0E44_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E44)))
-
-/* data refs=13 addr=5 f32=11 u32=2 */
-#define SFERA_STATIC_04ED0E48_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E48))
-#define SFERA_STATIC_04ED0E48_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E48)))
-#define SFERA_STATIC_04ED0E48_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E48)))
-
-/* data refs=7 addr=6 f32=7 */
-#define SFERA_STATIC_04ED0E4C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E4C))
-#define SFERA_STATIC_04ED0E4C_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E4C)))
-
-/* data refs=7 addr=7 f32=7 */
-#define SFERA_STATIC_04ED0E50_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E50))
-
-/* data refs=7 addr=7 f32=7 */
-#define SFERA_STATIC_04ED0E54_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E54))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04ED0E58_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E58))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04ED0E5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E5C))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04ED0E60_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E60))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED0E64_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E64))
-
-/* data refs=2 addr=1 f32=2 */
-#define SFERA_STATIC_04ED0E68_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E68))
-#define SFERA_STATIC_04ED0E68_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E68)))
-
-/* data refs=2 addr=1 f32=2 */
-#define SFERA_STATIC_04ED0E6C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E6C))
-#define SFERA_STATIC_04ED0E6C_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E6C)))
-
-/* data refs=5 addr=5 f32=5 */
-#define SFERA_STATIC_04ED0E70_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E70))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04ED0E74_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E74))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04ED0E78_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0E78))
-
-/* data refs=9 u32=9 */
-#define SFERA_STATIC_04ED0EA0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0EA0))
-#define SFERA_STATIC_04ED0EA0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EA0)))
-
-/* data refs=9 u32=9 */
-#define SFERA_STATIC_04ED0EA4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0EA4))
-#define SFERA_STATIC_04ED0EA4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EA4)))
-
-/* data refs=9 u32=9 */
-#define SFERA_STATIC_04ED0EA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0EA8))
-#define SFERA_STATIC_04ED0EA8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EA8)))
-
-/* data refs=9 u32=9 */
-#define SFERA_STATIC_04ED0EAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0EAC))
-#define SFERA_STATIC_04ED0EAC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EAC)))
-
-/* data refs=9 u32=9 */
-#define SFERA_STATIC_04ED0EB0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0EB0))
-#define SFERA_STATIC_04ED0EB0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EB0)))
-
-/* data refs=9 u32=9 */
-#define SFERA_STATIC_04ED0EB4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0EB4))
-#define SFERA_STATIC_04ED0EB4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EB4)))
 
 /* data refs=2 addr=1 f32=1 u32=1 */
 #define SFERA_STATIC_04ED0EB8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0EB8))
@@ -3516,60 +3246,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED0EBC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0EBC))
 #define SFERA_STATIC_04ED0EBC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EBC)))
 
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04ED0EC4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0EC4))
-#define SFERA_STATIC_04ED0EC4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EC4)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04ED0EC8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0EC8))
-#define SFERA_STATIC_04ED0EC8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EC8)))
-
-/* data refs=4 addr=4 */
-#define SFERA_STATIC_04ED0ECC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0ECC))
-
-/* data refs=16 u32=16 */
-#define SFERA_STATIC_04ED0F30_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0F30))
-#define SFERA_STATIC_04ED0F30_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0F30)))
-
-/* data refs=15 u32=15 */
-#define SFERA_STATIC_04ED0F34_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0F34))
-#define SFERA_STATIC_04ED0F34_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0F34)))
-
-/* data refs=29 addr=29 */
-#define SFERA_STATIC_04ED0F38_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0F38))
-
-/* data refs=5 addr=1 u32=4 */
-#define SFERA_STATIC_04ED0F5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0F5C))
-#define SFERA_STATIC_04ED0F5C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0F5C)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04ED0F60_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0F60))
-#define SFERA_STATIC_04ED0F60_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0F60)))
-
-/* data refs=5 addr=5 */
-#define SFERA_STATIC_04ED0F64_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0F64))
-
-/* data refs=5 addr=1 u32=4 */
-#define SFERA_STATIC_04ED0FE8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0FE8))
-#define SFERA_STATIC_04ED0FE8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0FE8)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04ED0FEC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0FEC))
-#define SFERA_STATIC_04ED0FEC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0FEC)))
-
-/* data refs=5 addr=5 */
-#define SFERA_STATIC_04ED0FF0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0FF0))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04ED1014_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1014))
-#define SFERA_STATIC_04ED1014_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1014)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04ED1018_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1018))
-#define SFERA_STATIC_04ED1018_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1018)))
-
-/* data refs=5 addr=5 */
-#define SFERA_STATIC_04ED101C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED101C))
 
 /* data refs=2 addr=2 */
 #define SFERA_STATIC_04ED1080_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1080))
@@ -3587,75 +3263,22 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED110C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED110C))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04ED1120_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1120))
 #define SFERA_STATIC_04ED1120_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1120)))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04ED1158_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1158))
 #define SFERA_STATIC_04ED1158_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1158)))
 
-/* data refs=21 u32=21 */
-#define SFERA_STATIC_04ED1190_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1190))
-#define SFERA_STATIC_04ED1190_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1190)))
-
-/* data refs=20 u32=20 */
-#define SFERA_STATIC_04ED1194_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1194))
-#define SFERA_STATIC_04ED1194_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1194)))
-
-/* data refs=32 addr=32 */
-#define SFERA_STATIC_04ED1198_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1198))
-
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04ED11BC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED11BC))
-#define SFERA_STATIC_04ED11BC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED11BC)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04ED11C0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED11C0))
-#define SFERA_STATIC_04ED11C0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED11C0)))
-
-/* data refs=7 addr=7 */
-#define SFERA_STATIC_04ED11C4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED11C4))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04ED11E8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED11E8))
 #define SFERA_STATIC_04ED11E8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED11E8)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED1220_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1220))
 #define SFERA_STATIC_04ED1220_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1220)))
 
-/* data refs=5 addr=1 u32=4 */
-#define SFERA_STATIC_04ED1258_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1258))
-#define SFERA_STATIC_04ED1258_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1258)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04ED125C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED125C))
-#define SFERA_STATIC_04ED125C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED125C)))
-
-/* data refs=5 addr=5 */
-#define SFERA_STATIC_04ED1260_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1260))
-
-/* data refs=12 addr=1 u32=11 */
-#define SFERA_STATIC_04ED1284_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1284))
-#define SFERA_STATIC_04ED1284_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1284)))
-
-/* data refs=8 u32=8 */
-#define SFERA_STATIC_04ED1288_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1288))
-#define SFERA_STATIC_04ED1288_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1288)))
-
-/* data refs=12 addr=12 */
-#define SFERA_STATIC_04ED128C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED128C))
 
 /* data refs=14 addr=14 f32=1 */
 #define SFERA_STATIC_04ED12B0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED12B0))
 
-/* data refs=66 addr=32 u32=34 */
-#define SFERA_STATIC_04ED12F0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED12F0))
-#define SFERA_STATIC_04ED12F0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED12F0)))
-
-/* data refs=33 u32=33 */
-#define SFERA_STATIC_04ED12F4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED12F4))
-#define SFERA_STATIC_04ED12F4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED12F4)))
 
 /* data refs=3 addr=3 */
 #define SFERA_STATIC_04ED132C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED132C))
@@ -3664,96 +3287,17 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED1358_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1358))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED1A30_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1A30))
 #define SFERA_STATIC_04ED1A30_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1A30)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED1A68_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1A68))
 #define SFERA_STATIC_04ED1A68_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1A68)))
 
 /* data refs=3 addr=3 */
-#define SFERA_STATIC_04ED1AA0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1AA0))
 
-/* data refs=10 u32=10 */
-#define SFERA_STATIC_04ED29A0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED29A0))
-#define SFERA_STATIC_04ED29A0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED29A0)))
-
-/* data refs=9 u32=9 */
-#define SFERA_STATIC_04ED29A4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED29A4))
-#define SFERA_STATIC_04ED29A4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED29A4)))
-
-/* data refs=17 addr=17 */
-#define SFERA_STATIC_04ED29A8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED29A8))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04ED29CC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED29CC))
-#define SFERA_STATIC_04ED29CC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED29CC)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04ED29D0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED29D0))
-#define SFERA_STATIC_04ED29D0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED29D0)))
-
-/* data refs=4 addr=4 */
-#define SFERA_STATIC_04ED29D4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED29D4))
-
-/* data refs=25 u32=25 */
-#define SFERA_STATIC_04ED29F8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED29F8))
-#define SFERA_STATIC_04ED29F8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED29F8)))
-
-/* data refs=24 u32=24 */
-#define SFERA_STATIC_04ED29FC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED29FC))
-#define SFERA_STATIC_04ED29FC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED29FC)))
-
-/* data refs=47 addr=47 */
-#define SFERA_STATIC_04ED2A00_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2A00))
-
-/* data refs=37 u32=37 */
-#define SFERA_STATIC_04ED2A24_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2A24))
-#define SFERA_STATIC_04ED2A24_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2A24)))
-
-/* data refs=36 u32=36 */
-#define SFERA_STATIC_04ED2A28_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2A28))
-#define SFERA_STATIC_04ED2A28_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2A28)))
-
-/* data refs=58 addr=58 */
-#define SFERA_STATIC_04ED2A2C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2A2C))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2A50_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2A50))
 #define SFERA_STATIC_04ED2A50_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2A50)))
 
-/* data refs=12 u32=12 */
-#define SFERA_STATIC_04ED2A7C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2A7C))
-#define SFERA_STATIC_04ED2A7C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2A7C)))
-
-/* data refs=10 u32=10 */
-#define SFERA_STATIC_04ED2A80_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2A80))
-#define SFERA_STATIC_04ED2A80_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2A80)))
-
-/* data refs=19 addr=19 */
-#define SFERA_STATIC_04ED2A84_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2A84))
-
-/* data refs=11 u32=11 */
-#define SFERA_STATIC_04ED2AA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2AA8))
-#define SFERA_STATIC_04ED2AA8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2AA8)))
-
-/* data refs=7 u32=7 */
-#define SFERA_STATIC_04ED2AAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2AAC))
-#define SFERA_STATIC_04ED2AAC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2AAC)))
-
-/* data refs=13 addr=13 */
-#define SFERA_STATIC_04ED2AB0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2AB0))
-
-/* data refs=12 u32=12 */
-#define SFERA_STATIC_04ED2AD4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2AD4))
-#define SFERA_STATIC_04ED2AD4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2AD4)))
-
-/* data refs=11 u32=11 */
-#define SFERA_STATIC_04ED2AD8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2AD8))
-#define SFERA_STATIC_04ED2AD8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2AD8)))
-
-/* data refs=21 addr=21 */
-#define SFERA_STATIC_04ED2ADC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2ADC))
 
 /* data refs=3 addr=1 f32=2 u32=1 */
 #define SFERA_STATIC_04ED2B00_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2B00))
@@ -3770,22 +3314,11 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED2B08_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2B08)))
 #define SFERA_STATIC_04ED2B08_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2B08)))
 
-/* data refs=7 addr=1 u32=6 */
-#define SFERA_STATIC_04ED2B0C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2B0C))
-#define SFERA_STATIC_04ED2B0C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2B0C)))
-
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04ED2B10_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2B10))
-#define SFERA_STATIC_04ED2B10_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2B10)))
-
-/* data refs=8 addr=8 */
-#define SFERA_STATIC_04ED2B14_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2B14))
 
 /* data refs=2 addr=2 f32=1 */
 #define SFERA_STATIC_04ED2B38_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2B38))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2BA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2BA8))
 #define SFERA_STATIC_04ED2BA8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2BA8)))
 
 /* data refs=3 addr=1 u32=2 */
@@ -3793,45 +3326,11 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED2BE0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2BE0)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2BE4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2BE4))
 #define SFERA_STATIC_04ED2BE4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2BE4)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2BE8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2BE8))
 #define SFERA_STATIC_04ED2BE8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2BE8)))
 
-/* data refs=15 u32=15 */
-#define SFERA_STATIC_04ED2BEC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2BEC))
-#define SFERA_STATIC_04ED2BEC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2BEC)))
-
-/* data refs=14 u32=14 */
-#define SFERA_STATIC_04ED2BF0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2BF0))
-#define SFERA_STATIC_04ED2BF0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2BF0)))
-
-/* data refs=26 addr=26 */
-#define SFERA_STATIC_04ED2BF4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2BF4))
-
-/* data refs=5 addr=1 u32=4 */
-#define SFERA_STATIC_04ED2C18_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2C18))
-#define SFERA_STATIC_04ED2C18_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C18)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04ED2C1C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2C1C))
-#define SFERA_STATIC_04ED2C1C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C1C)))
-
-/* data refs=5 addr=5 */
-#define SFERA_STATIC_04ED2C20_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2C20))
-
-/* data refs=6 u32=6 */
-#define SFERA_STATIC_04ED2C44_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2C44))
-#define SFERA_STATIC_04ED2C44_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C44)))
-
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04ED2C48_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2C48))
-#define SFERA_STATIC_04ED2C48_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C48)))
-
-/* data refs=9 addr=9 */
-#define SFERA_STATIC_04ED2C4C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2C4C))
 
 /* data refs=4 addr=4 f32=2 */
 #define SFERA_STATIC_04ED2C70_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2C70))
@@ -3881,7 +3380,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED2C9C_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C9C)))
 
 /* data refs=12 u8=12 */
-#define SFERA_STATIC_04ED2CA0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2CA0))
 #define SFERA_STATIC_04ED2CA0_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2CA0)))
 
 /* data refs=16 addr=12 f32=11 u32=3 */
@@ -3910,7 +3408,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED2CB8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2CB8))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2D28_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2D28))
 #define SFERA_STATIC_04ED2D28_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2D28)))
 
 /* data refs=14 addr=5 f32=6 u32=8 */
@@ -3945,42 +3442,25 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED2D78_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2D78))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2DB8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2DB8))
 #define SFERA_STATIC_04ED2DB8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2DB8)))
 
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04ED2DE4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2DE4))
-#define SFERA_STATIC_04ED2DE4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2DE4)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04ED2DE8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2DE8))
-#define SFERA_STATIC_04ED2DE8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2DE8)))
-
-/* data refs=5 addr=5 */
-#define SFERA_STATIC_04ED2DEC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2DEC))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2E10_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E10))
 #define SFERA_STATIC_04ED2E10_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E10)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2E14_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E14))
 #define SFERA_STATIC_04ED2E14_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E14)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2E18_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E18))
 #define SFERA_STATIC_04ED2E18_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E18)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2E1C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E1C))
 #define SFERA_STATIC_04ED2E1C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E1C)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2E20_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E20))
 #define SFERA_STATIC_04ED2E20_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E20)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2E24_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E24))
 #define SFERA_STATIC_04ED2E24_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E24)))
 
 /* data refs=2 addr=1 f32=1 u32=1 */
@@ -3995,38 +3475,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED2E30_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E30))
 #define SFERA_STATIC_04ED2E30_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E30)))
 
-/* data refs=12 u32=12 */
-#define SFERA_STATIC_04ED2E34_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E34))
-#define SFERA_STATIC_04ED2E34_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E34)))
-
-/* data refs=11 u32=11 */
-#define SFERA_STATIC_04ED2E38_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E38))
-#define SFERA_STATIC_04ED2E38_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E38)))
-
-/* data refs=21 addr=21 */
-#define SFERA_STATIC_04ED2E3C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E3C))
-
-/* data refs=6 addr=2 u32=4 */
-#define SFERA_STATIC_04ED2E60_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E60))
-#define SFERA_STATIC_04ED2E60_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E60)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04ED2E64_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E64))
-#define SFERA_STATIC_04ED2E64_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E64)))
-
-/* data refs=5 addr=5 */
-#define SFERA_STATIC_04ED2E68_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E68))
-
-/* data refs=45 u32=45 */
-#define SFERA_STATIC_04ED2E8C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E8C))
-#define SFERA_STATIC_04ED2E8C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E8C)))
-
-/* data refs=44 u32=44 */
-#define SFERA_STATIC_04ED2E90_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E90))
-#define SFERA_STATIC_04ED2E90_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E90)))
-
-/* data refs=84 addr=84 */
-#define SFERA_STATIC_04ED2E94_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2E94))
 
 /* data refs=2 addr=1 f32=1 u32=1 */
 #define SFERA_STATIC_04ED2EB8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2EB8))
@@ -4040,116 +3488,18 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED2EC0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2EC0))
 #define SFERA_STATIC_04ED2EC0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2EC0)))
 
-/* data refs=54 u32=54 */
-#define SFERA_STATIC_04ED2EC4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2EC4))
-#define SFERA_STATIC_04ED2EC4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2EC4)))
-
-/* data refs=53 u32=53 */
-#define SFERA_STATIC_04ED2EC8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2EC8))
-#define SFERA_STATIC_04ED2EC8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2EC8)))
-
-/* data refs=63 addr=63 */
-#define SFERA_STATIC_04ED2ECC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2ECC))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED2EF0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2EF0))
 #define SFERA_STATIC_04ED2EF0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2EF0)))
 
-/* data refs=6 u32=6 */
-#define SFERA_STATIC_04ED2F1C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2F1C))
-#define SFERA_STATIC_04ED2F1C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F1C)))
-
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04ED2F20_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2F20))
-#define SFERA_STATIC_04ED2F20_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F20)))
-
-/* data refs=9 addr=9 */
-#define SFERA_STATIC_04ED2F24_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2F24))
-
-/* data refs=237 addr=7 u32=230 */
-#define SFERA_STATIC_04ED2F48_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2F48))
-#define SFERA_STATIC_04ED2F48_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F48)))
-
-/* data refs=225 u32=225 */
-#define SFERA_STATIC_04ED2F4C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2F4C))
-#define SFERA_STATIC_04ED2F4C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F4C)))
-
-/* data refs=304 addr=304 */
-#define SFERA_STATIC_04ED2F50_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2F50))
-
-/* data refs=32 u32=32 */
-#define SFERA_STATIC_04ED2F74_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2F74))
-#define SFERA_STATIC_04ED2F74_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F74)))
-
-/* data refs=29 u32=29 */
-#define SFERA_STATIC_04ED2F78_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2F78))
-#define SFERA_STATIC_04ED2F78_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F78)))
-
-/* data refs=57 addr=57 */
-#define SFERA_STATIC_04ED2F7C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2F7C))
-
-/* data refs=9 u32=9 */
-#define SFERA_STATIC_04ED2FE0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2FE0))
-#define SFERA_STATIC_04ED2FE0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2FE0)))
-
-/* data refs=8 u32=8 */
-#define SFERA_STATIC_04ED2FE4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2FE4))
-#define SFERA_STATIC_04ED2FE4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2FE4)))
-
-/* data refs=15 addr=15 */
-#define SFERA_STATIC_04ED2FE8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2FE8))
-
-/* data refs=26 u32=26 */
-#define SFERA_STATIC_04ED300C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED300C))
-#define SFERA_STATIC_04ED300C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED300C)))
-
-/* data refs=25 u32=25 */
-#define SFERA_STATIC_04ED3010_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3010))
-#define SFERA_STATIC_04ED3010_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3010)))
-
-/* data refs=47 addr=47 */
-#define SFERA_STATIC_04ED3014_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3014))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED3038_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3038))
 #define SFERA_STATIC_04ED3038_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3038)))
 
-/* data refs=6 u32=6 */
-#define SFERA_STATIC_04ED3070_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3070))
-#define SFERA_STATIC_04ED3070_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3070)))
-
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04ED3074_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3074))
-#define SFERA_STATIC_04ED3074_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3074)))
-
-/* data refs=9 addr=9 */
-#define SFERA_STATIC_04ED3078_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3078))
-
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04ED309C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED309C))
-#define SFERA_STATIC_04ED309C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED309C)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04ED30A0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED30A0))
-#define SFERA_STATIC_04ED30A0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED30A0)))
-
-/* data refs=7 addr=7 */
-#define SFERA_STATIC_04ED30A4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED30A4))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED30C8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED30C8))
 #define SFERA_STATIC_04ED30C8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED30C8)))
 
-/* data refs=7 addr=3 u32=4 */
-#define SFERA_STATIC_04ED3100_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3100))
-#define SFERA_STATIC_04ED3100_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3100)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04ED3104_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3104))
-#define SFERA_STATIC_04ED3104_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3104)))
-
-/* data refs=5 addr=5 */
-#define SFERA_STATIC_04ED3108_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3108))
 
 /* data refs=2 addr=1 f32=1 u32=1 */
 #define SFERA_STATIC_04ED312C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED312C))
@@ -4168,136 +3518,73 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04ED3138_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3138)))
 
 /* data refs=6 addr=6 f32=2 */
-#define SFERA_STATIC_04ED36A0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36A0))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36A4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36A4))
 
 /* data refs=3 addr=3 f32=2 */
-#define SFERA_STATIC_04ED36A8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36A8))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36AC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36AC))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED36B0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36B0))
 
 /* data refs=4 addr=4 f32=4 */
-#define SFERA_STATIC_04ED36B8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36B8))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36BC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36BC))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36C0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36C0))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36C4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36C4))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36C8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36C8))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36CC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36CC))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED36D0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36D0))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36D8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36D8))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36DC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36DC))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36E0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36E0))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36E4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36E4))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36E8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36E8))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36EC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36EC))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED36F0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36F0))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36F8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36F8))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED36FC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED36FC))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED3700_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3700))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED3704_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3704))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED3708_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3708))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED370C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED370C))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04ED3710_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3710))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED3718_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED3718))
 
 /* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04ED371C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED371C))
 
-/* data refs=26 u32=26 */
-#define SFERA_STATIC_04EDCCA0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCCA0))
-#define SFERA_STATIC_04EDCCA0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCCA0)))
-
-/* data refs=25 u32=25 */
-#define SFERA_STATIC_04EDCCA4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCCA4))
-#define SFERA_STATIC_04EDCCA4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCCA4)))
-
-/* data refs=50 addr=50 */
-#define SFERA_STATIC_04EDCCA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCCA8))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EDCCCC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCCCC))
 #define SFERA_STATIC_04EDCCCC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCCCC)))
 
 /* data refs=18 addr=18 */
 #define SFERA_STATIC_04EDCCF8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCCF8))
 
-/* data refs=8 u32=8 */
-#define SFERA_STATIC_04EDCD58_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCD58))
-#define SFERA_STATIC_04EDCD58_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCD58)))
-
-/* data refs=8 u32=8 */
-#define SFERA_STATIC_04EDCD5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCD5C))
-#define SFERA_STATIC_04EDCD5C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCD5C)))
-
-/* data refs=8 u32=8 */
-#define SFERA_STATIC_04EDCD60_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCD60))
-#define SFERA_STATIC_04EDCD60_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCD60)))
-
-/* data refs=8 u32=8 */
-#define SFERA_STATIC_04EDCD64_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCD64))
-#define SFERA_STATIC_04EDCD64_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCD64)))
-
-/* data refs=8 u32=8 */
-#define SFERA_STATIC_04EDCD68_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCD68))
-#define SFERA_STATIC_04EDCD68_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCD68)))
-
-/* data refs=8 u32=8 */
-#define SFERA_STATIC_04EDCD6C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCD6C))
-#define SFERA_STATIC_04EDCD6C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCD6C)))
 
 /* data refs=6 addr=6 */
 #define SFERA_STATIC_04EDCD70_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCD70))
 
 /* data refs=16 u32=16 */
-#define SFERA_STATIC_04EDCD74_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCD74))
 #define SFERA_STATIC_04EDCD74_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCD74)))
 
 /* data refs=4 addr=3 f32=2 u32=1 */
@@ -4325,203 +3612,29 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EDCD94_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCD94)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EDCD98_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCD98))
 #define SFERA_STATIC_04EDCD98_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCD98)))
 
-/* data refs=19 u32=19 */
-#define SFERA_STATIC_04EDCDD0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCDD0))
-#define SFERA_STATIC_04EDCDD0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCDD0)))
-
-/* data refs=18 u32=18 */
-#define SFERA_STATIC_04EDCDD4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCDD4))
-#define SFERA_STATIC_04EDCDD4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCDD4)))
-
-/* data refs=35 addr=35 */
-#define SFERA_STATIC_04EDCDD8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCDD8))
-
-/* data refs=11 u32=11 */
-#define SFERA_STATIC_04EDCDFC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCDFC))
-#define SFERA_STATIC_04EDCDFC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCDFC)))
-
-/* data refs=10 u32=10 */
-#define SFERA_STATIC_04EDCE00_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE00))
-#define SFERA_STATIC_04EDCE00_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE00)))
-
-/* data refs=14 addr=14 */
-#define SFERA_STATIC_04EDCE04_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE04))
-
-/* data refs=7 u32=7 */
-#define SFERA_STATIC_04EDCE28_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE28))
-#define SFERA_STATIC_04EDCE28_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE28)))
-
-/* data refs=6 u32=6 */
-#define SFERA_STATIC_04EDCE2C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE2C))
-#define SFERA_STATIC_04EDCE2C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE2C)))
-
-/* data refs=11 addr=11 */
-#define SFERA_STATIC_04EDCE30_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE30))
-
-/* data refs=10 addr=2 u32=8 */
-#define SFERA_STATIC_04EDCE54_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE54))
-#define SFERA_STATIC_04EDCE54_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE54)))
-
-/* data refs=7 u32=7 */
-#define SFERA_STATIC_04EDCE58_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE58))
-#define SFERA_STATIC_04EDCE58_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE58)))
-
-/* data refs=12 addr=12 */
-#define SFERA_STATIC_04EDCE5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE5C))
-
-/* data refs=12 addr=12 f32=7 */
-#define SFERA_STATIC_04EDCE80_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE80))
-
-/* data refs=7 addr=7 f32=7 */
-#define SFERA_STATIC_04EDCE84_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE84))
-
-/* data refs=3 addr=3 f32=3 */
-#define SFERA_STATIC_04EDCE88_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE88))
-
-/* data refs=3 addr=3 f32=3 */
-#define SFERA_STATIC_04EDCE8C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE8C))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04EDCE90_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE90))
-#define SFERA_STATIC_04EDCE90_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE90)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04EDCE94_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE94))
-#define SFERA_STATIC_04EDCE94_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE94)))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04EDCE98_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE98))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04EDCE9C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCE9C))
-
-/* data refs=7 addr=7 f32=7 */
-#define SFERA_STATIC_04EDCEA0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEA0))
-
-/* data refs=4 addr=4 f32=4 */
-#define SFERA_STATIC_04EDCEA4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEA4))
-
-/* data refs=3 addr=3 f32=3 */
-#define SFERA_STATIC_04EDCEA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEA8))
-
-/* data refs=3 addr=3 f32=3 */
-#define SFERA_STATIC_04EDCEAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEAC))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04EDCEB0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEB0))
-#define SFERA_STATIC_04EDCEB0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCEB0)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04EDCEB4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEB4))
-#define SFERA_STATIC_04EDCEB4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCEB4)))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04EDCEB8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEB8))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04EDCEBC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEBC))
-
-/* data refs=4 addr=4 f32=4 */
-#define SFERA_STATIC_04EDCEC0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEC0))
-
-/* data refs=7 addr=7 f32=7 */
-#define SFERA_STATIC_04EDCEC4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEC4))
-
-/* data refs=3 addr=3 f32=3 */
-#define SFERA_STATIC_04EDCEC8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEC8))
-
-/* data refs=3 addr=3 f32=3 */
-#define SFERA_STATIC_04EDCECC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCECC))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04EDCED0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCED0))
-#define SFERA_STATIC_04EDCED0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCED0)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04EDCED4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCED4))
-#define SFERA_STATIC_04EDCED4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCED4)))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04EDCED8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCED8))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04EDCEDC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEDC))
-
-/* data refs=4 addr=4 f32=4 */
-#define SFERA_STATIC_04EDCEE0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEE0))
-
-/* data refs=4 addr=4 f32=4 */
-#define SFERA_STATIC_04EDCEE4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEE4))
-
-/* data refs=3 addr=3 f32=3 */
-#define SFERA_STATIC_04EDCEE8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEE8))
-
-/* data refs=3 addr=3 f32=3 */
-#define SFERA_STATIC_04EDCEEC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEEC))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04EDCEF0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEF0))
-#define SFERA_STATIC_04EDCEF0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCEF0)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04EDCEF4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEF4))
-#define SFERA_STATIC_04EDCEF4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCEF4)))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04EDCEF8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEF8))
-
-/* data refs=6 addr=6 f32=6 */
-#define SFERA_STATIC_04EDCEFC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCEFC))
 
 /* data refs=6 addr=6 */
 #define SFERA_STATIC_04EDCF00_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCF00))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EDCF40_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCF40))
 #define SFERA_STATIC_04EDCF40_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCF40)))
 
-/* data refs=7 u32=7 */
-#define SFERA_STATIC_04EDCF78_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCF78))
-#define SFERA_STATIC_04EDCF78_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCF78)))
-
-/* data refs=6 u32=6 */
-#define SFERA_STATIC_04EDCF7C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCF7C))
-#define SFERA_STATIC_04EDCF7C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCF7C)))
-
-/* data refs=11 addr=11 */
-#define SFERA_STATIC_04EDCF80_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCF80))
-
-/* data refs=14 u32=14 */
-#define SFERA_STATIC_04EDCFA4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCFA4))
-#define SFERA_STATIC_04EDCFA4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCFA4)))
-
-/* data refs=13 u32=13 */
-#define SFERA_STATIC_04EDCFA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCFA8))
-#define SFERA_STATIC_04EDCFA8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCFA8)))
-
-/* data refs=25 addr=25 */
-#define SFERA_STATIC_04EDCFAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCFAC))
 
 /* data refs=2 addr=2 */
 #define SFERA_STATIC_04EDCFD0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCFD0))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04EDD030_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD030))
 #define SFERA_STATIC_04EDD030_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD030)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04EDD068_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD068))
 #define SFERA_STATIC_04EDD068_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD068)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04EDD06C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD06C))
 #define SFERA_STATIC_04EDD06C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD06C)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04EDD070_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD070))
 #define SFERA_STATIC_04EDD070_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD070)))
 
 /* data refs=2 addr=2 f32=2 */
@@ -4532,7 +3645,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EDD078_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD078)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EDD080_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD080))
 #define SFERA_STATIC_04EDD080_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD080)))
 
 /* data refs=4 u32=6 */
@@ -4540,19 +3652,15 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EDD088_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD088)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EDD090_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD090))
 #define SFERA_STATIC_04EDD090_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD090)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EDD0A0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD0A0))
 #define SFERA_STATIC_04EDD0A0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0A0)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04EDD0A4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD0A4))
 #define SFERA_STATIC_04EDD0A4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0A4)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04EDD0A8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD0A8))
 #define SFERA_STATIC_04EDD0A8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0A8)))
 
 /* data refs=2 addr=2 */
@@ -4564,7 +3672,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EDD0C8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0C8)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EDD0CC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD0CC))
 #define SFERA_STATIC_04EDD0CC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0CC)))
 
 /* data refs=32 addr=24 u32=8 */
@@ -4572,20 +3679,16 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EDD0D0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0D0)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04EDD0D4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD0D4))
 #define SFERA_STATIC_04EDD0D4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0D4)))
 
 /* data refs=8 u16=2 u32=6 */
-#define SFERA_STATIC_04EDD0D8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD0D8))
 #define SFERA_STATIC_04EDD0D8_U16 (*(uint16_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0D8)))
 #define SFERA_STATIC_04EDD0D8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0D8)))
 
 /* data refs=2 u8=2 */
-#define SFERA_STATIC_04EDD0DA_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD0DA))
 #define SFERA_STATIC_04EDD0DA_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0DA)))
 
 /* data refs=6 u16=6 */
-#define SFERA_STATIC_04EDD0DC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD0DC))
 #define SFERA_STATIC_04EDD0DC_U16 (*(uint16_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD0DC)))
 
 /* data refs=3 addr=3 */
@@ -4630,17 +3733,14 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EDD358_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD358))
 
 /* data refs=2 f32=1 u32=1 */
-#define SFERA_STATIC_04EDD35C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD35C))
 #define SFERA_STATIC_04EDD35C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD35C)))
 #define SFERA_STATIC_04EDD35C_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD35C)))
 
 /* data refs=2 f32=1 u32=1 */
-#define SFERA_STATIC_04EDD360_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD360))
 #define SFERA_STATIC_04EDD360_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD360)))
 #define SFERA_STATIC_04EDD360_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD360)))
 
 /* data refs=2 f32=1 u32=1 */
-#define SFERA_STATIC_04EDD364_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD364))
 #define SFERA_STATIC_04EDD364_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD364)))
 #define SFERA_STATIC_04EDD364_F32 (*(float*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD364)))
 
@@ -4653,15 +3753,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EDD374_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD374)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04EDD380_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD380))
 #define SFERA_STATIC_04EDD380_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD380)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EDD384_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD384))
 #define SFERA_STATIC_04EDD384_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD384)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EDD388_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD388))
 #define SFERA_STATIC_04EDD388_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD388)))
 
 /* data refs=2 addr=2 */
@@ -4671,7 +3768,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EDD398_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD398))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EDD460_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD460))
 #define SFERA_STATIC_04EDD460_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD460)))
 
 /* data refs=4 addr=3 u8=1 */
@@ -4684,7 +3780,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EDD510_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD510))
 
 /* data refs=2 u8=2 */
-#define SFERA_STATIC_04EDD590_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD590))
 #define SFERA_STATIC_04EDD590_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDD590)))
 
 /* data refs=2 addr=2 */
@@ -4706,7 +3801,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EE0498_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EE0498)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EE04A0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EE04A0))
 #define SFERA_STATIC_04EE04A0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EE04A0)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -4743,7 +3837,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EE7158_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EE7158))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04EE8158_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EE8158))
 #define SFERA_STATIC_04EE8158_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EE8158)))
 
 /* data refs=3 u8=3 */
@@ -4764,7 +3857,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EE8630_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EE8630)))
 
 /* data refs=16 u32=16 */
-#define SFERA_STATIC_04EEA008_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA008))
 #define SFERA_STATIC_04EEA008_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA008)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -4772,30 +3864,24 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EEA010_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA010)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04EEA0E0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA0E0))
 #define SFERA_STATIC_04EEA0E0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA0E0)))
 
 /* data refs=3 u8=3 */
-#define SFERA_STATIC_04EEA0E4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA0E4))
 #define SFERA_STATIC_04EEA0E4_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA0E4)))
 
 /* data refs=2 addr=2 */
 #define SFERA_STATIC_04EEA0E8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA0E8))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04EEA128_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA128))
 #define SFERA_STATIC_04EEA128_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA128)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04EEA12C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA12C))
 #define SFERA_STATIC_04EEA12C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA12C)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04EEA130_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA130))
 #define SFERA_STATIC_04EEA130_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA130)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04EEA134_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA134))
 #define SFERA_STATIC_04EEA134_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA134)))
 
 /* data refs=6 addr=6 */
@@ -4806,44 +3892,7 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EEA150_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA150)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04EEA330_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA330))
 #define SFERA_STATIC_04EEA330_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA330)))
-
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04EEA518_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA518))
-#define SFERA_STATIC_04EEA518_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA518)))
-
-/* data refs=4 u32=3 u8=1 */
-#define SFERA_STATIC_04EEA520_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA520))
-#define SFERA_STATIC_04EEA520_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA520)))
-#define SFERA_STATIC_04EEA520_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA520)))
-
-/* data refs=58 u32=62 */
-#define SFERA_STATIC_04EEA524_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA524))
-#define SFERA_STATIC_04EEA524_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA524)))
-
-/* data refs=15 addr=11 u8=4 */
-#define SFERA_STATIC_04EEA528_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA528))
-
-/* data refs=25 u32=31 */
-#define SFERA_STATIC_04EEA628_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA628))
-#define SFERA_STATIC_04EEA628_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA628)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04EEA62C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA62C))
-#define SFERA_STATIC_04EEA62C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEA62C)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04EEA630_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA630))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04EEA634_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA634))
-
-/* data refs=9 u32=9 */
-#define SFERA_STATIC_04EEA638_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA638))
-
-/* data refs=104 addr=104 */
-#define SFERA_STATIC_04EEA720_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA720))
 
 /* data refs=2 addr=1 u32=1 */
 #define SFERA_STATIC_04EEA820_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEA820))
@@ -4870,19 +3919,15 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EEAC30_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEAC30)))
 
 /* data refs=15 u32=15 */
-#define SFERA_STATIC_04EEAD00_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEAD00))
 #define SFERA_STATIC_04EEAD00_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEAD00)))
 
 /* data refs=12 u32=12 */
-#define SFERA_STATIC_04EEAD04_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEAD04))
 #define SFERA_STATIC_04EEAD04_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEAD04)))
 
 /* data refs=17 u32=17 */
-#define SFERA_STATIC_04EEAD08_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEAD08))
 #define SFERA_STATIC_04EEAD08_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEAD08)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EEAD0C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEAD0C))
 #define SFERA_STATIC_04EEAD0C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEAD0C)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -4902,7 +3947,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EEAFB0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEAFB0)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04EEB080_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB080))
 #define SFERA_STATIC_04EEB080_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB080)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -4910,7 +3954,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EEB088_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB088)))
 
 /* data refs=12 u32=12 */
-#define SFERA_STATIC_04EEB158_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB158))
 #define SFERA_STATIC_04EEB158_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB158)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -4923,7 +3966,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EEB230_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB230)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04EEB430_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB430))
 #define SFERA_STATIC_04EEB430_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB430)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -4935,7 +3977,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EEB508_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB508)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04EEB50C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB50C))
 #define SFERA_STATIC_04EEB50C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB50C)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -4947,31 +3988,24 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04EEB5E0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB5E0)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EEB5E8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB5E8))
 #define SFERA_STATIC_04EEB5E8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB5E8)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EEB5EC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB5EC))
 #define SFERA_STATIC_04EEB5EC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB5EC)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EEB5F0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB5F0))
 #define SFERA_STATIC_04EEB5F0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB5F0)))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04EEB5F8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB5F8))
 #define SFERA_STATIC_04EEB5F8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB5F8)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04EEB5FC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB5FC))
 #define SFERA_STATIC_04EEB5FC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB5FC)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04EEB600_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB600))
 #define SFERA_STATIC_04EEB600_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB600)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04EEB604_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEB604))
 #define SFERA_STATIC_04EEB604_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EEB604)))
 
 /* data refs=4 addr=1 u16=3 */
@@ -4985,26 +4019,21 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F17960_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F17960)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F17964_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F17964))
 #define SFERA_STATIC_04F17964_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F17964)))
 
 /* data refs=4 u16=4 */
 #define SFERA_STATIC_04F17968_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F17968))
 
 /* data refs=12 u32=12 */
-#define SFERA_STATIC_04F37968_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37968))
 #define SFERA_STATIC_04F37968_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37968)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F3796C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3796C))
 #define SFERA_STATIC_04F3796C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3796C)))
 
 /* data refs=11 u32=11 */
-#define SFERA_STATIC_04F37970_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37970))
 #define SFERA_STATIC_04F37970_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37970)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F379E0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F379E0))
 #define SFERA_STATIC_04F379E0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F379E0)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5024,11 +4053,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F37B8C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37B8C)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F37EA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37EA8))
 #define SFERA_STATIC_04F37EA8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37EA8)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F37EAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37EAC))
 #define SFERA_STATIC_04F37EAC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37EAC)))
 
 /* data refs=3 u32=5 */
@@ -5036,38 +4063,30 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F37EB0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37EB0)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F37EB4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37EB4))
 #define SFERA_STATIC_04F37EB4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37EB4)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F37EC0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37EC0))
 #define SFERA_STATIC_04F37EC0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37EC0)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F37EC4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37EC4))
 #define SFERA_STATIC_04F37EC4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37EC4)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F37EC8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37EC8))
 #define SFERA_STATIC_04F37EC8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37EC8)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F37ECC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37ECC))
 #define SFERA_STATIC_04F37ECC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37ECC)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F37ED0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37ED0))
 #define SFERA_STATIC_04F37ED0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37ED0)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F37ED4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37ED4))
 #define SFERA_STATIC_04F37ED4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37ED4)))
 
 /* data refs=4 u8=4 */
 #define SFERA_STATIC_04F37ED8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37ED8))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F37F3C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F37F3C))
 #define SFERA_STATIC_04F37F3C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F37F3C)))
 
 /* data refs=2 u32=2 */
@@ -5080,22 +4099,18 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F38260_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F38260))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F383F0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F383F0))
 #define SFERA_STATIC_04F383F0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F383F0)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F383F8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F383F8))
 #define SFERA_STATIC_04F383F8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F383F8)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F383FC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F383FC))
 #define SFERA_STATIC_04F383FC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F383FC)))
 
 /* data refs=2 u32=2 */
 #define SFERA_STATIC_04F38400_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F38400))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F38800_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F38800))
 #define SFERA_STATIC_04F38800_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F38800)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5106,16 +4121,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F38818_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F38818))
 #define SFERA_STATIC_04F38818_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F38818)))
 
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04F38884_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F38884))
-#define SFERA_STATIC_04F38884_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F38884)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04F38888_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F38888))
-#define SFERA_STATIC_04F38888_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F38888)))
-
-/* data refs=7 addr=7 */
-#define SFERA_STATIC_04F3888C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3888C))
 
 /* data refs=5 addr=5 */
 #define SFERA_STATIC_04F38910_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F38910))
@@ -5127,11 +4132,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F389DC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F389DC))
 
 /* data refs=2 u8=2 */
-#define SFERA_STATIC_04F389E0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F389E0))
 #define SFERA_STATIC_04F389E0_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F389E0)))
 
 /* data refs=9 u32=9 */
-#define SFERA_STATIC_04F389E4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F389E4))
 #define SFERA_STATIC_04F389E4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F389E4)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5157,7 +4160,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F38E58_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F38E58)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04F38F28_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F38F28))
 #define SFERA_STATIC_04F38F28_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F38F28)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5176,11 +4178,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F391A0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F391A0))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04F3A460_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3A460))
 #define SFERA_STATIC_04F3A460_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3A460)))
 
 /* data refs=9 u32=9 */
-#define SFERA_STATIC_04F3A464_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3A464))
 #define SFERA_STATIC_04F3A464_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3A464)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5192,7 +4192,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F3A4D4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3A4D4)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04F3A4D8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3A4D8))
 #define SFERA_STATIC_04F3A4D8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3A4D8)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5230,11 +4229,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F3AC88_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3AC88)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04F3AD58_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3AD58))
 #define SFERA_STATIC_04F3AD58_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3AD58)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F3AD5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3AD5C))
 #define SFERA_STATIC_04F3AD5C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3AD5C)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5257,35 +4254,27 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F3B080_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B080)))
 
 /* data refs=18 u32=18 */
-#define SFERA_STATIC_04F3B084_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B084))
 #define SFERA_STATIC_04F3B084_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B084)))
 
 /* data refs=5 u8=5 */
-#define SFERA_STATIC_04F3B088_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B088))
 #define SFERA_STATIC_04F3B088_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B088)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04F3B08C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B08C))
 #define SFERA_STATIC_04F3B08C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B08C)))
 
 /* data refs=7 u32=7 */
-#define SFERA_STATIC_04F3B090_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B090))
 #define SFERA_STATIC_04F3B090_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B090)))
 
 /* data refs=15 u32=15 */
-#define SFERA_STATIC_04F3B094_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B094))
 #define SFERA_STATIC_04F3B094_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B094)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F3B098_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B098))
 #define SFERA_STATIC_04F3B098_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B098)))
 
 /* data refs=14 u32=14 */
-#define SFERA_STATIC_04F3B09C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B09C))
 #define SFERA_STATIC_04F3B09C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B09C)))
 
 /* data refs=7 u32=7 */
-#define SFERA_STATIC_04F3B0A0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B0A0))
 #define SFERA_STATIC_04F3B0A0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B0A0)))
 
 /* data refs=15 addr=5 u32=10 */
@@ -5313,15 +4302,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F3B188_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B188)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F3B18C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B18C))
 #define SFERA_STATIC_04F3B18C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B18C)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04F3B190_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B190))
 #define SFERA_STATIC_04F3B190_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B190)))
 
 /* data refs=12 u32=12 */
-#define SFERA_STATIC_04F3B194_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B194))
 #define SFERA_STATIC_04F3B194_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B194)))
 
 /* data refs=12 u32=14 */
@@ -5349,7 +4335,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F3B1B8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B1B8)))
 
 /* data refs=7 u32=7 */
-#define SFERA_STATIC_04F3B1BC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B1BC))
 #define SFERA_STATIC_04F3B1BC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B1BC)))
 
 /* data refs=2 addr=2 */
@@ -5359,14 +4344,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F3B1C8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B1C8))
 
 /* data refs=3 u8=3 */
-#define SFERA_STATIC_04F3B210_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B210))
 #define SFERA_STATIC_04F3B210_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B210)))
 
 /* data refs=7 addr=6 u8=1 */
 #define SFERA_STATIC_04F3B3C0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B3C0))
 
 /* data refs=2 u32=1 u8=1 */
-#define SFERA_STATIC_04F3B4C0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F3B4C0))
 #define SFERA_STATIC_04F3B4C0_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B4C0)))
 #define SFERA_STATIC_04F3B4C0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3B4C0)))
 
@@ -5415,7 +4398,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F47ED8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F47ED8)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04F47FA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F47FA8))
 #define SFERA_STATIC_04F47FA8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F47FA8)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5462,11 +4444,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F48960_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48960))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F48A5C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48A5C))
 #define SFERA_STATIC_04F48A5C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48A5C)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48A60_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48A60))
 #define SFERA_STATIC_04F48A60_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48A60)))
 
 /* data refs=2 addr=2 f32=2 */
@@ -5483,138 +4463,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F48A70_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48A70))
 #define SFERA_STATIC_04F48A70_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48A70)))
 
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04F48B6C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B6C))
-#define SFERA_STATIC_04F48B6C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B6C)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48B70_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B70))
-#define SFERA_STATIC_04F48B70_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B70)))
-
-/* data refs=5 addr=2 u32=3 */
-#define SFERA_STATIC_04F48B74_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B74))
-#define SFERA_STATIC_04F48B74_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B74)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04F48B78_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B78))
-#define SFERA_STATIC_04F48B78_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B78)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04F48B7C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B7C))
-#define SFERA_STATIC_04F48B7C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B7C)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04F48B80_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B80))
-#define SFERA_STATIC_04F48B80_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B80)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04F48B84_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B84))
-#define SFERA_STATIC_04F48B84_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B84)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04F48B88_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B88))
-#define SFERA_STATIC_04F48B88_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B88)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04F48B8C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B8C))
-#define SFERA_STATIC_04F48B8C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B8C)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04F48B90_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B90))
-#define SFERA_STATIC_04F48B90_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B90)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04F48B94_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B94))
-#define SFERA_STATIC_04F48B94_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B94)))
-
-/* data refs=4 addr=2 u32=2 */
-#define SFERA_STATIC_04F48B98_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B98))
-#define SFERA_STATIC_04F48B98_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B98)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48B9C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48B9C))
-#define SFERA_STATIC_04F48B9C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48B9C)))
-
-/* data refs=5 u32=4 u8=1 */
-#define SFERA_STATIC_04F48BA0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BA0))
-#define SFERA_STATIC_04F48BA0_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BA0)))
-#define SFERA_STATIC_04F48BA0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BA0)))
-
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04F48BA4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BA4))
-#define SFERA_STATIC_04F48BA4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BA4)))
-
-/* data refs=4 u32=4 */
-#define SFERA_STATIC_04F48BA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BA8))
-#define SFERA_STATIC_04F48BA8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BA8)))
-
-/* data refs=6 u32=6 */
-#define SFERA_STATIC_04F48BAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BAC))
-#define SFERA_STATIC_04F48BAC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BAC)))
-
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04F48BB0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BB0))
-#define SFERA_STATIC_04F48BB0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BB0)))
-
-/* data refs=7 u32=7 */
-#define SFERA_STATIC_04F48BB4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BB4))
-#define SFERA_STATIC_04F48BB4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BB4)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48BB8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BB8))
-#define SFERA_STATIC_04F48BB8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BB8)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48BBC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BBC))
-#define SFERA_STATIC_04F48BBC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BBC)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48BC0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BC0))
-#define SFERA_STATIC_04F48BC0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BC0)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48BC4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BC4))
-#define SFERA_STATIC_04F48BC4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BC4)))
-
-/* data refs=5 u32=5 */
-#define SFERA_STATIC_04F48BC8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BC8))
-#define SFERA_STATIC_04F48BC8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BC8)))
-
-/* data refs=5 addr=2 u32=3 */
-#define SFERA_STATIC_04F48BCC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BCC))
-#define SFERA_STATIC_04F48BCC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BCC)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48BD0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BD0))
-#define SFERA_STATIC_04F48BD0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BD0)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04F48BD4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BD4))
-#define SFERA_STATIC_04F48BD4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BD4)))
-
-/* data refs=3 u32=3 */
-#define SFERA_STATIC_04F48BD8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BD8))
-#define SFERA_STATIC_04F48BD8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BD8)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48BDC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BDC))
-#define SFERA_STATIC_04F48BDC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BDC)))
-
-/* data refs=3 addr=1 u32=2 */
-#define SFERA_STATIC_04F48BE0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BE0))
-#define SFERA_STATIC_04F48BE0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BE0)))
-
-/* data refs=6 addr=1 u32=5 */
-#define SFERA_STATIC_04F48BE4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BE4))
-#define SFERA_STATIC_04F48BE4_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BE4)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48BE8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BE8))
-#define SFERA_STATIC_04F48BE8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BE8)))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F48BEC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BEC))
-#define SFERA_STATIC_04F48BEC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F48BEC)))
 
 /* data refs=3 addr=3 */
 #define SFERA_STATIC_04F48BF0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F48BF0))
@@ -5633,15 +4481,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F499F0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F499F0)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F49A00_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49A00))
 #define SFERA_STATIC_04F49A00_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49A00)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04F49A04_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49A04))
 #define SFERA_STATIC_04F49A04_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49A04)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F49A08_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49A08))
 #define SFERA_STATIC_04F49A08_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49A08)))
 
 /* data refs=9 addr=1 u32=8 */
@@ -5652,11 +4497,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F49A10_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49A10))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F49A94_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49A94))
 #define SFERA_STATIC_04F49A94_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49A94)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04F49A98_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49A98))
 #define SFERA_STATIC_04F49A98_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49A98)))
 
 /* data refs=12 addr=1 u32=11 */
@@ -5672,7 +4515,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F49B70_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49B70)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F49B74_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49B74))
 #define SFERA_STATIC_04F49B74_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49B74)))
 
 /* data refs=9 addr=4 u32=5 */
@@ -5680,7 +4522,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F49B80_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49B80)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F49B84_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49B84))
 #define SFERA_STATIC_04F49B84_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49B84)))
 
 /* data refs=18 addr=2 u32=16 */
@@ -5688,7 +4529,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F49B90_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49B90)))
 
 /* data refs=8 u32=8 */
-#define SFERA_STATIC_04F49B94_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49B94))
 #define SFERA_STATIC_04F49B94_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49B94)))
 
 /* data refs=5 addr=5 */
@@ -5705,69 +4545,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F49E70_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49E70))
 #define SFERA_STATIC_04F49E70_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49E70)))
 
-/* data refs=4 addr=2 f32=2 u32=2 */
-#define SFERA_STATIC_04F49F40_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F40))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F44_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F44))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F48_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F48))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F4C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F4C))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F49F50_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F50))
-#define SFERA_STATIC_04F49F50_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49F50)))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F60_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F60))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F64_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F64))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F68_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F68))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F6C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F6C))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F49F70_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F70))
-#define SFERA_STATIC_04F49F70_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49F70)))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F80_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F80))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F84_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F84))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F88_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F88))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49F8C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F8C))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F49F90_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49F90))
-#define SFERA_STATIC_04F49F90_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49F90)))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49FA0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49FA0))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49FA4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49FA4))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49FA8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49FA8))
-
-/* data refs=2 addr=2 f32=2 */
-#define SFERA_STATIC_04F49FAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49FAC))
-
-/* data refs=2 u32=2 */
-#define SFERA_STATIC_04F49FB0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49FB0))
-#define SFERA_STATIC_04F49FB0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F49FB0)))
 
 /* data refs=2 addr=2 */
 #define SFERA_STATIC_04F49FC0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49FC0))
@@ -5803,11 +4580,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F4A508_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4A508))
 
 /* data refs=12 u32=12 */
-#define SFERA_STATIC_04F4A50C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4A50C))
 #define SFERA_STATIC_04F4A50C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F4A50C)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F4A510_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4A510))
 #define SFERA_STATIC_04F4A510_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F4A510)))
 
 /* data refs=10 u32=12 u8=2 */
@@ -5830,11 +4605,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F4C5F8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4C5F8))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F4C6FC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4C6FC))
 #define SFERA_STATIC_04F4C6FC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F4C6FC)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04F4C704_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4C704))
 #define SFERA_STATIC_04F4C704_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F4C704)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5873,12 +4646,8 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F4CB40_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4CB40))
 #define SFERA_STATIC_04F4CB40_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F4CB40)))
 
-/* data refs=473 u32=473 */
-#define SFERA_STATIC_04F4CC10_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4CC10))
-#define SFERA_STATIC_04F4CC10_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F4CC10)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04F4CC14_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4CC14))
 #define SFERA_STATIC_04F4CC14_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F4CC14)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5892,15 +4661,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F4CD2C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4CD2C))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F4CD94_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4CD94))
 #define SFERA_STATIC_04F4CD94_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F4CD94)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F4CD98_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4CD98))
 #define SFERA_STATIC_04F4CD98_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F4CD98)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F4CD9C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4CD9C))
 #define SFERA_STATIC_04F4CD9C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F4CD9C)))
 
 /* data refs=2 addr=1 u32=1 */
@@ -5921,11 +4687,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F8E770_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F8E770))
 
 /* data refs=5 u8=5 */
-#define SFERA_STATIC_04F8F770_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F8F770))
 #define SFERA_STATIC_04F8F770_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F8F770)))
 
 /* data refs=12 u8=12 */
-#define SFERA_STATIC_04F8F771_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F8F771))
 #define SFERA_STATIC_04F8F771_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F8F771)))
 
 /* data refs=9 u32=17 */
@@ -5943,7 +4707,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F8FA48_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F8FA48))
 
 /* data refs=5 u8=5 */
-#define SFERA_STATIC_04F8FAC7_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F8FAC7))
 #define SFERA_STATIC_04F8FAC7_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F8FAC7)))
 
 /* data refs=4 u32=6 */
@@ -5951,11 +4714,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F8FAC8_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F8FAC8)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04F8FACC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F8FACC))
 #define SFERA_STATIC_04F8FACC_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F8FACC)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F8FAD0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F8FAD0))
 #define SFERA_STATIC_04F8FAD0_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F8FAD0)))
 
 /* data refs=3 addr=3 */
@@ -5965,11 +4726,9 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F8FDA0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F8FDA0))
 
 /* data refs=12 u8=12 */
-#define SFERA_STATIC_04F90068_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90068))
 #define SFERA_STATIC_04F90068_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F90068)))
 
 /* data refs=6 u32=6 */
-#define SFERA_STATIC_04F9006C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F9006C))
 #define SFERA_STATIC_04F9006C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F9006C)))
 
 /* data refs=3 u16=3 */
@@ -5979,7 +4738,6 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F90270_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90270))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F90370_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90370))
 #define SFERA_STATIC_04F90370_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F90370)))
 
 /* data refs=2 addr=2 */
@@ -5989,15 +4747,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F903FC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F903FC))
 
 /* data refs=10 u8=10 */
-#define SFERA_STATIC_04F90414_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90414))
 #define SFERA_STATIC_04F90414_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F90414)))
 
 /* data refs=12 u8=12 */
-#define SFERA_STATIC_04F90415_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90415))
 #define SFERA_STATIC_04F90415_U8 (*(uint8_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F90415)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F90424_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90424))
 #define SFERA_STATIC_04F90424_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F90424)))
 
 /* data refs=2 u32=2 */
@@ -6005,23 +4760,18 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F9042C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F9042C)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F90430_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90430))
 #define SFERA_STATIC_04F90430_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F90430)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F90434_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90434))
 #define SFERA_STATIC_04F90434_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F90434)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F9076C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F9076C))
 #define SFERA_STATIC_04F9076C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F9076C)))
 
 /* data refs=5 u32=5 */
-#define SFERA_STATIC_04F90774_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90774))
 #define SFERA_STATIC_04F90774_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F90774)))
 
 /* data refs=2 u32=2 */
-#define SFERA_STATIC_04F9077C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F9077C))
 #define SFERA_STATIC_04F9077C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F9077C)))
 
 /* data refs=3 addr=1 u32=2 */
@@ -6029,57 +4779,12 @@ int sfera_vtable_token_address(uint32_t address);
 #define SFERA_STATIC_04F90784_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F90784)))
 
 /* data refs=3 u32=3 */
-#define SFERA_STATIC_04F90788_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90788))
 #define SFERA_STATIC_04F90788_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F90788)))
 
 /* data refs=4 u32=4 */
-#define SFERA_STATIC_04F9078C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F9078C))
 #define SFERA_STATIC_04F9078C_U32 (*(uint32_t*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F9078C)))
 
 /* Semantically known IAT slots referenced by lifted code. */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 /* ===== Resolved static control-flow tables ===== */

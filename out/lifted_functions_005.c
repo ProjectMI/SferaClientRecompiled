@@ -7519,7 +7519,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00434E80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
     LIFT_LOAD32(cpu->edx, cpu->esi);
     LIFT_INC(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
-    LIFT_PUSH6(cpu->eax, cpu->ecx, cpu->edx, ((uint32_t)(uintptr_t)&g_sfera_mbc_runtime->diagnostic_context[0]), ((uint32_t)(uintptr_t)"%s\n Slice out of range! ptr = %d, begin = %d, end = %d"), SFERA_STATIC_04ECBA50_ADDR);
+    LIFT_PUSH6(cpu->eax, cpu->ecx, cpu->edx, ((uint32_t)(uintptr_t)&g_sfera_mbc_runtime->diagnostic_context[0]), ((uint32_t)(uintptr_t)"%s\n Slice out of range! ptr = %d, begin = %d, end = %d"), ((uint32_t)(uintptr_t)&g_sfera_warning_log_runtime.object[0]));
     LIFT_CALL_ENTER(sfera_sub_0049B7F0, UINT32_C(0x00434EB4));
     LIFT_SP_ADD(UINT32_C(0x00000018));
     goto label_00034EE0;
@@ -7530,7 +7530,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00434E80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_INC(cpu->ecx, 32u, cpu->ecx = (uint32_t)(result););
     LIFT_PUSH2(cpu->ecx, cpu->edx);
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->eax + cpu->edi)));
-    LIFT_PUSH5(cpu->ecx, cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_mbc_runtime->diagnostic_context[0]), ((uint32_t)(uintptr_t)"%s\n Slice out of range! ptr = %d, ptr+offset = %d, begin = %d, end = %d"), SFERA_STATIC_04ECBA50_ADDR);
+    LIFT_PUSH5(cpu->ecx, cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_mbc_runtime->diagnostic_context[0]), ((uint32_t)(uintptr_t)"%s\n Slice out of range! ptr = %d, ptr+offset = %d, begin = %d, end = %d"), ((uint32_t)(uintptr_t)&g_sfera_warning_log_runtime.object[0]));
     LIFT_CALL_ENTER(sfera_sub_0049B7F0, UINT32_C(0x00434EDD));
     LIFT_SP_ADD(UINT32_C(0x0000001C));
     LIFT_BLOCK(label_00034EE0, UINT32_C(0x00434EE0));
@@ -10137,7 +10137,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00436ED0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000018));
     LIFT_LOAD32(cpu->edx, cpu->esi + UINT32_C(0x00000014));
     LIFT_INC(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
-    LIFT_PUSH6(cpu->eax, cpu->ecx, cpu->edx, ((uint32_t)(uintptr_t)&g_sfera_mbc_runtime->diagnostic_context[0]), ((uint32_t)(uintptr_t)"%s\n Slice out of range! ptr = %d, begin = %d, end = %d"), SFERA_STATIC_04ECBA50_ADDR);
+    LIFT_PUSH6(cpu->eax, cpu->ecx, cpu->edx, ((uint32_t)(uintptr_t)&g_sfera_mbc_runtime->diagnostic_context[0]), ((uint32_t)(uintptr_t)"%s\n Slice out of range! ptr = %d, begin = %d, end = %d"), ((uint32_t)(uintptr_t)&g_sfera_warning_log_runtime.object[0]));
     LIFT_CALL_ENTER(sfera_sub_0049B7F0, UINT32_C(0x00436F37));
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x00000014));
     LIFT_SP_ADD(UINT32_C(0x00000018));
@@ -12529,7 +12529,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004386C0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00038B90, UINT32_C(0x00438B90));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000004)))), UINT32_C(0x00000003), 32u);
     LIFT_JNZ(label_00038BCC, UINT32_C(0x00438B96));
-    LIFT_PUSH2(((uint32_t)(uintptr_t)"prc_link - memory allocation found in base process, pointer corruption quite possible."), SFERA_STATIC_04ECBA50_ADDR);
+    LIFT_PUSH2(((uint32_t)(uintptr_t)"prc_link - memory allocation found in base process, pointer corruption quite possible."), ((uint32_t)(uintptr_t)&g_sfera_warning_log_runtime.object[0]));
     LIFT_CALL_ENTER(sfera_sub_0049B790, UINT32_C(0x00438BA5));
     LIFT_LOAD32(cpu->edx, cpu->edi + (uint32_t)offsetof(SferaMbcProcessRecord, process_memory_base));
     LIFT_LOAD32(cpu->eax, cpu->esi);

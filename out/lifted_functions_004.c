@@ -5752,13 +5752,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042ADA0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000010), cpu->edx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000010))))))));
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000024), cpu->eax);
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) / ((double)(((int32_t)(SFERA_STATIC_04E0168C_U32)))));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) / ((double)(((int32_t)(g_sfera_graphics_runtime.display_width)))));
     LIFT_CALL_ENTER(sfera_sub_004EE940, UINT32_C(0x0042AE12));
     LIFT_IMUL32(cpu->esi, UINT32_C(0x000001E0));
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000010), cpu->esi);
     cpu->edi = (uint32_t)(cpu->eax);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000010))))))));
-    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) / ((double)(((int32_t)(SFERA_STATIC_04E792E4_U32)))));
+    lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) / ((double)(((int32_t)(g_sfera_graphics_runtime.display_height)))));
     LIFT_CALL_ENTER(sfera_sub_004EE940, UINT32_C(0x0042AE2D));
     lift_x87_push(cpu, 0.0);
     LIFT_X87_STORE_F32(cpu->esp + UINT32_C(0x00000028));

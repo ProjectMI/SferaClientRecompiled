@@ -1463,21 +1463,21 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F5BF0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x000000C8));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F5C01));
     LIFT_PUSH3(UINT32_C(0x000000C8), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED12F0_U32 = (uint32_t)(cpu->eax);
+    g_sfera_collision_runtime.contact_objects.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F5C13));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED12F4_U32 = (uint32_t)(UINT32_C(0x00000032));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED12F8)), UINT32_C(0x00002710));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED12FC)), UINT32_C(0x00000014));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1300)), UINT32_C(0x00000004));
+    g_sfera_collision_runtime.contact_objects.capacity = (uint32_t)(UINT32_C(0x00000032));
+    g_sfera_collision_runtime.contact_objects.maximum = UINT32_C(0x00002710);
+    g_sfera_collision_runtime.contact_objects.growth = UINT32_C(0x00000014);
+    g_sfera_collision_runtime.contact_objects.element_size = UINT32_C(0x00000004);
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F5C4A));
-    LIFT_PUSH2(cpu->eax, SFERA_DATA_CALL_ARGUMENT_04ED1304_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_collision_runtime.contact_objects.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F5C50), UINT32_C(0x004F5C56));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA530))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1313)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1324)), UINT32_C(0x000000EF));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_collision_runtime.contact_objects.debug_file[15]), UINT32_C(0x00000000));
+    g_sfera_collision_runtime.contact_objects.debug_line = UINT32_C(0x000000EF);
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F5C71));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1717,7 +1717,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F5DD0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_RET(0u);
     LIFT_BLOCK(label_000F5DD0, UINT32_C(0x004F5DD0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ECBA50_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_warning_log_runtime.object[0]));
     goto label_0009B950;
 }
 
@@ -1728,18 +1728,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F5DE0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00009C40));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F5DF1));
     LIFT_PUSH3(UINT32_C(0x00009C40), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED1190_U32 = (uint32_t)(cpu->eax);
+    g_sfera_light_runtime.cell_light_ids.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F5E03));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED1194_U32 = (uint32_t)(UINT32_C(0x00004E20));
+    g_sfera_light_runtime.cell_light_ids.capacity = (uint32_t)(UINT32_C(0x00004E20));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F5E1C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED1198_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_light_runtime.cell_light_ids.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F5E22), UINT32_C(0x004F5E28));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA590))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED11A7)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED11B8)), UINT32_C(0x0000016C));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_light_runtime.cell_light_ids.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_light_runtime.cell_light_ids.debug_line), UINT32_C(0x0000016C));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F5E43));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1752,18 +1752,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F5E50(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x0007F710));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F5E61));
     LIFT_PUSH3(UINT32_C(0x0007F710), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED29F8_U32 = (uint32_t)(cpu->eax);
+    g_sfera_landscape_runtime.file_records.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F5E73));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED29FC_U32 = (uint32_t)(UINT32_C(0x0000012C));
+    g_sfera_landscape_runtime.file_records.capacity = (uint32_t)(UINT32_C(0x0000012C));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F5E8C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2A00_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_landscape_runtime.file_records.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F5E92), UINT32_C(0x004F5E98));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA5B0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2A0F)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2A20)), UINT32_C(0x00000171));
+    g_sfera_landscape_runtime.file_records.debug_file[15] = 0;
+    g_sfera_landscape_runtime.file_records.debug_line = UINT32_C(0x00000171);
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F5EB3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1776,18 +1776,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F5EC0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00006D60));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F5ED1));
     LIFT_PUSH3(UINT32_C(0x00006D60), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2F74_U32 = (uint32_t)(cpu->eax);
+    g_sfera_interface_runtime.window_handle_table.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F5EE3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2F78_U32 = (uint32_t)(UINT32_C(0x00001B58));
+    g_sfera_interface_runtime.window_handle_table.capacity = (uint32_t)(UINT32_C(0x00001B58));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F5EFC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2F7C_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_interface_runtime.window_handle_table.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F5F02), UINT32_C(0x004F5F08));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA5D0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F8B)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F9C)), UINT32_C(0x00000193));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_interface_runtime.window_handle_table.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_interface_runtime.window_handle_table.debug_line), UINT32_C(0x00000193));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F5F23));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1800,18 +1800,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F5F30(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x001E8480));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F5F41));
     LIFT_PUSH3(UINT32_C(0x001E8480), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2F48_U32 = (uint32_t)(cpu->eax);
+    g_sfera_world_objects.object_handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F5F53));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2F4C_U32 = (uint32_t)(UINT32_C(0x0007A120));
+    g_sfera_world_objects.object_handles.capacity = (uint32_t)(UINT32_C(0x0007A120));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F5F6C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2F50_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_world_objects.object_handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F5F72), UINT32_C(0x004F5F78));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA5F0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F5F)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F70)), UINT32_C(0x000001A2));
+    g_sfera_world_objects.object_handles.debug_file[15] = 0;
+    g_sfera_world_objects.object_handles.debug_line = UINT32_C(0x000001A2);
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F5F93));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1824,18 +1824,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F5FA0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x0001D4C0));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F5FB1));
     LIFT_PUSH3(UINT32_C(0x0001D4C0), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2AD4_U32 = (uint32_t)(cpu->eax);
+    g_sfera_world_objects.extended_object_handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F5FC3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2AD8_U32 = (uint32_t)(UINT32_C(0x00007530));
+    g_sfera_world_objects.extended_object_handles.capacity = (uint32_t)(UINT32_C(0x00007530));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F5FDC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2ADC_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_world_objects.extended_object_handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F5FE2), UINT32_C(0x004F5FE8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA610))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2AEB)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2AFC)), UINT32_C(0x000001A5));
+    g_sfera_world_objects.extended_object_handles.debug_file[15] = 0;
+    g_sfera_world_objects.extended_object_handles.debug_line = UINT32_C(0x000001A5);
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6003));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1848,18 +1848,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6010(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000190));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6021));
     LIFT_PUSH3(UINT32_C(0x00000190), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2A24_U32 = (uint32_t)(cpu->eax);
+    g_sfera_interface_runtime.windows.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6033));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2A28_U32 = (uint32_t)(UINT32_C(0x00000064));
+    g_sfera_interface_runtime.windows.capacity = (uint32_t)(UINT32_C(0x00000064));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F604C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2A2C_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_interface_runtime.windows.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6052), UINT32_C(0x004F6058));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA630))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2A3B)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2A4C)), UINT32_C(0x000001A9));
+    g_sfera_interface_runtime.windows.debug_file[15] = 0;
+    g_sfera_interface_runtime.windows.debug_line = UINT32_C(0x000001A9);
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6073));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1872,18 +1872,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6080(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00013880));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6091));
     LIFT_PUSH3(UINT32_C(0x00013880), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED29A0_U32 = (uint32_t)(cpu->eax);
+    g_sfera_character_index_map.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F60A3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED29A4_U32 = (uint32_t)(UINT32_C(0x00004E20));
+    g_sfera_character_index_map.capacity = (uint32_t)(UINT32_C(0x00004E20));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F60BC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED29A8_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_character_index_map.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F60C2), UINT32_C(0x004F60C8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA650))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED29B7)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED29C8)), UINT32_C(0x000001BF));
+    g_sfera_character_index_map.debug_file[15] = '\0';
+    g_sfera_character_index_map.debug_line = UINT32_C(0x000001BF);
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F60E3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1896,18 +1896,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F60F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00013880));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6101));
     LIFT_PUSH3(UINT32_C(0x00013880), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED309C_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.object_visibility_indices.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6113));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED30A0_U32 = (uint32_t)(UINT32_C(0x00004E20));
+    g_sfera_scene_array_runtime.object_visibility_indices.capacity = (uint32_t)(UINT32_C(0x00004E20));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F612C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED30A4_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_visibility_indices.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6132), UINT32_C(0x004F6138));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA670))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED30B3)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED30C4)), UINT32_C(0x000001C0));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_visibility_indices.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_visibility_indices.debug_line), UINT32_C(0x000001C0));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6153));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1920,18 +1920,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6160(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00013880));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6171));
     LIFT_PUSH3(UINT32_C(0x00013880), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2F1C_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.object_sort_keys.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6183));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2F20_U32 = (uint32_t)(UINT32_C(0x00004E20));
+    g_sfera_scene_array_runtime.object_sort_keys.capacity = (uint32_t)(UINT32_C(0x00004E20));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F619C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2F24_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_sort_keys.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F61A2), UINT32_C(0x004F61A8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA690))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F33)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2F44)), UINT32_C(0x000001C3));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_sort_keys.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_sort_keys.debug_line), UINT32_C(0x000001C3));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F61C3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1944,18 +1944,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F61D0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00013880));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F61E1));
     LIFT_PUSH3(UINT32_C(0x00013880), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04EDCE28_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.object_sort_indices.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F61F3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04EDCE2C_U32 = (uint32_t)(UINT32_C(0x00004E20));
+    g_sfera_scene_array_runtime.object_sort_indices.capacity = (uint32_t)(UINT32_C(0x00004E20));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F620C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04EDCE30_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_sort_indices.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6212), UINT32_C(0x004F6218));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA6B0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE3F)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE50)), UINT32_C(0x000001C4));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_sort_indices.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_sort_indices.debug_line), UINT32_C(0x000001C4));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6233));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1968,18 +1968,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6240(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00013880));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6251));
     LIFT_PUSH3(UINT32_C(0x00013880), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED3070_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.object_draw_indices.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6263));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED3074_U32 = (uint32_t)(UINT32_C(0x00004E20));
+    g_sfera_scene_array_runtime.object_draw_indices.capacity = (uint32_t)(UINT32_C(0x00004E20));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F627C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED3078_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_draw_indices.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6282), UINT32_C(0x004F6288));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA6D0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3087)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3098)), UINT32_C(0x000001C5));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_draw_indices.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_draw_indices.debug_line), UINT32_C(0x000001C5));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F62A3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -1992,18 +1992,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F62B0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00013880));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F62C1));
     LIFT_PUSH3(UINT32_C(0x00013880), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2C44_U32 = (uint32_t)(cpu->eax);
+    g_sfera_collision_runtime.candidate_handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F62D3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2C48_U32 = (uint32_t)(UINT32_C(0x00004E20));
+    g_sfera_collision_runtime.candidate_handles.capacity = (uint32_t)(UINT32_C(0x00004E20));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F62EC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2C4C_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_collision_runtime.candidate_handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F62F2), UINT32_C(0x004F62F8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA6F0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C5B)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C6C)), UINT32_C(0x000001C6));
+    g_sfera_collision_runtime.candidate_handles.debug_file[15] = 0;
+    g_sfera_collision_runtime.candidate_handles.debug_line = UINT32_C(0x000001C6);
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6313));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2016,18 +2016,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6320(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00054F60));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6331));
     LIFT_PUSH3(UINT32_C(0x00054F60), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED0F30_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.scene_records.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6343));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED0F34_U32 = (uint32_t)(UINT32_C(0x00000BB8));
+    g_sfera_scene_array_runtime.scene_records.capacity = (uint32_t)(UINT32_C(0x00000BB8));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F635C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED0F38_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.scene_records.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6362), UINT32_C(0x004F6368));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA710))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0F47)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0F58)), UINT32_C(0x000001E3));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.scene_records.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.scene_records.debug_line), UINT32_C(0x000001E3));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6383));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2040,18 +2040,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6390(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x000000F0));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F63A1));
     LIFT_PUSH3(UINT32_C(0x000000F0), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2EC4_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.reflection_targets.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F63B3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2EC8_U32 = (uint32_t)(UINT32_C(0x0000000A));
+    g_sfera_scene_array_runtime.reflection_targets.capacity = (uint32_t)(UINT32_C(0x0000000A));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F63CC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2ECC_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.reflection_targets.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F63D2), UINT32_C(0x004F63D8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA730))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2EDB)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2EEC)), UINT32_C(0x00000236));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.reflection_targets.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.reflection_targets.debug_line), UINT32_C(0x00000236));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F63F3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2064,18 +2064,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6400(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00002A30));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6411));
     LIFT_PUSH3(UINT32_C(0x00002A30), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2AA8_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.scene_points.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6423));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2AAC_U32 = (uint32_t)(UINT32_C(0x00000384));
+    g_sfera_scene_array_runtime.scene_points.capacity = (uint32_t)(UINT32_C(0x00000384));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F643C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2AB0_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.scene_points.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6442), UINT32_C(0x004F6448));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA750))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2ABF)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2AD0)), UINT32_C(0x0000033C));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.scene_points.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.scene_points.debug_line), UINT32_C(0x0000033C));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6463));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2354,18 +2354,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6950(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000240));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6961));
     LIFT_PUSH3(UINT32_C(0x00000240), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2E34_U32 = (uint32_t)(cpu->eax);
+    g_sfera_light_runtime.cell_indices.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6973));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2E38_U32 = (uint32_t)(UINT32_C(0x00000090));
+    g_sfera_light_runtime.cell_indices.capacity = (uint32_t)(UINT32_C(0x00000090));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F698C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2E3C_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_light_runtime.cell_indices.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6992), UINT32_C(0x004F6998));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA850))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E4B)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E5C)), UINT32_C(0x00001247));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_light_runtime.cell_indices.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_light_runtime.cell_indices.debug_line), UINT32_C(0x00001247));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F69B3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2378,18 +2378,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F69C0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00003600));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F69D1));
     LIFT_PUSH3(UINT32_C(0x00003600), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2A7C_U32 = (uint32_t)(cpu->eax);
+    g_sfera_light_runtime.cell_records.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F69E3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2A80_U32 = (uint32_t)(UINT32_C(0x00000090));
+    g_sfera_light_runtime.cell_records.capacity = (uint32_t)(UINT32_C(0x00000090));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F69FC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2A84_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_light_runtime.cell_records.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6A02), UINT32_C(0x004F6A08));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA870))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2A93)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2AA4)), UINT32_C(0x00001248));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_light_runtime.cell_records.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_light_runtime.cell_records.debug_line), UINT32_C(0x00001248));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6A23));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2402,18 +2402,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6A30(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00009C40));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6A41));
     LIFT_PUSH3(UINT32_C(0x00009C40), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04EDCF78_U32 = (uint32_t)(cpu->eax);
+    g_sfera_landscape_runtime.microtexture_handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6A53));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04EDCF7C_U32 = (uint32_t)(UINT32_C(0x00002710));
+    g_sfera_landscape_runtime.microtexture_handles.capacity = (uint32_t)(UINT32_C(0x00002710));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F6A6C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04EDCF80_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_landscape_runtime.microtexture_handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6A72), UINT32_C(0x004F6A78));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA890))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCF8F)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCFA0)), UINT32_C(0x0000124A));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_landscape_runtime.microtexture_handles.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_landscape_runtime.microtexture_handles.debug_line), UINT32_C(0x0000124A));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6A93));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2426,18 +2426,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6AA0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00001F40));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6AB1));
     LIFT_PUSH3(UINT32_C(0x00001F40), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED11BC_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.surface_handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6AC3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED11C0_U32 = (uint32_t)(UINT32_C(0x000007D0));
+    g_sfera_scene_array_runtime.surface_handles.capacity = (uint32_t)(UINT32_C(0x000007D0));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F6ADC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED11C4_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.surface_handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6AE2), UINT32_C(0x004F6AE8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA8B0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED11D3)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED11E4)), UINT32_C(0x0000124B));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.surface_handles.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.surface_handles.debug_line), UINT32_C(0x0000124B));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6B03));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2501,18 +2501,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6C10(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000030));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6C21));
     LIFT_PUSH3(UINT32_C(0x00000030), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED1014_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.render_pass_slots.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6C30));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED1018_U32 = (uint32_t)(UINT32_C(0x0000000C));
+    g_sfera_scene_array_runtime.render_pass_slots.capacity = (uint32_t)(UINT32_C(0x0000000C));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F6C49));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED101C_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.render_pass_slots.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6C4F), UINT32_C(0x004F6C55));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA910))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED102B)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED103C)), UINT32_C(0x0000125B));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.render_pass_slots.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.render_pass_slots.debug_line), UINT32_C(0x0000125B));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6C70));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2525,18 +2525,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6C80(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00061A80));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6C91));
     LIFT_PUSH3(UINT32_C(0x00061A80), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED29CC_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.surface_records.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6CA3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED29D0_U32 = (uint32_t)(UINT32_C(0x00002710));
+    g_sfera_scene_array_runtime.surface_records.capacity = (uint32_t)(UINT32_C(0x00002710));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F6CBC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED29D4_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.surface_records.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6CC2), UINT32_C(0x004F6CC8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA930))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED29E3)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED29F4)), UINT32_C(0x00001264));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.surface_records.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.surface_records.debug_line), UINT32_C(0x00001264));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6CE3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2549,18 +2549,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6CF0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00013880));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6D01));
     LIFT_PUSH3(UINT32_C(0x00013880), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED0EC4_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.surface_index_map.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6D13));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED0EC8_U32 = (uint32_t)(UINT32_C(0x00009C40));
+    g_sfera_scene_array_runtime.surface_index_map.capacity = (uint32_t)(UINT32_C(0x00009C40));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F6D2C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED0ECC_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.surface_index_map.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6D32), UINT32_C(0x004F6D38));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA950))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EDB)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0EEC)), UINT32_C(0x00001266));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.surface_index_map.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.surface_index_map.debug_line), UINT32_C(0x00001266));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6D53));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2573,18 +2573,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6D60(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000FA0));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6D71));
     LIFT_PUSH3(UINT32_C(0x00000FA0), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04EDCDFC_U32 = (uint32_t)(cpu->eax);
+    g_sfera_light_runtime.handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6D83));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04EDCE00_U32 = (uint32_t)(UINT32_C(0x000003E8));
+    g_sfera_light_runtime.handles.capacity = (uint32_t)(UINT32_C(0x000003E8));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F6D9C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04EDCE04_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_light_runtime.handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6DA2), UINT32_C(0x004F6DA8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA970))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE13)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE24)), UINT32_C(0x0000127E));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_light_runtime.handles.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_light_runtime.handles.debug_line), UINT32_C(0x0000127E));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6DC3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2597,18 +2597,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6DD0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x000007D0));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6DE1));
     LIFT_PUSH3(UINT32_C(0x000007D0), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04EDCFA4_U32 = (uint32_t)(cpu->eax);
+    g_sfera_light_runtime.visible_handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6DF3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04EDCFA8_U32 = (uint32_t)(UINT32_C(0x000001F4));
+    g_sfera_light_runtime.visible_handles.capacity = (uint32_t)(UINT32_C(0x000001F4));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F6E0C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04EDCFAC_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_light_runtime.visible_handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6E12), UINT32_C(0x004F6E18));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA990))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCFBB)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCFCC)), UINT32_C(0x00001280));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_light_runtime.visible_handles.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_light_runtime.visible_handles.debug_line), UINT32_C(0x00001280));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6E33));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2621,18 +2621,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6E40(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x0000007C));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6E51));
     LIFT_PUSH3(UINT32_C(0x0000007C), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED300C_U32 = (uint32_t)(cpu->eax);
+    g_sfera_light_runtime.active_handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6E60));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED3010_U32 = (uint32_t)(UINT32_C(0x0000001F));
+    g_sfera_light_runtime.active_handles.capacity = (uint32_t)(UINT32_C(0x0000001F));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F6E79));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED3014_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_light_runtime.active_handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6E7F), UINT32_C(0x004F6E85));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA9B0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3023)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3034)), UINT32_C(0x00001282));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_light_runtime.active_handles.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_light_runtime.active_handles.debug_line), UINT32_C(0x00001282));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6EA0));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2645,18 +2645,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F6EB0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x000003E8));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F6EC1));
     LIFT_PUSH3(UINT32_C(0x000003E8), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04EDCCA0_U32 = (uint32_t)(cpu->eax);
+    g_sfera_mesh_partition_indices.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F6ED3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04EDCCA4_U32 = (uint32_t)(UINT32_C(0x000001F4));
+    g_sfera_mesh_partition_indices.capacity = (uint32_t)(UINT32_C(0x000001F4));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F6EEC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04EDCCA8_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_mesh_partition_indices.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F6EF2), UINT32_C(0x004F6EF8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FA9D0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCCB7)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCCC8)), UINT32_C(0x00001392));
+    g_sfera_mesh_partition_indices.debug_file[15] = '\0';
+    g_sfera_mesh_partition_indices.debug_line = UINT32_C(0x00001392);
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F6F13));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2779,18 +2779,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00004000));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F7101));
     LIFT_PUSH3(UINT32_C(0x00004000), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2DE4_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.model_matrices.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F7113));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2DE8_U32 = (uint32_t)(UINT32_C(0x00000100));
+    g_sfera_scene_array_runtime.model_matrices.capacity = (uint32_t)(UINT32_C(0x00000100));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F712C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2DEC_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.model_matrices.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F7132), UINT32_C(0x004F7138));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAA50))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2DFB)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E0C)), UINT32_C(0x000024EB));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.model_matrices.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.model_matrices.debug_line), UINT32_C(0x000024EB));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F7153));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2803,18 +2803,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F7160(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000140));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F7171));
     LIFT_PUSH3(UINT32_C(0x00000140), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04EDCDD0_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.character_matrices.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F7183));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04EDCDD4_U32 = (uint32_t)(UINT32_C(0x00000005));
+    g_sfera_scene_array_runtime.character_matrices.capacity = (uint32_t)(UINT32_C(0x00000005));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F719C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04EDCDD8_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.character_matrices.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F71A2), UINT32_C(0x004F71A8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAA70))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCDE7)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCDF8)), UINT32_C(0x000024F1));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.character_matrices.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.character_matrices.debug_line), UINT32_C(0x000024F1));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F71C3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2827,18 +2827,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F71D0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x0001D4C0));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F71E1));
     LIFT_PUSH3(UINT32_C(0x0001D4C0), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2BEC_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.object_positions.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F71F3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2BF0_U32 = (uint32_t)(UINT32_C(0x00002710));
+    g_sfera_scene_array_runtime.object_positions.capacity = (uint32_t)(UINT32_C(0x00002710));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F720C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2BF4_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_positions.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F7212), UINT32_C(0x004F7218));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAA90))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C03)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C14)), UINT32_C(0x00002539));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_positions.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.object_positions.debug_line), UINT32_C(0x00002539));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F7233));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2851,18 +2851,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F7240(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000960));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F7251));
     LIFT_PUSH3(UINT32_C(0x00000960), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED1284_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.clip_vectors.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F7263));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED1288_U32 = (uint32_t)(UINT32_C(0x000000C8));
+    g_sfera_scene_array_runtime.clip_vectors.capacity = (uint32_t)(UINT32_C(0x000000C8));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F727C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED128C_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.clip_vectors.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F7282), UINT32_C(0x004F7288));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAAB0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED129B)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED12AC)), UINT32_C(0x00002A71));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.clip_vectors.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.clip_vectors.debug_line), UINT32_C(0x00002A71));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F72A3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2875,18 +2875,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F72B0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000320));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F72C1));
     LIFT_PUSH3(UINT32_C(0x00000320), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04EDCE54_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.clip_indices.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F72D3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04EDCE58_U32 = (uint32_t)(UINT32_C(0x000000C8));
+    g_sfera_scene_array_runtime.clip_indices.capacity = (uint32_t)(UINT32_C(0x000000C8));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F72EC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04EDCE5C_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.clip_indices.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F72F2), UINT32_C(0x004F72F8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAAD0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE6B)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04EDCE7C)), UINT32_C(0x00002A77));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.clip_indices.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.clip_indices.debug_line), UINT32_C(0x00002A77));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F7313));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2899,18 +2899,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F7320(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x000001E0));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F7331));
     LIFT_PUSH3(UINT32_C(0x000001E0), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED3100_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.clip_points.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F7343));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED3104_U32 = (uint32_t)(UINT32_C(0x00000028));
+    g_sfera_scene_array_runtime.clip_points.capacity = (uint32_t)(UINT32_C(0x00000028));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F735C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED3108_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.clip_points.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F7362), UINT32_C(0x004F7368));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAAF0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3117)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3128)), UINT32_C(0x00002A84));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.clip_points.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.clip_points.debug_line), UINT32_C(0x00002A84));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F7383));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2923,18 +2923,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F7390(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00027100));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F73A1));
     LIFT_PUSH3(UINT32_C(0x00027100), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED0E14_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.cloud_records.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F73B3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED0E18_U32 = (uint32_t)(UINT32_C(0x000007D0));
+    g_sfera_scene_array_runtime.cloud_records.capacity = (uint32_t)(UINT32_C(0x000007D0));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F73CC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED0E1C_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.cloud_records.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F73D2), UINT32_C(0x004F73D8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAB10))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E2B)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0E3C)), UINT32_C(0x00002A85));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.cloud_records.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.cloud_records.debug_line), UINT32_C(0x00002A85));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F73F3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2947,18 +2947,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F7400(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000050));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F7411));
     LIFT_PUSH3(UINT32_C(0x00000050), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2C18_U32 = (uint32_t)(cpu->eax);
+    g_sfera_collision_runtime.near_result_handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F7420));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2C1C_U32 = (uint32_t)(UINT32_C(0x00000014));
+    g_sfera_collision_runtime.near_result_handles.capacity = (uint32_t)(UINT32_C(0x00000014));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F7439));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2C20_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_collision_runtime.near_result_handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F743F), UINT32_C(0x004F7445));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAB30))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C2F)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2C40)), UINT32_C(0x00002A86));
+    g_sfera_collision_runtime.near_result_handles.debug_file[15] = 0;
+    g_sfera_collision_runtime.near_result_handles.debug_line = UINT32_C(0x00002A86);
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F7460));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2971,18 +2971,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F7470(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x04C5BDA0));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F7481));
     LIFT_PUSH3(UINT32_C(0x04C5BDA0), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2E60_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.world_cell_records.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F7493));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2E64_U32 = (uint32_t)(UINT32_C(0x000001F4));
+    g_sfera_scene_array_runtime.world_cell_records.capacity = (uint32_t)(UINT32_C(0x000001F4));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F74AC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2E68_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.world_cell_records.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F74B2), UINT32_C(0x004F74B8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAB50))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E77)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2E88)), UINT32_C(0x00002A94));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.world_cell_records.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.world_cell_records.debug_line), UINT32_C(0x00002A94));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F74D3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -2995,18 +2995,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F74E0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000FA0));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F74F1));
     LIFT_PUSH3(UINT32_C(0x00000FA0), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2FE0_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.render_ranges.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F7503));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2FE4_U32 = (uint32_t)(UINT32_C(0x000001F4));
+    g_sfera_scene_array_runtime.render_ranges.capacity = (uint32_t)(UINT32_C(0x000001F4));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F751C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2FE8_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.render_ranges.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F7522), UINT32_C(0x004F7528));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAB70))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2FF7)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED3008)), UINT32_C(0x00003C0D));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.render_ranges.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.render_ranges.debug_line), UINT32_C(0x00003C0D));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F7543));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -3019,18 +3019,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F7550(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x0009C400));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F7561));
     LIFT_PUSH3(UINT32_C(0x0009C400), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2E8C_U32 = (uint32_t)(cpu->eax);
+    g_sfera_scene_array_runtime.render_work_records.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F7573));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2E90_U32 = (uint32_t)(UINT32_C(0x00004E20));
+    g_sfera_scene_array_runtime.render_work_records.capacity = (uint32_t)(UINT32_C(0x00004E20));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F758C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2E94_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.render_work_records.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F7592), UINT32_C(0x004F7598));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAB90))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2EA3)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2EB4)), UINT32_C(0x00003C0F));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.render_work_records.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_scene_array_runtime.render_work_records.debug_line), UINT32_C(0x00003C0F));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F75B3));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -3043,18 +3043,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F75C0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000168));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F75D1));
     LIFT_PUSH3(UINT32_C(0x00000168), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED2B0C_U32 = (uint32_t)(cpu->eax);
+    g_sfera_grass_runtime.type_records.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F75E3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED2B10_U32 = (uint32_t)(UINT32_C(0x00000014));
+    g_sfera_grass_runtime.type_records.capacity = (uint32_t)(UINT32_C(0x00000014));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F75FC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED2B14_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_grass_runtime.type_records.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F7602), UINT32_C(0x004F7608));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FABB0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2B23)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED2B34)), UINT32_C(0x00004409));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_grass_runtime.type_records.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_grass_runtime.type_records.debug_line), UINT32_C(0x00004409));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F7623));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -3067,18 +3067,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F7630(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x0000BB80));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F7641));
     LIFT_PUSH3(UINT32_C(0x0000BB80), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED0F5C_U32 = (uint32_t)(cpu->eax);
+    g_sfera_grass_runtime.instance_offsets.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F7653));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED0F60_U32 = (uint32_t)(UINT32_C(0x00002EE0));
+    g_sfera_grass_runtime.instance_offsets.capacity = (uint32_t)(UINT32_C(0x00002EE0));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F766C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED0F64_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_grass_runtime.instance_offsets.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F7672), UINT32_C(0x004F7678));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FABD0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0F73)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0F84)), UINT32_C(0x0000440A));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_grass_runtime.instance_offsets.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_grass_runtime.instance_offsets.debug_line), UINT32_C(0x0000440A));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F7693));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -3091,18 +3091,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F76A0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x0000BB80));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F76B1));
     LIFT_PUSH3(UINT32_C(0x0000BB80), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED1258_U32 = (uint32_t)(cpu->eax);
+    g_sfera_grass_runtime.instance_indices.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F76C3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED125C_U32 = (uint32_t)(UINT32_C(0x00002EE0));
+    g_sfera_grass_runtime.instance_indices.capacity = (uint32_t)(UINT32_C(0x00002EE0));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F76DC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED1260_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_grass_runtime.instance_indices.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F76E2), UINT32_C(0x004F76E8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FABF0))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED126F)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1280)), UINT32_C(0x0000440B));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_grass_runtime.instance_indices.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_grass_runtime.instance_indices.debug_line), UINT32_C(0x0000440B));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F7703));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -3115,18 +3115,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F7710(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x000000C8));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F7721));
     LIFT_PUSH3(UINT32_C(0x000000C8), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04ED0FE8_U32 = (uint32_t)(cpu->eax);
+    g_sfera_grass_runtime.model_handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F7733));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\main.cpp"));
-    SFERA_STATIC_04ED0FEC_U32 = (uint32_t)(UINT32_C(0x00000032));
+    g_sfera_grass_runtime.model_handles.capacity = (uint32_t)(UINT32_C(0x00000032));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F774C));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04ED0FF0_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_grass_runtime.model_handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F7752), UINT32_C(0x004F7758));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAC10))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED0FFF)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04ED1010)), UINT32_C(0x0000440C));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_grass_runtime.model_handles.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_grass_runtime.model_handles.debug_line), UINT32_C(0x0000440C));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F7773));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -3840,18 +3840,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F80B0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000190));
     LIFT_CALL_ENTER(sfera_sub_004EBE60, UINT32_C(0x004F80C1));
     LIFT_PUSH3(UINT32_C(0x00000190), UINT32_C(0x00000000), cpu->eax);
-    SFERA_STATIC_04F38884_U32 = (uint32_t)(cpu->eax);
+    g_sfera_weather_runtime.sky_texture_handles.data = (uint32_t)(cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004F80D3));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000000F)));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\WeatherManager.cpp"));
-    SFERA_STATIC_04F38888_U32 = (uint32_t)(UINT32_C(0x00000064));
+    g_sfera_weather_runtime.sky_texture_handles.capacity = (uint32_t)(UINT32_C(0x00000064));
     LIFT_CALL_ENTER(sfera_sub_00401000, UINT32_C(0x004F80EC));
-    LIFT_PUSH2(cpu->eax, SFERA_STATIC_04F3888C_ADDR);
+    LIFT_PUSH2(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_weather_runtime.sky_texture_handles.debug_file[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strncpy, UINT32_C(0x004F80F2), UINT32_C(0x004F80F8));
     lift_push32(cpu, (uint32_t)(LIFT_CALLBACK_RVA(UINT32_C(0x000FAF60))));
-    LIFT_STORE8(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F3889B)), UINT32_C(0x00000000));
-    LIFT_STORE32(SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04F388AC)), UINT32_C(0x00000157));
+    LIFT_STORE8(((uint32_t)(uintptr_t)&g_sfera_weather_runtime.sky_texture_handles.debug_file[15]), UINT32_C(0x00000000));
+    LIFT_STORE32(((uint32_t)(uintptr_t)&g_sfera_weather_runtime.sky_texture_handles.debug_line), UINT32_C(0x00000157));
     LIFT_CALL_ENTER(sfera_sub_004EE8C0, UINT32_C(0x004F8113));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_RET(0u);
@@ -6416,7 +6416,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA510(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA530(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA530));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED12F0_U32);
+    cpu->ecx = (uint32_t)(g_sfera_collision_runtime.contact_objects.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000073)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA542));
@@ -6443,7 +6443,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA570(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA590(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA590));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED1190_U32);
+    cpu->ecx = (uint32_t)(g_sfera_light_runtime.cell_light_ids.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA5A2));
@@ -6452,7 +6452,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA590(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA5B0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA5B0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED29F8_U32);
+    cpu->ecx = (uint32_t)(g_sfera_landscape_runtime.file_records.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA5C2));
@@ -6461,7 +6461,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA5B0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA5D0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA5D0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2F74_U32);
+    cpu->ecx = (uint32_t)(g_sfera_interface_runtime.window_handle_table.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA5E2));
@@ -6470,7 +6470,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA5D0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA5F0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA5F0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2F48_U32);
+    cpu->ecx = (uint32_t)(g_sfera_world_objects.object_handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA602));
@@ -6479,7 +6479,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA5F0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA610(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA610));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2AD4_U32);
+    cpu->ecx = (uint32_t)(g_sfera_world_objects.extended_object_handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA622));
@@ -6488,7 +6488,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA610(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA630(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA630));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2A24_U32);
+    cpu->ecx = (uint32_t)(g_sfera_interface_runtime.windows.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA642));
@@ -6497,7 +6497,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA630(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA650(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA650));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED29A0_U32);
+    cpu->ecx = (uint32_t)(g_sfera_character_index_map.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA662));
@@ -6506,7 +6506,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA650(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA670(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA670));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED309C_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.object_visibility_indices.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA682));
@@ -6515,7 +6515,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA670(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA690(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA690));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2F1C_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.object_sort_keys.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA6A2));
@@ -6524,7 +6524,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA690(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA6B0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA6B0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04EDCE28_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.object_sort_indices.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA6C2));
@@ -6533,7 +6533,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA6B0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA6D0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA6D0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED3070_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.object_draw_indices.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA6E2));
@@ -6542,7 +6542,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA6D0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA6F0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA6F0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2C44_U32);
+    cpu->ecx = (uint32_t)(g_sfera_collision_runtime.candidate_handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA702));
@@ -6551,7 +6551,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA6F0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA710(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA710));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED0F30_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.scene_records.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA722));
@@ -6560,7 +6560,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA710(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA730(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA730));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2EC4_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.reflection_targets.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA742));
@@ -6569,7 +6569,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA730(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA750(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA750));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2AA8_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.scene_points.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA762));
@@ -6641,7 +6641,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA830(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA850(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA850));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2E34_U32);
+    cpu->ecx = (uint32_t)(g_sfera_light_runtime.cell_indices.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA862));
@@ -6650,7 +6650,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA850(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA870(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA870));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2A7C_U32);
+    cpu->ecx = (uint32_t)(g_sfera_light_runtime.cell_records.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA882));
@@ -6659,7 +6659,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA870(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA890(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA890));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04EDCF78_U32);
+    cpu->ecx = (uint32_t)(g_sfera_landscape_runtime.microtexture_handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA8A2));
@@ -6668,7 +6668,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA890(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA8B0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA8B0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED11BC_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.surface_handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA8C2));
@@ -6695,7 +6695,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA8F0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA910(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA910));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED1014_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.render_pass_slots.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA922));
@@ -6704,7 +6704,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA910(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA930(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA930));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED29CC_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.surface_records.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA942));
@@ -6713,7 +6713,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA930(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA950(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA950));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED0EC4_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.surface_index_map.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA962));
@@ -6722,7 +6722,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA950(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA970(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA970));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04EDCDFC_U32);
+    cpu->ecx = (uint32_t)(g_sfera_light_runtime.handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA982));
@@ -6731,7 +6731,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA970(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA990(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA990));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04EDCFA4_U32);
+    cpu->ecx = (uint32_t)(g_sfera_light_runtime.visible_handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA9A2));
@@ -6740,7 +6740,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA990(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA9B0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA9B0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED300C_U32);
+    cpu->ecx = (uint32_t)(g_sfera_light_runtime.active_handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA9C2));
@@ -6749,7 +6749,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA9B0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FA9D0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FA9D0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04EDCCA0_U32);
+    cpu->ecx = (uint32_t)(g_sfera_mesh_partition_indices.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FA9E2));
@@ -6785,7 +6785,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAA30(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAA50(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAA50));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2DE4_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.model_matrices.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAA62));
@@ -6794,7 +6794,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAA50(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAA70(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAA70));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04EDCDD0_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.character_matrices.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAA82));
@@ -6803,7 +6803,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAA70(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAA90(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAA90));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2BEC_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.object_positions.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAAA2));
@@ -6812,7 +6812,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAA90(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAAB0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAAB0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED1284_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.clip_vectors.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAAC2));
@@ -6821,7 +6821,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAAB0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAAD0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAAD0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04EDCE54_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.clip_indices.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAAE2));
@@ -6830,7 +6830,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAAD0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAAF0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAAF0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED3100_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.clip_points.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAB02));
@@ -6839,7 +6839,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAAF0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAB10(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAB10));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED0E14_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.cloud_records.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAB22));
@@ -6848,7 +6848,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAB10(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAB30(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAB30));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2C18_U32);
+    cpu->ecx = (uint32_t)(g_sfera_collision_runtime.near_result_handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAB42));
@@ -6857,7 +6857,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAB30(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAB50(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAB50));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2E60_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.world_cell_records.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAB62));
@@ -6866,7 +6866,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAB50(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAB70(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAB70));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2FE0_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.render_ranges.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAB82));
@@ -6875,7 +6875,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAB70(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAB90(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAB90));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2E8C_U32);
+    cpu->ecx = (uint32_t)(g_sfera_scene_array_runtime.render_work_records.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FABA2));
@@ -6884,7 +6884,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAB90(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FABB0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FABB0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED2B0C_U32);
+    cpu->ecx = (uint32_t)(g_sfera_grass_runtime.type_records.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FABC2));
@@ -6893,7 +6893,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FABB0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FABD0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FABD0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED0F5C_U32);
+    cpu->ecx = (uint32_t)(g_sfera_grass_runtime.instance_offsets.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FABE2));
@@ -6902,7 +6902,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FABD0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FABF0(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FABF0));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED1258_U32);
+    cpu->ecx = (uint32_t)(g_sfera_grass_runtime.instance_indices.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAC02));
@@ -6911,7 +6911,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FABF0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAC10(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAC10));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04ED0FE8_U32);
+    cpu->ecx = (uint32_t)(g_sfera_grass_runtime.model_handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAC22));
@@ -7159,7 +7159,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAF50(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004FAF60(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004FAF60));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04F38884_U32);
+    cpu->ecx = (uint32_t)(g_sfera_weather_runtime.sky_texture_handles.data);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x0000004B)));
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h"));
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004FAF72));

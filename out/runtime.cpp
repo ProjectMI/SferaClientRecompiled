@@ -153,6 +153,19 @@ std::string client_executable_path_ansi() {
     return result;
 }
 
+bool native_executable_image_address(std::uint32_t address) noexcept {
+#if defined(SFERA_PORTABLE_CHECK)
+    (void)address;
+    return false;
+#else
+    MEMORY_BASIC_INFORMATION info{};
+    if (VirtualQuery(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), &info, sizeof(info)) != sizeof(info)) { return false; }
+    if (info.State != MEM_COMMIT || info.Type != MEM_IMAGE) { return false; }
+    const DWORD protection = info.Protect & UINT32_C(0xFF);
+    return protection == PAGE_EXECUTE || protection == PAGE_EXECUTE_READ || protection == PAGE_EXECUTE_READWRITE || protection == PAGE_EXECUTE_WRITECOPY;
+#endif
+}
+
 bool safe_copy(void* destination, const void* source, std::size_t size) noexcept {
 #if defined(SFERA_PORTABLE_CHECK)
     std::memcpy(destination, source, size);
@@ -307,6 +320,7 @@ void set_sub_flags(LiftCpu& state, std::uint64_t left, std::uint64_t right, std:
 
 extern "C" std::uint32_t __cdecl lift_source_rva(std::uint32_t address) { std::uint32_t rva = 0; return g_process_memory && g_process_memory->source_rva(address, rva) ? rva : UINT32_MAX; }
 extern "C" std::uint32_t __cdecl lift_code_rva(std::uint32_t address) { std::uint32_t rva = 0; return g_process_memory && g_process_memory->code_rva(address, rva) ? rva : UINT32_MAX; }
+extern "C" std::uint32_t __cdecl lift_is_native_code_address(std::uint32_t address) { return native_executable_image_address(address) ? 1u : 0u; }
 extern "C" std::uint32_t __cdecl lift_callback_address_rva(std::uint32_t rva) { return g_process_memory ? g_process_memory->callback_for_rva(rva) : 0u; }
 extern "C" std::uint32_t __cdecl lift_process_module_handle(void) { return process_module_handle(); }
 extern "C" std::uint8_t __cdecl lift_load8(std::uint32_t address) { return memory_read<std::uint8_t>(address); }
@@ -551,7 +565,7 @@ extern "C" void __cdecl lift_scas32(LiftCpu* cpu, std::uint32_t repeated, std::u
 extern "C" LIFT_NORETURN void __cdecl lift_trap(LiftCpu* cpu, std::uint32_t source_va, const char* reason) { if (cpu) { cpu->eip = source_va; } throw std::runtime_error(std::string("Lifted C trap at ") + hex_u32(source_va) + ": " + (reason ? reason : "unknown")); }
 
 extern "C" LIFT_NORETURN void __cdecl lift_trap_transfer(LiftCpu* cpu, std::uint32_t origin, std::uint32_t target, std::uint32_t esp_before, std::uint32_t stack_cleanup, std::uint32_t stop_address, const char* kind) {
-    auto classify = [](std::uint32_t value) -> std::string { const std::uint32_t rva = lift_source_rva(value); if (rva == UINT32_MAX) { return "non-code"; } if (lift_has_function_rva(rva)) { return "function@" + hex_u32(UINT32_C(0x00400000) + rva); } return "local-middle@" + hex_u32(UINT32_C(0x00400000) + rva); };
+    auto classify = [](std::uint32_t value) -> std::string { if (lift_is_native_code_address(value)) { return "native-image"; } const std::uint32_t rva = lift_source_rva(value); if (rva == UINT32_MAX) { return "non-code"; } if (lift_has_function_rva(rva)) { return "function@" + hex_u32(UINT32_C(0x00400000) + rva); } return "local-middle@" + hex_u32(UINT32_C(0x00400000) + rva); };
     auto peek = [cpu](std::uint32_t address, std::uint32_t& value) -> bool { if (!cpu || address < cpu->stack_limit || address > cpu->stack_base - 4u) { return false; } value = *reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(address)); return true; };
     std::string message = std::string("Invalid lifted control transfer kind=") + (kind ? kind : "unknown") + " origin=" + hex_u32(origin) + " target=" + hex_u32(target) + " target-class=" + classify(target) + " esp=" + hex_u32(esp_before) + " cleanup=" + std::to_string(stack_cleanup) + " stop=" + hex_u32(stop_address);
     if (g_last_native_callsite != 0u) { message += " last-native-callsite=" + hex_u32(g_last_native_callsite) + " last-native-target=" + hex_u32(g_last_native_target) + " native-esp-before=" + hex_u32(g_last_native_esp_before) + " native-esp-after=" + hex_u32(g_last_native_esp_after) + " native-esp-delta=" + std::to_string(static_cast<std::int32_t>(g_last_native_esp_after - g_last_native_esp_before)); }
@@ -659,7 +673,7 @@ std::uint32_t ProcessMemory::source_address(std::uint32_t source_va) {
 }
 
 bool ProcessMemory::code_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
-    if (address >= kSourceImageBase + UINT32_C(0x00001000) && address < kSourceImageBase + UINT32_C(0x000FC200)) { rva = address - kSourceImageBase; return true; }
+    if (address >= kSourceImageBase + UINT32_C(0x00001000) && address < kSourceImageBase + UINT32_C(0x000FC200) && !native_executable_image_address(address)) { rva = address - kSourceImageBase; return true; }
     const std::uint32_t token_rva = address - kCodeTokenBase;
     if (token_rva >= UINT32_C(0x00001000) && token_rva < UINT32_C(0x000FC200)) { rva = token_rva; return true; }
     return callback_rva(address, rva);

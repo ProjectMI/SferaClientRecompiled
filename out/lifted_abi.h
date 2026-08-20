@@ -150,6 +150,7 @@ void LIFT_CDECL lift_import_call(LiftCpu* cpu, uint32_t import_address, uint32_t
 void LIFT_CDECL lift_native_call(LiftCpu* cpu, uint32_t target, uint32_t callsite);
 uint32_t LIFT_CDECL lift_source_rva(uint32_t address);
 uint32_t LIFT_CDECL lift_code_rva(uint32_t address);
+uint32_t LIFT_CDECL lift_is_native_code_address(uint32_t address);
 LIFT_NORETURN void LIFT_CDECL lift_trap(LiftCpu* cpu, uint32_t source_va, const char* reason);
 LIFT_NORETURN void LIFT_CDECL lift_trap_transfer(LiftCpu* cpu, uint32_t origin, uint32_t target, uint32_t esp_before, uint32_t stack_cleanup, uint32_t stop_address, const char* kind);
 

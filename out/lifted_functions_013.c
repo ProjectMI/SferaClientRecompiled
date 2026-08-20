@@ -76,10 +76,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482170(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\objparam.cpp"));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004821FB));
-    LIFT_PUSH3(cpu->ebp, ((uint32_t)(uintptr_t)"openCfg: wrong fromat of Cfg %s"), SFERA_STATIC_04EEA528_ADDR);
+    LIFT_PUSH3(cpu->ebp, ((uint32_t)(uintptr_t)"openCfg: wrong fromat of Cfg %s"), ((uint32_t)(uintptr_t)&g_sfera_config_parser_runtime.token[0]));
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sprintf, UINT32_C(0x00482206), UINT32_C(0x0048220C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
-    cpu->ecx = (uint32_t)(SFERA_STATIC_04EEA528_ADDR);
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_config_parser_runtime.token[0]));
     LIFT_CALL_ENTER(sfera_sub_00459B10, UINT32_C(0x00482219));
     goto label_00082299;
     LIFT_BLOCK(label_0008221B, UINT32_C(0x0048221B));
@@ -92,7 +92,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482170(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(cpu->eax, cpu->edi, 32u);
     LIFT_JL_GOTO(label_00082221);
     LIFT_BLOCK(label_0008222A, UINT32_C(0x0048222A));
-    LIFT_CMP(SFERA_STATIC_04EEA62C_U32, UINT32_C(0x00000000), 32u);
+    LIFT_CMP(g_sfera_config_parser_runtime.open_mode, UINT32_C(0x00000000), 32u);
     LIFT_JNZ(label_00082299, UINT32_C(0x00482233));
     cpu->ecx = (uint32_t)(cpu->ebp);
     LIFT_CALL_ENTER(sfera_sub_0042EE20, UINT32_C(0x0048223A));
@@ -105,7 +105,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482170(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_0042F180, UINT32_C(0x0048224D));
     goto label_00082299;
     LIFT_BLOCK(label_0008224F, UINT32_C(0x0048224F));
-    LIFT_CMP(SFERA_STATIC_04EEA62C_U32, UINT32_C(0x00000001), 32u);
+    LIFT_CMP(g_sfera_config_parser_runtime.open_mode, UINT32_C(0x00000001), 32u);
     LIFT_JNZ(label_00082299, UINT32_C(0x00482258));
     LIFT_ZERO(cpu->eax, 32u);
     LIFT_TEST(cpu->edi, 32u);
@@ -9716,7 +9716,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00489BA0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00089CA1, UINT32_C(0x00489CA1));
     lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"internal error 075982391")));
     LIFT_BLOCK(label_00089CA6, UINT32_C(0x00489CA6));
-    lift_push32(cpu, (uint32_t)(SFERA_STATIC_04ECBA50_ADDR));
+    lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_warning_log_runtime.object[0])));
     LIFT_CALL_ENTER(sfera_sub_0049B790, UINT32_C(0x00489CB0));
     LIFT_SP_ADD(UINT32_C(0x00000008));
     LIFT_BLOCK(label_00089CB3, UINT32_C(0x00489CB3));
@@ -9846,7 +9846,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00489DE0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(UINT32_C(0x00000190));
     LIFT_CMP((cpu->eax & UINT32_C(0xFFFF)), (cpu->ecx & UINT32_C(0xFFFF)), 16u);
     LIFT_JL(label_00089E68, UINT32_C(0x00489E42));
-    LIFT_PUSH2(((uint32_t)(uintptr_t)"Too many files in quickfile"), SFERA_STATIC_04ECBA50_ADDR);
+    LIFT_PUSH2(((uint32_t)(uintptr_t)"Too many files in quickfile"), ((uint32_t)(uintptr_t)&g_sfera_warning_log_runtime.object[0]));
     LIFT_CALL_ENTER(sfera_sub_0049B790, UINT32_C(0x00489E51));
     LIFT_SP_ADD(UINT32_C(0x00000008));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"Too many files in quickfile\n"));
