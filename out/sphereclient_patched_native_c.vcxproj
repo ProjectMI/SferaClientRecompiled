@@ -107,7 +107,8 @@ copy /Y "$(ProjectDir)..\sound.dll" "$(OutDir)sound.dll" &gt;nul</Command>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="diagnostics.cpp" />
-    <ClCompile Include="semantic_native.cpp" />
+    <ClCompile Include="semantic_static.cpp" />
+    <ClCompile Include="semantic_zlib.cpp" />
     <ClCompile Include="semantic_classes.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="runtime.cpp" />
@@ -311,7 +312,8 @@ copy /Y "$(ProjectDir)..\sound.dll" "$(OutDir)sound.dll" &gt;nul</Command>
   <ItemGroup>
     <ClInclude Include="diagnostics.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="semantic_native.h" />
+    <ClInclude Include="semantic_static.h" />
+    <ClInclude Include="semantic_zlib.h" />
     <ClInclude Include="semantic_classes.h" />
     <ClInclude Include="lifted_fast_ops.h" />
     <ClInclude Include="runtime.h" />

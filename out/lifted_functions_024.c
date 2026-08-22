@@ -5990,7 +5990,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EF690(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x00000008));
-    LIFT_STORE32(cpu->esi, SFERA_LEGACY_VPTR_COM_ERROR);
+    LIFT_STORE32(cpu->esi, kLegacyVptrComError);
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_000EF6AA, UINT32_C(0x004EF6A2));
     LIFT_LOAD32(cpu->ecx, cpu->eax);
@@ -6020,7 +6020,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EF6C0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0xFFFFFFF0))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), SFERA_LEGACY_VPTR_COM_ERROR);
+    LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF0), kLegacyVptrComError);
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF4), cpu->eax);
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFF8), cpu->ecx);
     LIFT_STORE32(cpu->ebp + UINT32_C(0xFFFFFFFC), UINT32_C(0x00000000));
@@ -6036,7 +6036,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EF700(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->eax, cpu->ebp + UINT32_C(0x00000008));
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->esi = (uint32_t)(cpu->ecx);
-    LIFT_STORE32(cpu->esi, SFERA_LEGACY_VPTR_COM_ERROR);
+    LIFT_STORE32(cpu->esi, kLegacyVptrComError);
     LIFT_LOAD32(cpu->ecx, cpu->eax + UINT32_C(0x00000004));
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000004), cpu->ecx);
     LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000008));
@@ -6062,7 +6062,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EF740(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x00000008));
-    LIFT_STORE32(cpu->esi, SFERA_LEGACY_VPTR_COM_ERROR);
+    LIFT_STORE32(cpu->esi, kLegacyVptrComError);
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_000EF75D, UINT32_C(0x004EF755));
     LIFT_LOAD32(cpu->ecx, cpu->eax);
@@ -12133,7 +12133,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004F3B56(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004F3B90(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x004F3B90));
-    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_interface_core_runtime.storage[UINT32_C(0x00000108)]));
+    cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_interface_core_runtime.queue_head));
     LIFT_IMPORT_CALL_RETURN(SFERA_IMPORT_MSVCP100_Container_base12_dtor, UINT32_C(0x004F3B95));
     lift_trap(cpu, cpu->eip, "function fell through without control transfer");
 }

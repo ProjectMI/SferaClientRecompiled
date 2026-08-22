@@ -1,5 +1,6 @@
 #include "lifted_functions.h"
 #include "lifted_normalized_ops.h"
+#include "semantic_zlib.h"
 
 #include <math.h>
 

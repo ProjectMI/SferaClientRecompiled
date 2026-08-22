@@ -11167,14 +11167,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004255D0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->edi));
     LIFT_CALL_ENTER(sfera_sub_0049A670, UINT32_C(0x004254CF));
     cpu->ecx = (uint32_t)(cpu->eax);
-    LIFT_SUB(cpu->ecx, g_sfera_dyn_green_runtime.previous_timestamp_low, 0u, 32u, cpu->ecx = (uint32_t)(result););
+    LIFT_SUB(cpu->ecx, g_sfera_dyn_green_runtime.low, 0u, 32u, cpu->ecx = (uint32_t)(result););
     cpu->edi = (uint32_t)(cpu->edx);
-    LIFT_SUB(cpu->edi, g_sfera_dyn_green_runtime.previous_timestamp_high, ((cpu->eflags & LIFT_FLAG_CF) != 0u ? 1u : 0u), 32u, cpu->edi = (uint32_t)(result););
+    LIFT_SUB(cpu->edi, g_sfera_dyn_green_runtime.high, ((cpu->eflags & LIFT_FLAG_CF) != 0u ? 1u : 0u), 32u, cpu->edi = (uint32_t)(result););
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->ecx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000000C), cpu->edi);
     lift_x87_push(cpu, (double)(((int64_t)(lift_load64(((uint32_t)(cpu->esp + UINT32_C(0x00000008))))))));
-    g_sfera_dyn_green_runtime.previous_timestamp_low = (uint32_t)(cpu->eax);
-    g_sfera_dyn_green_runtime.previous_timestamp_high = (uint32_t)(cpu->edx);
+    g_sfera_dyn_green_runtime.low = (uint32_t)(cpu->eax);
+    g_sfera_dyn_green_runtime.high = (uint32_t)(cpu->edx);
     lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) / (2000.0));
     cpu->edi = (uint32_t)(lift_pop32(cpu));
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000004));

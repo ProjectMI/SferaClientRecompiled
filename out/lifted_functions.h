@@ -4572,7 +4572,6 @@ void LIFT_CDECL sfera_sub_004FC130(LiftCpu* cpu, uint32_t stop_address);
 void LIFT_CDECL sfera_sub_004FC140(LiftCpu* cpu, uint32_t stop_address);
 void LIFT_CDECL sfera_sub_004FC150(LiftCpu* cpu, uint32_t stop_address);
 void LIFT_CDECL sfera_sub_004FC15A(LiftCpu* cpu, uint32_t stop_address);
-void LIFT_CDECL sfera_u32_to_sso_decimal(LiftCpu* cpu);
 
 
 #ifdef __cplusplus

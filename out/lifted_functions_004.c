@@ -3955,7 +3955,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004298B0(LiftCpu* cpu, uint32_t stop_addres
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00429990(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00429990));
     LIFT_PUSH2(cpu->ecx, cpu->esi);
-    cpu->esi = (uint32_t)(g_sfera_effect_manager.effect_listeners.head);
+    cpu->esi = (uint32_t)(g_sfera_effect_manager.effect_listeners.sentinel);
     LIFT_LOAD32(cpu->edx, cpu->esi);
     LIFT_CMP(cpu->edx, cpu->esi, 32u);
     LIFT_JZ(label_00029A02, UINT32_C(0x0042999E));
@@ -4135,7 +4135,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429B20(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_effect_manager.effect_listeners));
     LIFT_CALL_ENTER(sfera_sub_00429A80, UINT32_C(0x00429B56));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000008));
-    LIFT_CMP(cpu->eax, g_sfera_effect_manager.effect_listeners.head, 32u);
+    LIFT_CMP(cpu->eax, g_sfera_effect_manager.effect_listeners.sentinel, 32u);
     LIFT_JZ(label_00029B79, UINT32_C(0x00429B62));
     LIFT_LOAD32(cpu->ecx, cpu->eax + UINT32_C(0x00000010));
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x0000001C));
@@ -4805,7 +4805,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042A320(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000008))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->esp + UINT32_C(0x0000000C), SFERA_LEGACY_VPTR_BAD_ALLOC);
+    LIFT_STORE32(cpu->esp + UINT32_C(0x0000000C), kLegacyVptrBadAlloc);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0042A391));
     LIFT_TRAP_RETURN(UINT32_C(0x0042A391), "INT3");
 }
@@ -5430,7 +5430,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042AA90(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000010), cpu->edi);
     LIFT_CALL_ENTER(sfera_sub_00429A80, UINT32_C(0x0042AAB1));
     LIFT_LOAD32(cpu->edx, cpu->esp + UINT32_C(0x0000000C));
-    LIFT_CMP(cpu->edx, g_sfera_effect_manager.effect_listeners.head, 32u);
+    LIFT_CMP(cpu->edx, g_sfera_effect_manager.effect_listeners.sentinel, 32u);
     LIFT_JZ(label_0002AAD6, UINT32_C(0x0042AABD));
     lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"EM_RegisterEffectListener::Multiple listeners not implemented.")));
     LIFT_CALL_ENTER(sfera_sub_0042E1D0, UINT32_C(0x0042AAC7));
@@ -5604,7 +5604,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042AB10(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_effect_manager.effect_listeners));
     LIFT_CALL_ENTER(sfera_sub_00429A80, UINT32_C(0x0042ACD9));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000014));
-    LIFT_CMP(cpu->eax, g_sfera_effect_manager.effect_listeners.head, 32u);
+    LIFT_CMP(cpu->eax, g_sfera_effect_manager.effect_listeners.sentinel, 32u);
     LIFT_JZ(label_0002AD20, UINT32_C(0x0042ACE5));
     LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000010));
     LIFT_STORE32(cpu->edi + UINT32_C(0x00000038), cpu->edx);

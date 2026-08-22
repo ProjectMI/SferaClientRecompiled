@@ -1,7 +1,6 @@
 #pragma once
 
 #include "lifted_abi.h"
-#include "semantic_native.h"
 
 #if defined(_MSC_VER)
 #define LIFT_FORCEINLINE static __forceinline

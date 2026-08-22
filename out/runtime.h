@@ -1,7 +1,7 @@
 #pragma once
 
 #include "lifted_abi.h"
-#include "semantic_native.h"
+#include "semantic_static.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -88,7 +88,6 @@ private:
     std::vector<HMODULE> loaded_modules_;
     std::vector<ResolvedImport> resolved_imports_;
     void allocate_runtime_regions();
-    void initialize_native_storage();
     void resolve_imports();
     void resolve_static_references();
     void initialize_callback_registry();

@@ -11,7 +11,6 @@
 #include <limits>
 #include <memory>
 #include <stdexcept>
-#include <string_view>
 #include <unordered_map>
 
 #if defined(_MSC_VER)
@@ -138,7 +137,7 @@ std::string narrow_path(const std::wstring& value) {
 }
 
 std::wstring wide_client_filename() {
-    return std::wstring(kClientExecutableName.begin(), kClientExecutableName.end());
+    return L"sphereclient_patched.exe";
 }
 
 std::wstring client_executable_path() {
@@ -639,9 +638,9 @@ std::uint32_t LocalStack::limit() const noexcept {
 ProcessMemory::ProcessMemory() {
     if (g_process_memory) { throw std::runtime_error("Only one process-memory instance is supported"); }
     DiagnosticPhaseScope phase(RuntimePhase::static_storage);
-    try { allocate_runtime_regions(); initialize_native_storage(); } catch (...) { release(); throw; }
+    try { allocate_runtime_regions(); } catch (...) { release(); throw; }
     g_process_memory = this;
-    const std::string note = "semantic native storage initialized; module=" + hex_u32(load_base()) + ", callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata=eliminated, semantic-data=native";
+    const std::string note = "semantic native storage ready; module=" + hex_u32(load_base()) + ", callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata=eliminated, semantic-data=native";
     diagnostic_note(note.c_str());
 }
 
@@ -649,10 +648,10 @@ ProcessMemory::~ProcessMemory() { release(); }
 
 std::uint32_t ProcessMemory::load_base() const noexcept { return process_module_handle(); }
 
-std::uint32_t ProcessMemory::entry_va() noexcept { return kCodeTokenBase + kEntryRva; }
+std::uint32_t ProcessMemory::entry_va() noexcept { return kCodeTokenBase + 0x000EF142u; }
 
 bool ProcessMemory::code_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
-    if (address >= kSourceImageBase + UINT32_C(0x00001000) && address < kSourceImageBase + UINT32_C(0x000FC200) && !native_executable_image_address(address)) { rva = address - kSourceImageBase; return true; }
+    if (address >= 0x00400000u + UINT32_C(0x00001000) && address < 0x00400000u + UINT32_C(0x000FC200) && !native_executable_image_address(address)) { rva = address - 0x00400000u; return true; }
     const std::uint32_t token_rva = address - kCodeTokenBase;
     if (token_rva >= UINT32_C(0x00001000) && token_rva < UINT32_C(0x000FC200)) { rva = token_rva; return true; }
     return false;
@@ -730,13 +729,11 @@ void ProcessMemory::write(std::uint32_t address, const void* value, std::size_t 
 }
 
 void ProcessMemory::allocate_runtime_regions() {
-    if (sizeof(void*) != 4 || kMachine != IMAGE_FILE_MACHINE_I386) { throw std::runtime_error("Generated runtime requires Win32/x86"); }
+    if (sizeof(void*) != 4 || 0x014Cu != IMAGE_FILE_MACHINE_I386) { throw std::runtime_error("Generated runtime requires Win32/x86"); }
     callback_thunks_size_ = kCallbackThunkCapacityBytes;
     callback_thunks_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, callback_thunks_size_, MEM_RESERVE, PAGE_NOACCESS));
     if (!callback_thunks_) { throw std::runtime_error(win32_error("VirtualAlloc(callback thunk pool reserve)")); }
 }
-
-void ProcessMemory::initialize_native_storage() { sfera_initialize_native_storage(); }
 
 void ProcessMemory::initialize_native() {
     try {
@@ -1178,7 +1175,7 @@ void ProcessMemory::resolve_imports() {
     bind(SFERA_IMPORT_MSVCP100_basic_istream_dtor, mod_MSVCP100_dll, "??1?$basic_istream@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_ios_base_Ios_base_dtor, mod_MSVCP100_dll, "?_Ios_base_dtor@ios_base@std@@CAXPAV12@@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_ostream_vftable, mod_MSVCP100_dll, "??_7?$basic_ostream@DU?$char_traits@D@std@@@std@@6B@", 0u, false, ImportBehavior::generic);
-    if (resolved_imports_.size() != kExpectedImportCount) { throw std::runtime_error("Resolved import count mismatch"); }
+    if (resolved_imports_.size() != 409u) { throw std::runtime_error("Resolved import count mismatch"); }
 }
 
 void ProcessMemory::resolve_static_references() {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "lifted_fast_ops.h"
-#include "semantic_native.h"
+#include "semantic_static.h"
 #ifdef __cplusplus
 #include <memory>
 #endif
