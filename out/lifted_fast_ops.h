@@ -14,24 +14,22 @@
 #define LIFT_CODE_TOKEN_BASE UINT32_C(0xE0000000)
 #define LIFT_CODE_TOKEN_RVA(rva) (LIFT_CODE_TOKEN_BASE + (uint32_t)(rva))
 #define LIFT_CODE_TOKEN_VA(source_va) LIFT_CODE_TOKEN_RVA((uint32_t)(source_va) - UINT32_C(0x00400000))
-#define LIFT_CALLBACK_RVA(rva) lift_callback_address_rva((uint32_t)(rva))
-#define LIFT_SOURCE_DATA_BEGIN UINT32_C(0x00520000)
-#define LIFT_SOURCE_DATA_SIZE UINT32_C(0x04A70790)
+#define LIFT_FUNCTION(function) ((uint32_t)(uintptr_t)(LiftFunction)(function))
+#define LIFT_CALLBACK(function) lift_callback_address((LiftFunction)(function))
+LIFT_FORCEINLINE uint32_t lift_fast_source_rva(uint32_t address) { uint32_t offset = address - LIFT_CODE_TOKEN_BASE; if (offset >= UINT32_C(0x00001000) && offset < UINT32_C(0x00001000) + LIFT_SOURCE_TEXT_SIZE) { return offset; } return lift_source_rva(address); }
 
-LIFT_FORCEINLINE uint32_t lift_fast_source_rva(uint32_t address) { uint32_t offset = address - LIFT_CODE_TOKEN_BASE; if (offset >= UINT32_C(0x00001000) && offset < UINT32_C(0x00001000) + LIFT_SOURCE_TEXT_SIZE) { return offset; } { uint32_t data_rva = sfera_data_source_rva(address); if (data_rva != UINT32_MAX) { return data_rva; } } return lift_source_rva(address); }
-
-LIFT_FORCEINLINE uint8_t lift_fast_load8(uint32_t address) { address = sfera_data_deref_address(address); return *(const uint8_t*)(uintptr_t)address; }
-LIFT_FORCEINLINE uint16_t lift_fast_load16(uint32_t address) { address = sfera_data_deref_address(address); return *(const uint16_t*)(uintptr_t)address; }
-LIFT_FORCEINLINE uint32_t lift_fast_load32(uint32_t address) { uint32_t value; if (sfera_vtable_try_load32(address, &value)) { return value; } address = sfera_data_deref_address(address); return *(const uint32_t*)(uintptr_t)address; }
-LIFT_FORCEINLINE uint64_t lift_fast_load64(uint32_t address) { address = sfera_data_deref_range(address, 8u); return *(const uint64_t*)(uintptr_t)address; }
-LIFT_FORCEINLINE float lift_fast_load_f32(uint32_t address) { address = sfera_data_deref_address(address); return *(const float*)(uintptr_t)address; }
-LIFT_FORCEINLINE double lift_fast_load_f64(uint32_t address) { address = sfera_data_deref_range(address, 8u); return *(const double*)(uintptr_t)address; }
-LIFT_FORCEINLINE void lift_fast_store8(uint32_t address, uint8_t value) { address = sfera_data_deref_address(address); *(uint8_t*)(uintptr_t)address = value; }
-LIFT_FORCEINLINE void lift_fast_store16(uint32_t address, uint16_t value) { address = sfera_data_deref_address(address); *(uint16_t*)(uintptr_t)address = value; }
-LIFT_FORCEINLINE void lift_fast_store32(uint32_t address, uint32_t value) { address = sfera_data_deref_address(address); *(uint32_t*)(uintptr_t)address = value; }
-LIFT_FORCEINLINE void lift_fast_store64(uint32_t address, uint64_t value) { address = sfera_data_deref_range(address, 8u); *(uint64_t*)(uintptr_t)address = value; }
-LIFT_FORCEINLINE void lift_fast_store_f32(uint32_t address, float value) { address = sfera_data_deref_address(address); *(float*)(uintptr_t)address = value; }
-LIFT_FORCEINLINE void lift_fast_store_f64(uint32_t address, double value) { address = sfera_data_deref_range(address, 8u); *(double*)(uintptr_t)address = value; }
+LIFT_FORCEINLINE uint8_t lift_fast_load8(uint32_t address) { return *(const uint8_t*)(uintptr_t)address; }
+LIFT_FORCEINLINE uint16_t lift_fast_load16(uint32_t address) { return *(const uint16_t*)(uintptr_t)address; }
+LIFT_FORCEINLINE uint32_t lift_fast_load32(uint32_t address) { return *(const uint32_t*)(uintptr_t)address; }
+LIFT_FORCEINLINE uint64_t lift_fast_load64(uint32_t address) { return *(const uint64_t*)(uintptr_t)address; }
+LIFT_FORCEINLINE float lift_fast_load_f32(uint32_t address) { return *(const float*)(uintptr_t)address; }
+LIFT_FORCEINLINE double lift_fast_load_f64(uint32_t address) { return *(const double*)(uintptr_t)address; }
+LIFT_FORCEINLINE void lift_fast_store8(uint32_t address, uint8_t value) { *(uint8_t*)(uintptr_t)address = value; }
+LIFT_FORCEINLINE void lift_fast_store16(uint32_t address, uint16_t value) { *(uint16_t*)(uintptr_t)address = value; }
+LIFT_FORCEINLINE void lift_fast_store32(uint32_t address, uint32_t value) { *(uint32_t*)(uintptr_t)address = value; }
+LIFT_FORCEINLINE void lift_fast_store64(uint32_t address, uint64_t value) { *(uint64_t*)(uintptr_t)address = value; }
+LIFT_FORCEINLINE void lift_fast_store_f32(uint32_t address, float value) { *(float*)(uintptr_t)address = value; }
+LIFT_FORCEINLINE void lift_fast_store_f64(uint32_t address, double value) { *(double*)(uintptr_t)address = value; }
 LIFT_FORCEINLINE uint8_t lift_fast_fs_load8(const LiftCpu* cpu, uint32_t offset) { return *(const uint8_t*)(cpu->fs_data + offset); }
 LIFT_FORCEINLINE uint16_t lift_fast_fs_load16(const LiftCpu* cpu, uint32_t offset) { return *(const uint16_t*)(const void*)(cpu->fs_data + offset); }
 LIFT_FORCEINLINE uint32_t lift_fast_fs_load32(const LiftCpu* cpu, uint32_t offset) { return *(const uint32_t*)(const void*)(cpu->fs_data + offset); }

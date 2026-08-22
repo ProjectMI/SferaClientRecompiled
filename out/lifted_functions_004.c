@@ -1188,7 +1188,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00427590(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000004)))), UINT32_C(0x00000000), 32u);
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_IEFFECTMANAGER);
+    std::construct_at(reinterpret_cast<IEffectManager*>(cpu->esi));
     LIFT_JZ(label_000275C0, UINT32_C(0x0042759F));
     LIFT_CMP(lift_load8(((uint32_t)(cpu->esi + UINT32_C(0x0000000C)))), UINT32_C(0x00000000), 8u);
     LIFT_JNZ(label_000275C0, UINT32_C(0x004275A5));
@@ -1312,11 +1312,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004276A0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = (uint32_t)(UINT32_C(0x00000725));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp"));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x00427733));
-    LIFT_LOAD32(cpu->edx, cpu->edi);
-    LIFT_LOAD32(cpu->eax, cpu->edx + UINT32_C(0x0000002C));
+
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000001)));
     cpu->ecx = (uint32_t)(cpu->edi);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002773E)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002773C)))) { return; }
+    reinterpret_cast<CScriptedEffect*>(cpu->edi)->destroyEffect(cpu);
     LIFT_ENTER(UINT32_C(0x0042773E));
     LIFT_EPILOGUE3(0u, cpu->edi, cpu->esi, cpu->ecx);
 }
@@ -1645,7 +1644,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000002C), UINT32_C(0x00000001));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00027B8D, UINT32_C(0x00427B73));
-    LIFT_PUSH3(LIFT_CALLBACK_RVA(UINT32_C(0x000277C0)), LIFT_CALLBACK_RVA(UINT32_C(0x00026710)), cpu->esi);
+    LIFT_PUSH3(LIFT_CALLBACK(sfera_sub_004277C0), LIFT_CALLBACK(sfera_sub_00426710), cpu->esi);
     cpu->edi = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0x00000004))));
     LIFT_PUSH2(UINT32_C(0x00000064), cpu->edi);
     LIFT_STORE32(cpu->eax, cpu->esi);
@@ -1701,7 +1700,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000002C), UINT32_C(0x00000002));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00027C5A, UINT32_C(0x00427C3D));
-    LIFT_PUSH3(LIFT_CALLBACK_RVA(UINT32_C(0x00083920)), LIFT_CALLBACK_RVA(UINT32_C(0x00083880)), cpu->esi);
+    LIFT_PUSH3(LIFT_CALLBACK(sfera_sub_00483920), LIFT_CALLBACK(sfera_sub_00483880), cpu->esi);
     cpu->edi = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0x00000004))));
     LIFT_PUSH2(UINT32_C(0x0000009C), cpu->edi);
     LIFT_STORE32(cpu->eax, cpu->esi);
@@ -1763,7 +1762,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000002C), UINT32_C(0x00000003));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00027D4A, UINT32_C(0x00427D2D));
-    LIFT_PUSH3(LIFT_CALLBACK_RVA(UINT32_C(0x00083F50)), LIFT_CALLBACK_RVA(UINT32_C(0x00086390)), cpu->esi);
+    LIFT_PUSH3(LIFT_CALLBACK(sfera_sub_00483F50), LIFT_CALLBACK(sfera_sub_00486390), cpu->esi);
     cpu->edi = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0x00000004))));
     LIFT_PUSH2(UINT32_C(0x0000019C), cpu->edi);
     LIFT_STORE32(cpu->eax, cpu->esi);
@@ -1851,7 +1850,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000002C), UINT32_C(0x00000004));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00027EA2, UINT32_C(0x00427E85));
-    LIFT_PUSH3(LIFT_CALLBACK_RVA(UINT32_C(0x00083F50)), LIFT_CALLBACK_RVA(UINT32_C(0x00086390)), cpu->esi);
+    LIFT_PUSH3(LIFT_CALLBACK(sfera_sub_00483F50), LIFT_CALLBACK(sfera_sub_00486390), cpu->esi);
     cpu->edi = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0x00000004))));
     LIFT_PUSH2(UINT32_C(0x0000019C), cpu->edi);
     LIFT_STORE32(cpu->eax, cpu->esi);
@@ -1954,7 +1953,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000140), UINT32_C(0x00000001));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00028032, UINT32_C(0x0042800F));
-    LIFT_PUSH3(LIFT_CALLBACK_RVA(UINT32_C(0x00083920)), LIFT_CALLBACK_RVA(UINT32_C(0x00083880)), cpu->edi);
+    LIFT_PUSH3(LIFT_CALLBACK(sfera_sub_00483920), LIFT_CALLBACK(sfera_sub_00483880), cpu->edi);
     cpu->ebx = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0x00000004))));
     LIFT_PUSH2(UINT32_C(0x0000009C), cpu->ebx);
     LIFT_STORE32(cpu->eax, cpu->edi);
@@ -2037,7 +2036,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000140), UINT32_C(0x00000002));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_0002814F, UINT32_C(0x0042812C));
-    LIFT_PUSH3(LIFT_CALLBACK_RVA(UINT32_C(0x00083F50)), LIFT_CALLBACK_RVA(UINT32_C(0x00086390)), cpu->edi);
+    LIFT_PUSH3(LIFT_CALLBACK(sfera_sub_00483F50), LIFT_CALLBACK(sfera_sub_00486390), cpu->edi);
     cpu->ebx = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0x00000004))));
     LIFT_PUSH2(UINT32_C(0x0000019C), cpu->ebx);
     LIFT_STORE32(cpu->eax, cpu->edi);
@@ -2179,7 +2178,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000140), UINT32_C(0x00000003));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00028358, UINT32_C(0x0042833B));
-    LIFT_PUSH3(LIFT_CALLBACK_RVA(UINT32_C(0x00083F50)), LIFT_CALLBACK_RVA(UINT32_C(0x00086390)), cpu->edi);
+    LIFT_PUSH3(LIFT_CALLBACK(sfera_sub_00483F50), LIFT_CALLBACK(sfera_sub_00486390), cpu->edi);
     cpu->ebx = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0x00000004))));
     LIFT_PUSH2(UINT32_C(0x0000019C), cpu->ebx);
     LIFT_STORE32(cpu->eax, cpu->edi);
@@ -2470,7 +2469,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000140), UINT32_C(0x00000005));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00028717, UINT32_C(0x004286FD));
-    LIFT_PUSH3(LIFT_CALLBACK_RVA(UINT32_C(0x000277C0)), LIFT_CALLBACK_RVA(UINT32_C(0x00026710)), cpu->edi);
+    LIFT_PUSH3(LIFT_CALLBACK(sfera_sub_004277C0), LIFT_CALLBACK(sfera_sub_00426710), cpu->edi);
     cpu->ebx = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0x00000004))));
     LIFT_PUSH2(UINT32_C(0x00000064), cpu->ebx);
     LIFT_STORE32(cpu->eax, cpu->edi);
@@ -3047,11 +3046,9 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00428BF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x00428E0A));
     LIFT_TEST(cpu->ebp, 32u);
     LIFT_JZ(label_00028E52, UINT32_C(0x00428E0E));
-    LIFT_LOAD32(cpu->edx, cpu->ebp);
-    LIFT_LOAD32(cpu->eax, cpu->edx + UINT32_C(0x0000002C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000001)));
     cpu->ecx = (uint32_t)(cpu->ebp);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00028E1A)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00028E18)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->destroyEffect(cpu);
     LIFT_ENTER(UINT32_C(0x00428E1A));
     goto label_00028E52;
     LIFT_BLOCK(label_00028E1C, UINT32_C(0x00428E1C));
@@ -3161,11 +3158,9 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00428BF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x00428F61));
     LIFT_CMP(cpu->ebp, cpu->ebx, 32u);
     LIFT_JZ(label_00028FA2, UINT32_C(0x00428F65));
-    LIFT_LOAD32(cpu->edx, cpu->ebp);
-    LIFT_LOAD32(cpu->eax, cpu->edx + UINT32_C(0x0000002C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000001)));
     cpu->ecx = (uint32_t)(cpu->ebp);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00028F71)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00028F6F)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->destroyEffect(cpu);
     LIFT_ENTER(UINT32_C(0x00428F71));
     goto label_00028FA2;
     LIFT_BLOCK(label_00028F73, UINT32_C(0x00428F73));
@@ -3229,7 +3224,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_addres
     (void)0; /* source SEH registration eliminated */
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000010), cpu->esi);
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_CSCRIPTEDEFFECT);
+    std::construct_at(reinterpret_cast<CScriptedEffect*>(cpu->esi));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x000000F4)))), UINT32_C(0x00000000), 32u);
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000001C), UINT32_C(0x00000000));
     LIFT_JZ(label_0002905F, UINT32_C(0x00429041));
@@ -3263,7 +3258,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JZ(label_000290D6, UINT32_C(0x004290B6));
     LIFT_LOAD32(cpu->ecx, cpu->eax + UINT32_C(0xFFFFFFFC));
     cpu->edi = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0xFFFFFFFC))));
-    LIFT_PUSH4(LIFT_CALLBACK_RVA(UINT32_C(0x00083F50)), cpu->ecx, UINT32_C(0x0000019C), cpu->eax);
+    LIFT_PUSH4(LIFT_CALLBACK(sfera_sub_00483F50), cpu->ecx, UINT32_C(0x0000019C), cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EEB86, UINT32_C(0x004290CD));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x004290D3));
@@ -3279,7 +3274,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JZ(label_00029118, UINT32_C(0x004290F8));
     LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0xFFFFFFFC));
     cpu->edi = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0xFFFFFFFC))));
-    LIFT_PUSH4(LIFT_CALLBACK_RVA(UINT32_C(0x00083920)), cpu->edx, UINT32_C(0x0000009C), cpu->eax);
+    LIFT_PUSH4(LIFT_CALLBACK(sfera_sub_00483920), cpu->edx, UINT32_C(0x0000009C), cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EEB86, UINT32_C(0x0042910F));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x00429115));
@@ -3295,7 +3290,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JZ(label_0002915A, UINT32_C(0x0042913A));
     LIFT_LOAD32(cpu->ecx, cpu->eax + UINT32_C(0xFFFFFFFC));
     cpu->edi = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0xFFFFFFFC))));
-    LIFT_PUSH4(LIFT_CALLBACK_RVA(UINT32_C(0x00083F50)), cpu->ecx, UINT32_C(0x0000019C), cpu->eax);
+    LIFT_PUSH4(LIFT_CALLBACK(sfera_sub_00483F50), cpu->ecx, UINT32_C(0x0000019C), cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EEB86, UINT32_C(0x00429151));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x00429157));
@@ -3311,7 +3306,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JZ(label_00029199, UINT32_C(0x0042917C));
     LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0xFFFFFFFC));
     cpu->edi = (uint32_t)(((uint32_t)(cpu->eax + UINT32_C(0xFFFFFFFC))));
-    LIFT_PUSH4(LIFT_CALLBACK_RVA(UINT32_C(0x000277C0)), cpu->edx, UINT32_C(0x00000064), cpu->eax);
+    LIFT_PUSH4(LIFT_CALLBACK(sfera_sub_004277C0), cpu->edx, UINT32_C(0x00000064), cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004EEB86, UINT32_C(0x00429190));
     lift_push32(cpu, (uint32_t)(cpu->edi));
     LIFT_CALL_ENTER(sfera_sub_004EBE20, UINT32_C(0x00429196));
@@ -3342,10 +3337,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->ecx, cpu->edi);
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JZ(label_000291FE, UINT32_C(0x004291F5));
-    LIFT_LOAD32(cpu->eax, cpu->ecx);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x0000002C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000001)));
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x000291FE)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x000291FC)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->destroyEffect(cpu);
     LIFT_BLOCK(label_000291FE, UINT32_C(0x004291FE));
     LIFT_INC(cpu->ebp, 32u, cpu->ebp = (uint32_t)(result););
     LIFT_ADD(cpu->edi, UINT32_C(0x00000004), 0u, 32u, cpu->edi = (uint32_t)(result););
@@ -3366,7 +3359,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_00029237, UINT32_C(0x00429237));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000004)))), UINT32_C(0x00000000), 32u);
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000001C), UINT32_C(0xFFFFFFFF));
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_IEFFECTMANAGER);
+    std::construct_at(reinterpret_cast<IEffectManager*>(cpu->esi));
     LIFT_JZ(label_0002926C, UINT32_C(0x0042924B));
     LIFT_CMP(lift_load8(((uint32_t)(cpu->esi + UINT32_C(0x0000000C)))), UINT32_C(0x00000000), 8u);
     LIFT_JNZ(label_0002926C, UINT32_C(0x00429251));
@@ -4145,11 +4138,9 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429B20(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(cpu->eax, g_sfera_effect_manager.effect_listeners.head, 32u);
     LIFT_JZ(label_00029B79, UINT32_C(0x00429B62));
     LIFT_LOAD32(cpu->ecx, cpu->eax + UINT32_C(0x00000010));
-    LIFT_LOAD32(cpu->edx, cpu->ecx);
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x0000001C));
-    LIFT_LOAD32(cpu->edx, cpu->edx + UINT32_C(0x00000004));
     LIFT_PUSH2(cpu->esi, cpu->eax);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00029B71)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00029B6F)))) { return; }
+    reinterpret_cast<BloodEffListener*>(cpu->ecx)->onEffectDetached(cpu);
     LIFT_ENTER(UINT32_C(0x00429B71));
     LIFT_TEST((cpu->eax & UINT32_C(0xFF)), 8u);
     LIFT_JZ_GOTO(label_00029C04);
@@ -4163,9 +4154,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429B20(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x0000001C));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JZ(label_00029B9E, UINT32_C(0x00429B90));
-    LIFT_LOAD32(cpu->eax, cpu->ecx);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000024));
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00029B97)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00029B95)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->releaseEffect(cpu);
     LIFT_ENTER(UINT32_C(0x00429B97));
     LIFT_STORE32(cpu->esi + UINT32_C(0x0000001C), UINT32_C(0x00000000));
     LIFT_BLOCK(label_00029B9E, UINT32_C(0x00429B9E));
@@ -4492,21 +4481,17 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->eax, cpu->ebx + UINT32_C(0x00000008));
     LIFT_CMP(cpu->eax, lift_load32(((uint32_t)(cpu->ecx + UINT32_C(0x00000004)))), 32u);
     LIFT_JNZ(label_00029FAD, UINT32_C(0x00429FA3));
-    LIFT_LOAD32(cpu->edx, cpu->ecx);
     LIFT_PUSH3(cpu->ebx, cpu->ebp, cpu->eax);
-    LIFT_LOAD32(cpu->eax, cpu->edx + UINT32_C(0x00000008));
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00029FAD)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00029FAB)))) { return; }
+    reinterpret_cast<BloodEffListener*>(cpu->ecx)->onEffectChanged(cpu);
     LIFT_BLOCK(label_00029FAD, UINT32_C(0x00429FAD));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->ebx + UINT32_C(0x00000028)))), UINT32_C(0x00000136), 32u);
     LIFT_JNZ(label_00029FCA, UINT32_C(0x00429FB6));
     LIFT_LOAD32(cpu->ecx, cpu->ebp + UINT32_C(0x00000038));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JZ(label_00029FCA, UINT32_C(0x00429FBD));
-    LIFT_LOAD32(cpu->edx, cpu->ecx);
     LIFT_LOAD32(cpu->eax, cpu->ebx + UINT32_C(0x00000008));
-    LIFT_LOAD32(cpu->edx, cpu->edx + UINT32_C(0x00000008));
     LIFT_PUSH3(cpu->ebx, cpu->ebp, cpu->eax);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00029FCA)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00029FC8)))) { return; }
+    reinterpret_cast<BloodEffListener*>(cpu->ecx)->onEffectChanged(cpu);
     LIFT_BLOCK(label_00029FCA, UINT32_C(0x00429FCA));
     LIFT_CMP(lift_load16(((uint32_t)(cpu->ebx))), UINT32_C(0x00000001), 16u);
     lift_push32(cpu, (uint32_t)(cpu->esi));
@@ -4603,41 +4588,35 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_IMPORT_CALL(SFERA_IMPORT_Sound_SI_GetInterface_YAPAVCSoundInterface_XZ, UINT32_C(0x0042A11F), UINT32_C(0x0042A125));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_0002A143, UINT32_C(0x0042A129));
-    LIFT_LOAD32(cpu->edx, cpu->ebp);
     LIFT_X87_LOAD_F32(cpu->esp + UINT32_C(0x000001B0));
-    LIFT_LOAD32(cpu->edx, cpu->edx + UINT32_C(0x00000004));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000030))));
     LIFT_X87_STORE_F32_POP(cpu->esp);
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(cpu->ebp);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A143)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A141)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->updateEffect(cpu);
     LIFT_BLOCK(label_0002A143, UINT32_C(0x0042A143));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x0000001C)))), UINT32_C(0x00000000), 32u);
     cpu->eax = (cpu->eax & UINT32_C(0xFFFFFF00)) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_ZF) != 0u)) ? 1u : 0u) & UINT32_C(0xFF));
     LIFT_CMP(lift_load8(((uint32_t)(cpu->ebp + UINT32_C(0x0000000F)))), UINT32_C(0x00000000), 8u);
     LIFT_STORE8(cpu->esp + UINT32_C(0x0000000F), (cpu->eax & UINT32_C(0xFF)));
     LIFT_JNZ(label_0002A18B, UINT32_C(0x0042A155));
-    LIFT_LOAD32(cpu->edx, cpu->ebp);
-    LIFT_LOAD32(cpu->edx, cpu->edx + UINT32_C(0x0000000C));
     cpu->eax = (uint32_t)((cpu->eax & UINT32_C(0xFF)));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(cpu->ebp);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A163)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A161)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->activateEffect(cpu);
     LIFT_ENTER(UINT32_C(0x0042A163));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0002A18B, UINT32_C(0x0042A167));
     LIFT_CMP(lift_load8(((uint32_t)(cpu->ebp + UINT32_C(0x0000000D)))), (cpu->eax & UINT32_C(0xFF)), 8u);
     LIFT_JNZ(label_0002A182, UINT32_C(0x0042A16C));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x0000001C));
-    LIFT_LOAD32(cpu->edx, cpu->ebp);
-    LIFT_LOAD32(cpu->edx, cpu->edx + UINT32_C(0x00000010));
     cpu->eax = (uint32_t)(lift_shift_right(cpu, cpu->eax, (uint32_t)(UINT32_C(0x00000001)), 32u));
     LIFT_LOGIC((cpu->eax & UINT32_C(0xFF)), UINT32_C(0x00000001), &, 8u, cpu->eax = (cpu->eax & UINT32_C(0xFFFFFF00)) | ((uint32_t)(result) & UINT32_C(0xFF)););
     cpu->eax = (uint32_t)((cpu->eax & UINT32_C(0xFF)));
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(cpu->ebp);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A182)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A180)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->deactivateEffect(cpu);
     LIFT_BLOCK(label_0002A182, UINT32_C(0x0042A182));
     LIFT_STORE8(cpu->ebp + UINT32_C(0x0000000F), UINT32_C(0x00000001));
     goto label_0002A269;
@@ -4681,20 +4660,16 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JZ(label_0002A228, UINT32_C(0x0042A1EA));
     LIFT_CMP(lift_load8(((uint32_t)(cpu->ebp + UINT32_C(0x0000000E)))), UINT32_C(0x00000000), 8u);
     LIFT_JZ(label_0002A1FA, UINT32_C(0x0042A1F0));
-    LIFT_LOAD32(cpu->eax, cpu->ebp);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000014));
     cpu->ecx = (uint32_t)(cpu->ebp);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A1FA)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A1F8)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->renderEffect(cpu);
     LIFT_BLOCK(label_0002A1FA, UINT32_C(0x0042A1FA));
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->ebx + UINT32_C(0x00000008))))))));
-    LIFT_LOAD32(cpu->eax, cpu->ebp);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000008));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000030))));
     LIFT_X87_STORE_F32_POP(cpu->esp);
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->ecx = (uint32_t)(cpu->ebp);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A210)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A20E)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->queryEffectState(cpu);
     LIFT_ENTER(UINT32_C(0x0042A210));
     goto label_0002A269;
     LIFT_BLOCK(label_0002A212, UINT32_C(0x0042A212));
@@ -4702,25 +4677,19 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0002A214, UINT32_C(0x0042A214));
     LIFT_CMP(lift_load8(((uint32_t)(cpu->ebp + UINT32_C(0x0000000D)))), UINT32_C(0x00000000), 8u);
     LIFT_JNZ(label_0002A269, UINT32_C(0x0042A21A));
-    LIFT_LOAD32(cpu->eax, cpu->ebp);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000010));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(cpu->ebp);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A226)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A224)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->deactivateEffect(cpu);
     LIFT_ENTER(UINT32_C(0x0042A226));
     goto label_0002A269;
     LIFT_BLOCK(label_0002A228, UINT32_C(0x0042A228));
     LIFT_CMP(lift_load8(((uint32_t)(cpu->ebp + UINT32_C(0x0000000D)))), UINT32_C(0x00000000), 8u);
     LIFT_JZ(label_0002A238, UINT32_C(0x0042A22E));
-    LIFT_LOAD32(cpu->eax, cpu->ebp);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000014));
     cpu->ecx = (uint32_t)(cpu->ebp);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A238)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A236)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->renderEffect(cpu);
     LIFT_BLOCK(label_0002A238, UINT32_C(0x0042A238));
     cpu->edx = (uint32_t)(lift_load8(((uint32_t)(cpu->esp + UINT32_C(0x0000000F)))));
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->ebx + UINT32_C(0x00000008))))))));
-    LIFT_LOAD32(cpu->eax, cpu->ebp);
-    LIFT_LOAD32(cpu->eax, cpu->eax);
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000068))));
     LIFT_PUSH3(cpu->ecx, cpu->edx, cpu->ecx);
     LIFT_ZERO(cpu->ecx, 32u);
@@ -4731,7 +4700,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(((uint32_t)(((uint32_t)(cpu->ecx) * 4u) + UINT32_C(0x00000001))));
     LIFT_PUSH2(cpu->ecx, cpu->edx);
     cpu->ecx = (uint32_t)(cpu->ebp);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A269)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A267)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->initializeEffect(cpu);
     LIFT_BLOCK(label_0002A269, UINT32_C(0x0042A269));
     cpu->esi = (uint32_t)(lift_pop32(cpu));
     LIFT_BLOCK(label_0002A26A, UINT32_C(0x0042A26A));
@@ -4836,7 +4805,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042A320(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000000)));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000008))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
-    LIFT_STORE32(cpu->esp + UINT32_C(0x0000000C), SFERA_VPTR_BAD_ALLOC);
+    LIFT_STORE32(cpu->esp + UINT32_C(0x0000000C), SFERA_LEGACY_VPTR_BAD_ALLOC);
     LIFT_CALL_ENTER(sfera_sub_004EE92A, UINT32_C(0x0042A391));
     LIFT_TRAP_RETURN(UINT32_C(0x0042A391), "INT3");
 }
@@ -4857,9 +4826,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042A3A0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x0000001C));
     LIFT_CMP(cpu->ecx, cpu->edi, 32u);
     LIFT_JZ(label_0002A3D5, UINT32_C(0x0042A3CB));
-    LIFT_LOAD32(cpu->eax, cpu->ecx);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000024));
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A3D2)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002A3D0)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->releaseEffect(cpu);
     LIFT_ENTER(UINT32_C(0x0042A3D2));
     LIFT_STORE32(cpu->esi + UINT32_C(0x0000001C), cpu->edi);
     LIFT_BLOCK(label_0002A3D5, UINT32_C(0x0042A3D5));
@@ -5553,19 +5520,15 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042AB10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_SP_ADD(UINT32_C(0x00000018));
     LIFT_RET(0u);
     LIFT_BLOCK(label_0002ABC3, UINT32_C(0x0042ABC3));
-    LIFT_LOAD32(cpu->eax, cpu->ecx);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000018));
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002ABCA)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002ABC8)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->createEffectResources(cpu);
     LIFT_ENTER(UINT32_C(0x0042ABCA));
     cpu->edi = (uint32_t)(cpu->eax);
     LIFT_CMP(cpu->edi, cpu->ebp, 32u);
     LIFT_JZ(label_0002AD0A, UINT32_C(0x0042ABD4));
     LIFT_CMP(g_sfera_effect_manager.effects_enabled, cpu->ebp, 32u);
     LIFT_JZ(label_0002ABED, UINT32_C(0x0042ABDC));
-    LIFT_LOAD32(cpu->eax, cpu->edi);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000028));
     cpu->ecx = (uint32_t)(cpu->edi);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002ABE5)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002ABE3)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->isEffectComplete(cpu);
     LIFT_ENTER(UINT32_C(0x0042ABE5));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JG_GOTO(label_0002AD0A);
@@ -5585,10 +5548,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042AB10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00456040, UINT32_C(0x0042AC1C));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0002AC54, UINT32_C(0x0042AC20));
-    LIFT_LOAD32(cpu->edx, cpu->edi);
-    LIFT_LOAD32(cpu->eax, cpu->edx + UINT32_C(0x00000024));
     cpu->ecx = (uint32_t)(cpu->edi);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002AC29)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002AC27)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->releaseEffect(cpu);
     LIFT_ENTER(UINT32_C(0x0042AC29));
     cpu->ecx = (uint32_t)(g_sfera_effect_items.free_count);
     cpu->edx = (uint32_t)(g_sfera_effect_items.free_items);
@@ -5612,7 +5573,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042AB10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000004), cpu->ebx);
     LIFT_STORE32(cpu->esi + UINT32_C(0x0000001C), cpu->edi);
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000020), cpu->ebp);
-    LIFT_STORE32(cpu->esi + UINT32_C(0x00000018), LIFT_CALLBACK_RVA(UINT32_C(0x00029F30)));
+    LIFT_STORE32(cpu->esi + UINT32_C(0x00000018), LIFT_CALLBACK(sfera_sub_00429F30));
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000024), cpu->ebp);
     LIFT_CALL_ENTER(sfera_sub_00425B20, UINT32_C(0x0042AC78));
     LIFT_X87_STORE_F32_POP(cpu->esi + UINT32_C(0x0000002C));
@@ -5649,14 +5610,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042AB10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->edi + UINT32_C(0x00000038), cpu->edx);
     LIFT_X87_LOAD_F32(cpu->esi + UINT32_C(0x0000002C));
     LIFT_LOAD32(cpu->eax, cpu->eax + UINT32_C(0x00000010));
-    LIFT_LOAD32(cpu->edx, cpu->eax);
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     LIFT_X87_STORE_F32_POP(cpu->esp);
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->ecx = (uint32_t)(cpu->eax);
-    LIFT_LOAD32(cpu->eax, cpu->edx);
     lift_push32(cpu, (uint32_t)(cpu->edi));
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002ACFF)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002ACFD)))) { return; }
+    reinterpret_cast<BloodEffListener*>(cpu->ecx)->onEffectAttached(cpu);
     LIFT_ENTER(UINT32_C(0x0042ACFF));
     LIFT_TEST((cpu->eax & UINT32_C(0xFF)), 8u);
     LIFT_JNZ(label_0002AD20, UINT32_C(0x0042AD03));
@@ -5907,7 +5866,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042AFC0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"spiral.effect0")));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000024), UINT32_C(0x00000000));
-    LIFT_STORE32(cpu->esi, (SFERA_VPTR_CSPIRALEFFECT));
+    std::construct_at(reinterpret_cast<CSpiralEffect*>(cpu->esi));
     LIFT_CALL_ENTER(sfera_sub_00425EB0, UINT32_C(0x0042B009));
     lift_x87_push(cpu, (double)-0.4000000059604645f);
     LIFT_X87_STORE_F32(cpu->esp + UINT32_C(0x0000000C));
@@ -6017,7 +5976,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042B150(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"molniya.effect110")));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000028), cpu->edi);
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_CMOLEFFECT);
+    std::construct_at(reinterpret_cast<CMolEffect*>(cpu->esi));
     LIFT_CALL_ENTER(sfera_sub_00425EB0, UINT32_C(0x0042B198));
     lift_x87_push(cpu, 0.0);
     LIFT_X87_STORE_F32(cpu->esi + UINT32_C(0x00000068));
@@ -6162,7 +6121,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042B320(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"blade")));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000024), UINT32_C(0x00000000));
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_CBLADEEFFECT);
+    std::construct_at(reinterpret_cast<CBladeEffect*>(cpu->esi));
     LIFT_CALL_ENTER(sfera_sub_00425EB0, UINT32_C(0x0042B369));
     lift_x87_push(cpu, 0.0);
     LIFT_X87_STORE_F32(cpu->esi + UINT32_C(0x00000068));
@@ -6261,7 +6220,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042B4A0(LiftCpu* cpu, uint32_t stop_addres
     (void)0; /* source SEH registration eliminated */
     cpu->ebx = (uint32_t)(cpu->ecx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000010), cpu->ebx);
-    LIFT_STORE32(cpu->ebx, SFERA_VPTR_CGAZERLAKEEFFECT);
+    std::construct_at(reinterpret_cast<CGazerLakeEffect*>(cpu->ebx));
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000001C), UINT32_C(0x00000000));
     cpu->esi = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000068))));
     cpu->edi = (uint32_t)(UINT32_C(0x00000010));
@@ -6274,10 +6233,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042B4A0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->ecx, cpu->esi);
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JZ(label_0002B503, UINT32_C(0x0042B4FA));
-    LIFT_LOAD32(cpu->eax, cpu->ecx);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x0000002C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000001)));
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002B503)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002B501)))) { return; }
+    reinterpret_cast<IEffectManager*>(cpu->ecx)->destroyEffect(cpu);
     LIFT_BLOCK(label_0002B503, UINT32_C(0x0042B503));
     LIFT_ADD(cpu->esi, UINT32_C(0x00000014), 0u, 32u, cpu->esi = (uint32_t)(result););
     LIFT_DEC(cpu->edi, 32u, cpu->edi = (uint32_t)(result););
@@ -6422,13 +6379,11 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042B530(LiftCpu* cpu, uint32_t stop_addres
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000030));
     LIFT_LOAD32(cpu->edx, cpu->esp + UINT32_C(0x00000030));
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000003C), cpu->edx);
-    LIFT_LOAD32(cpu->eax, cpu->ecx);
     LIFT_X87_STORE_F32_POP(cpu->esp);
-    LIFT_LOAD32(cpu->eax, cpu->eax);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000001)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000038))));
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002B6E2)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002B6E0)))) { return; }
+    reinterpret_cast<IEffectManager*>(static_cast<uintptr_t>(cpu->ecx))->initializeEffect(cpu);
     LIFT_ENTER(UINT32_C(0x0042B6E2));
     lift_x87_push(cpu, (double)-1.0f);
     LIFT_BLOCK(label_0002B6E8, UINT32_C(0x0042B6E8));
@@ -6473,7 +6428,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042B720(LiftCpu* cpu, uint32_t stop_addres
     lift_x87_push(cpu, (double)120.0f);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000018), cpu->eax);
     LIFT_X87_STORE_F32_POP(cpu->esi + UINT32_C(0x0000006C));
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_CRAINEFFECT);
+    std::construct_at(reinterpret_cast<CRainEffect*>(cpu->esi));
     lift_x87_push(cpu, 0.0);
     LIFT_STORE32(cpu->esi + UINT32_C(0x0000005C), UINT32_C(0xFFFFFFFF));
     LIFT_X87_STORE_F32_POP(cpu->esi + UINT32_C(0x00000070));
@@ -6686,7 +6641,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042BA50(LiftCpu* cpu, uint32_t stop_addres
     (void)0; /* source SEH registration eliminated */
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->esi);
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_CMOLEFFECT);
+    std::construct_at(reinterpret_cast<CMolEffect*>(cpu->esi));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000074));
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000014), UINT32_C(0x00000000));
     LIFT_TEST(cpu->ecx, 32u);
@@ -7117,7 +7072,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042C020(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x0042C020));
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->esi = (uint32_t)(cpu->ecx);
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_CBLADEEFFECT);
+    std::construct_at(reinterpret_cast<CBladeEffect*>(cpu->esi));
     LIFT_CALL_ENTER(sfera_sub_00425E70, UINT32_C(0x0042C02E));
     LIFT_LOGIC_FLAGS(lift_load8(((uint32_t)(cpu->esp + UINT32_C(0x00000008)))), UINT32_C(0x00000001), &, 8u);
     LIFT_JZ(label_0002C03E, UINT32_C(0x0042C035));
@@ -7535,7 +7490,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042C570(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"gazer.lake")));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000024), UINT32_C(0x00000000));
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_CGAZERLAKEEFFECT);
+    std::construct_at(reinterpret_cast<CGazerLakeEffect*>(cpu->esi));
     LIFT_STORE32(cpu->esi + UINT32_C(0x0000005C), UINT32_C(0x00000000));
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000060), cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_00425EB0, UINT32_C(0x0042C5CE));
@@ -7646,10 +7601,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042C6B0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ebx = (uint32_t)(UINT32_C(0x00000010));
     (void)cpu;
     LIFT_BLOCK(label_0002C740, UINT32_C(0x0042C740));
-    LIFT_LOAD32(cpu->eax, cpu->edi);
-    LIFT_LOAD32(cpu->edx, cpu->eax + UINT32_C(0x00000018));
     cpu->ecx = (uint32_t)(cpu->edi);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002C749)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002C747)))) { return; }
+    reinterpret_cast<IEffectManager*>(static_cast<uintptr_t>(cpu->edi))->createEffectResources(cpu);
     LIFT_ENTER(UINT32_C(0x0042C749));
     lift_x87_push(cpu, (double)-1.0f);
     LIFT_X87_STORE_F32_POP(cpu->esi);
@@ -7678,7 +7631,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042C770(LiftCpu* cpu, uint32_t stop_addres
     (void)0; /* source SEH registration eliminated */
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->esi);
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_CRAINEFFECT);
+    std::construct_at(reinterpret_cast<CRainEffect*>(cpu->esi));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000060)))), UINT32_C(0x00000000), 32u);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000014), UINT32_C(0x00000000));
     LIFT_JZ(label_0002C7C7, UINT32_C(0x0042C7AC));
@@ -9738,13 +9691,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042E210(LiftCpu* cpu, uint32_t stop_addres
     cpu->esi = (uint32_t)(cpu->ecx);
     cpu->edx = (uint32_t)(UINT32_C(0x0000005C));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\ErrorLog.cpp"));
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_IOUTPUTDEVICE);
+    std::construct_at(reinterpret_cast<IOutputDevice*>(cpu->esi));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0042E228));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00004000)));
     LIFT_CALL_ENTER(sfera_sub_004EBEA0, UINT32_C(0x0042E232));
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000004), cpu->eax);
     LIFT_SP_ADD(UINT32_C(0x00000004));
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_COUTPUTLOGDEVICE);
+    std::construct_at(reinterpret_cast<COutputLogDevice*>(cpu->esi));
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000008), UINT32_C(0x00000000));
     cpu->eax = (uint32_t)(cpu->esi);
     LIFT_EPILOGUE1(0u, cpu->esi);
@@ -9762,7 +9715,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042E250(LiftCpu* cpu, uint32_t stop_addres
     (void)0; /* source SEH registration eliminated */
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000008), cpu->esi);
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_COUTPUTLOGDEVICE);
+    std::construct_at(reinterpret_cast<COutputLogDevice*>(cpu->esi));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000008)))), UINT32_C(0x00000000), 32u);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000014), UINT32_C(0x00000000));
     LIFT_JZ(label_0002E2A7, UINT32_C(0x0042E28C));
@@ -9776,7 +9729,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042E250(LiftCpu* cpu, uint32_t stop_addres
     LIFT_BLOCK(label_0002E2A7, UINT32_C(0x0042E2A7));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000004)))), UINT32_C(0x00000000), 32u);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000014), UINT32_C(0xFFFFFFFF));
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_IOUTPUTDEVICE);
+    std::construct_at(reinterpret_cast<IOutputDevice*>(cpu->esi));
     LIFT_JZ(label_0002E2D6, UINT32_C(0x0042E2BB));
     cpu->edx = (uint32_t)(UINT32_C(0x00000065));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\ErrorLog.cpp"));
@@ -9920,13 +9873,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042E440(LiftCpu* cpu, uint32_t stop_addres
     cpu->esi = (uint32_t)(cpu->ecx);
     cpu->edx = (uint32_t)(UINT32_C(0x0000005C));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\ErrorLog.cpp"));
-    LIFT_STORE32(cpu->esi, SFERA_VPTR_IOUTPUTDEVICE);
+    std::construct_at(reinterpret_cast<IOutputDevice*>(cpu->esi));
     LIFT_CALL_ENTER(sfera_sub_004EB1C0, UINT32_C(0x0042E458));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00004000)));
     LIFT_CALL_ENTER(sfera_sub_004EBEA0, UINT32_C(0x0042E462));
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000004), cpu->eax);
     LIFT_SP_ADD(UINT32_C(0x00000004));
-    LIFT_STORE32(cpu->esi, (SFERA_VPTR_CSPHEREERROR));
+    std::construct_at(reinterpret_cast<CSphereError*>(cpu->esi));
     cpu->eax = (uint32_t)(cpu->esi);
     LIFT_EPILOGUE1(0u, cpu->esi);
 }
@@ -9948,12 +9901,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042E480(LiftCpu* cpu, uint32_t stop_addres
     LIFT_PUSH3(cpu->edx, cpu->ecx, cpu->eax);
     LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_vsprintf, UINT32_C(0x0042E4A2), UINT32_C(0x0042E4A8));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
-    LIFT_LOAD32(cpu->eax, cpu->esi);
-    LIFT_LOAD32(cpu->edx, cpu->eax);
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->ecx = (uint32_t)(cpu->esi);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E4B7)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E4B5)))) { return; }
+    reinterpret_cast<IOutputDevice*>(cpu->ecx)->write(cpu);
     LIFT_BLOCK(label_0002E4B7, UINT32_C(0x0042E4B7));
     LIFT_EPILOGUE1(0u, cpu->esi);
 }
@@ -9967,10 +9918,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042E4C0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->ecx, cpu->edi + UINT32_C(0x00000004));
     LIFT_TEST(cpu->ecx, 32u);
     LIFT_JZ(label_0002E509, UINT32_C(0x0042E4D4));
-    LIFT_LOAD32(cpu->eax, cpu->ecx);
-    LIFT_LOAD32(cpu->edx, cpu->eax);
     lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"*** ERROR ****************************************************:")));
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E4DF)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E4DD)))) { return; }
+    reinterpret_cast<IOutputDevice*>(cpu->ecx)->write(cpu);
     LIFT_ENTER(UINT32_C(0x0042E4DF));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000014));
     LIFT_LOAD32(cpu->esi, cpu->edi + UINT32_C(0x00000004));
@@ -9984,12 +9933,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042E4C0(LiftCpu* cpu, uint32_t stop_addres
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->ebx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E4FA)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E4F8)))) { return; }
     LIFT_ENTER(UINT32_C(0x0042E4FA));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
-    LIFT_LOAD32(cpu->eax, cpu->esi);
-    LIFT_LOAD32(cpu->edx, cpu->eax);
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->ecx = (uint32_t)(cpu->esi);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E509)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E507)))) { return; }
+    reinterpret_cast<IOutputDevice*>(cpu->ecx)->write(cpu);
     LIFT_BLOCK(label_0002E509, UINT32_C(0x0042E509));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000014));
     LIFT_BLOCK(label_0002E50D, UINT32_C(0x0042E50D));
@@ -10006,12 +9953,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042E4C0(LiftCpu* cpu, uint32_t stop_addres
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->ebx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E527)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E525)))) { return; }
     LIFT_ENTER(UINT32_C(0x0042E527));
     LIFT_LOAD32(cpu->ecx, cpu->esi + UINT32_C(0x00000004));
-    LIFT_LOAD32(cpu->eax, cpu->esi);
-    LIFT_LOAD32(cpu->edx, cpu->eax);
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->ecx = (uint32_t)(cpu->esi);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E536)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0002E534)))) { return; }
+    reinterpret_cast<IOutputDevice*>(cpu->ecx)->write(cpu);
     LIFT_BLOCK(label_0002E536, UINT32_C(0x0042E536));
     LIFT_EPILOGUE3(0u, cpu->edi, cpu->esi, cpu->ebx);
 }

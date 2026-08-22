@@ -5,7 +5,7 @@
 
 typedef struct LiftFunctionEntry { uint32_t rva; LiftFunction function; } LiftFunctionEntry;
 
-static const LiftFunctionEntry kLiftedFunctions[4893] = {
+static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x00001000u, &sfera_sub_00401000},
     {0x00001030u, &sfera_sub_00401030},
     {0x000010F0u, &sfera_sub_004010F0},
@@ -4575,26 +4575,58 @@ static const LiftFunctionEntry kLiftedFunctions[4893] = {
 };
 
 static LiftFunction kFastLiftedFunctions[LIFT_SOURCE_TEXT_SIZE];
+#define LIFT_NATIVE_FUNCTION_LOOKUP_SIZE 8192u
+_Static_assert((sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0])) < LIFT_NATIVE_FUNCTION_LOOKUP_SIZE, "native function lookup table too small");
+static LiftFunction kNativeFunctionKeys[LIFT_NATIVE_FUNCTION_LOOKUP_SIZE];
+static uint32_t kNativeFunctionIndices[LIFT_NATIVE_FUNCTION_LOOKUP_SIZE];
+
+uint32_t LIFT_CDECL lift_function_count(void) { return (uint32_t)(sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0])); }
+LiftFunction LIFT_CDECL lift_function_at(uint32_t index) { return index < lift_function_count() ? kLiftedFunctions[index].function : (LiftFunction)0; }
+uint32_t LIFT_CDECL lift_function_index(LiftFunction function) {
+    uint32_t identity; size_t slot; size_t probe;
+    if (!function) { return UINT32_MAX; }
+    identity = (uint32_t)(uintptr_t)function;
+    slot = ((identity >> 2u) * UINT32_C(2654435761)) & (LIFT_NATIVE_FUNCTION_LOOKUP_SIZE - 1u);
+    for (probe = 0u; probe != LIFT_NATIVE_FUNCTION_LOOKUP_SIZE; ++probe) {
+        LiftFunction key = kNativeFunctionKeys[slot];
+        if (key == function) { return kNativeFunctionIndices[slot] - 1u; }
+        if (!key) { return UINT32_MAX; }
+        slot = (slot + 1u) & (LIFT_NATIVE_FUNCTION_LOOKUP_SIZE - 1u);
+    }
+    return UINT32_MAX;
+}
+LiftFunction LIFT_CDECL lift_function_from_native_address(uint32_t address) { LiftFunction function = (LiftFunction)(uintptr_t)address; return lift_function_index(function) != UINT32_MAX ? function : (LiftFunction)0; }
 
 int LIFT_CDECL lift_has_function_rva(uint32_t rva) { size_t lo = 0u; size_t hi = sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0]); while (lo < hi) { size_t mid = lo + (hi - lo) / 2u; uint32_t value = kLiftedFunctions[mid].rva; if (value < rva) { lo = mid + 1u; } else { hi = mid; } } return lo < sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0]) && kLiftedFunctions[lo].rva == rva; }
 
 void LIFT_CDECL lift_initialize_dispatch(void) {
+    static int initialized = 0;
     size_t index;
+    if (initialized) { return; }
     for (index = 0u; index < sizeof(kLiftedFunctions) / sizeof(kLiftedFunctions[0]); ++index) {
         uint32_t rva = kLiftedFunctions[index].rva;
-        if (rva >= UINT32_C(0x00001000) && rva - UINT32_C(0x00001000) < LIFT_SOURCE_TEXT_SIZE) { kFastLiftedFunctions[rva - UINT32_C(0x00001000)] = kLiftedFunctions[index].function; }
+        LiftFunction function = kLiftedFunctions[index].function;
+        uint32_t identity = (uint32_t)(uintptr_t)function;
+        size_t slot = ((identity >> 2u) * UINT32_C(2654435761)) & (LIFT_NATIVE_FUNCTION_LOOKUP_SIZE - 1u);
+        if (rva >= UINT32_C(0x00001000) && rva - UINT32_C(0x00001000) < LIFT_SOURCE_TEXT_SIZE) { kFastLiftedFunctions[rva - UINT32_C(0x00001000)] = function; }
+        while (kNativeFunctionKeys[slot] && kNativeFunctionKeys[slot] != function) { slot = (slot + 1u) & (LIFT_NATIVE_FUNCTION_LOOKUP_SIZE - 1u); }
+        if (!kNativeFunctionKeys[slot]) { kNativeFunctionKeys[slot] = function; kNativeFunctionIndices[slot] = (uint32_t)index + 1u; }
     }
+    initialized = 1;
 }
 
 static LiftFunction resolve_lifted_function(uint32_t target) {
-    uint32_t rva = lift_code_rva(target);
+    LiftFunction callback = lift_callback_function(target);
+    uint32_t rva;
+    if (callback) { return callback; }
+    rva = lift_code_rva(target);
     if (rva < UINT32_C(0x00001000) || rva - UINT32_C(0x00001000) >= LIFT_SOURCE_TEXT_SIZE) { return (LiftFunction)0; }
     return kFastLiftedFunctions[rva - UINT32_C(0x00001000)];
 }
 
-static int target_is_local(uint32_t target) { return lift_code_rva(target) != UINT32_MAX; }
+static int target_is_local(uint32_t target) { return lift_callback_function(target) != (LiftFunction)0 || lift_code_rva(target) != UINT32_MAX; }
 
-static int target_is_recovered_function(uint32_t target) { uint32_t rva = lift_code_rva(target); return rva != UINT32_MAX && lift_has_function_rva(rva); }
+static int target_is_recovered_function(uint32_t target) { LiftFunction callback = lift_callback_function(target); uint32_t rva; if (callback) { return 1; } rva = lift_code_rva(target); return rva != UINT32_MAX && lift_has_function_rva(rva); }
 
 static void dispatch_return_target(LiftCpu* cpu, uint32_t target, uint32_t stop_address, uint32_t origin, uint32_t esp_before, uint32_t stack_cleanup, const char* kind) {
     cpu->eip = target;

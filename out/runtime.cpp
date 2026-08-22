@@ -1,5 +1,6 @@
 #include "runtime.h"
 #include "diagnostics.h"
+#include "lifted_functions.h"
 
 #include <intrin.h>
 #include <algorithm>
@@ -321,7 +322,8 @@ void set_sub_flags(LiftCpu& state, std::uint64_t left, std::uint64_t right, std:
 extern "C" std::uint32_t __cdecl lift_source_rva(std::uint32_t address) { std::uint32_t rva = 0; return g_process_memory && g_process_memory->source_rva(address, rva) ? rva : UINT32_MAX; }
 extern "C" std::uint32_t __cdecl lift_code_rva(std::uint32_t address) { std::uint32_t rva = 0; return g_process_memory && g_process_memory->code_rva(address, rva) ? rva : UINT32_MAX; }
 extern "C" std::uint32_t __cdecl lift_is_native_code_address(std::uint32_t address) { return native_executable_image_address(address) ? 1u : 0u; }
-extern "C" std::uint32_t __cdecl lift_callback_address_rva(std::uint32_t rva) { return g_process_memory ? g_process_memory->callback_for_rva(rva) : 0u; }
+extern "C" std::uint32_t __cdecl lift_callback_address(LiftFunction function) { return g_process_memory ? g_process_memory->callback_for_function(function) : 0u; }
+extern "C" LiftFunction __cdecl lift_callback_function(std::uint32_t address) { return g_process_memory ? g_process_memory->callback_function(address) : (LiftFunction)0; }
 extern "C" std::uint32_t __cdecl lift_process_module_handle(void) { return process_module_handle(); }
 extern "C" std::uint8_t __cdecl lift_load8(std::uint32_t address) { return memory_read<std::uint8_t>(address); }
 extern "C" std::uint16_t __cdecl lift_load16(std::uint32_t address) { return memory_read<std::uint16_t>(address); }
@@ -524,14 +526,14 @@ extern "C" void __cdecl lift_x87_sincos(LiftCpu* cpu) { const double value = lif
 template <class T>
 void move_string(LiftCpu* cpu, bool repeated) {
     std::uint32_t count = repeated ? cpu->ecx : 1u;
-    if ((cpu->eflags & LIFT_FLAG_DF) == 0u && repeated) { const std::uint32_t bytes = count * static_cast<std::uint32_t>(sizeof(T)); const std::uint32_t source_end = cpu->esi + bytes; const std::uint32_t destination_end = cpu->edi + bytes; if (cpu->edi >= source_end || cpu->esi >= destination_end || bytes == 0u) { const std::uint32_t source = sfera_data_deref_range(cpu->esi, bytes); const std::uint32_t destination = sfera_data_deref_range(cpu->edi, bytes); std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(destination)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(source)), bytes); cpu->esi = source_end; cpu->edi = destination_end; cpu->ecx = 0u; return; } }
+    if ((cpu->eflags & LIFT_FLAG_DF) == 0u && repeated) { const std::uint32_t bytes = count * static_cast<std::uint32_t>(sizeof(T)); const std::uint32_t source_end = cpu->esi + bytes; const std::uint32_t destination_end = cpu->edi + bytes; if (cpu->edi >= source_end || cpu->esi >= destination_end || bytes == 0u) { std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(cpu->edi)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(cpu->esi)), bytes); cpu->esi = source_end; cpu->edi = destination_end; cpu->ecx = 0u; return; } }
     const std::int32_t delta = (cpu->eflags & LIFT_FLAG_DF) != 0u ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
     while (count-- != 0u) { const T value = memory_read<T>(cpu->esi); memory_write<T>(cpu->edi, value); cpu->esi += delta; cpu->edi += delta; if (repeated) { --cpu->ecx; } }
 }
 template <class T>
 void store_string(LiftCpu* cpu, bool repeated) {
     std::uint32_t count = repeated ? cpu->ecx : 1u;
-    if (repeated && (cpu->eflags & LIFT_FLAG_DF) == 0u) { const std::uint32_t bytes = count * static_cast<std::uint32_t>(sizeof(T)); const std::uint32_t destination = sfera_data_deref_range(cpu->edi, bytes); std::fill_n(reinterpret_cast<T*>(static_cast<std::uintptr_t>(destination)), count, static_cast<T>(cpu->eax)); cpu->edi += bytes; cpu->ecx = 0u; return; }
+    if (repeated && (cpu->eflags & LIFT_FLAG_DF) == 0u) { const std::uint32_t bytes = count * static_cast<std::uint32_t>(sizeof(T)); std::fill_n(reinterpret_cast<T*>(static_cast<std::uintptr_t>(cpu->edi)), count, static_cast<T>(cpu->eax)); cpu->edi += bytes; cpu->ecx = 0u; return; }
     const std::int32_t delta = (cpu->eflags & LIFT_FLAG_DF) != 0u ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
     while (count-- != 0u) { memory_write<T>(cpu->edi, static_cast<T>(cpu->eax)); cpu->edi += delta; if (repeated) { --cpu->ecx; } }
 }
@@ -565,7 +567,7 @@ extern "C" void __cdecl lift_scas32(LiftCpu* cpu, std::uint32_t repeated, std::u
 extern "C" LIFT_NORETURN void __cdecl lift_trap(LiftCpu* cpu, std::uint32_t source_va, const char* reason) { if (cpu) { cpu->eip = source_va; } throw std::runtime_error(std::string("Lifted C trap at ") + hex_u32(source_va) + ": " + (reason ? reason : "unknown")); }
 
 extern "C" LIFT_NORETURN void __cdecl lift_trap_transfer(LiftCpu* cpu, std::uint32_t origin, std::uint32_t target, std::uint32_t esp_before, std::uint32_t stack_cleanup, std::uint32_t stop_address, const char* kind) {
-    auto classify = [](std::uint32_t value) -> std::string { if (lift_is_native_code_address(value)) { return "native-image"; } const std::uint32_t rva = lift_source_rva(value); if (rva == UINT32_MAX) { return "non-code"; } if (lift_has_function_rva(rva)) { return "function@" + hex_u32(UINT32_C(0x00400000) + rva); } return "local-middle@" + hex_u32(UINT32_C(0x00400000) + rva); };
+    auto classify = [](std::uint32_t value) -> std::string { if (LiftFunction function = lift_callback_function(value)) { const std::uint32_t index = lift_function_index(function); return "lifted-function#" + std::to_string(index); } if (lift_is_native_code_address(value)) { return "native-image"; } const std::uint32_t rva = lift_source_rva(value); if (rva == UINT32_MAX) { return "non-code"; } if (lift_has_function_rva(rva)) { return "function@" + hex_u32(UINT32_C(0x00400000) + rva); } return "local-middle@" + hex_u32(UINT32_C(0x00400000) + rva); };
     auto peek = [cpu](std::uint32_t address, std::uint32_t& value) -> bool { if (!cpu || address < cpu->stack_limit || address > cpu->stack_base - 4u) { return false; } value = *reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(address)); return true; };
     std::string message = std::string("Invalid lifted control transfer kind=") + (kind ? kind : "unknown") + " origin=" + hex_u32(origin) + " target=" + hex_u32(target) + " target-class=" + classify(target) + " esp=" + hex_u32(esp_before) + " cleanup=" + std::to_string(stack_cleanup) + " stop=" + hex_u32(stop_address);
     if (g_last_native_callsite != 0u) { message += " last-native-callsite=" + hex_u32(g_last_native_callsite) + " last-native-target=" + hex_u32(g_last_native_target) + " native-esp-before=" + hex_u32(g_last_native_esp_before) + " native-esp-after=" + hex_u32(g_last_native_esp_after) + " native-esp-delta=" + std::to_string(static_cast<std::int32_t>(g_last_native_esp_after - g_last_native_esp_before)); }
@@ -637,9 +639,9 @@ std::uint32_t LocalStack::limit() const noexcept {
 ProcessMemory::ProcessMemory() {
     if (g_process_memory) { throw std::runtime_error("Only one process-memory instance is supported"); }
     DiagnosticPhaseScope phase(RuntimePhase::static_storage);
-    try { allocate_static_regions(); install_initial_static_data(); } catch (...) { release(); throw; }
+    try { allocate_runtime_regions(); initialize_native_storage(); } catch (...) { release(); throw; }
     g_process_memory = this;
-    const std::string note = "semantic native storage initialized; module=" + hex_u32(load_base()) + ", callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata=eliminated, data compatibility=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_data_compat_base)));
+    const std::string note = "semantic native storage initialized; module=" + hex_u32(load_base()) + ", callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata=eliminated, semantic-data=native";
     diagnostic_note(note.c_str());
 }
 
@@ -647,113 +649,102 @@ ProcessMemory::~ProcessMemory() { release(); }
 
 std::uint32_t ProcessMemory::load_base() const noexcept { return process_module_handle(); }
 
-std::uint32_t ProcessMemory::entry_va() noexcept {
-    try { return source_address(kSourceImageBase + kEntryRva); } catch (...) { return 0; }
-}
-
-std::uint8_t* ProcessMemory::region_pointer(std::uint32_t rva, std::size_t size) const {
-    if (rva >= UINT32_C(0x000FD000) && rva < UINT32_C(0x0011FE00)) { throw std::runtime_error("Source RVA targets eliminated .rdata: " + hex_u32(rva)); }
-    if (rva >= UINT32_C(0x00120000) && static_cast<std::uint64_t>(rva - UINT32_C(0x00120000)) + size <= SFERA_DATA_SOURCE_SIZE) { return g_sfera_data_compat_base + (rva - UINT32_C(0x00120000)); }
-    throw std::runtime_error("Source RVA is outside semantic static storage: " + hex_u32(rva));
-}
-
-std::uint32_t ProcessMemory::static_address(std::uint32_t rva) const { return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(region_pointer(rva))); }
-
-std::uint32_t ProcessMemory::source_address(std::uint32_t source_va) {
-    if (source_va < kSourceImageBase || static_cast<std::uint64_t>(source_va) >= static_cast<std::uint64_t>(kSourceImageBase) + kImageSize) { throw std::runtime_error("Source image address is outside the generated address space: " + hex_u32(source_va)); }
-    const std::uint32_t rva = source_va - kSourceImageBase;
-    if (rva >= 0x00001000u && rva < 0x00001000u + 0x000FB200u) {
-        const std::uint32_t callback = callback_address(rva);
-        if (callback != 0u) { return callback; }
-        return kCodeTokenBase + rva;
-    }
-    if (source_va >= SFERA_ELIMINATED_RDATA_BEGIN && source_va < SFERA_ELIMINATED_RDATA_BEGIN + SFERA_ELIMINATED_RDATA_SIZE) { throw std::runtime_error("Eliminated source .rdata address escaped into data flow: " + hex_u32(source_va)); }
-    if (source_va >= SFERA_DATA_SOURCE_BEGIN && source_va < SFERA_DATA_SOURCE_BEGIN + SFERA_DATA_SOURCE_SIZE) { return static_address(rva); }
-    throw std::runtime_error("Source address has no semantic storage: " + hex_u32(source_va));
-}
+std::uint32_t ProcessMemory::entry_va() noexcept { return kCodeTokenBase + kEntryRva; }
 
 bool ProcessMemory::code_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
     if (address >= kSourceImageBase + UINT32_C(0x00001000) && address < kSourceImageBase + UINT32_C(0x000FC200) && !native_executable_image_address(address)) { rva = address - kSourceImageBase; return true; }
     const std::uint32_t token_rva = address - kCodeTokenBase;
     if (token_rva >= UINT32_C(0x00001000) && token_rva < UINT32_C(0x000FC200)) { rva = token_rva; return true; }
-    return callback_rva(address, rva);
-}
-
-bool ProcessMemory::source_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
-    if (code_rva(address, rva)) { return true; }
-    { const std::uint32_t data_rva = sfera_data_source_rva(address); if (data_rva != UINT32_MAX) { rva = data_rva; return true; } }
     return false;
 }
 
+bool ProcessMemory::source_rva(std::uint32_t address, std::uint32_t& rva) const noexcept { return code_rva(address, rva); }
 
-std::uint32_t ProcessMemory::callback_address(std::uint32_t rva) {
-    if (!lift_has_function_rva(rva)) { return 0u; }
-    const auto found = callback_addresses_.find(rva); if (found != callback_addresses_.end()) { return found->second; }
-    const std::uint32_t offset = callback_thunk_count_ * kCallbackThunkSize;
-    if (!callback_thunks_ || offset + kCallbackThunkSize > callback_thunks_size_) { throw std::runtime_error("Callback thunk pool exhausted"); }
-    const std::uint32_t first_page = offset / kCallbackThunkPageSize;
-    const std::uint32_t last_page = (offset + kCallbackThunkSize - 1u) / kCallbackThunkPageSize;
-    while (callback_committed_pages_ <= last_page) { std::uint8_t* page = callback_thunks_ + callback_committed_pages_ * kCallbackThunkPageSize; if (!VirtualAlloc(page, kCallbackThunkPageSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE)) { throw std::runtime_error(win32_error("VirtualAlloc(callback thunk page)")); } ++callback_committed_pages_; }
-    while (callback_rx_pages_ < first_page) { DWORD old = 0; std::uint8_t* page = callback_thunks_ + callback_rx_pages_ * kCallbackThunkPageSize; if (!VirtualProtect(page, kCallbackThunkPageSize, PAGE_EXECUTE_READ, &old)) { throw std::runtime_error(win32_error("VirtualProtect(callback thunk page RX)")); } ++callback_rx_pages_; }
-    std::uint8_t* const thunk = callback_thunks_ + offset; ++callback_thunk_count_; thunk[0] = 0x68u; const std::uint32_t target = kCodeTokenBase + rva; std::memcpy(thunk + 1, &target, sizeof(target)); thunk[5] = 0xE9u; const std::uintptr_t bridge = reinterpret_cast<std::uintptr_t>(&callback_bridge); const std::intptr_t delta = static_cast<std::intptr_t>(bridge - reinterpret_cast<std::uintptr_t>(thunk + kCallbackThunkSize)); if (delta < std::numeric_limits<std::int32_t>::min() || delta > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("Callback bridge is outside rel32 range"); } const std::int32_t relative = static_cast<std::int32_t>(delta); std::memcpy(thunk + 6, &relative, sizeof(relative)); FlushInstructionCache(GetCurrentProcess(), thunk, kCallbackThunkSize); const std::uint32_t address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(thunk)); callback_addresses_.emplace(rva, address); return address;
+
+void ProcessMemory::initialize_callback_registry() {
+    const std::uint32_t count = lift_function_count();
+    const std::size_t used_bytes = static_cast<std::size_t>(count) * kCallbackThunkSize;
+    if (!callback_thunks_ || used_bytes > callback_thunks_size_) { throw std::runtime_error("Lifted function thunk pool is too small"); }
+    const std::size_t committed_bytes = (used_bytes + kCallbackThunkPageSize - 1u) & ~(static_cast<std::size_t>(kCallbackThunkPageSize) - 1u);
+    if (!VirtualAlloc(callback_thunks_, committed_bytes, MEM_COMMIT, PAGE_READWRITE)) { throw std::runtime_error(win32_error("VirtualAlloc(lifted function thunks)")); }
+    for (std::uint32_t index = 0u; index < count; ++index) {
+        const LiftFunction function = lift_function_at(index);
+        if (!function) { throw std::runtime_error("Null lifted function identity"); }
+        const std::uint32_t identity = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(function));
+        std::uint8_t* const thunk = callback_thunks_ + static_cast<std::size_t>(index) * kCallbackThunkSize;
+        thunk[0] = 0x68u;
+        std::memcpy(thunk + 1, &identity, sizeof(identity));
+        thunk[5] = 0xE9u;
+        const std::uintptr_t bridge = reinterpret_cast<std::uintptr_t>(&callback_bridge);
+        const std::intptr_t delta = static_cast<std::intptr_t>(bridge - reinterpret_cast<std::uintptr_t>(thunk + kCallbackThunkSize));
+        if (delta < std::numeric_limits<std::int32_t>::min() || delta > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("Callback bridge is outside rel32 range"); }
+        const std::int32_t relative = static_cast<std::int32_t>(delta);
+        std::memcpy(thunk + 6, &relative, sizeof(relative));
+    }
+    callback_thunk_count_ = count;
+    for (std::uint32_t index = 0u; index < count; ++index) {
+        const LiftFunction function = lift_function_at(index);
+        const std::uint32_t identity = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(function));
+        const std::uint32_t thunk_address = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_ + static_cast<std::size_t>(index) * kCallbackThunkSize));
+        if (lift_function_index(function) != index || callback_function(identity) != function || callback_function(thunk_address) != function) { throw std::runtime_error("Semantic callback registry self-test failed"); }
+    }
+    FlushInstructionCache(GetCurrentProcess(), callback_thunks_, used_bytes);
+    DWORD old = 0u;
+    if (!VirtualProtect(callback_thunks_, committed_bytes, PAGE_EXECUTE_READ, &old)) { throw std::runtime_error(win32_error("VirtualProtect(lifted function thunks RX)")); }
 }
 
-bool ProcessMemory::callback_rva(std::uint32_t address, std::uint32_t& rva) const noexcept {
-    if (!callback_thunks_) { return false; } const std::uint32_t begin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_)); if (address < begin || address - begin >= callback_thunk_count_ * kCallbackThunkSize) { return false; } const std::uint32_t offset = address - begin; if ((offset % kCallbackThunkSize) != 0u) { return false; } const std::uint8_t* thunk = callback_thunks_ + offset; if (thunk[0] != 0x68u) { return false; } std::uint32_t token = 0u; std::memcpy(&token, thunk + 1, sizeof(token)); rva = token - kCodeTokenBase; return lift_has_function_rva(rva) != 0;
+std::uint32_t ProcessMemory::callback_address(LiftFunction function) const noexcept {
+    const std::uint32_t index = lift_function_index(function);
+    if (!callback_thunks_ || index == UINT32_MAX || index >= callback_thunk_count_) { return 0u; }
+    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_ + static_cast<std::size_t>(index) * kCallbackThunkSize));
 }
+
+LiftFunction ProcessMemory::callback_function(std::uint32_t address) const noexcept {
+    LiftFunction direct = lift_function_from_native_address(address);
+    if (direct) { return direct; }
+    if (!callback_thunks_) { return (LiftFunction)0; }
+    const std::uint32_t begin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_));
+    if (address < begin) { return (LiftFunction)0; }
+    const std::uint32_t offset = address - begin;
+    if ((offset % kCallbackThunkSize) != 0u) { return (LiftFunction)0; }
+    const std::uint32_t index = offset / kCallbackThunkSize;
+    if (index >= callback_thunk_count_) { return (LiftFunction)0; }
+    return lift_function_at(index);
+}
+
+bool ProcessMemory::is_callback_function(LiftFunction function) const noexcept { return lift_function_index(function) != UINT32_MAX; }
 
 const std::vector<ResolvedImport>& ProcessMemory::resolved_imports() const noexcept { return resolved_imports_; }
 
-bool ProcessMemory::try_read(std::uint32_t address, void* value, std::size_t size) const noexcept { if (!value) { return false; } if (size == sizeof(std::uint32_t)) { std::uint32_t semantic = 0u; try { if (sfera_vtable_try_load32(address, &semantic)) { std::memcpy(value, &semantic, sizeof(semantic)); return true; } } catch (...) { return false; } } address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size)); return safe_copy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size); }
-bool ProcessMemory::try_write(std::uint32_t address, const void* value, std::size_t size) noexcept { if (!value || sfera_vtable_token_address(address)) { return false; } address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size)); return safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size); }
+bool ProcessMemory::try_read(std::uint32_t address, void* value, std::size_t size) const noexcept { if (!value) { return false; } return safe_copy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size); }
+bool ProcessMemory::try_write(std::uint32_t address, const void* value, std::size_t size) noexcept { if (!value) { return false; } return safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size); }
 
 void ProcessMemory::read(std::uint32_t address, void* value, std::size_t size) const {
     if (!value) { throw std::runtime_error("Local memory read has a null destination"); }
-    if (size == sizeof(std::uint32_t)) { std::uint32_t semantic = 0u; if (sfera_vtable_try_load32(address, &semantic)) { std::memcpy(value, &semantic, sizeof(semantic)); return; } }
-    address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size));
     std::memcpy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size);
 }
 
 void ProcessMemory::write(std::uint32_t address, const void* value, std::size_t size) {
     if (!value) { throw std::runtime_error("Local memory write has a null source"); }
-    if (sfera_vtable_token_address(address)) { throw std::runtime_error("Attempted write through semantic vtable token"); }
-    address = sfera_data_deref_range(address, static_cast<std::uint32_t>(size));
     std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size);
 }
 
-void ProcessMemory::allocate_static_regions() {
+void ProcessMemory::allocate_runtime_regions() {
     if (sizeof(void*) != 4 || kMachine != IMAGE_FILE_MACHINE_I386) { throw std::runtime_error("Generated runtime requires Win32/x86"); }
-    callback_thunks_size_ = kCallbackThunkCapacityBytes; callback_thunks_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, callback_thunks_size_, MEM_RESERVE, PAGE_NOACCESS)); if (!callback_thunks_) { throw std::runtime_error(win32_error("VirtualAlloc(callback thunk pool reserve)")); }
-    HANDLE data_backing = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0u, SFERA_DATA_STORAGE_SIZE, nullptr); if (!data_backing) { throw std::runtime_error(win32_error("CreateFileMappingW(data storage)")); }
-    data_compat_view_ = static_cast<std::uint8_t*>(MapViewOfFile(data_backing, FILE_MAP_ALL_ACCESS, 0u, 0u, SFERA_DATA_STORAGE_SIZE)); if (!data_compat_view_) { CloseHandle(data_backing); throw std::runtime_error(win32_error("MapViewOfFile(data compatibility)")); } g_sfera_data_compat_base = data_compat_view_;
-    auto map_semantic_range = [&](std::uint32_t source_begin, std::uint32_t size) { const std::uint32_t offset = source_begin - SFERA_DATA_SOURCE_BEGIN; if ((offset & (SFERA_DATA_PAGE_SIZE - 1u)) != 0u || (size & (SFERA_DATA_PAGE_SIZE - 1u)) != 0u || offset + size > SFERA_DATA_STORAGE_SIZE) { throw std::runtime_error("Invalid semantic data range"); } const std::uint32_t first_page = offset >> SFERA_DATA_PAGE_SHIFT; const std::uint32_t pages = size >> SFERA_DATA_PAGE_SHIFT; for (std::uint32_t page = 0u; page < pages; ++page) { const std::uint32_t storage_offset = offset + page * SFERA_DATA_PAGE_SIZE; std::uint8_t* alias = static_cast<std::uint8_t*>(MapViewOfFile(data_backing, FILE_MAP_ALL_ACCESS, 0u, storage_offset, SFERA_DATA_PAGE_SIZE)); if (!alias) { throw std::runtime_error(win32_error("MapViewOfFile(data semantic page)")); } g_sfera_data_semantic_page_alias[first_page + page] = alias; } };
-    map_semantic_range(SFERA_DATA_SOURCE_BEGIN, UINT32_C(0x00010000));
-    map_semantic_range(UINT32_C(0x00660000), UINT32_C(0x00010000));
-    map_semantic_range(UINT32_C(0x006B0000), UINT32_C(0x00010000));
-    map_semantic_range(UINT32_C(0x00910000), UINT32_C(0x00010000));
-    map_semantic_range(UINT32_C(0x00B60000), UINT32_C(0x00010000));
-    map_semantic_range(UINT32_C(0x03FE0000), UINT32_C(0x00010000));
-    map_semantic_range(UINT32_C(0x04000000), UINT32_C(0x00020000));
-    map_semantic_range(UINT32_C(0x048F0000), UINT32_C(0x00020000));
-    map_semantic_range(UINT32_C(0x04B50000), UINT32_C(0x00020000));
-    map_semantic_range(UINT32_C(0x04DB0000), UINT32_C(0x00040000));
-    map_semantic_range(UINT32_C(0x04E00000), UINT32_C(0x00030000));
-    map_semantic_range(UINT32_C(0x04E50000), UINT32_C(0x00010000));
-    map_semantic_range(UINT32_C(0x04E70000), UINT32_C(0x00010000));
-    map_semantic_range(UINT32_C(0x04EB0000), UINT32_C(0x00040000));
-    map_semantic_range(UINT32_C(0x04F10000), UINT32_C(0x00010000));
-    map_semantic_range(UINT32_C(0x04F30000), UINT32_C(0x00020000));
-    map_semantic_range(UINT32_C(0x04F80000), UINT32_C(0x00020000));
-    CloseHandle(data_backing);
+    callback_thunks_size_ = kCallbackThunkCapacityBytes;
+    callback_thunks_ = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, callback_thunks_size_, MEM_RESERVE, PAGE_NOACCESS));
+    if (!callback_thunks_) { throw std::runtime_error(win32_error("VirtualAlloc(callback thunk pool reserve)")); }
 }
-void ProcessMemory::install_initial_static_data() { sfera_initialize_data_storage(g_sfera_data_compat_base); }
+
+void ProcessMemory::initialize_native_storage() { sfera_initialize_native_storage(); }
 
 void ProcessMemory::initialize_native() {
     try {
-        resolve_static_references(); verify_semantic_data_views();
+        lift_initialize_dispatch();
+        initialize_callback_registry();
+        resolve_static_references();
         { DiagnosticPhaseScope phase(RuntimePhase::load_imports); resolve_imports(); diagnostic_note("native imports resolved in the current process"); }
         { DiagnosticPhaseScope phase(RuntimePhase::protect_static_storage); protect_regions(); diagnostic_note("semantic static-region protections applied"); }
-        FlushInstructionCache(GetCurrentProcess(), callback_thunks_, callback_thunk_count_ * kCallbackThunkSize);
     } catch (...) { release(); throw; }
 }
 
@@ -1191,90 +1182,84 @@ void ProcessMemory::resolve_imports() {
 }
 
 void ProcessMemory::resolve_static_references() {
-    if (!sfera_bind_native_std_stream_vtables()) { throw std::runtime_error("Failed to bind native MSVCP stream vtables"); }
+    if (!sfera_bind_legacy_cpp_vtables()) { throw std::runtime_error("Failed to bind legacy external C++ vtables"); }
     enum class ComAbiInterface : std::uint32_t { storage, inplace_frame, client_site, inplace_site, doc_host_ui_handler };
-    auto data_slot = [&](std::uint32_t source_va) -> std::uint8_t* { if (source_va < SFERA_DATA_SOURCE_BEGIN || source_va + sizeof(std::uint32_t) > SFERA_DATA_SOURCE_BEGIN + SFERA_DATA_SOURCE_SIZE) { throw std::runtime_error("Explicit .data relocation is outside semantic storage: " + hex_u32(source_va)); } return g_sfera_data_compat_base + (source_va - SFERA_DATA_SOURCE_BEGIN); };
-    auto write32 = [&](std::uint32_t source_va, std::uint32_t value) { std::memcpy(data_slot(source_va), &value, sizeof(value)); };
-    auto com_method_rva = [](ComAbiInterface interface_id, std::uint32_t slot) noexcept -> std::uint32_t {
+    auto com_method_function = [](ComAbiInterface interface_id, std::uint32_t slot) noexcept -> LiftFunction {
         switch (interface_id) {
         case ComAbiInterface::storage:
-            if (slot == 0u || slot == 13u || slot == 16u || slot == 17u) { return UINT32_C(0x00021A80); }
-            if (slot == 1u || slot == 2u) { return UINT32_C(0x00021980); }
-            if (slot >= 3u && slot <= 5u) { return UINT32_C(0x00021820); }
-            if (slot == 6u) { return UINT32_C(0x00021830); }
-            if (slot == 7u || slot == 8u || slot == 11u || slot == 14u) { return UINT32_C(0x00021840); }
-            if (slot == 9u || slot == 12u) { return UINT32_C(0x00021A70); }
-            if (slot == 10u) { return UINT32_C(0x00021A00); }
-            if (slot == 15u) { return UINT32_C(0x000219E0); }
-            return 0u;
+            if (slot == 0u || slot == 13u || slot == 16u || slot == 17u) { return &sfera_sub_00421A80; }
+            if (slot == 1u || slot == 2u) { return &sfera_sub_00421980; }
+            if (slot >= 3u && slot <= 5u) { return &sfera_sub_00421820; }
+            if (slot == 6u) { return &sfera_sub_00421830; }
+            if (slot == 7u || slot == 8u || slot == 11u || slot == 14u) { return &sfera_sub_00421840; }
+            if (slot == 9u || slot == 12u) { return &sfera_sub_00421A70; }
+            if (slot == 10u) { return &sfera_sub_00421A00; }
+            if (slot == 15u) { return &sfera_sub_004219E0; }
+            return (LiftFunction)0;
         case ComAbiInterface::inplace_frame:
-            if (slot == 0u || slot == 9u || slot == 14u) { return UINT32_C(0x00021A80); }
-            if (slot == 1u || slot == 2u) { return UINT32_C(0x00021980); }
-            if (slot == 3u) { return UINT32_C(0x00021A50); }
-            if ((slot >= 4u && slot <= 7u) || slot == 11u) { return UINT32_C(0x00021A70); }
-            if (slot == 8u) { return UINT32_C(0x0003B130); }
-            if (slot == 10u) { return UINT32_C(0x00021790); }
-            if (slot == 12u || slot == 13u) { return UINT32_C(0x000219E0); }
-            return 0u;
+            if (slot == 0u || slot == 9u || slot == 14u) { return &sfera_sub_00421A80; }
+            if (slot == 1u || slot == 2u) { return &sfera_sub_00421980; }
+            if (slot == 3u) { return &sfera_sub_00421A50; }
+            if ((slot >= 4u && slot <= 7u) || slot == 11u) { return &sfera_sub_00421A70; }
+            if (slot == 8u) { return &sfera_sub_0043B130; }
+            if (slot == 10u) { return &sfera_sub_00421790; }
+            if (slot == 12u || slot == 13u) { return &sfera_sub_004219E0; }
+            return (LiftFunction)0;
         case ComAbiInterface::client_site:
-            if (slot == 0u) { return UINT32_C(0x00021850); }
-            if (slot == 1u || slot == 2u) { return UINT32_C(0x00021980); }
-            if (slot == 3u || slot == 8u) { return UINT32_C(0x00021A00); }
-            if (slot == 4u) { return UINT32_C(0x00021940); }
-            if (slot == 5u) { return UINT32_C(0x00021950); }
-            if (slot == 6u) { return UINT32_C(0x000219F0); }
-            if (slot == 7u) { return UINT32_C(0x00021A70); }
-            return 0u;
+            if (slot == 0u) { return &sfera_sub_00421850; }
+            if (slot == 1u || slot == 2u) { return &sfera_sub_00421980; }
+            if (slot == 3u || slot == 8u) { return &sfera_sub_00421A00; }
+            if (slot == 4u) { return &sfera_sub_00421940; }
+            if (slot == 5u) { return &sfera_sub_00421950; }
+            if (slot == 6u) { return &sfera_sub_004219F0; }
+            if (slot == 7u) { return &sfera_sub_00421A70; }
+            return (LiftFunction)0;
         case ComAbiInterface::inplace_site:
-            if (slot == 0u) { return UINT32_C(0x00021970); }
-            if (slot == 1u || slot == 2u) { return UINT32_C(0x00021980); }
-            if (slot == 3u) { return UINT32_C(0x00021990); }
-            if (slot == 4u) { return UINT32_C(0x00021A70); }
-            if ((slot >= 5u && slot <= 7u) || slot == 11u) { return UINT32_C(0x000219F0); }
-            if (slot == 8u) { return UINT32_C(0x000219B0); }
-            if (slot == 9u) { return UINT32_C(0x00021A80); }
-            if (slot == 10u) { return UINT32_C(0x000219E0); }
-            if (slot == 12u || slot == 13u) { return UINT32_C(0x00021A00); }
-            if (slot == 14u) { return UINT32_C(0x00021A10); }
-            return 0u;
+            if (slot == 0u) { return &sfera_sub_00421970; }
+            if (slot == 1u || slot == 2u) { return &sfera_sub_00421980; }
+            if (slot == 3u) { return &sfera_sub_00421990; }
+            if (slot == 4u) { return &sfera_sub_00421A70; }
+            if ((slot >= 5u && slot <= 7u) || slot == 11u) { return &sfera_sub_004219F0; }
+            if (slot == 8u) { return &sfera_sub_004219B0; }
+            if (slot == 9u) { return &sfera_sub_00421A80; }
+            if (slot == 10u) { return &sfera_sub_004219E0; }
+            if (slot == 12u || slot == 13u) { return &sfera_sub_00421A00; }
+            if (slot == 14u) { return &sfera_sub_00421A10; }
+            return (LiftFunction)0;
         case ComAbiInterface::doc_host_ui_handler:
-            if (slot == 0u) { return UINT32_C(0x00021FB0); }
-            if (slot == 1u || slot == 2u) { return UINT32_C(0x00021980); }
-            if (slot == 3u) { return UINT32_C(0x00021750); }
-            if (slot == 4u) { return UINT32_C(0x00021760); }
-            if (slot == 5u) { return UINT32_C(0x00021780); }
-            if (slot == 6u || slot == 7u) { return UINT32_C(0x000219F0); }
-            if (slot >= 8u && slot <= 10u) { return UINT32_C(0x000219E0); }
-            if (slot == 11u) { return UINT32_C(0x00021790); }
-            if (slot == 12u) { return UINT32_C(0x000217A0); }
-            if (slot == 13u || slot == 14u) { return UINT32_C(0x000217B0); }
-            if (slot == 15u) { return UINT32_C(0x000217C0); }
-            if (slot == 16u) { return UINT32_C(0x000217E0); }
-            if (slot == 17u) { return UINT32_C(0x00021800); }
-            return 0u;
+            if (slot == 0u) { return &sfera_sub_00421FB0; }
+            if (slot == 1u || slot == 2u) { return &sfera_sub_00421980; }
+            if (slot == 3u) { return &sfera_sub_00421750; }
+            if (slot == 4u) { return &sfera_sub_00421760; }
+            if (slot == 5u) { return &sfera_sub_00421780; }
+            if (slot == 6u || slot == 7u) { return &sfera_sub_004219F0; }
+            if (slot >= 8u && slot <= 10u) { return &sfera_sub_004219E0; }
+            if (slot == 11u) { return &sfera_sub_00421790; }
+            if (slot == 12u) { return &sfera_sub_004217A0; }
+            if (slot == 13u || slot == 14u) { return &sfera_sub_004217B0; }
+            if (slot == 15u) { return &sfera_sub_004217C0; }
+            if (slot == 16u) { return &sfera_sub_004217E0; }
+            if (slot == 17u) { return &sfera_sub_00421800; }
+            return (LiftFunction)0;
         }
-        return 0u;
+        return (LiftFunction)0;
     };
-    auto bind_com_vtable = [&](std::uint32_t* vtable, std::uint32_t slot_count, ComAbiInterface interface_id, const char* interface_name) { for (std::uint32_t slot = 0u; slot < slot_count; ++slot) { const std::uint32_t rva = com_method_rva(interface_id, slot); const std::uint32_t callback = callback_address(rva); if (rva == 0u || callback == 0u) { throw std::runtime_error(std::string("Missing lifted ") + interface_name + " vtable handler at slot " + std::to_string(slot)); } vtable[slot] = callback; } };
+    auto bind_com_vtable = [&](std::uint32_t* vtable, std::uint32_t slot_count, ComAbiInterface interface_id, const char* interface_name) { for (std::uint32_t slot = 0u; slot < slot_count; ++slot) { const LiftFunction function = com_method_function(interface_id, slot); const std::uint32_t callback = callback_address(function); if (!function || callback == 0u) { throw std::runtime_error(std::string("Missing lifted ") + interface_name + " vtable handler at slot " + std::to_string(slot)); } vtable[slot] = callback; } };
     bind_com_vtable(g_sfera_ole_host_abi.storage_vtable, 18u, ComAbiInterface::storage, "IStorage");
     bind_com_vtable(g_sfera_ole_host_abi.inplace_frame_vtable, 15u, ComAbiInterface::inplace_frame, "IOleInPlaceFrame");
     bind_com_vtable(g_sfera_ole_host_abi.client_site_vtable, 9u, ComAbiInterface::client_site, "IOleClientSite");
     bind_com_vtable(g_sfera_ole_host_abi.inplace_site_vtable, 15u, ComAbiInterface::inplace_site, "IOleInPlaceSite");
     bind_com_vtable(g_sfera_ole_host_abi.doc_host_ui_handler_vtable, 18u, ComAbiInterface::doc_host_ui_handler, "IDocHostUIHandler");
     g_sfera_ole_host_abi.storage_object_vtable = (std::uint32_t)(uintptr_t)&g_sfera_ole_host_abi.storage_vtable[0];
-    g_sfera_memory_runtime.critical_error_callback = callback_address(UINT32_C(0x000EBF30));
+    g_sfera_memory_runtime.critical_error_callback = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&sfera_sub_004EBF30));
 }
-
-void ProcessMemory::verify_semantic_data_views() const { if (!g_sfera_data_compat_base) { throw std::runtime_error("Data compatibility view is not initialized"); } for (std::uint32_t page = 0u; page < SFERA_DATA_PAGE_COUNT; ++page) { const std::uint8_t* semantic = g_sfera_data_semantic_page_alias[page]; if (!semantic) { continue; } const std::uint8_t* compatibility = g_sfera_data_compat_base + page * SFERA_DATA_PAGE_SIZE; if (std::memcmp(semantic, compatibility, SFERA_DATA_PAGE_SIZE) != 0) { throw std::runtime_error("Semantic data page is not coherent with compatibility backing"); } } }
 
 void ProcessMemory::protect_regions() {}
 
 void ProcessMemory::release() noexcept {
     if (g_process_memory == this) { g_process_memory = nullptr; }
     resolved_imports_.clear(); loaded_modules_.clear();
-    for (std::uint32_t page = 0u; page < SFERA_DATA_PAGE_COUNT; ++page) { if (g_sfera_data_semantic_page_alias[page]) { UnmapViewOfFile(g_sfera_data_semantic_page_alias[page]); g_sfera_data_semantic_page_alias[page] = nullptr; } }
-    if (data_compat_view_) { UnmapViewOfFile(data_compat_view_); data_compat_view_ = nullptr; } g_sfera_data_compat_base = nullptr;
-    callback_addresses_.clear(); callback_thunk_count_ = 0u; callback_committed_pages_ = 0u; callback_rx_pages_ = 0u; if (callback_thunks_) { VirtualFree(callback_thunks_, 0, MEM_RELEASE); callback_thunks_ = nullptr; } callback_thunks_size_ = 0u;
+    callback_thunk_count_ = 0u; if (callback_thunks_) { VirtualFree(callback_thunks_, 0, MEM_RELEASE); callback_thunks_ = nullptr; } callback_thunks_size_ = 0u;
 }
 
 namespace {
@@ -1374,7 +1359,6 @@ NativeRuntime::NativeRuntime() {
     verify_native_bridge();
     DiagnosticPhaseScope phase(RuntimePhase::function_map);
     for (const ResolvedImport& item : memory_.resolved_imports()) { std::size_t slot = ((item.address >> 4u) * UINT32_C(2654435761)) & (kImportLookupSize - 1u); while (import_lookup_addresses_[slot] != 0u && import_lookup_addresses_[slot] != item.address) { slot = (slot + 1u) & (kImportLookupSize - 1u); } if (import_lookup_addresses_[slot] == 0u) { import_lookup_addresses_[slot] = item.address; import_lookup_behaviors_[slot] = item.behavior; } }
-    lift_initialize_dispatch();
     diagnostic_note("native C function map initialized");
 }
 
@@ -1448,8 +1432,9 @@ int NativeRuntime::execute() {
 }
 
 void NativeRuntime::dispatch_callback(CallbackRegisters& registers) {
-    const std::uint32_t target = registers.callback_target;
-    const std::uint32_t original_esp = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&registers.callback_target) + sizeof(registers.callback_target));
+    const LiftFunction function = reinterpret_cast<LiftFunction>(static_cast<std::uintptr_t>(registers.callback_function));
+    if (!memory_.is_callback_function(function)) { throw std::runtime_error("Unknown semantic callback function"); }
+    const std::uint32_t original_esp = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&registers.callback_function) + sizeof(registers.callback_function));
     const std::uint32_t api_return = *reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(original_esp));
 #if !defined(SFERA_PORTABLE_CHECK) && defined(_M_IX86)
     const std::uintptr_t stack_base = __readfsdword(4);
@@ -1468,11 +1453,11 @@ void NativeRuntime::dispatch_callback(CallbackRegisters& registers) {
     std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(clone_esp)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(original_esp)), copy_size);
     *reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(clone_esp)) = LIFT_CALLBACK_SENTINEL;
     LiftCpu state{};
-    state.eax = registers.eax; state.ecx = registers.ecx; state.edx = registers.edx; state.ebx = registers.ebx; state.esp = clone_esp; state.ebp = registers.ebp; state.esi = registers.esi; state.edi = registers.edi; state.eip = target; state.eflags = registers.eflags;
+    state.eax = registers.eax; state.ecx = registers.ecx; state.edx = registers.edx; state.ebx = registers.ebx; state.esp = clone_esp; state.ebp = registers.ebp; state.esi = registers.esi; state.edi = registers.edi; state.eip = LIFT_CALLBACK_SENTINEL; state.eflags = registers.eflags;
     state.fpu_control = 0x027Fu;
     state.stack_base = clone.base(); state.stack_limit = clone.limit();
     initialize_fs(state, true);
-    lift_dispatch(&state, target, LIFT_CALLBACK_SENTINEL);
+    function(&state, LIFT_CALLBACK_SENTINEL);
     const std::uint32_t stack_delta = state.esp - clone_esp;
     if (stack_delta < 4u || stack_delta > copy_size) { throw std::runtime_error("Lifted callback returned an invalid stack delta"); }
     if (copy_size > 4u) { std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(original_esp + 4u)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(clone_esp + 4u)), copy_size - 4u); }
@@ -1503,7 +1488,7 @@ extern "C" void callback_bridge() {}
 static_assert(offsetof(LiftCpu, eax) == 0 && offsetof(LiftCpu, eflags) == 36 && offsetof(LiftCpu, fpu_control) == 114);
 static_assert(offsetof(LiftCpu, fs_data) == 120);
 static_assert(offsetof(NativeCallFrame, state) == 0 && offsetof(NativeCallFrame, native_st0) == 40);
-static_assert(offsetof(CallbackRegisters, edi) == 0 && offsetof(CallbackRegisters, eax) == 28 && offsetof(CallbackRegisters, eflags) == 32 && offsetof(CallbackRegisters, callback_target) == 36);
+static_assert(offsetof(CallbackRegisters, edi) == 0 && offsetof(CallbackRegisters, eax) == 28 && offsetof(CallbackRegisters, eflags) == 32 && offsetof(CallbackRegisters, callback_function) == 36);
 static_assert(sizeof(CallbackRegisters) == 40);
 
 extern "C" __declspec(naked) void __cdecl native_call_bridge(NativeCallFrame*) {

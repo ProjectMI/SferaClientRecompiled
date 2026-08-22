@@ -4940,8 +4940,7 @@ label_000E79D8: ;
     LIFT_ADD(cpu->eax, UINT32_C(0x7FFBFDDE), 0u, 32u, cpu->eax = (uint32_t)(result););
     LIFT_CMP(cpu->eax, UINT32_C(0x0000003D), 32u);
     LIFT_JA(label_000EA18F, UINT32_C(0x004E7B45));
-    uint32_t sfera_selector_000EA2D9 = (uint32_t)(cpu->eax);
-    switch ((uint32_t)(sfera_selector_000EA2D9)) {
+    switch ((uint32_t)(cpu->eax)) {
         case 0u: goto label_000E7B53;
         case 1u: goto label_000E7B5D;
         case 2u: goto label_000E7B67;
@@ -5121,8 +5120,7 @@ label_000E79D8: ;
     LIFT_ADD(cpu->eax, UINT32_C(0x7FFBFD9E), 0u, 32u, cpu->eax = (uint32_t)(result););
     LIFT_CMP(cpu->eax, UINT32_C(0x000000A2), 32u);
     LIFT_JA(label_000EA18F, UINT32_C(0x004E7D1A));
-    uint32_t sfera_selector_000EA3C7 = (uint32_t)(cpu->eax);
-    switch ((uint32_t)(sfera_selector_000EA3C7)) {
+    switch ((uint32_t)(cpu->eax)) {
         case 0u: goto label_000E7D5A;
         case 2u: goto label_000E7D64;
         case 3u: goto label_000E7D6E;
@@ -5312,8 +5310,7 @@ label_000E7D28: ;
     LIFT_ADD(cpu->eax, UINT32_C(0x7FFBFC0E), 0u, 32u, cpu->eax = (uint32_t)(result););
     LIFT_CMP(cpu->eax, UINT32_C(0x00000015), 32u);
     LIFT_JA(label_000EA18F, UINT32_C(0x004E7F14));
-    uint32_t sfera_selector_000EA496 = (uint32_t)(cpu->eax);
-    switch ((uint32_t)(sfera_selector_000EA496)) {
+    switch ((uint32_t)(cpu->eax)) {
         case 0u: goto label_000E7F4A;
         case 13u: goto label_000E7F22;
         case 14u: goto label_000E7F2C;
@@ -6485,8 +6482,7 @@ label_000E82B7: ;
     LIFT_ADD(cpu->eax, UINT32_C(0x7789FDCC), 0u, 32u, cpu->eax = (uint32_t)(result););
     LIFT_CMP(cpu->eax, UINT32_C(0x00000038), 32u);
     LIFT_JA(label_000EA18F, UINT32_C(0x004E8DAF));
-    uint32_t sfera_selector_000EA5CC = (uint32_t)(cpu->eax);
-    switch ((uint32_t)(sfera_selector_000EA5CC)) {
+    switch ((uint32_t)(cpu->eax)) {
         case 0u: goto label_000E8DBD;
         case 1u: goto label_000E8DC7;
         case 2u: goto label_000E8DD1;
@@ -6745,8 +6741,7 @@ label_000E82B7: ;
     LIFT_ADD(cpu->eax, UINT32_C(0x7789FC94), 0u, 32u, cpu->eax = (uint32_t)(result););
     LIFT_CMP(cpu->eax, UINT32_C(0x00000029), 32u);
     LIFT_JA(label_000EA18F, UINT32_C(0x004E90CE));
-    uint32_t sfera_selector_000EA655 = (uint32_t)(cpu->eax);
-    switch ((uint32_t)(sfera_selector_000EA655)) {
+    switch ((uint32_t)(cpu->eax)) {
         case 0u: goto label_000E90DC;
         case 24u: goto label_000E90E6;
         case 25u: goto label_000E90F0;
@@ -7097,8 +7092,7 @@ label_000E91B8: ;
     LIFT_ADD(cpu->eax, UINT32_C(0x7787EEEF), 0u, 32u, cpu->eax = (uint32_t)(result););
     LIFT_CMP(cpu->eax, UINT32_C(0x00000010), 32u);
     LIFT_JA(label_000EA18F, UINT32_C(0x004E9511));
-    uint32_t sfera_selector_000EA6E3 = (uint32_t)(cpu->eax);
-    switch ((uint32_t)(sfera_selector_000EA6E3)) {
+    switch ((uint32_t)(cpu->eax)) {
         case 0u: goto label_000E951F;
         case 2u: goto label_000E9529;
         case 3u: goto label_000E9533;
@@ -7260,8 +7254,7 @@ label_000E9598: ;
     LIFT_ADD(cpu->eax, UINT32_C(0x7787EEC9), 0u, 32u, cpu->eax = (uint32_t)(result););
     LIFT_CMP(cpu->eax, UINT32_C(0x00000030), 32u);
     LIFT_JA(label_000EA18F, UINT32_C(0x004E9681));
-    uint32_t sfera_selector_000EA7A8 = (uint32_t)(cpu->eax);
-    switch ((uint32_t)(sfera_selector_000EA7A8)) {
+    switch ((uint32_t)(cpu->eax)) {
         case 0u: goto label_000E9699;
         case 1u: goto label_000E96A3;
         case 2u: goto label_000E96AD;

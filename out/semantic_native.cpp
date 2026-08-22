@@ -26,6 +26,7 @@ SferaNetworkRuntime g_sfera_network_runtime = {};
 SferaDirectPlayRuntime g_sfera_directplay_runtime = {};
 SferaNetworkConnectionCheckerRuntime g_sfera_network_connection_checker = {};
 SferaNetworkSendRuntime g_sfera_network_send_runtime = {};
+SferaFontRuntime g_sfera_font_runtime = {};
 SferaCursorManagerRuntime g_sfera_cursor_manager_runtime = {};
 SferaSliceReference32 g_sfera_pop_slice_fallback = {};
 SferaSliceReference32 g_sfera_pop_sliceup_fallback = {};
@@ -43,6 +44,7 @@ SferaBoundCheckArray g_sfera_mesh_partition_indices = {};
 SferaGraphicsOptionsRuntime g_sfera_graphics_options_runtime = {};
 SferaSphereOptionsRuntime g_sfera_sphere_options_runtime = {};
 SferaOptionsDialogRuntime g_sfera_options_dialog_runtime = {};
+uint32_t g_sfera_options_dialog_cleanup_state = 0u;
 SferaWindowRuntime g_sfera_window_runtime = {};
 SferaInputDeviceRuntime g_sfera_input_device_runtime = {};
 SferaScreenClipRuntime g_sfera_screen_clip_runtime = {};
@@ -91,6 +93,13 @@ SferaWorldSlotTableRuntime g_sfera_world_slot_table_runtime = {};
 SferaConfigTextRuntime g_sfera_config_text_runtime = {};
 SferaPlantingTableRuntime g_sfera_planting_table_runtime = {};
 SferaStaticRenderLookupRuntime g_sfera_static_render_lookup_runtime = {};
+SferaMbcStaticRuntime g_sfera_mbc_static_runtime = {};
+SferaViewRenderObjectsRuntime g_sfera_view_render_objects_runtime = {};
+SferaMapGeneratorRuntime g_sfera_map_generator_runtime = {};
+SferaAlphaMaterialRuntime g_sfera_alpha_material_runtime = {};
+SferaClientArrayRuntime g_sfera_client_array_runtime = {};
+SFERA_STORAGE_ALIGN uint8_t g_sfera_shadow_object_storage[SFERA_TRANSFORM_BOUNDS_STORAGE_SIZE] = {};
+SFERA_STORAGE_ALIGN uint8_t g_sfera_options_dialog_object_storage[SFERA_TRANSFORM_BOUNDS_STORAGE_SIZE] = {};
 SferaSpatialIndexRuntime g_sfera_spatial_index_runtime = {};
 SferaStartupCommandLineRuntime g_sfera_startup_command_line_runtime = {};
 SferaCollisionScratchRuntime g_sfera_collision_scratch_runtime = {};
@@ -195,11 +204,13 @@ SferaMsvcString32 g_sfera_menu_sprite_not_found_message = {};
 const SferaMsvcVbtable2 g_sfera_vbtable_basic_ofstream = {0, 0x60};
 const SferaMsvcVbtable2 g_sfera_vbtable_basic_ifstream = {0, 0x68};
 const SferaMsvcVbtable2 g_sfera_vbtable_basic_ostringstream = {0, 0x50};
-uint32_t g_sfera_native_vtable_basic_filebuf[15] = {};
-uint32_t g_sfera_native_vtable_basic_ofstream[1] = {};
-uint32_t g_sfera_native_vtable_basic_ifstream[1] = {};
-uint32_t g_sfera_native_vtable_basic_stringbuf[15] = {};
-uint32_t g_sfera_native_vtable_basic_ostringstream[1] = {};
+uint32_t g_sfera_msvcp100_vtable_basic_filebuf[15] = {};
+uint32_t g_sfera_msvcp100_vtable_basic_ofstream[1] = {};
+uint32_t g_sfera_msvcp100_vtable_basic_ifstream[1] = {};
+uint32_t g_sfera_msvcp100_vtable_basic_stringbuf[15] = {};
+uint32_t g_sfera_msvcp100_vtable_basic_ostringstream[1] = {};
+uint32_t g_sfera_legacy_vtable_bad_alloc[2] = {};
+uint32_t g_sfera_legacy_vtable_com_error[1] = {};
 const SferaGuid32 g_sfera_guid_iid_doc_host_ui_handler = {UINT32_C(0xBD3F23C0), UINT16_C(0xD43E), UINT16_C(0x11CF), {UINT8_C(0x89), UINT8_C(0x3B), UINT8_C(0x00), UINT8_C(0xAA), UINT8_C(0x00), UINT8_C(0xBD), UINT8_C(0xCE), UINT8_C(0x1A)}};
 const SferaGuid32 g_sfera_guid_iid_ole_client_site = {UINT32_C(0x00000118), UINT16_C(0x0000), UINT16_C(0x0000), {UINT8_C(0xC0), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x46)}};
 const SferaGuid32 g_sfera_guid_iid_ole_object = {UINT32_C(0x00000112), UINT16_C(0x0000), UINT16_C(0x0000), {UINT8_C(0xC0), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x46)}};
@@ -629,687 +640,54 @@ uint32_t SFERA_IMPORT_MSVCP100_basic_ostream_vftable = 0u;
 
 /* Static control-flow tables are resolved into direct C switches in lifted_functions_*.c. */
 
-uint8_t* g_sfera_data_compat_base = nullptr;
-uint8_t* g_sfera_data_semantic_page_alias[SFERA_DATA_PAGE_COUNT] = {};
 }
 
 #undef SFERA_STORAGE_ALIGN
 
-/* ===== Semantic virtual dispatch ===== */
-/* Source vptr values are class-identity tokens; no .rdata storage is materialized. */
+/* ===== External C++ ABI bridge ===== */
 namespace {
-uint32_t sfera_window_virtual_rva(uint32_t slot) {
-    switch (slot) {
-    case 0u: return UINT32_C(0x000D47B0);
-    case 1u: return UINT32_C(0x000D5510);
-    case 2u: return UINT32_C(0x000D2DD0);
-    case 3u: return UINT32_C(0x000D19E0);
-    case 4u: return UINT32_C(0x000D25E0);
-    case 5u: return UINT32_C(0x000D28B0);
-    case 6u: return UINT32_C(0x000D2A40);
-    case 7u: return UINT32_C(0x000D2B80);
-    case 8u: return UINT32_C(0x000D2AE0);
-    case 9u: return UINT32_C(0x000D1AC0);
-    case 10u: return UINT32_C(0x000D1B00);
-    case 11u: return UINT32_C(0x000A13C0);
-    default: return 0u;
+
+bool sfera_bind_legacy_vtable(uint32_t* slots, const LiftFunction* functions, uint32_t count) {
+    for (uint32_t slot = 0u; slot < count; ++slot) {
+        const uint32_t callback = lift_callback_address(functions[slot]);
+        if (callback == 0u) {
+            return false;
+        }
+        slots[slot] = callback;
     }
-}
-uint32_t sfera_virtual_override_rva(uint32_t class_id, uint32_t slot) {
-    switch (class_id) {
-    case 0u: /* .?AVBloodEffListener@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0001A090);
-        case 1u: return UINT32_C(0x0001A070);
-        case 2u: return UINT32_C(0x0001A9F0);
-        default: return 0u;
-        }
-    case 1u: /* .?AVIEffectManager@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000EEB22);
-        case 1u: return UINT32_C(0x000EEB22);
-        case 2u: return UINT32_C(0x0002B3D0);
-        case 3u: return UINT32_C(0x000EEB22);
-        case 4u: return UINT32_C(0x000EEB22);
-        case 5u: return UINT32_C(0x000EEB22);
-        case 6u: return UINT32_C(0x000EEB22);
-        case 7u: return UINT32_C(0x000EEB22);
-        case 8u: return UINT32_C(0x0002B7D0);
-        case 9u: return UINT32_C(0x00025F60);
-        case 10u: return UINT32_C(0x00025F90);
-        case 11u: return UINT32_C(0x00027590);
-        default: return 0u;
-        }
-    case 2u: /* .?AVCScriptedEffect@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000294E0);
-        case 1u: return UINT32_C(0x00026640);
-        case 2u: return UINT32_C(0x00029280);
-        case 3u: return UINT32_C(0x000266B0);
-        case 4u: return UINT32_C(0x00027750);
-        case 5u: return UINT32_C(0x000266D0);
-        case 6u: return UINT32_C(0x000278E0);
-        case 7u: return UINT32_C(0x0002B3D0);
-        case 8u: return UINT32_C(0x0002B7D0);
-        case 9u: return UINT32_C(0x000276A0);
-        case 10u: return UINT32_C(0x000261A0);
-        case 11u: return UINT32_C(0x00029A10);
-        default: return 0u;
-        }
-    case 3u: /* .?AVCSpiralEffect@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0002B800);
-        case 1u: return UINT32_C(0x0002B3D0);
-        case 2u: return UINT32_C(0x0002B3D0);
-        case 3u: return UINT32_C(0x0002B710);
-        case 4u: return UINT32_C(0x0002B0A0);
-        case 5u: return UINT32_C(0x0002B7D0);
-        case 6u: return UINT32_C(0x0002B0B0);
-        case 7u: return UINT32_C(0x0002B130);
-        case 8u: return UINT32_C(0x0002B7D0);
-        case 9u: return UINT32_C(0x00025F60);
-        case 10u: return UINT32_C(0x00025F90);
-        case 11u: return UINT32_C(0x0002B7E0);
-        default: return 0u;
-        }
-    case 4u: /* .?AVCMolEffect@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0002BAD0);
-        case 1u: return UINT32_C(0x0002B200);
-        case 2u: return UINT32_C(0x0002B3D0);
-        case 3u: return UINT32_C(0x0002B710);
-        case 4u: return UINT32_C(0x0002B0A0);
-        case 5u: return UINT32_C(0x0002B7D0);
-        case 6u: return UINT32_C(0x0002B260);
-        case 7u: return UINT32_C(0x0002B300);
-        case 8u: return UINT32_C(0x0002B7D0);
-        case 9u: return UINT32_C(0x00025F60);
-        case 10u: return UINT32_C(0x00025F90);
-        case 11u: return UINT32_C(0x0002BA50);
-        default: return 0u;
-        }
-    case 5u: /* .?AVCBladeEffect@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0002C050);
-        case 1u: return UINT32_C(0x0002B3D0);
-        case 2u: return UINT32_C(0x0002B3D0);
-        case 3u: return UINT32_C(0x0002B710);
-        case 4u: return UINT32_C(0x0002B0A0);
-        case 5u: return UINT32_C(0x0002B7D0);
-        case 6u: return UINT32_C(0x0002B3E0);
-        case 7u: return UINT32_C(0x0002B480);
-        case 8u: return UINT32_C(0x0002B7D0);
-        case 9u: return UINT32_C(0x00025F60);
-        case 10u: return UINT32_C(0x00025F90);
-        case 11u: return UINT32_C(0x0002C020);
-        default: return 0u;
-        }
-    case 6u: /* .?AVCGazerLakeEffect@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0002B530);
-        case 1u: return UINT32_C(0x0002B3D0);
-        case 2u: return UINT32_C(0x0002B3D0);
-        case 3u: return UINT32_C(0x0002B710);
-        case 4u: return UINT32_C(0x0002B0A0);
-        case 5u: return UINT32_C(0x0002B7D0);
-        case 6u: return UINT32_C(0x0002C6B0);
-        case 7u: return UINT32_C(0x0002B3D0);
-        case 8u: return UINT32_C(0x0002B7D0);
-        case 9u: return UINT32_C(0x00025F60);
-        case 10u: return UINT32_C(0x00025F90);
-        case 11u: return UINT32_C(0x0002C690);
-        default: return 0u;
-        }
-    case 7u: /* .?AVCRainEffect@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0002C800);
-        case 1u: return UINT32_C(0x0002B3D0);
-        case 2u: return UINT32_C(0x0002B3D0);
-        case 3u: return UINT32_C(0x0002B710);
-        case 4u: return UINT32_C(0x0002B0A0);
-        case 5u: return UINT32_C(0x0002B7D0);
-        case 6u: return UINT32_C(0x0002CFC0);
-        case 7u: return UINT32_C(0x0002B3D0);
-        case 8u: return UINT32_C(0x0002B7D0);
-        case 9u: return UINT32_C(0x00025F60);
-        case 10u: return UINT32_C(0x00025F90);
-        case 11u: return UINT32_C(0x0002C770);
-        default: return 0u;
-        }
-    case 8u: /* .?AVIOutputDevice@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000EEB22);
-        default: return 0u;
-        }
-    case 9u: /* .?AVCOutputLogDevice@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0002E3F0);
-        default: return 0u;
-        }
-    case 10u: /* .?AVCSphereError@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0002E430);
-        default: return 0u;
-        }
-    case 11u: /* .?AVGrassMapMngr@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x00030AC0);
-        default: return 0u;
-        }
-    case 12u: /* .?AUHyperTextElement_WordWrap@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0001FBB0);
-        default: return 0u;
-        }
-    case 13u: /* .?AUHyperTextElement@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0001FBB0);
-        default: return 0u;
-        }
-    case 14u: /* .?AUHyperTextElementWithParameters@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0001FBB0);
-        default: return 0u;
-        }
-    case 15u: /* .?AUHyperTextElement_PlainText@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0001FBB0);
-        default: return 0u;
-        }
-    case 16u: /* .?AUHyperTextElement_Link@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0001FBB0);
-        default: return 0u;
-        }
-    case 17u: /* .?AVCItem@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0002B7D0);
-        case 1u: return UINT32_C(0x0002B7D0);
-        default: return 0u;
-        }
-    case 18u: /* .?AVCCommonItem@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0002B7D0);
-        case 1u: return UINT32_C(0x0002B7D0);
-        default: return 0u;
-        }
-    case 19u: /* .?AV?$CItemList@VCCommonItem@@@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x00047DD0);
-        case 1u: return UINT32_C(0x0002B7D0);
-        default: return 0u;
-        }
-    case 20u: /* .?AV?$CBaseManager@V?$CItemList@VCCommonItem@@@@VCCommonItem@@@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x00047DD0);
-        case 1u: return UINT32_C(0x0002B7D0);
-        case 2u: return UINT32_C(0x0003B130);
-        case 3u: return UINT32_C(0x0003B130);
-        case 4u: return UINT32_C(0x000219F0);
-        default: return 0u;
-        }
-    case 21u: /* .?AVCLightEffect@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0004B230);
-        case 1u: return UINT32_C(0x0002B3D0);
-        case 2u: return UINT32_C(0x0002B3D0);
-        case 3u: return UINT32_C(0x0004B340);
-        case 4u: return UINT32_C(0x0004B380);
-        case 5u: return UINT32_C(0x0004B3B0);
-        case 6u: return UINT32_C(0x0004B3C0);
-        case 7u: return UINT32_C(0x0004B440);
-        case 8u: return UINT32_C(0x0002B7D0);
-        case 9u: return UINT32_C(0x00025F60);
-        case 10u: return UINT32_C(0x00025F90);
-        case 11u: return UINT32_C(0x0004B510);
-        default: return 0u;
-        }
-    case 22u: /* .?AVNatureRainListener@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0007FA50);
-        case 1u: return UINT32_C(0x0007F7B0);
-        case 2u: return UINT32_C(0x0001A080);
-        default: return 0u;
-        }
-    case 23u: /* .?AVLightingListener@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0007F820);
-        case 1u: return UINT32_C(0x0007F5A0);
-        case 2u: return UINT32_C(0x0007F5C0);
-        default: return 0u;
-        }
-    case 24u: /* .?AVCSoundFX@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000EE7F2);
-        case 1u: return UINT32_C(0x000EE7F8);
-        case 2u: return UINT32_C(0x000EE7FE);
-        default: return 0u;
-        }
-    case 25u: /* .?AVButtonCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x0009EDE0);
-        case 1u: return UINT32_C(0x000A0DB0);
-        case 2u: return UINT32_C(0x0009F5A0);
-        case 4u: return UINT32_C(0x0009F230);
-        case 5u: return UINT32_C(0x0009F7A0);
-        case 11u: return UINT32_C(0x0009F1A0);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 26u: /* .?AVCheckBox@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000A0ED0);
-        case 1u: return UINT32_C(0x000A1740);
-        case 2u: return UINT32_C(0x000A12C0);
-        case 4u: return UINT32_C(0x000A13E0);
-        case 5u: return UINT32_C(0x000A1200);
-        case 12u: return UINT32_C(0x000A1350);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 27u: /* .?AVCDescriptionWindow@SphereUI@@ */
-        switch (slot) {
-        case 4u: return UINT32_C(0x000A2280);
-        case 11u: return UINT32_C(0x000A1DF0);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 28u: /* .?AVEditCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000A3000);
-        case 1u: return UINT32_C(0x000A3C50);
-        case 2u: return UINT32_C(0x000A3990);
-        case 4u: return UINT32_C(0x000A2810);
-        case 5u: return UINT32_C(0x000A3400);
-        case 11u: return UINT32_C(0x000A2FE0);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 29u: /* .?AVFilterListCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000C0D80);
-        case 1u: return UINT32_C(0x000A49E0);
-        case 2u: return UINT32_C(0x000A48A0);
-        case 4u: return UINT32_C(0x000BF210);
-        case 5u: return UINT32_C(0x000BEEF0);
-        case 11u: return UINT32_C(0x000A44D0);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 30u: /* .?AVFontPicker@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000A5800);
-        case 1u: return UINT32_C(0x000A5B70);
-        case 2u: return UINT32_C(0x000A57A0);
-        case 4u: return UINT32_C(0x000A56E0);
-        case 5u: return UINT32_C(0x000A5600);
-        case 9u: return UINT32_C(0x000A5990);
-        case 10u: return UINT32_C(0x000A59F0);
-        case 11u: return UINT32_C(0x000A5A50);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 31u: /* .?AVHyperTextChatListControl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000A9CC0);
-        case 1u: return UINT32_C(0x000AD590);
-        case 2u: return UINT32_C(0x000ACE10);
-        case 4u: return UINT32_C(0x000AB430);
-        case 5u: return UINT32_C(0x000AB7C0);
-        case 9u: return UINT32_C(0x000AA0D0);
-        case 11u: return UINT32_C(0x000AAB30);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 32u: /* .?AVHyperTextCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000AEEA0);
-        case 1u: return UINT32_C(0x000B1210);
-        case 2u: return UINT32_C(0x000B08B0);
-        case 4u: return UINT32_C(0x000AF040);
-        case 5u: return UINT32_C(0x000B0590);
-        case 11u: return UINT32_C(0x000B0250);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 33u: /* .?AV?$basic_filebuf@DU?$char_traits@D@std@@@std@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000B3B70);
-        case 1u: return UINT32_C(0x000B15E0);
-        case 2u: return UINT32_C(0x000B15F0);
-        case 3u: return UINT32_C(0x000B2680);
-        case 4u: return UINT32_C(0x000B16D0);
-        case 5u: return UINT32_C(0x000EF656);
-        case 6u: return UINT32_C(0x000B1600);
-        case 7u: return UINT32_C(0x000B28A0);
-        case 8u: return UINT32_C(0x000EF65C);
-        case 9u: return UINT32_C(0x000EF662);
-        case 10u: return UINT32_C(0x000B2EE0);
-        case 11u: return UINT32_C(0x000B2FE0);
-        case 12u: return UINT32_C(0x000B1760);
-        case 13u: return UINT32_C(0x000B1650);
-        case 14u: return UINT32_C(0x000B17F0);
-        default: return 0u;
-        }
-    case 34u: /* .?AV?$basic_ofstream@DU?$char_traits@D@std@@@std@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000B4D90);
-        default: return 0u;
-        }
-    case 35u: /* .?AV?$basic_ifstream@DU?$char_traits@D@std@@@std@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000B5780);
-        default: return 0u;
-        }
-    case 36u: /* .?AVHyperTextEditControl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000B6410);
-        case 1u: return UINT32_C(0x000B7720);
-        case 2u: return UINT32_C(0x000B45C0);
-        case 4u: return UINT32_C(0x000B47D0);
-        case 5u: return UINT32_C(0x000B6F30);
-        case 11u: return UINT32_C(0x000B6F10);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 37u: /* .?AVImageCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000B77F0);
-        case 1u: return UINT32_C(0x000B80A0);
-        case 2u: return UINT32_C(0x000B7DC0);
-        case 4u: return UINT32_C(0x000B7970);
-        case 5u: return UINT32_C(0x000B7AF0);
-        case 6u: return UINT32_C(0x000B7F10);
-        case 11u: return UINT32_C(0x000B7F90);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 38u: /* .?AV?$basic_stringbuf@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000B9070);
-        case 1u: return UINT32_C(0x000EF668);
-        case 2u: return UINT32_C(0x000EF66E);
-        case 3u: return UINT32_C(0x000B8D40);
-        case 4u: return UINT32_C(0x000B8F00);
-        case 5u: return UINT32_C(0x000EF656);
-        case 6u: return UINT32_C(0x000B8B10);
-        case 7u: return UINT32_C(0x000EF674);
-        case 8u: return UINT32_C(0x000EF65C);
-        case 9u: return UINT32_C(0x000EF662);
-        case 10u: return UINT32_C(0x000B8B80);
-        case 11u: return UINT32_C(0x000B8F50);
-        case 12u: return UINT32_C(0x000EF67A);
-        case 13u: return UINT32_C(0x000EF680);
-        case 14u: return UINT32_C(0x000EF686);
-        default: return 0u;
-        }
-    case 39u: /* .?AV?$basic_ostringstream@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000B92A0);
-        default: return 0u;
-        }
-    case 40u: /* .?AVListItemCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000BE3E0);
-        case 1u: return UINT32_C(0x000BE8C0);
-        case 2u: return UINT32_C(0x000BE170);
-        case 4u: return UINT32_C(0x000BD000);
-        case 5u: return UINT32_C(0x000BD340);
-        case 6u: return UINT32_C(0x000BD880);
-        case 7u: return UINT32_C(0x000BD970);
-        case 8u: return UINT32_C(0x000BDA30);
-        case 11u: return UINT32_C(0x000BE3C0);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 41u: /* .?AVListCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000C0D80);
-        case 1u: return UINT32_C(0x000C04C0);
-        case 2u: return UINT32_C(0x000C08C0);
-        case 4u: return UINT32_C(0x000BF210);
-        case 5u: return UINT32_C(0x000BEEF0);
-        case 11u: return UINT32_C(0x000BFE80);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 42u: /* .?AVCMenuListControl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000C1B30);
-        case 1u: return UINT32_C(0x000C2FB0);
-        case 2u: return UINT32_C(0x000C2A40);
-        case 4u: return UINT32_C(0x000C1A40);
-        case 5u: return UINT32_C(0x000C1660);
-        case 11u: return UINT32_C(0x000C2A20);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 43u: /* .?AVMiniHelpCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000D0230);
-        case 1u: return UINT32_C(0x000C3520);
-        case 2u: return UINT32_C(0x000D0130);
-        case 4u: return UINT32_C(0x000CFA00);
-        case 5u: return UINT32_C(0x000C3060);
-        case 11u: return UINT32_C(0x000C3270);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 44u: /* .?AVCMinimapControl@SphereUI@@ */
-        switch (slot) {
-        case 1u: return UINT32_C(0x000C3670);
-        case 2u: return UINT32_C(0x000C3710);
-        case 4u: return UINT32_C(0x000C3750);
-        case 11u: return UINT32_C(0x000C3720);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 45u: /* .?AVProgressBar@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000C3FC0);
-        case 1u: return UINT32_C(0x000C42B0);
-        case 2u: return UINT32_C(0x000C3EB0);
-        case 4u: return UINT32_C(0x000C3C00);
-        case 5u: return UINT32_C(0x0002B0A0);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 46u: /* .?AVRadioButtonCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000A0ED0);
-        case 1u: return UINT32_C(0x000C43C0);
-        case 2u: return UINT32_C(0x000A12C0);
-        case 4u: return UINT32_C(0x000A13E0);
-        case 5u: return UINT32_C(0x000A1200);
-        case 12u: return UINT32_C(0x000C4360);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 47u: /* .?AVRichEditCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000C4480);
-        case 1u: return UINT32_C(0x000C5E10);
-        case 2u: return UINT32_C(0x000C6370);
-        case 4u: return UINT32_C(0x000C4D90);
-        case 5u: return UINT32_C(0x000C6810);
-        case 11u: return UINT32_C(0x000C5990);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 48u: /* .?AVScrollBar@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000C6B80);
-        case 1u: return UINT32_C(0x000C7F20);
-        case 2u: return UINT32_C(0x000C7AB0);
-        case 4u: return UINT32_C(0x000C6EC0);
-        case 5u: return UINT32_C(0x000C7120);
-        case 11u: return UINT32_C(0x000C7DC0);
-        case 12u: return UINT32_C(0x000C7880);
-        case 13u: return UINT32_C(0x000C7CF0);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 49u: /* .?AVSliderCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000C80C0);
-        case 1u: return UINT32_C(0x000C8450);
-        case 2u: return UINT32_C(0x000C7AB0);
-        case 4u: return UINT32_C(0x000C82E0);
-        case 5u: return UINT32_C(0x000C7120);
-        case 11u: return UINT32_C(0x000C7DC0);
-        case 12u: return UINT32_C(0x000C8270);
-        case 13u: return UINT32_C(0x000C8060);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 50u: /* .?AVSlotCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000C95F0);
-        case 1u: return UINT32_C(0x000C99D0);
-        case 2u: return UINT32_C(0x000C9250);
-        case 4u: return UINT32_C(0x000C85E0);
-        case 5u: return UINT32_C(0x000C8D00);
-        case 7u: return UINT32_C(0x000C8570);
-        case 11u: return UINT32_C(0x000C9150);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 51u: /* .?AVSpinButton@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000CD550);
-        case 1u: return UINT32_C(0x000CDE00);
-        case 2u: return UINT32_C(0x000CDA30);
-        case 4u: return UINT32_C(0x000CD760);
-        case 5u: return UINT32_C(0x000CD820);
-        case 11u: return UINT32_C(0x000CDA10);
-        case 12u: return UINT32_C(0x000CDBF0);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 52u: /* .?AVTextCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000CF3E0);
-        case 1u: return UINT32_C(0x000CF670);
-        case 4u: return UINT32_C(0x000CF4C0);
-        case 5u: return UINT32_C(0x000CF310);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 53u: /* .?AVToolTipCtrl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000D0230);
-        case 1u: return UINT32_C(0x000CFF20);
-        case 2u: return UINT32_C(0x000D0130);
-        case 4u: return UINT32_C(0x000CFA00);
-        case 5u: return UINT32_C(0x000CF7C0);
-        case 11u: return UINT32_C(0x000C3270);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 54u: /* .?AVCWebBrowserControl@SphereUI@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000D0E10);
-        case 1u: return UINT32_C(0x000D0BB0);
-        case 2u: return UINT32_C(0x000D0EC0);
-        case 4u: return UINT32_C(0x000D0520);
-        case 5u: return UINT32_C(0x000D0670);
-        case 11u: return UINT32_C(0x000D09D0);
-        default: return sfera_window_virtual_rva(slot);
-        }
-    case 55u: return sfera_window_virtual_rva(slot); /* .?AVWindow@SphereUI@@ */
-    case 56u: /* .?AVCCursor@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000EEB22);
-        case 1u: return UINT32_C(0x000EEB22);
-        case 2u: return UINT32_C(0x000EEB22);
-        case 3u: return UINT32_C(0x000EEB22);
-        case 4u: return UINT32_C(0x000EEB22);
-        case 5u: return UINT32_C(0x000EEB22);
-        case 6u: return UINT32_C(0x000EEB22);
-        case 7u: return UINT32_C(0x000EEB22);
-        case 8u: return UINT32_C(0x000EEB22);
-        case 9u: return UINT32_C(0x000EEB22);
-        case 10u: return UINT32_C(0x000EEB22);
-        case 11u: return UINT32_C(0x000EEB22);
-        case 12u: return UINT32_C(0x000EEB22);
-        case 13u: return UINT32_C(0x000EEB22);
-        default: return 0u;
-        }
-    case 57u: /* .?AVCHardwareCursor@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000D8340);
-        case 1u: return UINT32_C(0x000D7C50);
-        case 2u: return UINT32_C(0x000D7CB0);
-        case 3u: return UINT32_C(0x000D7CF0);
-        case 4u: return UINT32_C(0x000D7D00);
-        case 5u: return UINT32_C(0x0002B7D0);
-        case 6u: return UINT32_C(0x000D7D10);
-        case 7u: return UINT32_C(0x000D7D60);
-        case 8u: return UINT32_C(0x000D7DA0);
-        case 9u: return UINT32_C(0x000D7DD0);
-        case 10u: return UINT32_C(0x000D7E10);
-        case 11u: return UINT32_C(0x000D7E30);
-        case 12u: return UINT32_C(0x000D7E50);
-        case 13u: return UINT32_C(0x000D7E60);
-        default: return 0u;
-        }
-    case 58u: /* .?AVCSoftwareCursor@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000D8340);
-        case 1u: return UINT32_C(0x000D7FB0);
-        case 2u: return UINT32_C(0x000D8030);
-        case 3u: return UINT32_C(0x000D80A0);
-        case 4u: return UINT32_C(0x0002B7D0);
-        case 5u: return UINT32_C(0x000D8100);
-        case 6u: return UINT32_C(0x000D8140);
-        case 7u: return UINT32_C(0x000D8160);
-        case 8u: return UINT32_C(0x000D8180);
-        case 9u: return UINT32_C(0x000D82D0);
-        case 10u: return UINT32_C(0x000D82E0);
-        case 11u: return UINT32_C(0x000D82F0);
-        case 12u: return UINT32_C(0x000D8300);
-        case 13u: return UINT32_C(0x000D8310);
-        default: return 0u;
-        }
-    case 59u: /* .?AVUnmanagedResourceVB@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000D9740);
-        case 1u: return UINT32_C(0x000D9820);
-        default: return 0u;
-        }
-    case 60u: /* .?AVUnmanagedResourceIB@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000D97B0);
-        case 1u: return UINT32_C(0x000D9820);
-        default: return 0u;
-        }
-    case 61u: /* .?AVUnmanagedResourceTexture@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000D9840);
-        case 1u: return UINT32_C(0x000D9820);
-        default: return 0u;
-        }
-    case 62u: /* .?AV?$Vect@PAVUnmanagedResourceBase@@@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000DA510);
-        default: return 0u;
-        }
-    case 63u: /* .?AVStdAllocator@@ */
-        switch (slot) {
-        case 0u: return UINT32_C(0x000ED770);
-        case 1u: return UINT32_C(0x000ED790);
-        case 2u: return UINT32_C(0x000ED7B0);
-        default: return 0u;
-        }
-    case 64u: /* std::bad_alloc */
-        switch (slot) { case 0u: return UINT32_C(0x00001BB0); case 1u: return UINT32_C(0x000EE924); default: return 0u; }
-    case 65u: /* _com_error */
-        switch (slot) { case 0u: return UINT32_C(0x000EF740); default: return 0u; }
-    default: return 0u;
-    }
-}
-int sfera_decode_vptr_token(uint32_t address, uint32_t* class_id, uint32_t* slot) {
-    const uint32_t offset = address - SFERA_VPTR_TOKEN_BASE;
-    if (offset >= UINT32_C(0x00001080) || (offset & 3u) != 0u) { return 0; }
-    const uint32_t decoded_class = offset >> 6u;
-    const uint32_t decoded_slot = (offset & 0x3Fu) >> 2u;
-    if (sfera_virtual_override_rva(decoded_class, decoded_slot) == 0u) { return 0; }
-    if (class_id) { *class_id = decoded_class; }
-    if (slot) { *slot = decoded_slot; }
-    return 1;
-}
+    return true;
 }
 
-extern "C" int sfera_bind_native_std_stream_vtables(void) { struct NativeVtableBinding { uint32_t class_id; uint32_t* slots; uint32_t slot_count; }; const NativeVtableBinding bindings[] = {{33u, g_sfera_native_vtable_basic_filebuf, 15u}, {34u, g_sfera_native_vtable_basic_ofstream, 1u}, {35u, g_sfera_native_vtable_basic_ifstream, 1u}, {38u, g_sfera_native_vtable_basic_stringbuf, 15u}, {39u, g_sfera_native_vtable_basic_ostringstream, 1u}}; for (const NativeVtableBinding& binding : bindings) { for (uint32_t slot = 0u; slot < binding.slot_count; ++slot) { const uint32_t rva = sfera_virtual_override_rva(binding.class_id, slot); if (rva == 0u) { return 0; } const uint32_t callback = lift_callback_address_rva(rva); if (callback == 0u) { return 0; } binding.slots[slot] = callback; } } return 1; }
-extern "C" int sfera_vtable_token_address(uint32_t address) { return sfera_decode_vptr_token(address, nullptr, nullptr); }
-extern "C" int sfera_vtable_try_load32(uint32_t address, uint32_t* value) {
-    uint32_t class_id = 0u; uint32_t slot = 0u;
-    if (!value || !sfera_decode_vptr_token(address, &class_id, &slot)) { return 0; }
-    *value = lift_callback_address_rva(sfera_virtual_override_rva(class_id, slot));
-    return 1;
+}
+
+extern "C" int sfera_bind_legacy_cpp_vtables(void) {
+    static const LiftFunction filebuf[] = {
+        &sfera_sub_004B3B70, &sfera_sub_004B15E0, &sfera_sub_004B15F0, &sfera_sub_004B2680, &sfera_sub_004B16D0,
+        &sfera_sub_004EF656, &sfera_sub_004B1600, &sfera_sub_004B28A0, &sfera_sub_004EF65C, &sfera_sub_004EF662,
+        &sfera_sub_004B2EE0, &sfera_sub_004B2FE0, &sfera_sub_004B1760, &sfera_sub_004B1650, &sfera_sub_004B17F0
+    };
+    static const LiftFunction ofstream[] = {&sfera_sub_004B4D90};
+    static const LiftFunction ifstream[] = {&sfera_sub_004B5780};
+    static const LiftFunction stringbuf[] = {
+        &sfera_sub_004B9070, &sfera_sub_004EF668, &sfera_sub_004EF66E, &sfera_sub_004B8D40, &sfera_sub_004B8F00,
+        &sfera_sub_004EF656, &sfera_sub_004B8B10, &sfera_sub_004EF674, &sfera_sub_004EF65C, &sfera_sub_004EF662,
+        &sfera_sub_004B8B80, &sfera_sub_004B8F50, &sfera_sub_004EF67A, &sfera_sub_004EF680, &sfera_sub_004EF686
+    };
+    static const LiftFunction ostringstream[] = {&sfera_sub_004B92A0};
+    static const LiftFunction bad_alloc[] = {&sfera_sub_00401BB0, &sfera_sub_004EE924};
+    static const LiftFunction com_error[] = {&sfera_sub_004EF740};
+    return sfera_bind_legacy_vtable(g_sfera_msvcp100_vtable_basic_filebuf, filebuf, 15u)
+        && sfera_bind_legacy_vtable(g_sfera_msvcp100_vtable_basic_ofstream, ofstream, 1u)
+        && sfera_bind_legacy_vtable(g_sfera_msvcp100_vtable_basic_ifstream, ifstream, 1u)
+        && sfera_bind_legacy_vtable(g_sfera_msvcp100_vtable_basic_stringbuf, stringbuf, 15u)
+        && sfera_bind_legacy_vtable(g_sfera_msvcp100_vtable_basic_ostringstream, ostringstream, 1u)
+        && sfera_bind_legacy_vtable(g_sfera_legacy_vtable_bad_alloc, bad_alloc, 2u)
+        && sfera_bind_legacy_vtable(g_sfera_legacy_vtable_com_error, com_error, 1u);
 }
 
 namespace {
-template <typename T>
-static T& sfera_initial_data(uint8_t* storage, uint32_t source_va) { return *reinterpret_cast<T*>(storage + (source_va - SFERA_DATA_SOURCE_BEGIN)); }
 
-static_assert(sizeof(SferaStdAllocator) == 4u, "StdAllocator state layout changed");
+static_assert(sizeof(void*) != 4u || sizeof(SferaStdAllocator) == 4u, "StdAllocator state layout changed");
 static_assert(sizeof(SferaAutoBoundsArray) == 0x38u, "AutoBoundsArray state layout changed");
 static_assert(sizeof(SferaFileRuntime) == 0x84u, "file runtime state layout changed");
 static_assert(sizeof(SferaBoundCheckArray) == 0x2Cu, "BoundCheckArray state layout changed");
@@ -1466,6 +844,13 @@ static void sfera_initialize_runtime_sentinels(void) {
     memset(&g_sfera_config_text_runtime, 0, sizeof(g_sfera_config_text_runtime));
     memset(&g_sfera_planting_table_runtime, 0, sizeof(g_sfera_planting_table_runtime));
     memset(&g_sfera_static_render_lookup_runtime, 0, sizeof(g_sfera_static_render_lookup_runtime));
+    memset(&g_sfera_mbc_static_runtime, 0, sizeof(g_sfera_mbc_static_runtime));
+    memset(&g_sfera_view_render_objects_runtime, 0, sizeof(g_sfera_view_render_objects_runtime));
+    memset(&g_sfera_map_generator_runtime, 0, sizeof(g_sfera_map_generator_runtime));
+    memset(&g_sfera_alpha_material_runtime, 0, sizeof(g_sfera_alpha_material_runtime));
+    memset(&g_sfera_client_array_runtime, 0, sizeof(g_sfera_client_array_runtime));
+    memset(g_sfera_shadow_object_storage, 0, sizeof(g_sfera_shadow_object_storage));
+    memset(g_sfera_options_dialog_object_storage, 0, sizeof(g_sfera_options_dialog_object_storage));
     memset(&g_sfera_spatial_index_runtime, 0, sizeof(g_sfera_spatial_index_runtime));
     memset(&g_sfera_startup_command_line_runtime, 0, sizeof(g_sfera_startup_command_line_runtime));
     memset(&g_sfera_collision_scratch_runtime, 0, sizeof(g_sfera_collision_scratch_runtime));
@@ -1531,17 +916,14 @@ static void sfera_initialize_memory_runtime(void) {
     g_sfera_memory_runtime.tracker_primary = UINT32_C(1000000000);
     g_sfera_memory_runtime.tracker_floor = UINT32_C(1000000000);
     g_sfera_memory_runtime.tracker_ceiling = UINT32_C(1000000000);
-    g_sfera_std_allocator.vptr = SFERA_VPTR_STDALLOCATOR;
 }
 }
 
-extern "C" void sfera_initialize_data_storage(uint8_t* storage) {
-    if (!storage) { return; }
+extern "C" void sfera_initialize_native_storage(void) {
     memset(&g_sfera_mbc_runtime_storage, 0, sizeof(g_sfera_mbc_runtime_storage));
     g_sfera_mbc_runtime = &g_sfera_mbc_runtime_storage;
     memset(&g_sfera_mbc_interpreter_storage, 0, sizeof(g_sfera_mbc_interpreter_storage));
     memset(g_sfera_mbc_module_memory_stats, 0, sizeof(g_sfera_mbc_module_memory_stats));
-    memset(storage, 0, UINT32_C(0x00005600));
     memset(g_sfera_array_error_buffer, 0, sizeof(g_sfera_array_error_buffer));
     memset(&g_sfera_shared_parser_whitespace, 0, sizeof(g_sfera_shared_parser_whitespace));
     memset(&g_sfera_shared_parser_path_separators, 0, sizeof(g_sfera_shared_parser_path_separators));
@@ -1552,7 +934,6 @@ extern "C" void sfera_initialize_data_storage(uint8_t* storage) {
     memset(&g_sfera_menu_list_missing_parameter_message, 0, sizeof(g_sfera_menu_list_missing_parameter_message));
     memset(&g_sfera_menu_not_enough_arguments_message, 0, sizeof(g_sfera_menu_not_enough_arguments_message));
     memset(&g_sfera_menu_sprite_not_found_message, 0, sizeof(g_sfera_menu_sprite_not_found_message));
-    memset(&g_sfera_std_allocator, 0, sizeof(g_sfera_std_allocator));
     memset(&g_sfera_main_command_state_runtime, 0, sizeof(g_sfera_main_command_state_runtime));
     memset(&g_sfera_main_input_state_runtime, 0, sizeof(g_sfera_main_input_state_runtime));
     memset(&g_sfera_main_view_state_runtime, 0, sizeof(g_sfera_main_view_state_runtime));
@@ -1663,11 +1044,11 @@ static SferaInflateHuft32 g_sfera_zlib_fixed_distance_pool[512] = {};
 
 template <typename T>
 static T* sfera_zlib_pointer(uint32_t address) {
-    return reinterpret_cast<T*>(static_cast<uintptr_t>(sfera_data_deref_address(address)));
+    return reinterpret_cast<T*>(static_cast<uintptr_t>(address));
 }
 
 static uint8_t* sfera_zlib_bytes(uint32_t address, uint32_t size) {
-    return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(sfera_data_deref_range(address, size)));
+    (void)size; return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(address));
 }
 
 static SferaDeflateConfig sfera_zlib_deflate_config(int32_t level) {

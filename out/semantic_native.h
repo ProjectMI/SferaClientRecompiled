@@ -7,14 +7,17 @@
  *
  * Current state:
  *   - source .rdata has no materialized backing store; strings and scalar constants live at their consumers.
- *   - client vtables are semantic class tokens: virtual slot reads resolve directly to the lifted override callback.
+ *   - recovered client classes use compiler-generated C++ virtual dispatch; no semantic vtable token layer remains.
  *   - MSVC C++ EH frame metadata and __CxxFrameHandler3 entrypoints are eliminated; lifted throw paths terminate semantically.
- *   - .data keeps a compatibility view only for state whose source address is still observable; compiler-only TypeDescriptor objects are removed after initialization.
+ *   - source .data has been lifted into native typed storage; no compatibility mapping of the original .data address space remains.
  *
  * Lifted function shards remain separate only to keep MSVC compile times sane.
  */
 
 #include "lifted_abi.h"
+#ifdef __cplusplus
+#include "semantic_classes.h"
+#endif
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -27,10 +30,8 @@ static inline uint32_t sfera_f32_bits(float value) { uint32_t bits; memcpy(&bits
 #define SFERA_STATIC_ASSERT(condition, message) _Static_assert(condition, message)
 #endif
 
-/* ===== Native static storage and address translation ===== */
-/* Source .rdata addresses survive only as semantic class/vptr tokens.
- * .data still has a canonical compatibility view while its remaining address-sensitive state is lifted by consumer.
- */
+/* ===== Native static storage ===== */
+/* Source .data addresses do not survive: all recognized static state lives in native typed storage. */
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,16 +42,20 @@ extern "C" {
 extern const SferaMsvcVbtable2 g_sfera_vbtable_basic_ofstream;
 extern const SferaMsvcVbtable2 g_sfera_vbtable_basic_ifstream;
 extern const SferaMsvcVbtable2 g_sfera_vbtable_basic_ostringstream;
-extern uint32_t g_sfera_native_vtable_basic_filebuf[15];
-extern uint32_t g_sfera_native_vtable_basic_ofstream[1];
-extern uint32_t g_sfera_native_vtable_basic_ifstream[1];
-extern uint32_t g_sfera_native_vtable_basic_stringbuf[15];
-extern uint32_t g_sfera_native_vtable_basic_ostringstream[1];
+extern uint32_t g_sfera_msvcp100_vtable_basic_filebuf[15];
+extern uint32_t g_sfera_msvcp100_vtable_basic_ofstream[1];
+extern uint32_t g_sfera_msvcp100_vtable_basic_ifstream[1];
+extern uint32_t g_sfera_msvcp100_vtable_basic_stringbuf[15];
+extern uint32_t g_sfera_msvcp100_vtable_basic_ostringstream[1];
+extern uint32_t g_sfera_legacy_vtable_bad_alloc[2];
+extern uint32_t g_sfera_legacy_vtable_com_error[1];
 extern const SferaGuid32 g_sfera_guid_direct_input_key;
 extern const SferaGuid32 g_sfera_guid_direct_input_x_axis;
 extern const SferaGuid32 g_sfera_guid_direct_input_y_axis;
 extern const SferaGuid32 g_sfera_guid_direct_input_z_axis;
-int sfera_bind_native_std_stream_vtables(void);
+int sfera_bind_legacy_cpp_vtables(void);
+void sfera_initialize_native_storage(void);
+uint32_t sfera_cursor_texture_name(uint32_t slot);
 extern const SferaGuid32 g_sfera_guid_iid_doc_host_ui_handler;
 extern const SferaGuid32 g_sfera_guid_iid_ole_client_site;
 extern const SferaGuid32 g_sfera_guid_iid_ole_object;
@@ -472,14 +477,9 @@ extern uint32_t SFERA_IMPORT_MSVCP100_basic_istream_ctor;
 extern uint32_t SFERA_IMPORT_MSVCP100_basic_istream_dtor;
 extern uint32_t SFERA_IMPORT_MSVCP100_ios_base_Ios_base_dtor;
 extern uint32_t SFERA_IMPORT_MSVCP100_basic_ostream_vftable;
-extern uint8_t* g_sfera_data_compat_base;
 extern uint32_t g_sfera_security_cookie;
 extern uint32_t g_sfera_security_cookie_complement;
 extern uint32_t g_sfera_log_first_write;
-#define SFERA_DATA_PAGE_SHIFT UINT32_C(16)
-#define SFERA_DATA_PAGE_SIZE UINT32_C(0x00010000)
-#define SFERA_DATA_PAGE_COUNT UINT32_C(0x000004A8)
-extern uint8_t* g_sfera_data_semantic_page_alias[SFERA_DATA_PAGE_COUNT];
 
 #ifdef __cplusplus
 }
@@ -493,11 +493,6 @@ extern uint8_t* g_sfera_data_semantic_page_alias[SFERA_DATA_PAGE_COUNT];
 
 #define SFERA_ELIMINATED_RDATA_BEGIN UINT32_C(0x004FD000)
 #define SFERA_ELIMINATED_RDATA_SIZE UINT32_C(0x00022E00)
-#define SFERA_DATA_SOURCE_BEGIN UINT32_C(0x00520000)
-#define SFERA_DATA_SOURCE_SIZE UINT32_C(0x04A70790)
-#define SFERA_DATA_STORAGE_SIZE UINT32_C(0x04A80000)
-#define SFERA_DATA_SEMANTIC_VA(source_va) ((uint32_t)(uintptr_t)(g_sfera_data_semantic_page_alias[(((uint32_t)(source_va) - SFERA_DATA_SOURCE_BEGIN) >> SFERA_DATA_PAGE_SHIFT)] + (((uint32_t)(source_va) - SFERA_DATA_SOURCE_BEGIN) & (SFERA_DATA_PAGE_SIZE - 1u))))
-#define SFERA_DATA_CANONICAL_ADDR(source_va) ((uint32_t)(uintptr_t)(g_sfera_data_compat_base + ((uint32_t)(source_va) - SFERA_DATA_SOURCE_BEGIN)))
 
 
 
@@ -579,7 +574,8 @@ typedef struct SferaSoundRuntime { uint32_t effect_manager; uint32_t manager; Sf
 typedef struct SferaWarningLogRuntime { uint8_t object[0x5320]; } SferaWarningLogRuntime;
 SFERA_STATIC_ASSERT(sizeof(SferaWarningLogRuntime) == 0x5320u, "warning log runtime ABI size");
 typedef struct SferaControlOptionsRuntime { uint32_t active_slot; uint32_t configured_bindings[64]; uint32_t working_bindings[64]; } SferaControlOptionsRuntime;
-typedef struct SferaSpriteRuntime { uint32_t render_mode; } SferaSpriteRuntime;
+#define SFERA_SPRITE_TEXTURE_TOKEN_CAPACITY UINT32_C(0x110)
+typedef struct SferaSpriteRuntime { uint32_t render_mode; char texture_token[SFERA_SPRITE_TEXTURE_TOKEN_CAPACITY]; } SferaSpriteRuntime;
 typedef struct SferaCrashRuntime { uint8_t report_pending; } SferaCrashRuntime;
 typedef struct SferaContoursRuntime { uint32_t round_robin_counter; } SferaContoursRuntime;
 typedef struct SferaDynGreenRuntime { uint32_t previous_timestamp_low; uint32_t previous_timestamp_high; } SferaDynGreenRuntime;
@@ -591,7 +587,7 @@ SFERA_STATIC_ASSERT(sizeof(SferaU64Words) == 8u, "64-bit word pair ABI size");
 typedef struct SferaFrameRuntime { float fps; uint32_t fps_sample_count; SferaU64Words fps_anchor; uint32_t frame_sample_count; SferaU64Words frame_anchor; SferaU64Words frame_state_anchor; uint32_t frame_state; uint32_t primary_toggle; uint32_t secondary_toggle; uint8_t color_lookup_object[0x1C]; uint32_t color_lookup_flags; uint32_t warning_header_written; } SferaFrameRuntime;
 typedef struct SferaHighResolutionClockRuntime { SferaU64Words elapsed_counter; SferaU64Words epoch_microseconds; SferaU64Words performance_frequency; uint32_t frequency_shift; uint32_t initialized; SferaU64Words counter_anchor; } SferaHighResolutionClockRuntime;
 #define SFERA_PROFILE_SLOT_COUNT UINT32_C(100)
-typedef struct SferaProfilerRuntime { SferaU64Words accumulated_ticks[SFERA_PROFILE_SLOT_COUNT]; uint8_t active[SFERA_PROFILE_SLOT_COUNT]; uint32_t frame_count; SferaU64Words start_time_us[SFERA_PROFILE_SLOT_COUNT]; uint32_t call_count[SFERA_PROFILE_SLOT_COUNT]; uint32_t frame_time_total; SferaU64Words report_clock_snapshot; } SferaProfilerRuntime;
+typedef struct SferaProfilerRuntime { SferaU64Words accumulated_ticks[SFERA_PROFILE_SLOT_COUNT]; uint8_t active[SFERA_PROFILE_SLOT_COUNT]; uint32_t frame_count; SferaU64Words start_time_us[SFERA_PROFILE_SLOT_COUNT]; uint32_t call_count[SFERA_PROFILE_SLOT_COUNT]; uint32_t frame_time_total; SferaU64Words report_clock_snapshot; uint32_t report_percent[10]; } SferaProfilerRuntime;
 typedef struct SferaCrc32Runtime { uint32_t table[256]; uint32_t current; } SferaCrc32Runtime;
 typedef struct SferaUiLoadScratchRuntime { char button_value[256]; char checkbox_value[256]; char text_value[256]; char image_value[256]; char cursor_name[128]; char resolved_ui_path[256]; char localized_text[1024]; char localized_key[256]; char list_item_value[256]; char progress_bar_value[256]; char scroll_bar_value[256]; char slider_status_value[256]; char slot_value[256]; char resolution_text[128]; char spin_value_text[128]; char text_style_token[256]; char tooltip_key[256]; } SferaUiLoadScratchRuntime;
 typedef struct SferaHyperTextScratchRuntime { char attribute_name[256]; char command_text[256]; char token_text[256]; } SferaHyperTextScratchRuntime;
@@ -623,7 +619,7 @@ SFERA_STATIC_ASSERT(sizeof(SferaGrassPlacementRuntime) == 0x6A50u, "grass placem
 typedef union SferaInterfaceCoreRuntime { uint32_t alignment[207]; uint8_t storage[0x33C]; } SferaInterfaceCoreRuntime;
 typedef struct SferaClientMainScalarRuntime { uint32_t counter_01; uint32_t state_01; uint32_t state_02; uint32_t state_03; uint32_t state_04; uint32_t counter_02; uint32_t counter_03; uint32_t mode_01; uint32_t mode_02; uint32_t state_05; uint32_t state_06; uint32_t state_07; uint32_t state_09; uint32_t state_10; uint32_t state_11; uint32_t state_12; uint32_t state_13; uint32_t state_14; uint32_t state_15; uint32_t state_16; uint32_t state_17; uint32_t state_18; uint32_t state_19; uint32_t state_20; uint32_t state_21; uint32_t state_22; uint32_t state_23; uint32_t state_24; uint32_t state_25; uint32_t state_26; uint32_t state_27; uint32_t state_28; uint32_t state_29; uint32_t state_30; uint32_t state_31; uint32_t state_32; uint32_t state_33; uint32_t state_34; uint32_t state_35; uint32_t state_36; uint32_t counter_04; } SferaClientMainScalarRuntime;
 typedef struct SferaInterScalarRuntime { uint32_t state_01; uint32_t state_02; uint32_t state_03; uint32_t mode_01; uint32_t mode_02; uint32_t mode_03; uint32_t state_04; uint32_t mode_04; uint32_t state_05; uint32_t state_06; uint32_t state_07; } SferaInterScalarRuntime;
-typedef struct SferaTextureSetScalarRuntime { uint32_t state_01; uint32_t state_02; uint32_t mode_01; uint32_t state_03; uint32_t mode_02; } SferaTextureSetScalarRuntime;
+typedef struct SferaTextureSetScalarRuntime { uint32_t state_01; uint32_t state_02; uint32_t mode_01; uint32_t state_03; uint32_t mode_02; uint32_t record_default_38; uint32_t record_default_3c; uint32_t last_selector; } SferaTextureSetScalarRuntime;
 #define SFERA_TEXTURE_HASH_BUCKET_COUNT UINT32_C(65536)
 #define SFERA_TEXTURE_PATH_COUNT_MAX UINT32_C(500)
 #define SFERA_TEXTURE_PATH_CAPACITY UINT32_C(100)
@@ -633,7 +629,11 @@ SFERA_STATIC_ASSERT(sizeof(((SferaTextureRegistryRuntime*)0)->hash_heads) == 0x2
 SFERA_STATIC_ASSERT(sizeof(((SferaTextureRegistryRuntime*)0)->paths) == 50000u, "texture path table ABI span");
 SFERA_STATIC_ASSERT(sizeof(((SferaTextureRegistryRuntime*)0)->hash_mix) == 0x200u, "texture hash-mix table ABI span");
 typedef struct SferaInterfaceRuntime { uint32_t cursor_kind; uint8_t primary_gate; uint8_t secondary_gate; uint32_t cross_enabled; uint32_t sounds_enabled; uint32_t description_auto_popup; uint32_t invite_messages; uint32_t description_window; uint32_t previous_input_modifiers; SferaBoundCheckArray windows; SferaBoundCheckArray window_handle_table; } SferaInterfaceRuntime;
+#ifdef __cplusplus
+using SferaStdAllocator = StdAllocator;
+#else
 typedef struct SferaStdAllocator { uint32_t vptr; } SferaStdAllocator;
+#endif
 typedef struct SferaMemoryRuntime { uint32_t allocation_source_file; uint32_t allocation_source_line; uint32_t critical_error_callback; uint32_t tracker_primary; uint32_t tracker_auxiliary; uint32_t tracker_floor; uint32_t tracker_ceiling; uint32_t bucket_bytes[1024]; uint32_t bucket_allocations[1024]; uint8_t tracking_initialized; uint8_t diagnostics_dirty; uint32_t live_allocation_count; uint32_t validation_pass_count; uint32_t lock_words[6]; uint8_t lock_initialized; uint8_t lock_held; } SferaMemoryRuntime;
 #define SFERA_MEMORY_SOURCE_HASH_BUCKET_COUNT UINT32_C(1024)
 typedef struct SferaMemorySourceHashRuntime { uint32_t entries; uint32_t capacity; uint16_t free_index; uint16_t bucket_heads[SFERA_MEMORY_SOURCE_HASH_BUCKET_COUNT]; uint8_t reserved_80a[6]; } SferaMemorySourceHashRuntime;
@@ -653,7 +653,7 @@ typedef SferaModelRegistryRuntime SferaControlReferenceRegistryRuntime;
 typedef SferaModelRegistryRuntime SferaCursorTextureRegistryRuntime;
 typedef struct SferaBrowserWindowRuntime { uint8_t class_registered; uint8_t reserved_01[3]; uint32_t original_window_proc; } SferaBrowserWindowRuntime;
 typedef struct SferaMinimapTextureRuntime { uint32_t singleton; } SferaMinimapTextureRuntime;
-typedef struct SferaCrtStartupRuntime { uint32_t managed_app; uint32_t environment; uint32_t main_return_code; uint32_t has_cctor; uint32_t dynamic_tls_dtor_callbacks; uint32_t startup_state; uint32_t processor_feature_10; uint32_t dynamic_tls_init_callback; uint32_t encoded_onexit_begin; uint32_t encoded_onexit_end; } SferaCrtStartupRuntime;
+typedef struct SferaCrtStartupRuntime { uint32_t managed_app; uint32_t environment; uint32_t main_return_code; uint32_t has_cctor; uint32_t dynamic_tls_dtor_callbacks; uint32_t startup_state; uint32_t processor_feature_10; uint32_t dynamic_tls_init_callback; uint32_t encoded_onexit_begin; uint32_t encoded_onexit_end; uint32_t argc; uint32_t argv; uint32_t envp; uint32_t mainargs_result; uint32_t new_mode; uint32_t environment_mode; uint32_t commode; uint32_t fmode; uint32_t startup_lock; uint32_t tls_cleanup_object; uint32_t heap_compatibility_flag; } SferaCrtStartupRuntime;
 #define SFERA_CRASH_REPORT_TEXT_CAPACITY UINT32_C(0x2000)
 #define SFERA_CRASH_PATH_CAPACITY UINT32_C(0x104)
 typedef struct SferaCrashReportRuntime { char report_text[SFERA_CRASH_REPORT_TEXT_CAPACITY]; uint32_t report_length; uint32_t reserved_2004; char error_log_path[SFERA_CRASH_PATH_CAPACITY]; uint32_t previous_exception_filter; uint32_t process_handle; uint32_t error_log_handle; } SferaCrashReportRuntime;
@@ -741,10 +741,11 @@ SFERA_STATIC_ASSERT(offsetof(SferaWindowRuntime, main_window) == 0xBCu, "window 
 SFERA_STATIC_ASSERT(offsetof(SferaWindowRuntime, diagnostic_message) == 0xD8u, "window runtime diagnostic buffer offset");
 typedef struct SferaInputDeviceRuntime { uint32_t process_value; uint32_t input_generation; uint32_t reserved_008; SferaFloatWord minimum_lod_distance; SferaFloatWord lod_distance; uint32_t keyboard_device; uint32_t keyboard_state_code; uint32_t reserved_01c; SferaFloatWord frame_interval; uint32_t render_state; uint32_t shared_object; } SferaInputDeviceRuntime;
 typedef struct SferaScreenClipRuntime { uint32_t left; uint32_t top; uint32_t right; uint32_t bottom; } SferaScreenClipRuntime;
-typedef struct SferaDirectInputRuntime { uint32_t direct_input; uint32_t mouse_device; uint8_t keyboard_state[256]; } SferaDirectInputRuntime;
+typedef struct SferaDirectInputRuntime { uint32_t direct_input; uint32_t mouse_device; uint8_t keyboard_state[256]; uint32_t acquire_failure_state; uint8_t view_adjust_state; uint8_t modifier_08; uint8_t modifier_20; uint8_t reserved_10b; } SferaDirectInputRuntime;
 typedef struct SferaShadowRuntime { uint32_t projected_points; uint32_t span_records; uint32_t manager; uint32_t projected_point_capacity; uint32_t aligned_global_object; } SferaShadowRuntime;
+#define SFERA_TRANSFORM_BOUNDS_STORAGE_SIZE UINT32_C(0xC0)
 typedef struct SferaWorldRenderRuntime { uint32_t active_model; uint32_t world_spatial_index; uint32_t feature_toggle; uint32_t render_queue_count; uint32_t scene_active; } SferaWorldRenderRuntime;
-typedef struct SferaWorldLoadRuntime { uint32_t render_shadows; uint32_t active_tool_context; uint32_t live_object_count; uint32_t packed_variant; uint32_t loading_work_total; } SferaWorldLoadRuntime;
+typedef struct SferaWorldLoadRuntime { uint32_t render_shadows; uint32_t active_tool_context; uint32_t live_object_count; uint32_t packed_variant; uint32_t loading_work_total; uint32_t snow_path_object; } SferaWorldLoadRuntime;
 typedef struct SferaWorldBoundsRuntime { SferaVec3Word minimum; SferaVec3Word maximum; } SferaWorldBoundsRuntime;
 #define SFERA_RENDER_LOOKUP_COUNT UINT32_C(256)
 typedef struct SferaRenderLookupEntry { uint32_t resource; uint32_t mask; } SferaRenderLookupEntry;
@@ -842,12 +843,13 @@ SFERA_STATIC_ASSERT(sizeof(SferaPlantingRecord) == 0x468u, "planting record ABI 
 #define SFERA_FONT_LOOKUP_CLASS_COUNT UINT32_C(5)
 #define SFERA_FONT_LOOKUP_GLYPH_COUNT UINT32_C(256)
 #define SFERA_RENDER_QUANTIZATION_TABLE_SIZE UINT32_C(3072)
-typedef struct SferaStaticRenderLookupRuntime { float normalized_levels[7]; float command_samples[SFERA_RENDER_SAMPLE_COUNT]; float view_phase; uint16_t packed_format_code; uint16_t reserved_1e; uint32_t sample_state; uint32_t sample_flags[SFERA_RENDER_SAMPLE_COUNT]; uint8_t glyph_presence[SFERA_FONT_LOOKUP_GLYPH_COUNT]; uint32_t atlas_resources[SFERA_FONT_LOOKUP_GLYPH_COUNT][SFERA_FONT_LOOKUP_CLASS_COUNT]; uint8_t quantization_a[SFERA_RENDER_QUANTIZATION_TABLE_SIZE]; uint8_t quantization_b[SFERA_RENDER_QUANTIZATION_TABLE_SIZE]; uint32_t glyph_metrics[SFERA_FONT_LOOKUP_GLYPH_COUNT][SFERA_FONT_LOOKUP_CLASS_COUNT]; float projection_scale; } SferaStaticRenderLookupRuntime;
+#define SFERA_RENDER_BLEND_LUT_STORAGE_SIZE UINT32_C(0x4001)
+typedef struct SferaStaticRenderLookupRuntime { float normalized_levels[7]; float command_samples[SFERA_RENDER_SAMPLE_COUNT]; float view_phase; uint16_t packed_format_code; uint16_t reserved_1e; uint32_t sample_state; uint32_t sample_flags[SFERA_RENDER_SAMPLE_COUNT]; uint8_t glyph_presence[SFERA_FONT_LOOKUP_GLYPH_COUNT]; uint32_t atlas_resources[SFERA_FONT_LOOKUP_GLYPH_COUNT][SFERA_FONT_LOOKUP_CLASS_COUNT]; uint8_t quantization_a[SFERA_RENDER_QUANTIZATION_TABLE_SIZE]; uint8_t quantization_b[SFERA_RENDER_QUANTIZATION_TABLE_SIZE]; uint32_t glyph_metrics[SFERA_FONT_LOOKUP_GLYPH_COUNT][SFERA_FONT_LOOKUP_CLASS_COUNT]; float projection_scale; uint8_t blend_lut[SFERA_RENDER_BLEND_LUT_STORAGE_SIZE]; uint8_t color_remap_a[256]; uint8_t color_remap_b[256]; uint8_t color_remap_c[256]; uint8_t legacy_crc_low_table[256]; } SferaStaticRenderLookupRuntime;
 #define SFERA_UI_SORT_INDEX_COUNT UINT32_C(100)
 #define SFERA_QUADTREE_GRID_DIMENSION UINT32_C(256)
 typedef struct SferaSpatialIndexRuntime { uint32_t ui_sort_indices[SFERA_UI_SORT_INDEX_COUNT]; uint32_t quadtree_cells[SFERA_QUADTREE_GRID_DIMENSION * SFERA_QUADTREE_GRID_DIMENSION]; uint32_t quadtree_state; } SferaSpatialIndexRuntime;
 #define SFERA_STARTUP_COMMAND_LINE_CAPACITY UINT32_C(0x160)
-typedef struct SferaStartupCommandLineRuntime { char text[SFERA_STARTUP_COMMAND_LINE_CAPACITY]; } SferaStartupCommandLineRuntime;
+typedef struct SferaStartupCommandLineRuntime { char text[SFERA_STARTUP_COMMAND_LINE_CAPACITY]; uint32_t parser_state; } SferaStartupCommandLineRuntime;
 #define SFERA_LIGHT_CANDIDATE_COUNT UINT32_C(30)
 #define SFERA_LIGHT_CANDIDATE_STRIDE UINT32_C(0x3C)
 #define SFERA_VIEW_TRANSFORM_STORAGE_SIZE UINT32_C(0x568)
@@ -855,6 +857,12 @@ typedef struct SferaCollisionScratchRuntime { uint8_t debug_vertices[0x70]; uint
 SFERA_STATIC_ASSERT(sizeof(((SferaCollisionScratchRuntime*)0)->view_transform) == 0x568u, "view transform ABI span");
 typedef union SferaGrassPatternRecord { uint32_t alignment[14]; uint8_t storage[0x38]; } SferaGrassPatternRecord;
 SFERA_STATIC_ASSERT(sizeof(SferaGrassPatternRecord) == 0x38u, "grass pattern record ABI stride");
+typedef struct SferaMbcStaticRuntime { uint32_t profile_fallback; uint32_t stack_default_values[256]; SferaU64Words startup_time; uint32_t init_marker; uint8_t init_flag; uint8_t service_flag; uint8_t reserved[2]; } SferaMbcStaticRuntime;
+typedef struct SferaViewRenderObjectRuntime { uint8_t storage[0x15C]; } SferaViewRenderObjectRuntime;
+typedef struct SferaViewRenderObjectsRuntime { SferaViewRenderObjectRuntime primary; SferaViewRenderObjectRuntime alternate; uint8_t reset_flag; } SferaViewRenderObjectsRuntime;
+typedef struct SferaMapGeneratorRuntime { uint8_t storage[0x68]; } SferaMapGeneratorRuntime;
+typedef struct SferaAlphaMaterialRuntime { int32_t selected_slot; uint8_t option_a; uint8_t option_b; uint8_t option_c; uint8_t reserved_07; float alpha[4]; } SferaAlphaMaterialRuntime;
+typedef struct SferaClientArrayRuntime { SferaAutoBoundsArray e7_records; SferaAutoBoundsArray e8_indices; SferaAutoBoundsArray e9_indices; SferaAutoBoundsArray eb_records; SferaAutoBoundsArray ed_indices; SferaAutoBoundsArray line_102_indices; SferaAutoBoundsArray line_105_records; SferaAutoBoundsArray line_6b1_indices; SferaAutoBoundsArray line_6b3_indices; SferaAutoBoundsArray line_6b4_indices; SferaAutoBoundsArray line_6b5_records; SferaBoundCheckArray line_124d_records; SferaBoundCheckArray line_24de_records; SferaBoundCheckArray line_24e0_records; SferaBoundCheckArray line_24e2_records; } SferaClientArrayRuntime;
 typedef struct SferaRecoveredStaticRuntime { uint32_t network_bytes_sent_snapshot; uint32_t network_bytes_retried_snapshot; uint32_t network_bytes_received_snapshot; uint32_t simulation_tick; uint32_t vertical_sync_enabled; uint32_t memory_warning_as_error; uint32_t mbc_stack_table_cursor; uint32_t server_number; uint32_t loadcount_guard; SferaVec3Word mbc_vector_scratch; uint8_t mbc_service_object[0x4010]; float inverse_40; SferaBoundCheckArray legacy_light_arrays[3]; uint32_t view_transition_counter; uint32_t view_direction_state; uint32_t render_record_state; uint8_t glyph_presence_shadow[256]; SferaGrassPatternRecord grass_patterns[30]; uint32_t scene_mode; uint32_t scene_counter; uint8_t scene_lock[24]; uint32_t input_state_a; float cursor_accumulator; uint32_t input_state_b; uint32_t render_gate; uint32_t text_size_height; uint32_t client_state_01; uint32_t client_state_02; uint32_t client_state_03; float ui_cell_width; float clip_depth; uint32_t client_state_04; uint32_t client_state_05; uint32_t client_state_06; uint32_t graphics_state; uint32_t font_renderer_state; uint32_t font_state; uint32_t render_state_07; uint32_t render_state_08; uint32_t render_state_09; uint32_t render_state_10; uint32_t scene_state_07; uint32_t scene_state_08; uint32_t scene_state_09; uint32_t interaction_enabled; uint32_t interaction_input_flags; uint32_t environment_lookup_result; float primary_frame_interval; float secondary_frame_interval; float transition_factor; uint32_t animation_state; float animation_phase; uint32_t animation_result_a; uint32_t animation_result_b; SferaAutoBoundsArray primary_auto_array; SferaVec3Word flare_clip_vector; SferaAutoBoundsArray secondary_auto_array; SferaAutoBoundsArray tertiary_auto_array; uint32_t ui_counter_a; uint32_t ui_counter_b; } SferaRecoveredStaticRuntime;
 #define SFERA_PENDING_KEY_CAPACITY UINT32_C(30)
 typedef struct SferaPendingKeyRuntime { uint32_t count; uint32_t key_codes[SFERA_PENDING_KEY_CAPACITY]; } SferaPendingKeyRuntime;
@@ -979,8 +987,7 @@ extern SferaNetworkRuntime g_sfera_network_runtime;
 extern SferaDirectPlayRuntime g_sfera_directplay_runtime;
 extern SferaNetworkConnectionCheckerRuntime g_sfera_network_connection_checker;
 extern SferaNetworkSendRuntime g_sfera_network_send_runtime;
-#define g_sfera_font_runtime (*(SferaFontRuntime*)(uintptr_t)SFERA_DATA_SEMANTIC_VA(UINT32_C(0x04E72314)))
-SFERA_STATIC_INLINE uint32_t sfera_font_runtime_guest_address(void) { return SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E72314)); }
+extern SferaFontRuntime g_sfera_font_runtime;
 extern SferaCursorManagerRuntime g_sfera_cursor_manager_runtime;
 extern SferaSliceReference32 g_sfera_pop_slice_fallback;
 extern SferaSliceReference32 g_sfera_pop_sliceup_fallback;
@@ -998,6 +1005,7 @@ extern SferaBoundCheckArray g_sfera_mesh_partition_indices;
 extern SferaGraphicsOptionsRuntime g_sfera_graphics_options_runtime;
 extern SferaSphereOptionsRuntime g_sfera_sphere_options_runtime;
 extern SferaOptionsDialogRuntime g_sfera_options_dialog_runtime;
+extern uint32_t g_sfera_options_dialog_cleanup_state;
 extern SferaWindowRuntime g_sfera_window_runtime;
 extern SferaInputDeviceRuntime g_sfera_input_device_runtime;
 extern SferaScreenClipRuntime g_sfera_screen_clip_runtime;
@@ -1046,6 +1054,13 @@ extern SferaWorldSlotTableRuntime g_sfera_world_slot_table_runtime;
 extern SferaConfigTextRuntime g_sfera_config_text_runtime;
 extern SferaPlantingTableRuntime g_sfera_planting_table_runtime;
 extern SferaStaticRenderLookupRuntime g_sfera_static_render_lookup_runtime;
+extern SferaMbcStaticRuntime g_sfera_mbc_static_runtime;
+extern SferaViewRenderObjectsRuntime g_sfera_view_render_objects_runtime;
+extern SferaMapGeneratorRuntime g_sfera_map_generator_runtime;
+extern SferaAlphaMaterialRuntime g_sfera_alpha_material_runtime;
+extern SferaClientArrayRuntime g_sfera_client_array_runtime;
+extern uint8_t g_sfera_shadow_object_storage[SFERA_TRANSFORM_BOUNDS_STORAGE_SIZE];
+extern uint8_t g_sfera_options_dialog_object_storage[SFERA_TRANSFORM_BOUNDS_STORAGE_SIZE];
 extern SferaSpatialIndexRuntime g_sfera_spatial_index_runtime;
 extern SferaStartupCommandLineRuntime g_sfera_startup_command_line_runtime;
 extern SferaCollisionScratchRuntime g_sfera_collision_scratch_runtime;
@@ -1149,8 +1164,6 @@ extern SferaMsvcString32 g_sfera_menu_sprite_not_found_message;
 }
 #endif
 
-SFERA_STATIC_INLINE uint32_t sfera_data_deref_address(uint32_t address) { uint32_t begin; uint32_t offset; uint8_t* alias; if (!g_sfera_data_compat_base) { return address; } begin = (uint32_t)(uintptr_t)g_sfera_data_compat_base; offset = address - begin; if (offset >= SFERA_DATA_SOURCE_SIZE) { return address; } alias = g_sfera_data_semantic_page_alias[offset >> SFERA_DATA_PAGE_SHIFT]; return alias ? (uint32_t)(uintptr_t)(alias + (offset & (SFERA_DATA_PAGE_SIZE - 1u))) : address; }
-SFERA_STATIC_INLINE uint32_t sfera_data_deref_range(uint32_t address, uint32_t size) { uint32_t first; uint32_t last; if (size == 0u || address > UINT32_MAX - (size - 1u)) { return address; } first = sfera_data_deref_address(address); if (first == address) { return address; } last = sfera_data_deref_address(address + size - 1u); return last != address + size - 1u && last - first == size - 1u ? first : address; }
 
 #ifdef __cplusplus
 extern "C" {
@@ -1194,377 +1207,20 @@ uint32_t sfera_zlib_huft_build(uint32_t lengths_address, uint32_t code_count, ui
 #ifdef __cplusplus
 }
 #endif
-SFERA_STATIC_INLINE uint32_t sfera_data_semantic_address(uint32_t source_va) { uint32_t offset; uint8_t* alias; if (source_va < SFERA_DATA_SOURCE_BEGIN) { return 0u; } offset = source_va - SFERA_DATA_SOURCE_BEGIN; if (offset >= SFERA_DATA_SOURCE_SIZE) { return 0u; } alias = g_sfera_data_semantic_page_alias[offset >> SFERA_DATA_PAGE_SHIFT]; return alias ? (uint32_t)(uintptr_t)(alias + (offset & (SFERA_DATA_PAGE_SIZE - 1u))) : 0u; }
 SFERA_STATIC_INLINE uint32_t sfera_calendar_days_in_month(uint32_t month) { if (month < 1u || month > 12u) { return 0u; } return 30u + ((month + (month > 7u ? 1u : 0u)) & 1u) - (month == 2u ? 2u : 0u); }
 SFERA_STATIC_INLINE uint32_t sfera_calendar_days_before_month(uint32_t month) { uint32_t days = 0u; uint32_t current; if (month < 1u || month > 13u) { return 0u; } for (current = 1u; current < month; ++current) { days += sfera_calendar_days_in_month(current); } return days; }
-SFERA_STATIC_INLINE uint32_t sfera_data_source_rva(uint32_t address) { uint32_t begin; uint32_t offset; uint32_t page; if (g_sfera_data_compat_base) { begin = (uint32_t)(uintptr_t)g_sfera_data_compat_base; offset = address - begin; if (offset < SFERA_DATA_SOURCE_SIZE) { return UINT32_C(0x00120000) + offset; } } for (page = 0u; page < SFERA_DATA_PAGE_COUNT; ++page) { uint8_t* alias = g_sfera_data_semantic_page_alias[page]; if (!alias) { continue; } begin = (uint32_t)(uintptr_t)alias; offset = address - begin; if (offset < SFERA_DATA_PAGE_SIZE) { return UINT32_C(0x00120000) + page * SFERA_DATA_PAGE_SIZE + offset; } } return UINT32_MAX; }
 
 #undef SFERA_STATIC_INLINE
 
-/* ===== Semantic virtual dispatch ===== */
-/* Source vptr values are class-identity tokens. There is no materialized .rdata backing. */
-#ifdef __cplusplus
-extern "C" {
-#endif
-void sfera_initialize_data_storage(uint8_t* storage);
-uint32_t sfera_cursor_texture_name(uint32_t slot);
-int sfera_vtable_try_load32(uint32_t source_slot_va, uint32_t* value);
-int sfera_vtable_token_address(uint32_t address);
-#ifdef __cplusplus
-}
-#endif
-#define SFERA_VPTR_TOKEN_BASE UINT32_C(0xF1000000)
-#define SFERA_VPTR_TOKEN(class_id) (SFERA_VPTR_TOKEN_BASE + ((uint32_t)(class_id) << 6u))
-#define SFERA_VPTR_BLOODEFFLISTENER SFERA_VPTR_TOKEN(0u) /* .?AVBloodEffListener@@, 3 virtual slot(s) */
-#define SFERA_VPTR_IEFFECTMANAGER SFERA_VPTR_TOKEN(1u) /* .?AVIEffectManager@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CSCRIPTEDEFFECT SFERA_VPTR_TOKEN(2u) /* .?AVCScriptedEffect@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CSPIRALEFFECT SFERA_VPTR_TOKEN(3u) /* .?AVCSpiralEffect@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CMOLEFFECT SFERA_VPTR_TOKEN(4u) /* .?AVCMolEffect@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CBLADEEFFECT SFERA_VPTR_TOKEN(5u) /* .?AVCBladeEffect@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CGAZERLAKEEFFECT SFERA_VPTR_TOKEN(6u) /* .?AVCGazerLakeEffect@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CRAINEFFECT SFERA_VPTR_TOKEN(7u) /* .?AVCRainEffect@@, 12 virtual slot(s) */
-#define SFERA_VPTR_IOUTPUTDEVICE SFERA_VPTR_TOKEN(8u) /* .?AVIOutputDevice@@, 1 virtual slot(s) */
-#define SFERA_VPTR_COUTPUTLOGDEVICE SFERA_VPTR_TOKEN(9u) /* .?AVCOutputLogDevice@@, 1 virtual slot(s) */
-#define SFERA_VPTR_CSPHEREERROR SFERA_VPTR_TOKEN(10u) /* .?AVCSphereError@@, 1 virtual slot(s) */
-#define SFERA_VPTR_GRASSMAPMNGR SFERA_VPTR_TOKEN(11u) /* .?AVGrassMapMngr@@, 1 virtual slot(s) */
-#define SFERA_VPTR_HYPERTEXTELEMENT_WORDWRAP SFERA_VPTR_TOKEN(12u) /* .?AUHyperTextElement_WordWrap@@, 1 virtual slot(s) */
-#define SFERA_VPTR_HYPERTEXTELEMENT SFERA_VPTR_TOKEN(13u) /* .?AUHyperTextElement@@, 1 virtual slot(s) */
-#define SFERA_VPTR_HYPERTEXTELEMENTWITHPARAMETERS SFERA_VPTR_TOKEN(14u) /* .?AUHyperTextElementWithParameters@@, 1 virtual slot(s) */
-#define SFERA_VPTR_HYPERTEXTELEMENT_PLAINTEXT SFERA_VPTR_TOKEN(15u) /* .?AUHyperTextElement_PlainText@@, 1 virtual slot(s) */
-#define SFERA_VPTR_HYPERTEXTELEMENT_LINK SFERA_VPTR_TOKEN(16u) /* .?AUHyperTextElement_Link@@, 1 virtual slot(s) */
-#define SFERA_VPTR_CITEM SFERA_VPTR_TOKEN(17u) /* .?AVCItem@@, 2 virtual slot(s) */
-#define SFERA_VPTR_CCOMMONITEM SFERA_VPTR_TOKEN(18u) /* .?AVCCommonItem@@, 2 virtual slot(s) */
-#define SFERA_VPTR_CITEMLIST_COMMONITEM SFERA_VPTR_TOKEN(19u) /* .?AV?$CItemList@VCCommonItem@@@@, 2 virtual slot(s) */
-#define SFERA_VPTR_CBASEMANAGER_CITEMLIST_COMMONITEM SFERA_VPTR_TOKEN(20u) /* .?AV?$CBaseManager@V?$CItemList@VCCommonItem@@@@VCCommonItem@@@@, 5 virtual slot(s) */
-#define SFERA_VPTR_CLIGHTEFFECT SFERA_VPTR_TOKEN(21u) /* .?AVCLightEffect@@, 12 virtual slot(s) */
-#define SFERA_VPTR_NATURERAINLISTENER SFERA_VPTR_TOKEN(22u) /* .?AVNatureRainListener@@, 3 virtual slot(s) */
-#define SFERA_VPTR_LIGHTINGLISTENER SFERA_VPTR_TOKEN(23u) /* .?AVLightingListener@@, 3 virtual slot(s) */
-#define SFERA_VPTR_CSOUNDFX SFERA_VPTR_TOKEN(24u) /* .?AVCSoundFX@@, 3 virtual slot(s) */
-#define SFERA_VPTR_BUTTONCTRL_SPHEREUI SFERA_VPTR_TOKEN(25u) /* .?AVButtonCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CHECKBOX_SPHEREUI SFERA_VPTR_TOKEN(26u) /* .?AVCheckBox@SphereUI@@, 13 virtual slot(s) */
-#define SFERA_VPTR_CDESCRIPTIONWINDOW_SPHEREUI SFERA_VPTR_TOKEN(27u) /* .?AVCDescriptionWindow@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_EDITCTRL_SPHEREUI SFERA_VPTR_TOKEN(28u) /* .?AVEditCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_FILTERLISTCTRL_SPHEREUI SFERA_VPTR_TOKEN(29u) /* .?AVFilterListCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_FONTPICKER_SPHEREUI SFERA_VPTR_TOKEN(30u) /* .?AVFontPicker@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_HYPERTEXTCHATLISTCONTROL_SPHEREUI SFERA_VPTR_TOKEN(31u) /* .?AVHyperTextChatListControl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_HYPERTEXTCTRL_SPHEREUI SFERA_VPTR_TOKEN(32u) /* .?AVHyperTextCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_STD_BASIC_FILEBUF ((uint32_t)(uintptr_t)&g_sfera_native_vtable_basic_filebuf[0]) /* native MSVCP ABI bridge; 15 virtual slot(s) */
-#define SFERA_VPTR_STD_BASIC_OFSTREAM ((uint32_t)(uintptr_t)&g_sfera_native_vtable_basic_ofstream[0]) /* native MSVCP ABI bridge; 1 virtual slot */
-#define SFERA_VPTR_STD_BASIC_IFSTREAM ((uint32_t)(uintptr_t)&g_sfera_native_vtable_basic_ifstream[0]) /* native MSVCP ABI bridge; 1 virtual slot */
-#define SFERA_VPTR_HYPERTEXTEDITCONTROL_SPHEREUI SFERA_VPTR_TOKEN(36u) /* .?AVHyperTextEditControl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_IMAGECTRL_SPHEREUI SFERA_VPTR_TOKEN(37u) /* .?AVImageCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_STD_BASIC_STRINGBUF ((uint32_t)(uintptr_t)&g_sfera_native_vtable_basic_stringbuf[0]) /* native MSVCP ABI bridge; 15 virtual slot(s) */
-#define SFERA_VPTR_STD_BASIC_OSTRINGSTREAM ((uint32_t)(uintptr_t)&g_sfera_native_vtable_basic_ostringstream[0]) /* native MSVCP ABI bridge; 1 virtual slot */
-#define SFERA_VPTR_LISTITEMCTRL_SPHEREUI SFERA_VPTR_TOKEN(40u) /* .?AVListItemCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_LISTCTRL_SPHEREUI SFERA_VPTR_TOKEN(41u) /* .?AVListCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CMENULISTCONTROL_SPHEREUI SFERA_VPTR_TOKEN(42u) /* .?AVCMenuListControl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_MINIHELPCTRL_SPHEREUI SFERA_VPTR_TOKEN(43u) /* .?AVMiniHelpCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CMINIMAPCONTROL_SPHEREUI SFERA_VPTR_TOKEN(44u) /* .?AVCMinimapControl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_PROGRESSBAR_SPHEREUI SFERA_VPTR_TOKEN(45u) /* .?AVProgressBar@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_RADIOBUTTONCTRL_SPHEREUI SFERA_VPTR_TOKEN(46u) /* .?AVRadioButtonCtrl@SphereUI@@, 13 virtual slot(s) */
-#define SFERA_VPTR_RICHEDITCTRL_SPHEREUI SFERA_VPTR_TOKEN(47u) /* .?AVRichEditCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_SCROLLBAR_SPHEREUI SFERA_VPTR_TOKEN(48u) /* .?AVScrollBar@SphereUI@@, 14 virtual slot(s) */
-#define SFERA_VPTR_SLIDERCTRL_SPHEREUI SFERA_VPTR_TOKEN(49u) /* .?AVSliderCtrl@SphereUI@@, 14 virtual slot(s) */
-#define SFERA_VPTR_SLOTCTRL_SPHEREUI SFERA_VPTR_TOKEN(50u) /* .?AVSlotCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_SPINBUTTON_SPHEREUI SFERA_VPTR_TOKEN(51u) /* .?AVSpinButton@SphereUI@@, 13 virtual slot(s) */
-#define SFERA_VPTR_TEXTCTRL_SPHEREUI SFERA_VPTR_TOKEN(52u) /* .?AVTextCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_TOOLTIPCTRL_SPHEREUI SFERA_VPTR_TOKEN(53u) /* .?AVToolTipCtrl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CWEBBROWSERCONTROL_SPHEREUI SFERA_VPTR_TOKEN(54u) /* .?AVCWebBrowserControl@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_WINDOW_SPHEREUI SFERA_VPTR_TOKEN(55u) /* .?AVWindow@SphereUI@@, 12 virtual slot(s) */
-#define SFERA_VPTR_CCURSOR SFERA_VPTR_TOKEN(56u) /* .?AVCCursor@@, 14 virtual slot(s) */
-#define SFERA_VPTR_CHARDWARECURSOR SFERA_VPTR_TOKEN(57u) /* .?AVCHardwareCursor@@, 14 virtual slot(s) */
-#define SFERA_VPTR_CSOFTWARECURSOR SFERA_VPTR_TOKEN(58u) /* .?AVCSoftwareCursor@@, 14 virtual slot(s) */
-#define SFERA_VPTR_UNMANAGEDRESOURCEVB SFERA_VPTR_TOKEN(59u) /* .?AVUnmanagedResourceVB@@, 2 virtual slot(s) */
-#define SFERA_VPTR_UNMANAGEDRESOURCEIB SFERA_VPTR_TOKEN(60u) /* .?AVUnmanagedResourceIB@@, 2 virtual slot(s) */
-#define SFERA_VPTR_UNMANAGEDRESOURCETEXTURE SFERA_VPTR_TOKEN(61u) /* .?AVUnmanagedResourceTexture@@, 2 virtual slot(s) */
-#define SFERA_VPTR_VECT_UNMANAGEDRESOURCE_PTR SFERA_VPTR_TOKEN(62u) /* .?AV?$Vect@PAVUnmanagedResourceBase@@@@, 1 virtual slot(s) */
-#define SFERA_VPTR_STDALLOCATOR SFERA_VPTR_TOKEN(63u) /* .?AVStdAllocator@@, 3 virtual slot(s) */
-#define SFERA_VPTR_BAD_ALLOC SFERA_VPTR_TOKEN(64u) /* std::bad_alloc, semantic exception object */
-#define SFERA_VPTR_COM_ERROR SFERA_VPTR_TOKEN(65u) /* _com_error, semantic exception object */
-
-/* ===== Resolved .data pointer roots ===== */
-/* Compatibility-address roots remain here only until their owning native objects are recovered.
- * Resolved runtime state must be addressed through its typed storage rather than a source-image constant. */
-
-/* Native OLE32 consumes these exact x86 interface layouts. They are retained as a typed ABI bridge, not as generic source-image pointers. */
-/* arithmetic base root; sfera_sub_00449180 @ lifted_functions_007.c:7297; source=0x00663FC0 */
-#define SFERA_DATA_ARITHMETIC_BASE_00663FC0_ADDR ((uint32_t)(uintptr_t)&g_sfera_world_slot_table_runtime.slots[0].storage[0x10])
-/* call argument root; sfera_sub_00449180 @ lifted_functions_007.c:7301; source=0x006BDD5C */
-#define SFERA_DATA_CALL_ARGUMENT_006BDD5C_ADDR ((uint32_t)(uintptr_t)&g_sfera_world_slot_table_runtime.slots[400].storage[0x2C])
-/* call argument root; sfera_sub_00449180 @ lifted_functions_007.c:7309; source=0x006BDEF4 */
-#define SFERA_DATA_CALL_ARGUMENT_006BDEF4_ADDR ((uint32_t)(uintptr_t)&g_sfera_world_slot_table_runtime.slots[400].storage[0x1C4])
-/* global object root; sfera_sub_004F5450 @ lifted_functions_025.c:1713; source=0x006BE1F8 */
-/* global object root; sfera_sub_004F5480 @ lifted_functions_025.c:1735; source=0x006BE258 */
-/* indexed table base root; sfera_sub_0043ECC0 @ lifted_functions_006.c:7183; source=0x048F5698 */
-#define SFERA_DATA_TABLE_BASE_048F5698_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x048F5698))
-/* global object root; sfera_sub_004F54C0 @ lifted_functions_025.c:1746; source=0x04DBC4A0 */
-/* global object root; sfera_sub_004F54F0 @ lifted_functions_025.c:1768; source=0x04DC0520 */
-/* global object root; sfera_sub_004F55B0 @ lifted_functions_025.c:1848; source=0x04DD0A30 */
-/* global object root; sfera_sub_004F55E0 @ lifted_functions_025.c:1870; source=0x04DD0A98 */
-/* call argument root; sfera_sub_004F5700 @ lifted_functions_025.c:1941; source=0x04DD0B00 */
-#define SFERA_DATA_CALL_ARGUMENT_04DD0B00_ADDR ((uint32_t)(uintptr_t)&g_sfera_recovered_static_runtime.legacy_light_arrays[0].debug_file[0])
-/* call argument root; sfera_sub_004F5690 @ lifted_functions_025.c:1917; source=0x04DD0B2C */
-#define SFERA_DATA_CALL_ARGUMENT_04DD0B2C_ADDR ((uint32_t)(uintptr_t)&g_sfera_recovered_static_runtime.legacy_light_arrays[1].debug_file[0])
-/* call argument root; sfera_sub_004F5620 @ lifted_functions_025.c:1893; source=0x04DD0B58 */
-#define SFERA_DATA_CALL_ARGUMENT_04DD0B58_ADDR ((uint32_t)(uintptr_t)&g_sfera_recovered_static_runtime.legacy_light_arrays[2].debug_file[0])
-/* global object root; sfera_sub_004F5770 @ lifted_functions_025.c:1953; source=0x04DD0B90 */
-/* global object root; sfera_sub_004F57A0 @ lifted_functions_025.c:1975; source=0x04DD0BF0 */
-/* global object root; sfera_sub_00454BA0 @ lifted_functions_008.c:8467; source=0x04DD1074 */
-/* arithmetic base root; sfera_sub_0045BE50 @ lifted_functions_009.c:4909; source=0x04DD12A8 */
-#define SFERA_DATA_ARITHMETIC_BASE_04DD12A8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD12A8))
-/* global object root; sfera_sub_00464BA0 @ lifted_functions_010.c:3282; source=0x04DD12A9 */
-#define SFERA_DATA_GLOBAL_OBJECT_04DD12A9_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD12A9))
-/* pointer value root; sfera_sub_00464BA0 @ lifted_functions_010.c:3365; source=0x04DD52A9 */
-#define SFERA_DATA_POINTER_VALUE_04DD52A9_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD52A9))
-/* indexed table base root; sfera_sub_0047D040 @ lifted_functions_012.c:6540; source=0x04DD563C */
-#define SFERA_DATA_TABLE_BASE_04DD563C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD563C))
-/* global object root; sfera_sub_0047D040 @ lifted_functions_012.c:6523; source=0x04DD5640 */
-#define SFERA_DATA_GLOBAL_OBJECT_04DD5640_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD5640))
-/* pointer value root; sfera_sub_0047D040 @ lifted_functions_012.c:6537; source=0x04DD565C */
-#define SFERA_DATA_POINTER_VALUE_04DD565C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DD565C))
-/* indexed table base root; sfera_sub_0044E480 @ lifted_functions_008.c:590; source=0x04DD7A4C */
-#define SFERA_DATA_TABLE_BASE_04DD7A4C_ADDR ((uint32_t)(uintptr_t)&g_sfera_static_render_lookup_runtime.sample_flags[1])
-/* indexed table base root; sfera_sub_0044E480 @ lifted_functions_008.c:592; source=0x04DD7A78 */
-#define SFERA_DATA_TABLE_BASE_04DD7A78_ADDR ((uint32_t)(uintptr_t)&g_sfera_static_render_lookup_runtime.sample_flags[12])
-/* indexed table base root; sfera_sub_0044E480 @ lifted_functions_008.c:606; source=0x04DD7A7C */
-#define SFERA_DATA_TABLE_BASE_04DD7A7C_ADDR ((uint32_t)(uintptr_t)&g_sfera_static_render_lookup_runtime.sample_flags[13])
-/* global object root; sfera_sub_0047A150 @ lifted_functions_012.c:2398; source=0x04DDFE60 */
-#define SFERA_DATA_GLOBAL_OBJECT_04DDFE60_ADDR ((uint32_t)(uintptr_t)&g_sfera_recovered_static_runtime.grass_patterns[1].storage[0])
-/* pointer value root; sfera_sub_0047A150 @ lifted_functions_012.c:2414; source=0x04DE04F0 */
-#define SFERA_DATA_POINTER_VALUE_04DE04F0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04DE04F0))
-/* arithmetic base root; sfera_sub_00461220 @ lifted_functions_009.c:10850; source=0x04E016A8 */
-#define SFERA_DATA_ARITHMETIC_BASE_04E016A8_ADDR ((uint32_t)(uintptr_t)&g_sfera_planting_table_runtime.records[0].storage[0x18])
-/* arithmetic base root; sfera_sub_00461220 @ lifted_functions_009.c:10861; source=0x04E016AC */
-#define SFERA_DATA_ARITHMETIC_BASE_04E016AC_ADDR ((uint32_t)(uintptr_t)&g_sfera_planting_table_runtime.records[0].storage[0x1C])
-/* arithmetic base root; sfera_sub_00461220 @ lifted_functions_009.c:10906; source=0x04E01AF4 */
-#define SFERA_DATA_ARITHMETIC_BASE_04E01AF4_ADDR ((uint32_t)(uintptr_t)&g_sfera_planting_table_runtime.records[0].storage[0x464])
-/* arithmetic base root; sfera_sub_0045BE50 @ lifted_functions_009.c:4862; source=0x04E1CF48 */
-/* pointer value root; sfera_sub_0045BE50 @ lifted_functions_009.c:4841; source=0x04E1D26C */
-/* arithmetic base root; sfera_sub_0044EBC0 @ lifted_functions_008.c:1104; source=0x04E1DC0F */
-#define SFERA_DATA_ARITHMETIC_BASE_04E1DC0F_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DC0F))
-/* array base root; sfera_sub_0047A150 @ lifted_functions_012.c:3009; source=0x04E1DC10 */
-#define SFERA_DATA_ARRAY_BASE_04E1DC10_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E1DC10))
-/* arithmetic base root; sfera_sub_0044DAC0 @ lifted_functions_007.c:12639; source=0x04E2BFB0 */
-#define SFERA_DATA_ARITHMETIC_BASE_04E2BFB0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E2BFB0))
-/* global object root; sfera_sub_0048A740 @ lifted_functions_013.c:10941; source=0x04E2C930 */
-/* indexed table base root; sfera_sub_00457E80 @ lifted_functions_009.c:1018; source=0x04E2DE1E */
-/* indexed table base root; sfera_sub_00457E80 @ lifted_functions_009.c:1020; source=0x04E2DE20 */
-/* indexed table base root; sfera_sub_00457E80 @ lifted_functions_009.c:1021; source=0x04E2DE22 */
-/* global object root; sfera_sub_0045BC60 @ lifted_functions_009.c:4722; source=0x04E769E8 */
-/* global object root; sfera_sub_0047C670 @ lifted_functions_012.c:5389; source=0x04E78AAC */
-#define SFERA_DATA_GLOBAL_OBJECT_04E78AAC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78AAC))
-/* global object root; sfera_sub_0047C670 @ lifted_functions_012.c:5386; source=0x04E78C08 */
-#define SFERA_DATA_GLOBAL_OBJECT_04E78C08_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78C08))
-/* arithmetic base root; sfera_sub_0044EBC0 @ lifted_functions_008.c:1103; source=0x04E78FB7 */
-#define SFERA_DATA_ARITHMETIC_BASE_04E78FB7_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78FB7))
-/* array base root; sfera_sub_0047A150 @ lifted_functions_012.c:3007; source=0x04E78FB8 */
-#define SFERA_DATA_ARRAY_BASE_04E78FB8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E78FB8))
-/* arithmetic base root; sfera_sub_0044EBC0 @ lifted_functions_008.c:1106; source=0x04E790B7 */
-#define SFERA_DATA_ARITHMETIC_BASE_04E790B7_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E790B7))
-/* array base root; sfera_sub_0047A150 @ lifted_functions_012.c:3014; source=0x04E790B8 */
-#define SFERA_DATA_ARRAY_BASE_04E790B8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04E790B8))
-/* call argument root; sfera_sub_004F6470 @ lifted_functions_025.c:2853; source=0x04EC4F8C */
-/* call argument root; sfera_sub_004F6510 @ lifted_functions_025.c:2877; source=0x04EC4FC4 */
-/* call argument root; sfera_sub_0047A150 @ lifted_functions_012.c:2972; source=0x04EC4FE8 */
-/* call argument root; sfera_sub_004F5920 @ lifted_functions_025.c:2081; source=0x04ED0D84 */
-#define SFERA_DATA_CALL_ARGUMENT_04ED0D84_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED0D84))
-/* global object root; sfera_sub_004F57E0 @ lifted_functions_025.c:1986; source=0x04ED0DB8 */
-/* global object root; sfera_sub_004F5810 @ lifted_functions_025.c:2008; source=0x04ED0F88 */
-/* call argument root; sfera_sub_004F6650 @ lifted_functions_025.c:2965; source=0x04ED1134 */
-#define SFERA_DATA_CALL_ARGUMENT_04ED1134_ADDR ((uint32_t)(uintptr_t)&g_sfera_recovered_static_runtime.primary_auto_array.debug_file[0])
-/* call argument root; sfera_sub_004F6580 @ lifted_functions_025.c:2921; source=0x04ED116C */
-#define SFERA_DATA_CALL_ARGUMENT_04ED116C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED116C))
-/* call argument root; sfera_sub_004F6720 @ lifted_functions_025.c:3009; source=0x04ED11FC */
-#define SFERA_DATA_CALL_ARGUMENT_04ED11FC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED11FC))
-/* call argument root; sfera_sub_004F5A40 @ lifted_functions_025.c:2135; source=0x04ED1234 */
-#define SFERA_DATA_CALL_ARGUMENT_04ED1234_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1234))
-/* call argument root; sfera_sub_004F5BF0 @ lifted_functions_025.c:2216; source=0x04ED1304 */
-/* indexed table base root; sfera_sub_00468750 @ lifted_functions_010.c:6796; source=0x04ED1328 */
-#define SFERA_DATA_TABLE_BASE_04ED1328_ADDR ((uint32_t)(uintptr_t)&g_sfera_collision_scratch_runtime.light_candidates[0][0])
-/* call argument root; sfera_sub_004F5C90 @ lifted_functions_025.c:2356; source=0x04ED1A44 */
-#define SFERA_DATA_CALL_ARGUMENT_04ED1A44_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1A44))
-/* call argument root; sfera_sub_004F5B60 @ lifted_functions_025.c:2189; source=0x04ED1A7C */
-#define SFERA_DATA_CALL_ARGUMENT_04ED1A7C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED1A7C))
-/* call argument root; sfera_sub_004F7010 @ lifted_functions_025.c:3481; source=0x04ED2A58 */
-#define SFERA_DATA_CALL_ARGUMENT_04ED2A58_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2A58))
-/* call argument root; sfera_sub_004F59B0 @ lifted_functions_025.c:2108; source=0x04ED2BBC */
-#define SFERA_DATA_CALL_ARGUMENT_04ED2BBC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2BBC))
-/* global object root; sfera_sub_00443F20 @ lifted_functions_007.c:4219; source=0x04ED2CC0 */
-#define SFERA_DATA_GLOBAL_OBJECT_04ED2CC0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2CC0))
-/* call argument root; sfera_sub_004F68C0 @ lifted_functions_025.c:3080; source=0x04ED2D3C */
-#define SFERA_DATA_CALL_ARGUMENT_04ED2D3C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2D3C))
-/* call argument root; sfera_sub_004F6B10 @ lifted_functions_025.c:3200; source=0x04ED2DC0 */
-#define SFERA_DATA_CALL_ARGUMENT_04ED2DC0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2DC0))
-/* call argument root; sfera_sub_004F6FA0 @ lifted_functions_025.c:3457; source=0x04ED2EF8 */
-#define SFERA_DATA_CALL_ARGUMENT_04ED2EF8_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED2EF8))
-/* call argument root; sfera_sub_004F5AD0 @ lifted_functions_025.c:2162; source=0x04ED304C */
-#define SFERA_DATA_CALL_ARGUMENT_04ED304C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED304C))
-/* call argument root; sfera_sub_004F5D20 @ lifted_functions_025.c:2383; source=0x04ED30DC */
-#define SFERA_DATA_CALL_ARGUMENT_04ED30DC_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04ED30DC))
-/* call argument root; sfera_sub_004F7080 @ lifted_functions_025.c:3505; source=0x04EDCCD4 */
-#define SFERA_DATA_CALL_ARGUMENT_04EDCCD4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDCCD4))
-/* call argument root; sfera_sub_004F5890 @ lifted_functions_025.c:2054; source=0x04EDCDAC */
-#define SFERA_DATA_CALL_ARGUMENT_04EDCDAC_ADDR ((uint32_t)(uintptr_t)&g_sfera_recovered_static_runtime.secondary_auto_array.debug_file[0])
-/* call argument root; sfera_sub_004F6B80 @ lifted_functions_025.c:3227; source=0x04EDCF54 */
-#define SFERA_DATA_CALL_ARGUMENT_04EDCF54_ADDR ((uint32_t)(uintptr_t)&g_sfera_recovered_static_runtime.tertiary_auto_array.debug_file[0])
-/* call argument root; sfera_sub_004F67F0 @ lifted_functions_025.c:3053; source=0x04EDD044 */
-#define SFERA_DATA_CALL_ARGUMENT_04EDD044_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EDD044))
-/* global object root; sfera_sub_004F7780 @ lifted_functions_025.c:3877; source=0x04EE04B8 */
-/* global object root; sfera_sub_004F77B0 @ lifted_functions_025.c:3899; source=0x04EE0518 */
-/* global object root; sfera_sub_004F77F0 @ lifted_functions_025.c:3910; source=0x04EE8570 */
-/* global object root; sfera_sub_004F7820 @ lifted_functions_025.c:3932; source=0x04EE85D0 */
-/* global object root; sfera_sub_004F7860 @ lifted_functions_025.c:3943; source=0x04EE8640 */
-/* global object root; sfera_sub_004F7890 @ lifted_functions_025.c:3965; source=0x04EE86A0 */
-/* global object root; sfera_sub_004F78D0 @ lifted_functions_025.c:3976; source=0x04EEA020 */
-/* global object root; sfera_sub_004F7900 @ lifted_functions_025.c:3998; source=0x04EEA080 */
-/* call argument root; sfera_sub_0047FDC0 @ lifted_functions_012.c:9933; source=0x04EEA168 */
-/* global object root; sfera_sub_0047FF70 @ lifted_functions_012.c:10047; source=0x04EEA338 */
-/* indexed table base root; sfera_sub_0047FF70 @ lifted_functions_012.c:10060; source=0x04EEA344 */
-/* global object root; sfera_sub_004F7940 @ lifted_functions_025.c:4009; source=0x04EEA830 */
-/* global object root; sfera_sub_004F7970 @ lifted_functions_025.c:4031; source=0x04EEA890 */
-/* global object root; sfera_sub_004F79B0 @ lifted_functions_025.c:4042; source=0x04EEA900 */
-/* global object root; sfera_sub_004F79E0 @ lifted_functions_025.c:4064; source=0x04EEA960 */
-/* global object root; sfera_sub_004F7A20 @ lifted_functions_025.c:4075; source=0x04EEA9D0 */
-/* global object root; sfera_sub_004F7A50 @ lifted_functions_025.c:4097; source=0x04EEAA30 */
-/* global object root; sfera_sub_004F7A90 @ lifted_functions_025.c:4108; source=0x04EEAAA0 */
-/* global object root; sfera_sub_004F7AC0 @ lifted_functions_025.c:4130; source=0x04EEAB00 */
-/* global object root; sfera_sub_004F7B00 @ lifted_functions_025.c:4141; source=0x04EEAB70 */
-/* global object root; sfera_sub_004F7B30 @ lifted_functions_025.c:4163; source=0x04EEABD0 */
-/* global object root; sfera_sub_004F7B70 @ lifted_functions_025.c:4174; source=0x04EEAC40 */
-/* global object root; sfera_sub_004F7BA0 @ lifted_functions_025.c:4196; source=0x04EEACA0 */
-/* global object root; sfera_sub_004F7BF0 @ lifted_functions_025.c:4214; source=0x04EEAD20 */
-#define SFERA_DATA_GLOBAL_OBJECT_04EEAD20_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEAD20))
-/* global object root; sfera_sub_004F7C20 @ lifted_functions_025.c:4236; source=0x04EEAD80 */
-#define SFERA_DATA_GLOBAL_OBJECT_04EEAD80_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04EEAD80))
-/* global object root; sfera_sub_004F7CA0 @ lifted_functions_025.c:4267; source=0x04EEAEF0 */
-/* global object root; sfera_sub_004F7CD0 @ lifted_functions_025.c:4289; source=0x04EEAF50 */
-/* global object root; sfera_sub_004F7D10 @ lifted_functions_025.c:4300; source=0x04EEAFC0 */
-/* global object root; sfera_sub_004F7D40 @ lifted_functions_025.c:4322; source=0x04EEB020 */
-/* global object root; sfera_sub_004F7D80 @ lifted_functions_025.c:4333; source=0x04EEB098 */
-/* global object root; sfera_sub_004F7DB0 @ lifted_functions_025.c:4355; source=0x04EEB0F8 */
-/* global object root; sfera_sub_004F7E00 @ lifted_functions_025.c:4373; source=0x04EEB170 */
-/* global object root; sfera_sub_004F7E30 @ lifted_functions_025.c:4395; source=0x04EEB1D0 */
-/* global object root; sfera_sub_004F7E70 @ lifted_functions_025.c:4406; source=0x04EEB448 */
-/* global object root; sfera_sub_004F7EA0 @ lifted_functions_025.c:4428; source=0x04EEB4A8 */
-/* global object root; sfera_sub_004F7EF0 @ lifted_functions_025.c:4446; source=0x04EEB520 */
-/* global object root; sfera_sub_004F7F20 @ lifted_functions_025.c:4468; source=0x04EEB580 */
-/* global object root; sfera_sub_004F7F60 @ lifted_functions_025.c:4479; source=0x04F379F8 */
-/* global object root; sfera_sub_004F7F90 @ lifted_functions_025.c:4501; source=0x04F37A58 */
-/* global object root; sfera_sub_004F7FD0 @ lifted_functions_025.c:4512; source=0x04F37AC8 */
-/* global object root; sfera_sub_004F8000 @ lifted_functions_025.c:4534; source=0x04F37B28 */
-/* global object root; sfera_sub_004F8040 @ lifted_functions_025.c:4545; source=0x04F38828 */
-/* global object root; sfera_sub_004F8070 @ lifted_functions_025.c:4567; source=0x04F388B0 */
-/* global object root; sfera_sub_004F8120 @ lifted_functions_025.c:4602; source=0x04F389F8 */
-/* global object root; sfera_sub_004F8150 @ lifted_functions_025.c:4624; source=0x04F38A58 */
-/* global object root; sfera_sub_004F8190 @ lifted_functions_025.c:4635; source=0x04F38BC8 */
-/* global object root; sfera_sub_004F81C0 @ lifted_functions_025.c:4657; source=0x04F38C28 */
-/* global object root; sfera_sub_004F8240 @ lifted_functions_025.c:4688; source=0x04F38D98 */
-/* global object root; sfera_sub_004F8270 @ lifted_functions_025.c:4710; source=0x04F38DF8 */
-/* global object root; sfera_sub_004F82F0 @ lifted_functions_025.c:4741; source=0x04F38E68 */
-/* global object root; sfera_sub_004F8320 @ lifted_functions_025.c:4763; source=0x04F38EC8 */
-/* global object root; sfera_sub_004F8360 @ lifted_functions_025.c:4774; source=0x04F38F40 */
-/* global object root; sfera_sub_004F8390 @ lifted_functions_025.c:4796; source=0x04F38FA0 */
-/* global object root; sfera_sub_004F8410 @ lifted_functions_025.c:4827; source=0x04F39010 */
-/* global object root; sfera_sub_004F8440 @ lifted_functions_025.c:4849; source=0x04F39070 */
-/* global object root; sfera_sub_004F84C0 @ lifted_functions_025.c:4880; source=0x04F390E0 */
-/* global object root; sfera_sub_004F84F0 @ lifted_functions_025.c:4902; source=0x04F39140 */
-/* global object root; sfera_sub_004F8570 @ lifted_functions_025.c:4933; source=0x04F3A478 */
-/* global object root; sfera_sub_004F85A0 @ lifted_functions_025.c:4955; source=0x04F3A4E8 */
-/* global object root; sfera_sub_004F85F0 @ lifted_functions_025.c:4973; source=0x04F3A558 */
-/* global object root; sfera_sub_004F8620 @ lifted_functions_025.c:4995; source=0x04F3A5B8 */
-/* global object root; sfera_sub_004F86A0 @ lifted_functions_025.c:5026; source=0x04F3A928 */
-/* global object root; sfera_sub_004F86D0 @ lifted_functions_025.c:5048; source=0x04F3A988 */
-/* global object root; sfera_sub_004F8710 @ lifted_functions_025.c:5059; source=0x04F3A9F8 */
-/* global object root; sfera_sub_004F8740 @ lifted_functions_025.c:5081; source=0x04F3AA58 */
-/* global object root; sfera_sub_004F87C0 @ lifted_functions_025.c:5112; source=0x04F3AAC8 */
-/* global object root; sfera_sub_004F87F0 @ lifted_functions_025.c:5134; source=0x04F3AB28 */
-/* global object root; sfera_sub_004F8870 @ lifted_functions_025.c:5165; source=0x04F3AC98 */
-/* global object root; sfera_sub_004F88A0 @ lifted_functions_025.c:5187; source=0x04F3ACF8 */
-/* global object root; sfera_sub_004F8920 @ lifted_functions_025.c:5218; source=0x04F3AD70 */
-/* global object root; sfera_sub_004F8950 @ lifted_functions_025.c:5240; source=0x04F3ADD0 */
-/* global object root; sfera_sub_004F89D0 @ lifted_functions_025.c:5271; source=0x04F3AF40 */
-/* global object root; sfera_sub_004F8A00 @ lifted_functions_025.c:5293; source=0x04F3AFA0 */
-/* global object root; sfera_sub_004F8A80 @ lifted_functions_025.c:5324; source=0x04F3B0C0 */
-/* global object root; sfera_sub_004F8AB0 @ lifted_functions_025.c:5346; source=0x04F3B128 */
-/* global object root; sfera_sub_004F8DA0 @ lifted_functions_025.c:5569; source=0x04F3BAD8 */
-/* global object root; sfera_sub_004F8DD0 @ lifted_functions_025.c:5591; source=0x04F3BB38 */
-/* global object root; sfera_sub_004F8E50 @ lifted_functions_025.c:5622; source=0x04F3BBA8 */
-/* global object root; sfera_sub_004F8E80 @ lifted_functions_025.c:5644; source=0x04F3BC08 */
-/* global object root; sfera_sub_004F8EC0 @ lifted_functions_025.c:5655; source=0x04F47C78 */
-/* global object root; sfera_sub_004F8EF0 @ lifted_functions_025.c:5677; source=0x04F47CD8 */
-/* global object root; sfera_sub_004F8F70 @ lifted_functions_025.c:5708; source=0x04F47D48 */
-/* global object root; sfera_sub_004F8FA0 @ lifted_functions_025.c:5730; source=0x04F47DA8 */
-/* global object root; sfera_sub_004F9080 @ lifted_functions_025.c:5791; source=0x04F47E18 */
-/* global object root; sfera_sub_004F90B0 @ lifted_functions_025.c:5813; source=0x04F47E78 */
-/* global object root; sfera_sub_004F9130 @ lifted_functions_025.c:5844; source=0x04F47EE8 */
-/* global object root; sfera_sub_004F9160 @ lifted_functions_025.c:5866; source=0x04F47F48 */
-/* global object root; sfera_sub_004F91E0 @ lifted_functions_025.c:5897; source=0x04F47FC0 */
-/* global object root; sfera_sub_004F9210 @ lifted_functions_025.c:5919; source=0x04F48020 */
-/* global object root; sfera_sub_004F9250 @ lifted_functions_025.c:5930; source=0x04F48190 */
-/* global object root; sfera_sub_004F9280 @ lifted_functions_025.c:5952; source=0x04F481F0 */
-/* global object root; sfera_sub_004F9300 @ lifted_functions_025.c:5983; source=0x04F48260 */
-/* global object root; sfera_sub_004F9330 @ lifted_functions_025.c:6005; source=0x04F482C0 */
-/* global object root; sfera_sub_004F93B0 @ lifted_functions_025.c:6036; source=0x04F48330 */
-/* global object root; sfera_sub_004F93E0 @ lifted_functions_025.c:6058; source=0x04F48390 */
-/* global object root; sfera_sub_004F9460 @ lifted_functions_025.c:6089; source=0x04F48500 */
-/* global object root; sfera_sub_004F9490 @ lifted_functions_025.c:6111; source=0x04F48560 */
-/* global object root; sfera_sub_004F9510 @ lifted_functions_025.c:6142; source=0x04F486D0 */
-/* global object root; sfera_sub_004F9540 @ lifted_functions_025.c:6164; source=0x04F48730 */
-/* global object root; sfera_sub_004F95C0 @ lifted_functions_025.c:6195; source=0x04F488A0 */
-/* global object root; sfera_sub_004F95F0 @ lifted_functions_025.c:6217; source=0x04F48900 */
-/* global object root; sfera_sub_004C9EB0 @ lifted_functions_020.c:7862; source=0x04F48DF0 */
-/* global object root; sfera_sub_004C9EB0 @ lifted_functions_020.c:7876; source=0x04F48FF0 */
-/* global object root; sfera_sub_004C9EB0 @ lifted_functions_020.c:7890; source=0x04F491F0 */
-/* global object root; sfera_sub_004F9670 @ lifted_functions_025.c:6248; source=0x04F49AB0 */
-#define SFERA_DATA_GLOBAL_OBJECT_04F49AB0_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49AB0))
-/* global object root; sfera_sub_004F96A0 @ lifted_functions_025.c:6270; source=0x04F49B10 */
-#define SFERA_DATA_GLOBAL_OBJECT_04F49B10_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49B10))
-/* global object root; sfera_sub_004F9750 @ lifted_functions_025.c:6322; source=0x04F49CB0 */
-/* global object root; sfera_sub_004F9780 @ lifted_functions_025.c:6344; source=0x04F49D10 */
-/* call argument root; sfera_sub_004CE8A0 @ lifted_functions_021.c:2503; source=0x04F49D70 */
-#define SFERA_DATA_CALL_ARGUMENT_04F49D70_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F49D70))
-/* global object root; sfera_sub_004F9800 @ lifted_functions_025.c:6375; source=0x04F49E80 */
-/* global object root; sfera_sub_004F9830 @ lifted_functions_025.c:6397; source=0x04F49EE0 */
-/* global object root; sfera_sub_004F9870 @ lifted_functions_025.c:6408; source=0x04F4A0D0 */
-/* global object root; sfera_sub_004F98A0 @ lifted_functions_025.c:6430; source=0x04F4A130 */
-/* global object root; sfera_sub_004F9920 @ lifted_functions_025.c:6461; source=0x04F4A2A0 */
-/* global object root; sfera_sub_004F9950 @ lifted_functions_025.c:6483; source=0x04F4A300 */
-/* global object root; sfera_sub_004F99D0 @ lifted_functions_025.c:6514; source=0x04F4A370 */
-/* global object root; sfera_sub_004F9A00 @ lifted_functions_025.c:6536; source=0x04F4A3D0 */
-/* global object root; sfera_sub_004F9A80 @ lifted_functions_025.c:6567; source=0x04F4A440 */
-/* global object root; sfera_sub_004F9AB0 @ lifted_functions_025.c:6589; source=0x04F4A4A8 */
-/* global object root; sfera_sub_004F9B50 @ lifted_functions_025.c:6631; source=0x04F4A530 */
-/* global object root; sfera_sub_004F9B80 @ lifted_functions_025.c:6653; source=0x04F4A590 */
-/* global object root; sfera_sub_004F9C00 @ lifted_functions_025.c:6684; source=0x04F4C708 */
-#define SFERA_DATA_GLOBAL_OBJECT_04F4C708_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4C708))
-/* global object root; sfera_sub_004F9C20 @ lifted_functions_025.c:6693; source=0x04F4C720 */
-/* global object root; sfera_sub_004F9C50 @ lifted_functions_025.c:6715; source=0x04F4C780 */
-/* global object root; sfera_sub_004F9C90 @ lifted_functions_025.c:6726; source=0x04F4C7F0 */
-/* global object root; sfera_sub_004F9CC0 @ lifted_functions_025.c:6748; source=0x04F4C850 */
-/* global object root; sfera_sub_004F9D00 @ lifted_functions_025.c:6759; source=0x04F4C8D8 */
-/* global object root; sfera_sub_004F9D30 @ lifted_functions_025.c:6781; source=0x04F4C938 */
-/* global object root; sfera_sub_004F9D70 @ lifted_functions_025.c:6792; source=0x04F4C9A8 */
-/* global object root; sfera_sub_004F9DA0 @ lifted_functions_025.c:6814; source=0x04F4CA08 */
-/* global object root; sfera_sub_004F9DE0 @ lifted_functions_025.c:6825; source=0x04F4CA78 */
-/* global object root; sfera_sub_004F9E10 @ lifted_functions_025.c:6847; source=0x04F4CAD8 */
-/* global object root; sfera_sub_004F9E50 @ lifted_functions_025.c:6858; source=0x04F4CB50 */
-/* global object root; sfera_sub_004F9E80 @ lifted_functions_025.c:6880; source=0x04F4CBB0 */
-/* global object root; sfera_sub_004F9EC0 @ lifted_functions_025.c:6891; source=0x04F4CC28 */
-/* global object root; sfera_sub_004F9EF0 @ lifted_functions_025.c:6913; source=0x04F4CC88 */
-/* call argument root; sfera_sub_004DC1D0 @ lifted_functions_022.c:7603; source=0x04F4CDE4 */
-#define SFERA_DATA_CALL_ARGUMENT_04F4CDE4_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F4CDE4))
-/* global object root; sfera_sub_004F9F30 @ lifted_functions_025.c:6924; source=0x04F4CE20 */
-/* global object root; sfera_sub_004F9F60 @ lifted_functions_025.c:6946; source=0x04F4CE80 */
-/* call argument root; sfera_sub_004EEE61 @ lifted_functions_024.c:5124; source=0x04F90418 */
-#define SFERA_DATA_CALL_ARGUMENT_04F90418_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90418))
-/* call argument root; sfera_sub_004EEE61 @ lifted_functions_024.c:5124; source=0x04F9041C */
-#define SFERA_DATA_CALL_ARGUMENT_04F9041C_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F9041C))
-/* call argument root; sfera_sub_004EEE61 @ lifted_functions_024.c:5124; source=0x04F90420 */
-#define SFERA_DATA_CALL_ARGUMENT_04F90420_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90420))
-/* global object root; sfera_sub_004FC15A @ lifted_functions_025.c:10330; source=0x04F90770 */
-#define SFERA_DATA_GLOBAL_OBJECT_04F90770_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90770))
-/* global object root; sfera_sub_004EF142 @ lifted_functions_024.c:5246; source=0x04F90778 */
-#define SFERA_DATA_GLOBAL_OBJECT_04F90778_ADDR SFERA_DATA_CANONICAL_ADDR(UINT32_C(0x04F90778))
+/* ===== External C++ ABI bridge ===== */
+/* MSVCP100 and compiler-runtime exception objects still need concrete ABI slots until those external types are lifted separately. */
+#define SFERA_MSVCP100_VPTR_BASIC_FILEBUF ((uint32_t)(uintptr_t)&g_sfera_msvcp100_vtable_basic_filebuf[0])
+#define SFERA_MSVCP100_VPTR_BASIC_OFSTREAM ((uint32_t)(uintptr_t)&g_sfera_msvcp100_vtable_basic_ofstream[0])
+#define SFERA_MSVCP100_VPTR_BASIC_IFSTREAM ((uint32_t)(uintptr_t)&g_sfera_msvcp100_vtable_basic_ifstream[0])
+#define SFERA_MSVCP100_VPTR_BASIC_STRINGBUF ((uint32_t)(uintptr_t)&g_sfera_msvcp100_vtable_basic_stringbuf[0])
+#define SFERA_MSVCP100_VPTR_BASIC_OSTRINGSTREAM ((uint32_t)(uintptr_t)&g_sfera_msvcp100_vtable_basic_ostringstream[0])
+#define SFERA_LEGACY_VPTR_BAD_ALLOC ((uint32_t)(uintptr_t)&g_sfera_legacy_vtable_bad_alloc[0])
+#define SFERA_LEGACY_VPTR_COM_ERROR ((uint32_t)(uintptr_t)&g_sfera_legacy_vtable_com_error[0])
 
 /* ===== Recovered static symbols ===== */
 /* Remaining source-VA symbols are compatibility identities for state that has not

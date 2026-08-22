@@ -16,7 +16,6 @@
 #include <string>
 #include <array>
 #include <vector>
-#include <unordered_map>
 
 namespace lifted {
 
@@ -44,7 +43,7 @@ struct CallbackRegisters {
     std::uint32_t ecx;
     std::uint32_t eax;
     std::uint32_t eflags;
-    std::uint32_t callback_target;
+    std::uint32_t callback_function;
 };
 
 struct ResolvedImport { std::uint32_t address; ImportBehavior behavior; };
@@ -71,8 +70,6 @@ public:
     ~ProcessMemory();
     std::uint32_t load_base() const noexcept;
     std::uint32_t entry_va() noexcept;
-    std::uint32_t static_address(std::uint32_t rva) const;
-    std::uint32_t source_address(std::uint32_t source_va);
     bool source_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
     bool code_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
     const std::vector<ResolvedImport>& resolved_imports() const noexcept;
@@ -81,25 +78,21 @@ public:
     void read(std::uint32_t address, void* value, std::size_t size) const;
     void write(std::uint32_t address, const void* value, std::size_t size);
     void initialize_native();
-    std::uint32_t callback_for_rva(std::uint32_t rva) { return callback_address(rva); }
+    std::uint32_t callback_for_function(LiftFunction function) const noexcept { return callback_address(function); }
+    LiftFunction callback_function(std::uint32_t address) const noexcept;
+    bool is_callback_function(LiftFunction function) const noexcept;
 private:
     std::uint8_t* callback_thunks_ = nullptr;
     std::uint32_t callback_thunks_size_ = 0;
-    std::uint8_t* data_compat_view_ = nullptr;
     std::uint32_t callback_thunk_count_ = 0u;
-    std::uint32_t callback_committed_pages_ = 0u;
-    std::uint32_t callback_rx_pages_ = 0u;
-    std::unordered_map<std::uint32_t, std::uint32_t> callback_addresses_;
     std::vector<HMODULE> loaded_modules_;
     std::vector<ResolvedImport> resolved_imports_;
-    void allocate_static_regions();
-    std::uint8_t* region_pointer(std::uint32_t rva, std::size_t size = 1u) const;
-    void install_initial_static_data();
+    void allocate_runtime_regions();
+    void initialize_native_storage();
     void resolve_imports();
     void resolve_static_references();
-    void verify_semantic_data_views() const;
-    std::uint32_t callback_address(std::uint32_t rva);
-    bool callback_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
+    void initialize_callback_registry();
+    std::uint32_t callback_address(LiftFunction function) const noexcept;
     void protect_regions();
     void release() noexcept;
 };

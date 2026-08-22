@@ -2,6 +2,9 @@
 
 #include "lifted_fast_ops.h"
 #include "semantic_native.h"
+#ifdef __cplusplus
+#include <memory>
+#endif
 
 #define LIFT_ENTER(address) do { cpu->eip = LIFT_CODE_TOKEN_VA((address)); } while (0)
 #define LIFT_BLOCK(label, address) label: cpu->eip = LIFT_CODE_TOKEN_VA(address)

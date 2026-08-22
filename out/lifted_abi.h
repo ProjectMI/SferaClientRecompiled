@@ -86,7 +86,12 @@ _Static_assert(sizeof(LiftCpu) == 184, "LiftCpu ABI size changed");
 typedef void (LIFT_CDECL *LiftFunction)(LiftCpu* cpu, uint32_t stop_address);
 
 
-uint32_t LIFT_CDECL lift_callback_address_rva(uint32_t rva);
+uint32_t LIFT_CDECL lift_callback_address(LiftFunction function);
+LiftFunction LIFT_CDECL lift_callback_function(uint32_t address);
+uint32_t LIFT_CDECL lift_function_count(void);
+LiftFunction LIFT_CDECL lift_function_at(uint32_t index);
+uint32_t LIFT_CDECL lift_function_index(LiftFunction function);
+LiftFunction LIFT_CDECL lift_function_from_native_address(uint32_t address);
 uint32_t LIFT_CDECL lift_process_module_handle(void);
 int LIFT_CDECL lift_has_function_rva(uint32_t rva);
 uint8_t LIFT_CDECL lift_load8(uint32_t address);

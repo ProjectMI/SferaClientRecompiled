@@ -6506,12 +6506,11 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004731C0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000060), UINT32_C(0xFFFFFFFF));
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x00000040));
     LIFT_CALL_ENTER(sfera_sub_00438460, UINT32_C(0x00473211));
-    LIFT_LOAD32(cpu->edx, cpu->eax);
-    LIFT_LOAD32(cpu->edx, cpu->edx + UINT32_C(0x00000018));
+
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000080))));
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->ecx = (uint32_t)(cpu->eax);
-    if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00073222)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00073220)))) { return; }
+    reinterpret_cast<CCursor*>(cpu->ecx)->getPosition(cpu);
     LIFT_ENTER(UINT32_C(0x00473222));
     LIFT_X87_LOAD_F32(((uint32_t)(uintptr_t)&g_sfera_view_geometry_runtime.reference_points[2].x));
     LIFT_X87_LOAD_F32_DUP(((uint32_t)(uintptr_t)&g_sfera_view_geometry_runtime.reference_points[1].x));
