@@ -4,8 +4,6 @@
 #include <math.h>
 
 static uint32_t sfera_window_class_name(void) { return (uint32_t)(uintptr_t)"SphereWclName"; }
-static SferaDIObjectDataFormat32 sfera_di_object_format(uint32_t object_guid, uint32_t offset, uint32_t type) { SferaDIObjectDataFormat32 value = {object_guid, offset, type, 0u}; return value; }
-static uint32_t sfera_mouse_axis_guid(uint32_t index) { switch (index) { case 0u: return (uint32_t)(uintptr_t)&g_sfera_guid_direct_input_x_axis; case 1u: return (uint32_t)(uintptr_t)&g_sfera_guid_direct_input_y_axis; default: return (uint32_t)(uintptr_t)&g_sfera_guid_direct_input_z_axis; } }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00457E80(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00457E80));
@@ -3375,22 +3373,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0045A9C0(LiftCpu* cpu, uint32_t stop_addres
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0045AA50(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x0045AA50));
-    const SferaGuid32 iid_direct_input8a = {UINT32_C(0xBF798030), UINT16_C(0x483A), UINT16_C(0x4DA2), {UINT8_C(0xAA), UINT8_C(0x99), UINT8_C(0x5D), UINT8_C(0x64), UINT8_C(0xED), UINT8_C(0x36), UINT8_C(0x97), UINT8_C(0x00)}};
-    const SferaGuid32 guid_sys_keyboard = {UINT32_C(0x6F1D2B61), UINT16_C(0xD5A0), UINT16_C(0x11CF), {UINT8_C(0xBF), UINT8_C(0xC7), UINT8_C(0x44), UINT8_C(0x45), UINT8_C(0x53), UINT8_C(0x54), UINT8_C(0x00), UINT8_C(0x00)}};
-    const SferaGuid32 guid_sys_mouse = {UINT32_C(0x6F1D2B60), UINT16_C(0xD5A0), UINT16_C(0x11CF), {UINT8_C(0xBF), UINT8_C(0xC7), UINT8_C(0x44), UINT8_C(0x45), UINT8_C(0x53), UINT8_C(0x54), UINT8_C(0x00), UINT8_C(0x00)}};
-    SferaDIObjectDataFormat32 keyboard_objects[256];
-    SferaDIObjectDataFormat32 mouse_objects[7];
-    for (uint32_t index = 0u; index < 3u; ++index) { mouse_objects[index] = sfera_di_object_format(sfera_mouse_axis_guid(index), index * 4u, UINT32_C(0x00FFFF03) | (index == 2u ? UINT32_C(0x80000000) : 0u)); }
-    for (uint32_t index = 3u; index < 7u; ++index) { mouse_objects[index] = sfera_di_object_format(0u, index + 9u, UINT32_C(0x00FFFF0C) | (index >= 5u ? UINT32_C(0x80000000) : 0u)); }
-    for (uint32_t index = 0u; index < 256u; ++index) { keyboard_objects[index] = sfera_di_object_format((uint32_t)(uintptr_t)&g_sfera_guid_direct_input_key, index, UINT32_C(0x8000000C) | (index << 8u)); }
-    const SferaDIDataFormat32 keyboard_format = {UINT32_C(0x18), UINT32_C(0x10), UINT32_C(0x02), UINT32_C(0x100), UINT32_C(0x100), (uint32_t)(uintptr_t)keyboard_objects};
-    const SferaDIDataFormat32 mouse_format = {UINT32_C(0x18), UINT32_C(0x10), UINT32_C(0x02), UINT32_C(0x10), UINT32_C(0x07), (uint32_t)(uintptr_t)mouse_objects};
     LIFT_SP_SUB(UINT32_C(0x00000018));
     cpu->eax = (uint32_t)(g_sfera_security_cookie);
     LIFT_LOGIC(cpu->eax, cpu->esp, ^, 32u, cpu->eax = (uint32_t)(result););
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000014), cpu->eax);
     cpu->eax = (uint32_t)((*(uint32_t*)(void*)&g_sfera_main_ui_state_runtime.active_ui_object));
-    LIFT_PUSH5(UINT32_C(0x00000000), ((uint32_t)(uintptr_t)&g_sfera_direct_input_runtime.direct_input), ((uint32_t)(uintptr_t)&iid_direct_input8a), UINT32_C(0x00000800), cpu->eax);
+    LIFT_PUSH5(UINT32_C(0x00000000), ((uint32_t)(uintptr_t)&g_sfera_direct_input_runtime.direct_input), address32(&IID_IDirectInput8A), UINT32_C(0x00000800), cpu->eax);
     LIFT_CALL_ENTER(sfera_sub_004E77D4, UINT32_C(0x0045AA7A));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_0005AA88, UINT32_C(0x0045AA7E));
@@ -3400,7 +3388,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0045AA50(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(g_sfera_direct_input_runtime.direct_input);
     LIFT_LOAD32(cpu->ecx, cpu->eax);
     LIFT_LOAD32(cpu->edx, cpu->ecx + UINT32_C(0x0000000C));
-    LIFT_PUSH4(UINT32_C(0x00000000), ((uint32_t)(uintptr_t)&g_sfera_input_device_runtime.keyboard_device), ((uint32_t)(uintptr_t)&guid_sys_keyboard), cpu->eax);
+    LIFT_PUSH4(UINT32_C(0x00000000), ((uint32_t)(uintptr_t)&g_sfera_input_device_runtime.keyboard_device), address32(&GUID_SysKeyboard), cpu->eax);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0005AAA1)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0005AA9F)))) { return; }
     LIFT_ENTER(UINT32_C(0x0045AAA1));
     LIFT_TEST(cpu->eax, 32u);
@@ -3411,7 +3399,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0045AA50(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(g_sfera_direct_input_runtime.direct_input);
     LIFT_LOAD32(cpu->ecx, cpu->eax);
     LIFT_LOAD32(cpu->edx, cpu->ecx + UINT32_C(0x0000000C));
-    LIFT_PUSH4(UINT32_C(0x00000000), ((uint32_t)(uintptr_t)&g_sfera_direct_input_runtime.mouse_device), ((uint32_t)(uintptr_t)&guid_sys_mouse), cpu->eax);
+    LIFT_PUSH4(UINT32_C(0x00000000), ((uint32_t)(uintptr_t)&g_sfera_direct_input_runtime.mouse_device), address32(&GUID_SysMouse), cpu->eax);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0005AAC8)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0005AAC6)))) { return; }
     LIFT_ENTER(UINT32_C(0x0045AAC8));
     LIFT_TEST(cpu->eax, 32u);
@@ -3446,7 +3434,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0045AA50(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(g_sfera_input_device_runtime.keyboard_device);
     LIFT_LOAD32(cpu->ecx, cpu->eax);
     LIFT_LOAD32(cpu->edx, cpu->ecx + UINT32_C(0x0000002C));
-    LIFT_PUSH2(((uint32_t)(uintptr_t)&keyboard_format), cpu->eax);
+    LIFT_PUSH2(address32(&c_dfDIKeyboard), cpu->eax);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0005AB30)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0005AB2E)))) { return; }
     LIFT_ENTER(UINT32_C(0x0045AB30));
     LIFT_TEST(cpu->eax, 32u);
@@ -3457,7 +3445,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0045AA50(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(g_sfera_direct_input_runtime.mouse_device);
     LIFT_LOAD32(cpu->ecx, cpu->eax);
     LIFT_LOAD32(cpu->edx, cpu->ecx + UINT32_C(0x0000002C));
-    LIFT_PUSH2(((uint32_t)(uintptr_t)&mouse_format), cpu->eax);
+    LIFT_PUSH2(address32(&c_dfDIMouse), cpu->eax);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->edx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0005AB50)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0005AB4E)))) { return; }
     LIFT_ENTER(UINT32_C(0x0045AB50));
     LIFT_TEST(cpu->eax, 32u);

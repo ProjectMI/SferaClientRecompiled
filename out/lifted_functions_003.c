@@ -1,6 +1,5 @@
 #include "lifted_functions.h"
 #include "lifted_normalized_ops.h"
-
 #include <math.h>
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_0041C5B0(LiftCpu* cpu, uint32_t stop_address) {
@@ -6578,7 +6577,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00421850(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x00421850));
     LIFT_LOAD32(cpu->edx, cpu->esp + UINT32_C(0x00000008));
     lift_push32(cpu, (uint32_t)(cpu->esi));
-    cpu->eax = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_guid_iid_iunknown));
+    cpu->eax = (uint32_t)(address32(&__uuidof(IUnknown)));
     cpu->esi = (uint32_t)(cpu->edx);
     lift_push32(cpu, (uint32_t)(cpu->edi));
     cpu->ecx = (uint32_t)(UINT32_C(0x00000010));
@@ -6598,7 +6597,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00421850(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ZERO(cpu->eax, 32u);
     LIFT_EPILOGUE1(12u, cpu->esi);
     LIFT_BLOCK(label_00021887, UINT32_C(0x00421887));
-    cpu->eax = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_guid_iid_ole_client_site));
+    cpu->eax = (uint32_t)(address32(&__uuidof(IOleClientSite)));
     cpu->esi = (uint32_t)(cpu->edx);
     cpu->ecx = (uint32_t)(UINT32_C(0x00000010));
     LIFT_SUB(cpu->esi, cpu->eax, 0u, 32u, cpu->esi = (uint32_t)(result););
@@ -6617,7 +6616,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00421850(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ZERO(cpu->eax, 32u);
     LIFT_EPILOGUE1(12u, cpu->esi);
     LIFT_BLOCK(label_000218B8, UINT32_C(0x004218B8));
-    cpu->eax = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_guid_00000119));
+    cpu->eax = (uint32_t)(address32(&__uuidof(IOleInPlaceSite)));
     cpu->esi = (uint32_t)(cpu->edx);
     cpu->ecx = (uint32_t)(UINT32_C(0x00000010));
     LIFT_SUB(cpu->esi, cpu->eax, 0u, 32u, cpu->esi = (uint32_t)(result););
@@ -6637,7 +6636,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00421850(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ZERO(cpu->eax, 32u);
     LIFT_EPILOGUE1(12u, cpu->esi);
     LIFT_BLOCK(label_000218EC, UINT32_C(0x004218EC));
-    cpu->eax = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_guid_iid_doc_host_ui_handler));
+    cpu->eax = (uint32_t)(address32(&__uuidof(IDocHostUIHandler)));
     cpu->ecx = (uint32_t)(UINT32_C(0x00000010));
     LIFT_SUB(cpu->edx, cpu->eax, 0u, 32u, cpu->edx = (uint32_t)(result););
     LIFT_BLOCK(label_000218F8, UINT32_C(0x004218F8));
@@ -6745,7 +6744,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00421A10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->eax, cpu->eax + UINT32_C(0xFFFFFFF8));
     LIFT_LOAD32(cpu->ecx, cpu->eax);
     cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000004))));
-    LIFT_PUSH3(cpu->edx, ((uint32_t)(uintptr_t)&g_sfera_guid_00000113), cpu->eax);
+    LIFT_PUSH3(cpu->edx, address32(&__uuidof(IOleInPlaceObject)), cpu->eax);
     LIFT_LOAD32(cpu->eax, cpu->ecx);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00021A28)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00021A26)))) { return; }
     LIFT_ENTER(UINT32_C(0x00421A28));
@@ -6796,7 +6795,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00421A90(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->eax, cpu->eax);
     LIFT_LOAD32(cpu->ecx, cpu->eax);
     cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000008))));
-    LIFT_PUSH3(cpu->edx, ((uint32_t)(uintptr_t)&g_sfera_guid_iid_web_browser2), cpu->eax);
+    LIFT_PUSH3(cpu->edx, address32(&__uuidof(IWebBrowser2)), cpu->eax);
     LIFT_LOAD32(cpu->eax, cpu->ecx);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00021AB6)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00021AB4)))) { return; }
     LIFT_ENTER(UINT32_C(0x00421AB6));
@@ -6836,7 +6835,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00421C00(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->eax, cpu->eax);
     LIFT_LOAD32(cpu->ecx, cpu->eax);
     cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000004))));
-    LIFT_PUSH3(cpu->edx, ((uint32_t)(uintptr_t)&g_sfera_guid_iid_web_browser2), cpu->eax);
+    LIFT_PUSH3(cpu->edx, address32(&__uuidof(IWebBrowser2)), cpu->eax);
     LIFT_LOAD32(cpu->eax, cpu->ecx);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00021C22)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00021C20)))) { return; }
     LIFT_ENTER(UINT32_C(0x00421C22));
@@ -6920,7 +6919,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00421CF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->eax, cpu->eax);
     LIFT_LOAD32(cpu->ecx, cpu->eax);
     cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000004))));
-    LIFT_PUSH3(cpu->edx, ((uint32_t)(uintptr_t)&g_sfera_guid_iid_web_browser2), cpu->eax);
+    LIFT_PUSH3(cpu->edx, address32(&__uuidof(IWebBrowser2)), cpu->eax);
     LIFT_LOAD32(cpu->eax, cpu->ecx);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00021D10)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00021D0E)))) { return; }
     LIFT_ENTER(UINT32_C(0x00421D10));
@@ -6972,7 +6971,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00421D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->esi));
     cpu->esi = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000004))));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000010))));
-    LIFT_PUSH7(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_ole_host_abi.storage_object_vtable), cpu->esi, UINT32_C(0x00000000), UINT32_C(0x00000001), ((uint32_t)(uintptr_t)&g_sfera_guid_iid_ole_object), ((uint32_t)(uintptr_t)&g_sfera_guid_clsid_web_browser));
+    LIFT_PUSH7(cpu->eax, ((uint32_t)(uintptr_t)&g_sfera_ole_host_abi.storage_object_vtable), cpu->esi, UINT32_C(0x00000000), UINT32_C(0x00000001), address32(&__uuidof(IOleObject)), address32(&__uuidof(WebBrowser)));
     LIFT_STORE32(cpu->esi, ((uint32_t)(uintptr_t)&g_sfera_ole_host_abi.client_site_vtable[0]));
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000004), ((uint32_t)(uintptr_t)&g_sfera_ole_host_abi.inplace_site_vtable[0]));
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000008), ((uint32_t)(uintptr_t)&g_sfera_ole_host_abi.inplace_frame_vtable[0]));
@@ -7012,7 +7011,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00421D50(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000010));
     LIFT_LOAD32(cpu->ecx, cpu->eax);
     cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000000C))));
-    LIFT_PUSH3(cpu->edx, ((uint32_t)(uintptr_t)&g_sfera_guid_iid_web_browser2), cpu->eax);
+    LIFT_PUSH3(cpu->edx, address32(&__uuidof(IWebBrowser2)), cpu->eax);
     LIFT_LOAD32(cpu->eax, cpu->ecx);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->eax), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00021E45)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00021E43)))) { return; }
     LIFT_ENTER(UINT32_C(0x00421E45));

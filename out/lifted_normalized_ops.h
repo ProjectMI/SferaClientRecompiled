@@ -6,6 +6,27 @@
 #include <memory>
 #endif
 
+#ifndef DIRECTINPUT_VERSION
+#define DIRECTINPUT_VERSION 0x0800
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <oleidl.h>
+#include <exdisp.h>
+#include <mshtmhst.h>
+#include <dinput.h>
+#include <mshtml.h>
+
+namespace {
+	const GUID kDirectPlay8ClientIid = { 0x5102DACD, 0x241B, 0x11D3, {0xAE, 0xA7, 0x00, 0x60, 0x97, 0xB0, 0x14, 0x11} };
+	const GUID kDirectPlay8ClientClsid = { 0x743F1DC6, 0x5ABA, 0x429F, {0x8B, 0xDF, 0xC5, 0x4D, 0x03, 0x25, 0x3D, 0xC2} };
+	const GUID kDirectPlay8AddressClsid = { 0x934A9523, 0xA3CA, 0x4BC5, {0xAD, 0xA0, 0xD6, 0xD9, 0x5D, 0x97, 0x94, 0x21} };
+	const GUID kDirectPlay8AddressIid = { 0x83783300, 0x4063, 0x4C8A, {0x9D, 0xB3, 0x82, 0x83, 0x0A, 0x7F, 0xEB, 0x31} };
+	const GUID kDirectPlay8TcpIpProvider = { 0xEBFE7BA0, 0x628D, 0x11D2, {0xAE, 0x0F, 0x00, 0x60, 0x97, 0xB0, 0x14, 0x11} };
+}
+
 #define LIFT_ENTER(address) do { cpu->eip = LIFT_CODE_TOKEN_VA((address)); } while (0)
 #define LIFT_BLOCK(label, address) label: cpu->eip = LIFT_CODE_TOKEN_VA(address)
 #define LIFT_CALL(function, return_address) do { lift_push32(cpu, (return_address)); function(cpu, (return_address)); if (cpu->eip != (return_address)) return; } while (0)
