@@ -4243,7 +4243,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00429C10(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE8(cpu->esp + UINT32_C(0x00000007), UINT32_C(0x00000001));
     g_sfera_effect_manager.render_cycle = (uint32_t)(cpu->ebx);
     LIFT_BLOCK(label_00029C9C, UINT32_C(0x00429C9C));
-    LIFT_X87_LOAD_F32(SFERA_STATIC_04ED2C78_ADDR);
+    LIFT_X87_LOAD_F32(((uint32_t)(uintptr_t)&g_sfera_view_spatial_runtime.basis[0].z));
     lift_push32(cpu, (uint32_t)(cpu->esi));
     lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (10.0));
     cpu->esi = (uint32_t)(g_sfera_effect_manager.active_effects.first);
@@ -10363,7 +10363,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0042E990(LiftCpu* cpu, uint32_t stop_addres
     LIFT_PUSH3(cpu->edx, UINT32_C(0x00000000), UINT32_C(0x0002BF20));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000020))));
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000001C), cpu->eax);
-    cpu->eax = (uint32_t)(SFERA_STATIC_006BE110_U32);
+    cpu->eax = (uint32_t)(g_sfera_directplay_runtime.peer);
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000001)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x0000001C))));
     LIFT_STORE32(cpu->esp + UINT32_C(0x0000001C), UINT32_C(0x00000800));
