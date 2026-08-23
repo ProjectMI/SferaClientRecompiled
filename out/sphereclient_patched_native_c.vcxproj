@@ -69,17 +69,18 @@
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <TargetMachine>MachineX86</TargetMachine>
-      <AdditionalDependencies>dinput8.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(IntDir)generated_imports;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;comctl32.lib;ws2_32.lib;winmm.lib;dinput8.lib;dxguid.lib;d3d9.lib;dbghelp.lib;d3dx9_26.lib;sound.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>if not exist "$(IntDir)generated_imports" mkdir "$(IntDir)generated_imports"
+"$(VCToolsInstallDir)bin\Hostx64\x86\lib.exe" /nologo /def:"$(ProjectDir)imports\d3dx9_26.def" /machine:x86 /out:"$(IntDir)generated_imports\d3dx9_26.lib"
+if errorlevel 1 exit /b 1
+"$(VCToolsInstallDir)bin\Hostx64\x86\lib.exe" /nologo /def:"$(ProjectDir)imports\sound.def" /machine:x86 /out:"$(IntDir)generated_imports\sound.lib"
+if errorlevel 1 exit /b 1</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)..\d3dx9_26.dll" "$(OutDir)d3dx9_26.dll" &gt;nul
-copy /Y "$(ProjectDir)..\d3dx9_30.dll" "$(OutDir)d3dx9_30.dll" &gt;nul
-copy /Y "$(ProjectDir)..\dbghelp.dll" "$(OutDir)dbghelp.dll" &gt;nul
-copy /Y "$(ProjectDir)..\msvcp100.dll" "$(OutDir)msvcp100.dll" &gt;nul
-copy /Y "$(ProjectDir)..\msvcp71.dll" "$(OutDir)msvcp71.dll" &gt;nul
-copy /Y "$(ProjectDir)..\msvcr100.dll" "$(OutDir)msvcr100.dll" &gt;nul
-copy /Y "$(ProjectDir)..\msvcr71.dll" "$(OutDir)msvcr71.dll" &gt;nul
-copy /Y "$(ProjectDir)..\sound.dll" "$(OutDir)sound.dll" &gt;nul</Command>
+      <Command>copy /Y "$(ProjectDir)runtime_dlls\*.dll" "$(OutDir)" &gt;nul</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -321,6 +322,19 @@ copy /Y "$(ProjectDir)..\sound.dll" "$(OutDir)sound.dll" &gt;nul</Command>
     <ClInclude Include="lifted_abi.h" />
     <ClInclude Include="lifted_functions.h" />
     <ClInclude Include="lifted_normalized_ops.h" />
+    <ClInclude Include="import_bridge.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="imports\d3dx9_26.def" />
+    <None Include="imports\sound.def" />
+    <None Include="runtime_dlls\d3dx9_26.dll" />
+    <None Include="runtime_dlls\d3dx9_30.dll" />
+    <None Include="runtime_dlls\dbghelp.dll" />
+    <None Include="runtime_dlls\msvcp71.dll" />
+    <None Include="runtime_dlls\msvcr71.dll" />
+    <None Include="runtime_dlls\msvcp100.dll" />
+    <None Include="runtime_dlls\msvcr100.dll" />
+    <None Include="runtime_dlls\sound.dll" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

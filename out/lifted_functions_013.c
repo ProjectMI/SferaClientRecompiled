@@ -77,7 +77,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482170(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_CALL_ENTER(sfera_sub_004EB520, UINT32_C(0x004821FB));
     LIFT_PUSH3(cpu->ebp, ((uint32_t)(uintptr_t)"openCfg: wrong fromat of Cfg %s"), ((uint32_t)(uintptr_t)&g_sfera_config_parser_runtime.token[0]));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sprintf, UINT32_C(0x00482206), UINT32_C(0x0048220C));
+    LIFT_NATIVE_CALL(native_function_address32(&::sprintf), UINT32_C(0x00482206), UINT32_C(0x0048220C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)&g_sfera_config_parser_runtime.token[0]));
     LIFT_CALL_ENTER(sfera_sub_00459B10, UINT32_C(0x00482219));
@@ -514,7 +514,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004826C0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_PUSH2(cpu->esi, UINT32_C(0x00000040));
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_PUSH2(UINT32_C(0x00000000), cpu->esi);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004826D0));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x004826CB), UINT32_C(0x004826D0));
     lift_x87_push(cpu, 1.0);
     LIFT_X87_STORE_F32(cpu->esi + UINT32_C(0x0000003C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
@@ -544,7 +544,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482720(LiftCpu* cpu, uint32_t stop_addres
     LIFT_PUSH2(cpu->esi, UINT32_C(0x00000040));
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_PUSH2(UINT32_C(0x00000000), cpu->esi);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00482730));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x0048272B), UINT32_C(0x00482730));
     lift_x87_push(cpu, 1.0);
     LIFT_X87_STORE_F32(cpu->esi + UINT32_C(0x0000003C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
@@ -574,7 +574,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482780(LiftCpu* cpu, uint32_t stop_addres
     LIFT_PUSH2(cpu->esi, UINT32_C(0x00000040));
     cpu->esi = (uint32_t)(cpu->ecx);
     LIFT_PUSH2(UINT32_C(0x00000000), cpu->esi);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00482790));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x0048278B), UINT32_C(0x00482790));
     lift_x87_push(cpu, 1.0);
     LIFT_X87_STORE_F32(cpu->esi + UINT32_C(0x0000003C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
@@ -606,7 +606,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004827E0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_RET(0u);
     LIFT_BLOCK(label_000827E7, UINT32_C(0x004827E7));
     lift_push32(cpu, (uint32_t)(cpu->edi));
-    cpu->edi = (uint32_t)(SFERA_IMPORT_MSVCR100_stricmp);
+    cpu->edi = (uint32_t)(native_function_address32(&::_stricmp));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"PS_ROTATEXYZ"), cpu->esi);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->edi), LIFT_CODE_TOKEN_RVA(UINT32_C(0x000827F6)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x000827F4)))) { return; }
     LIFT_ENTER(UINT32_C(0x004827F6));
@@ -850,7 +850,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482A30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_RET(0u);
     LIFT_BLOCK(label_00082A35, UINT32_C(0x00482A35));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"I_COSINE"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_stricmp, UINT32_C(0x00482A3B), UINT32_C(0x00482A41));
+    LIFT_NATIVE_CALL(native_function_address32(&::_stricmp), UINT32_C(0x00482A3B), UINT32_C(0x00482A41));
     LIFT_SP_ADD(UINT32_C(0x00000008));
     LIFT_NEG(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
     LIFT_SUB(cpu->eax, cpu->eax, ((cpu->eflags & LIFT_FLAG_CF) != 0u ? 1u : 0u), 32u, cpu->eax = (uint32_t)(result););
@@ -866,7 +866,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482A50(LiftCpu* cpu, uint32_t stop_addres
     LIFT_RET(0u);
     LIFT_BLOCK(label_00082A57, UINT32_C(0x00482A57));
     lift_push32(cpu, (uint32_t)(cpu->edi));
-    cpu->edi = (uint32_t)(SFERA_IMPORT_MSVCR100_stricmp);
+    cpu->edi = (uint32_t)(native_function_address32(&::_stricmp));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"EMITSHAPE_LINE"), cpu->esi);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->edi), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00082A66)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00082A64)))) { return; }
     LIFT_ENTER(UINT32_C(0x00482A66));
@@ -982,7 +982,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482B00(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000030))));
     LIFT_PUSH2(UINT32_C(0x00000000), cpu->eax);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000020), UINT32_C(0x00000000));
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00482BB4));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x00482BAF), UINT32_C(0x00482BB4));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ecx = (uint32_t)(cpu->esi);
@@ -990,7 +990,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482B00(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"key")));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_CALL_ENTER(sfera_sub_004945C0, UINT32_C(0x00482BCB));
-    cpu->ebx = (uint32_t)(SFERA_IMPORT_MSVCR100_sscanf);
+    cpu->ebx = (uint32_t)(native_function_address32(&::sscanf));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00082C37, UINT32_C(0x00482BD5));
     cpu->ebp = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x00000010))));
@@ -1121,7 +1121,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482CE0(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000058))));
     LIFT_PUSH2(UINT32_C(0x00000000), cpu->eax);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000020), UINT32_C(0x00000000));
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00482D9D));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x00482D98), UINT32_C(0x00482D9D));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ecx = (uint32_t)(cpu->esi);
@@ -1129,7 +1129,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00482CE0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"key")));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_CALL_ENTER(sfera_sub_004945C0, UINT32_C(0x00482DB4));
-    cpu->ebx = (uint32_t)(SFERA_IMPORT_MSVCR100_sscanf);
+    cpu->ebx = (uint32_t)(native_function_address32(&::sscanf));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00082E52, UINT32_C(0x00482DC2));
     cpu->ebp = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x00000010))));
@@ -1779,7 +1779,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004835D0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ADD(cpu->ecx, cpu->ecx, 0u, 32u, cpu->ecx = (uint32_t)(result););
     LIFT_PUSH3(cpu->ecx, UINT32_C(0x00000000), cpu->eax);
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000044), cpu->eax);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00483617));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x00483612), UINT32_C(0x00483617));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     cpu->edx = (uint32_t)(UINT32_C(0x000001BC));
     cpu->ecx = (uint32_t)(((uint32_t)(uintptr_t)"..\\ShareClientSeverCode\\ParticleSystem.cpp"));
@@ -1798,7 +1798,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004835D0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ADD(cpu->ecx, cpu->ecx, 0u, 32u, cpu->ecx = (uint32_t)(result););
     LIFT_PUSH3(cpu->ecx, UINT32_C(0x00000000), cpu->eax);
     LIFT_STORE32(cpu->esi + UINT32_C(0x0000004C), cpu->eax);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00483655));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x00483650), UINT32_C(0x00483655));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_00083658, UINT32_C(0x00483658));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x0000002C)))), UINT32_C(0x00000000), 32u);
@@ -1821,7 +1821,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004835D0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ADD(cpu->ecx, cpu->ecx, 0u, 32u, cpu->ecx = (uint32_t)(result););
     LIFT_PUSH3(cpu->ecx, UINT32_C(0x00000000), cpu->eax);
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000048), cpu->eax);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x0048369B));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x00483696), UINT32_C(0x0048369B));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_0008369E, UINT32_C(0x0048369E));
     LIFT_EPILOGUE1(0u, cpu->esi);
@@ -2027,7 +2027,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00483880(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000090), cpu->eax);
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000098), cpu->eax);
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000094), UINT32_C(0xFFFFFFFF));
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00483903));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x004838FE), UINT32_C(0x00483903));
     lift_x87_push(cpu, 1.0);
     LIFT_X87_STORE_F32(cpu->edi + UINT32_C(0x0000003C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
@@ -2158,7 +2158,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00483920(LiftCpu* cpu, uint32_t stop_addres
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00483A80(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00483A80));
     lift_push32(cpu, (uint32_t)(cpu->ebx));
-    cpu->ebx = (uint32_t)(SFERA_IMPORT_MSVCR100_rand);
+    cpu->ebx = (uint32_t)(native_function_address32(&::rand));
     lift_push32(cpu, (uint32_t)(cpu->esi));
     LIFT_LOAD32(cpu->esi, cpu->esp + UINT32_C(0x0000000C));
     LIFT_X87_LOAD_F32(cpu->esi + UINT32_C(0x00000024));
@@ -2203,7 +2203,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00483A80(LiftCpu* cpu, uint32_t stop_addres
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00483B00(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00483B00));
     LIFT_PUSH2(cpu->esi, cpu->edi);
-    cpu->edi = (uint32_t)(SFERA_IMPORT_MSVCR100_rand);
+    cpu->edi = (uint32_t)(native_function_address32(&::rand));
     cpu->esi = (uint32_t)(cpu->ecx);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->edi), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00083B0C)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00083B0A)))) { return; }
     LIFT_ENTER(UINT32_C(0x00483B0C));
@@ -2401,7 +2401,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00483C80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ZERO(cpu->ebp, 32u);
     cpu->edi = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000050))));
     LIFT_PUSH2(cpu->ebp, cpu->edi);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00483D1E));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x00483D19), UINT32_C(0x00483D1E));
     lift_x87_push(cpu, 1.0);
     LIFT_X87_STORE_F32(cpu->edi + UINT32_C(0x0000003C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
@@ -2982,7 +2982,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00484420(LiftCpu* cpu, uint32_t stop_addres
 LIFT_ENTRY void LIFT_CDECL sfera_sub_00484440(LiftCpu* cpu, uint32_t stop_address) {
     LIFT_ENTER(UINT32_C(0x00484440));
     LIFT_PUSH2(cpu->esi, cpu->edi);
-    cpu->edi = (uint32_t)(SFERA_IMPORT_MSVCR100_rand);
+    cpu->edi = (uint32_t)(native_function_address32(&::rand));
     cpu->esi = (uint32_t)(cpu->ecx);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->edi), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0008444C)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0008444A)))) { return; }
     LIFT_ENTER(UINT32_C(0x0048444C));
@@ -3050,7 +3050,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004844D0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->ebp + UINT32_C(0x00000060), cpu->edi);
     LIFT_X87_LOAD_F32(cpu->ebx + UINT32_C(0x0000006C));
     LIFT_X87_STORE_F32_POP(cpu->ebp + UINT32_C(0x0000006C));
-    cpu->esi = (uint32_t)(SFERA_IMPORT_MSVCR100_rand);
+    cpu->esi = (uint32_t)(native_function_address32(&::rand));
     lift_x87_push(cpu, 0.0);
     LIFT_X87_STORE_F32_POP(cpu->ebp + UINT32_C(0x00000070));
     LIFT_LOAD32(cpu->eax, cpu->ebx + UINT32_C(0x0000004C));
@@ -3458,7 +3458,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00484A80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ENTER(UINT32_C(0x00484A80));
     LIFT_SP_SUB(UINT32_C(0x00000014));
     LIFT_PUSH2(cpu->ebx, cpu->ebp);
-    cpu->ebp = (uint32_t)(SFERA_IMPORT_MSVCR100_rand);
+    cpu->ebp = (uint32_t)(native_function_address32(&::rand));
     LIFT_PUSH2(cpu->esi, cpu->edi);
     LIFT_LOAD32(cpu->edi, cpu->esp + UINT32_C(0x00000028));
     cpu->edi = (uint32_t)(((uint32_t)(cpu->edi + ((uint32_t)(cpu->edi) * 4u))));
@@ -3580,7 +3580,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00484A80(LiftCpu* cpu, uint32_t stop_addres
     LIFT_IMUL32(cpu->edx, lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000028)))));
     LIFT_ADD(cpu->edx, cpu->eax, 0u, 32u, cpu->edx = (uint32_t)(result););
     lift_push32(cpu, (uint32_t)(cpu->edx));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_srand, UINT32_C(0x00484BE7), UINT32_C(0x00484BED));
+    LIFT_NATIVE_CALL(native_function_address32(&::srand), UINT32_C(0x00484BE7), UINT32_C(0x00484BED));
     LIFT_SP_ADD(UINT32_C(0x00000004));
     LIFT_BLOCK(label_00084BF0, UINT32_C(0x00484BF0));
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x00000008));
@@ -3883,7 +3883,7 @@ label_00084C03: ;
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->ebp), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00084FB3)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00084FB1)))) { return; }
     LIFT_ENTER(UINT32_C(0x00484FB3));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000028));
-    cpu->ebp = (uint32_t)(SFERA_IMPORT_MSVCR100_rand);
+    cpu->ebp = (uint32_t)(native_function_address32(&::rand));
     LIFT_SUB(cpu->ecx, cpu->eax, 0u, 32u, cpu->ecx = (uint32_t)(result););
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000028), cpu->ecx);
     lift_x87_push(cpu, (double)(((int32_t)(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000028))))))));
@@ -4022,9 +4022,9 @@ label_00084C03: ;
     LIFT_BLOCK(label_0008519E, UINT32_C(0x0048519E));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esi + UINT32_C(0x00000018)))), UINT32_C(0x00000000), 32u);
     LIFT_JLE(label_000851B4, UINT32_C(0x004851A4));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_WINMM_timeGetTime, UINT32_C(0x004851A4), UINT32_C(0x004851AA));
+    LIFT_NATIVE_CALL(native_function_address32(&::timeGetTime), UINT32_C(0x004851A4), UINT32_C(0x004851AA));
     lift_push32(cpu, (uint32_t)(cpu->eax));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_srand, UINT32_C(0x004851AB), UINT32_C(0x004851B1));
+    LIFT_NATIVE_CALL(native_function_address32(&::srand), UINT32_C(0x004851AB), UINT32_C(0x004851B1));
     LIFT_SP_ADD(UINT32_C(0x00000004));
     LIFT_BLOCK(label_000851B4, UINT32_C(0x004851B4));
     LIFT_LOAD32(cpu->eax, cpu->esi + UINT32_C(0x0000004C));
@@ -4292,7 +4292,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485430(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000030)));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000048))));
     LIFT_PUSH2(cpu->ebx, cpu->eax);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x0048550C));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x00485507), UINT32_C(0x0048550C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
     cpu->ecx = (uint32_t)(cpu->esi);
@@ -4300,7 +4300,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485430(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(((uint32_t)(uintptr_t)"key")));
     cpu->ecx = (uint32_t)(cpu->esi);
     LIFT_CALL_ENTER(sfera_sub_004945C0, UINT32_C(0x00485523));
-    cpu->ebx = (uint32_t)(SFERA_IMPORT_MSVCR100_sscanf);
+    cpu->ebx = (uint32_t)(native_function_address32(&::sscanf));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_000855B4, UINT32_C(0x00485531));
     cpu->ebp = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x00000010))));
@@ -4871,7 +4871,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485AF0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->edi + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%d %d %d %d"), cpu->edx);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x00485C83), UINT32_C(0x00485C89));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x00485C83), UINT32_C(0x00485C89));
     LIFT_SP_ADD(UINT32_C(0x00000018));
     LIFT_BLOCK(label_00085C8C, UINT32_C(0x00485C8C));
     LIFT_PUSH2(UINT32_C(0x00000001), cpu->esi);
@@ -4939,7 +4939,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485AF0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000034))));
     LIFT_PUSH3(cpu->ecx, ((uint32_t)(uintptr_t)"%d %f %f %f %f"), cpu->ebp);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x00485D6F), UINT32_C(0x00485D75));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x00485D6F), UINT32_C(0x00485D75));
     LIFT_X87_LOAD_F32(cpu->esp + UINT32_C(0x00000080));
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x0000008C));
     LIFT_SP_ADD(UINT32_C(0x0000001C));
@@ -4995,7 +4995,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485AF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00085E53, UINT32_C(0x00485E3F));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"I_COSINE"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_stricmp, UINT32_C(0x00485E45), UINT32_C(0x00485E4B));
+    LIFT_NATIVE_CALL(native_function_address32(&::_stricmp), UINT32_C(0x00485E45), UINT32_C(0x00485E4B));
     LIFT_SP_ADD(UINT32_C(0x00000008));
     LIFT_NEG(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
     LIFT_SUB(cpu->eax, cpu->eax, ((cpu->eflags & LIFT_FLAG_CF) != 0u ? 1u : 0u), 32u, cpu->eax = (uint32_t)(result););
@@ -5071,7 +5071,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485AF0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000034))));
     LIFT_PUSH3(cpu->ecx, ((uint32_t)(uintptr_t)"%d %f %f %f %f"), cpu->ebp);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x00485F3F), UINT32_C(0x00485F45));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x00485F3F), UINT32_C(0x00485F45));
     LIFT_X87_LOAD_F32(cpu->esp + UINT32_C(0x00000054));
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x0000008C));
     LIFT_SP_ADD(UINT32_C(0x0000001C));
@@ -5117,7 +5117,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485AF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00085FFC, UINT32_C(0x00485FE8));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"I_COSINE"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_stricmp, UINT32_C(0x00485FEE), UINT32_C(0x00485FF4));
+    LIFT_NATIVE_CALL(native_function_address32(&::_stricmp), UINT32_C(0x00485FEE), UINT32_C(0x00485FF4));
     LIFT_SP_ADD(UINT32_C(0x00000008));
     LIFT_NEG(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
     LIFT_SUB(cpu->eax, cpu->eax, ((cpu->eflags & LIFT_FLAG_CF) != 0u ? 1u : 0u), 32u, cpu->eax = (uint32_t)(result););
@@ -5192,7 +5192,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485AF0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000044))));
     LIFT_PUSH3(cpu->ecx, ((uint32_t)(uintptr_t)"%d %f %f %f %f"), cpu->ebp);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x004860EF), UINT32_C(0x004860F5));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x004860EF), UINT32_C(0x004860F5));
     LIFT_X87_LOAD_F32(cpu->esp + UINT32_C(0x00000074));
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x000000BC));
     LIFT_SP_ADD(UINT32_C(0x0000001C));
@@ -5240,7 +5240,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485AF0(LiftCpu* cpu, uint32_t stop_addres
     goto label_000861AF;
     LIFT_BLOCK(label_0008619B, UINT32_C(0x0048619B));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"I_COSINE"), cpu->esi);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_stricmp, UINT32_C(0x004861A1), UINT32_C(0x004861A7));
+    LIFT_NATIVE_CALL(native_function_address32(&::_stricmp), UINT32_C(0x004861A1), UINT32_C(0x004861A7));
     LIFT_SP_ADD(UINT32_C(0x00000008));
     LIFT_NEG(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
     LIFT_SUB(cpu->eax, cpu->eax, ((cpu->eflags & LIFT_FLAG_CF) != 0u ? 1u : 0u), 32u, cpu->eax = (uint32_t)(result););
@@ -5311,7 +5311,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485AF0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_00494400, UINT32_C(0x0048628A));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_000862B7, UINT32_C(0x0048628E));
-    cpu->ebp = (uint32_t)(SFERA_IMPORT_MSVCR100_stricmp);
+    cpu->ebp = (uint32_t)(native_function_address32(&::_stricmp));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"PS_BLENDADD"), cpu->esi);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->ebp), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0008629C)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0008629A)))) { return; }
     LIFT_ENTER(UINT32_C(0x0048629C));
@@ -5341,7 +5341,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00485AF0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(cpu->ebx);
     LIFT_CALL(sfera_sub_00483BF0, LIFT_CODE_TOKEN_RVA(UINT32_C(0x000862E2)));
     LIFT_BLOCK(label_000862E2, UINT32_C(0x004862E2));
-    cpu->ebp = (uint32_t)(SFERA_IMPORT_MSVCR100_rand);
+    cpu->ebp = (uint32_t)(native_function_address32(&::rand));
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->ebp), LIFT_CODE_TOKEN_RVA(UINT32_C(0x000862EA)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x000862E8)))) { return; }
     LIFT_ENTER(UINT32_C(0x004862EA));
     cpu->edx = ((int32_t)cpu->eax < 0) ? UINT32_C(0xFFFFFFFF) : 0u;
@@ -5396,7 +5396,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00486390(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ZERO(cpu->edi, 32u);
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esi + UINT32_C(0x00000008))));
     LIFT_PUSH2(cpu->edi, cpu->eax);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004863A5));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x004863A0), UINT32_C(0x004863A5));
     lift_x87_push(cpu, 0.0);
     LIFT_X87_STORE_F32(cpu->esp + UINT32_C(0x00000014));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
@@ -5568,7 +5568,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004865F0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000004), cpu->eax);
     LIFT_STORE32(cpu->esi + UINT32_C(0x0000005C), cpu->edi);
     LIFT_STORE32(cpu->esi + UINT32_C(0x00000060), cpu->ebp);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00486666));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x00486661), UINT32_C(0x00486666));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_CMP(cpu->edi, cpu->ebp, 32u);
     LIFT_JBE(label_0008669A, UINT32_C(0x0048666D));
@@ -5670,7 +5670,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004866A0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_ZERO(cpu->edi, 32u);
     cpu->esi = (uint32_t)(((uint32_t)(cpu->ebp + UINT32_C(0x0000011C))));
     LIFT_PUSH2(cpu->edi, cpu->esi);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00486807));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x00486802), UINT32_C(0x00486807));
     lift_x87_push(cpu, 1.0);
     LIFT_X87_STORE_F32(cpu->esi + UINT32_C(0x0000003C));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
@@ -6008,7 +6008,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004866A0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CMP(lift_load32(((uint32_t)(cpu->ebp + UINT32_C(0x0000005C)))), cpu->edi, 32u);
     LIFT_JBE(label_00087194, UINT32_C(0x00486D3C));
     lift_x87_push(cpu, 0.0);
-    cpu->ebx = (uint32_t)(SFERA_IMPORT_MSVCR100_rand);
+    cpu->ebx = (uint32_t)(native_function_address32(&::rand));
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000030), cpu->edi);
     LIFT_BLOCK(label_00086D48, UINT32_C(0x00486D48));
     LIFT_LOAD32(cpu->esi, cpu->ebp + UINT32_C(0x00000004));
@@ -7275,7 +7275,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%f %f %f"), cpu->edx);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x00487EC1), UINT32_C(0x00487EC7));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x00487EC1), UINT32_C(0x00487EC7));
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_BLOCK(label_00087ECA, UINT32_C(0x00487ECA));
     LIFT_PUSH2(cpu->esi, ((uint32_t)(uintptr_t)"transform_vec1"));
@@ -7291,7 +7291,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->edx));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%f %f %f"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x00487EF9), UINT32_C(0x00487EFF));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x00487EF9), UINT32_C(0x00487EFF));
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_BLOCK(label_00087F02, UINT32_C(0x00487F02));
     LIFT_PUSH2(cpu->esi, ((uint32_t)(uintptr_t)"transform_vec2"));
@@ -7307,7 +7307,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%f %f %f"), cpu->ecx);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x00487F31), UINT32_C(0x00487F37));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x00487F31), UINT32_C(0x00487F37));
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_BLOCK(label_00087F3A, UINT32_C(0x00487F3A));
     LIFT_PUSH2(cpu->esi, ((uint32_t)(uintptr_t)"transform_vec3"));
@@ -7323,7 +7323,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%f %f %f"), cpu->edx);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x00487F69), UINT32_C(0x00487F6F));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x00487F69), UINT32_C(0x00487F6F));
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_BLOCK(label_00087F72, UINT32_C(0x00487F72));
     LIFT_PUSH2(cpu->esi, ((uint32_t)(uintptr_t)"distortion_vec"));
@@ -7339,7 +7339,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->edx));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%f %f %f"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x00487FA1), UINT32_C(0x00487FA7));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x00487FA1), UINT32_C(0x00487FA7));
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_BLOCK(label_00087FAA, UINT32_C(0x00487FAA));
     LIFT_PUSH2(cpu->esi, ((uint32_t)(uintptr_t)"self_illumination"));
@@ -7448,7 +7448,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000030)));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000064))));
     LIFT_PUSH2(UINT32_C(0x00000000), cpu->edx);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00488120));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x0048811B), UINT32_C(0x00488120));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000014))));
     lift_push32(cpu, (uint32_t)(cpu->eax));
@@ -7474,7 +7474,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->edx));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%d %f %f %f %f"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x00488175), UINT32_C(0x0048817B));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x00488175), UINT32_C(0x0048817B));
     LIFT_X87_LOAD_F32(cpu->esp + UINT32_C(0x0000004C));
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x0000007C));
     LIFT_SP_ADD(UINT32_C(0x0000001C));
@@ -7821,7 +7821,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->eax));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%f %f %f"), cpu->ecx);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x004885DC), UINT32_C(0x004885E2));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x004885DC), UINT32_C(0x004885E2));
     LIFT_X87_LOAD_F32_DUP(cpu->esp + UINT32_C(0x00000044));
     LIFT_SP_ADD(UINT32_C(0x00000014));
     lift_x87_push(cpu, 0.0);
@@ -7888,7 +7888,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->edx));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%f %f %f"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x004886AD), UINT32_C(0x004886B3));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x004886AD), UINT32_C(0x004886B3));
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_BLOCK(label_000886B6, UINT32_C(0x004886B6));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x0000003C));
@@ -7995,7 +7995,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->edx));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%f %f %f"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x004887F9), UINT32_C(0x004887FF));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x004887F9), UINT32_C(0x004887FF));
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_BLOCK(label_00088802, UINT32_C(0x00488802));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000014))));
@@ -8012,7 +8012,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%f %f %f"), cpu->edx);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x0048882C), UINT32_C(0x00488832));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x0048882C), UINT32_C(0x00488832));
     LIFT_SP_ADD(UINT32_C(0x00000014));
     LIFT_BLOCK(label_00088835, UINT32_C(0x00488835));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000014))));
@@ -8061,7 +8061,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->ecx));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%d %f %f %f"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x004888CD), UINT32_C(0x004888D3));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x004888CD), UINT32_C(0x004888D3));
     LIFT_X87_LOAD_F32(cpu->esp + UINT32_C(0x0000003C));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000048));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->eax + ((uint32_t)(cpu->eax) * 2u))));
@@ -8560,7 +8560,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     LIFT_PUSH2(cpu->ecx, ((uint32_t)(uintptr_t)"texture_def"));
     cpu->ecx = (uint32_t)(cpu->ebx);
     LIFT_CALL_ENTER(sfera_sub_00493F70, UINT32_C(0x00488FC0));
-    cpu->esi = (uint32_t)(SFERA_IMPORT_MSVCR100_stricmp);
+    cpu->esi = (uint32_t)(native_function_address32(&::_stricmp));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_0008929A, UINT32_C(0x00488FCE));
     cpu->edx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000014))));
@@ -8730,7 +8730,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->edx));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->ebx + UINT32_C(0x00000010))));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"%d %f %f %f %f %f %f %f %f"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_sscanf, UINT32_C(0x004891B0), UINT32_C(0x004891B6));
+    LIFT_NATIVE_CALL(native_function_address32(&::sscanf), UINT32_C(0x004891B0), UINT32_C(0x004891B6));
     LIFT_SP_ADD(UINT32_C(0x0000002C));
     LIFT_LOGIC(lift_load32(((uint32_t)(cpu->edi + UINT32_C(0x000000E8)))), UINT32_C(0x00000002), |, 32u, lift_store32(((uint32_t)(cpu->edi + UINT32_C(0x000000E8))), (uint32_t)(result)););
     goto label_0008927F;
@@ -8841,7 +8841,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->edx, cpu->edi + UINT32_C(0x0000005C));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000020));
     LIFT_PUSH3(cpu->edx, UINT32_C(0x00000001), cpu->eax);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00489320));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x0048931B), UINT32_C(0x00489320));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     cpu->ecx = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000014))));
     LIFT_PUSH2(cpu->ecx, ((uint32_t)(uintptr_t)"select"));
@@ -8857,14 +8857,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JZ(label_0008942B, UINT32_C(0x00489352));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x0000001C));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"range"), cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_stricmp, UINT32_C(0x0048935C), UINT32_C(0x00489362));
+    LIFT_NATIVE_CALL(native_function_address32(&::_stricmp), UINT32_C(0x0048935C), UINT32_C(0x00489362));
     LIFT_SP_ADD(UINT32_C(0x00000008));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_000893C0, UINT32_C(0x00489369));
     LIFT_LOAD32(cpu->ecx, cpu->edi + UINT32_C(0x0000005C));
     LIFT_LOAD32(cpu->edx, cpu->esp + UINT32_C(0x00000020));
     LIFT_PUSH3(cpu->ecx, cpu->eax, cpu->edx);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x00489378));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x00489373), UINT32_C(0x00489378));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     lift_push32(cpu, (uint32_t)(UINT32_C(0x00000001)));
     cpu->ecx = (uint32_t)(cpu->ebx);
@@ -8895,19 +8895,19 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->eax));
     LIFT_ADD(cpu->ecx, cpu->esi, 0u, 32u, cpu->ecx = (uint32_t)(result););
     LIFT_PUSH2(UINT32_C(0x00000001), cpu->ecx);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004893BD));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x004893B8), UINT32_C(0x004893BD));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     LIFT_BLOCK(label_000893C0, UINT32_C(0x004893C0));
     LIFT_LOAD32(cpu->edx, cpu->esp + UINT32_C(0x0000001C));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"number"), cpu->edx);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_stricmp, UINT32_C(0x004893CA), UINT32_C(0x004893D0));
+    LIFT_NATIVE_CALL(native_function_address32(&::_stricmp), UINT32_C(0x004893CA), UINT32_C(0x004893D0));
     LIFT_SP_ADD(UINT32_C(0x00000008));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_0008942B, UINT32_C(0x004893D7));
     LIFT_LOAD32(cpu->eax, cpu->edi + UINT32_C(0x0000005C));
     LIFT_LOAD32(cpu->ecx, cpu->esp + UINT32_C(0x00000020));
     LIFT_PUSH3(cpu->eax, UINT32_C(0x00000000), cpu->ecx);
-    LIFT_CALL_ENTER(sfera_sub_004EE80A, UINT32_C(0x004893E7));
+    LIFT_NATIVE_CALL(native_function_address32(&::memset), UINT32_C(0x004893E2), UINT32_C(0x004893E7));
     LIFT_SP_ADD(UINT32_C(0x0000000C));
     cpu->ecx = (uint32_t)(cpu->ebx);
     LIFT_CALL_ENTER(sfera_sub_004947E0, UINT32_C(0x004893F1));
@@ -9099,7 +9099,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JZ(label_00089637, UINT32_C(0x0048961D));
     LIFT_PUSH2(((uint32_t)(uintptr_t)"RANDOM"), cpu->esi);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_stricmp, UINT32_C(0x00489623), UINT32_C(0x00489629));
+    LIFT_NATIVE_CALL(native_function_address32(&::_stricmp), UINT32_C(0x00489623), UINT32_C(0x00489629));
     LIFT_SP_ADD(UINT32_C(0x00000008));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_00089637, UINT32_C(0x00489630));
@@ -9179,7 +9179,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00487D50(LiftCpu* cpu, uint32_t stop_addres
     LIFT_CALL_ENTER(sfera_sub_0042E4C0, UINT32_C(0x0048971D));
     LIFT_SP_ADD(UINT32_C(0x00000010));
     LIFT_BLOCK(label_00089720, UINT32_C(0x00489720));
-    cpu->esi = (uint32_t)(SFERA_IMPORT_MSVCR100_rand);
+    cpu->esi = (uint32_t)(native_function_address32(&::rand));
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->esi), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00089728)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x00089726)))) { return; }
     LIFT_ENTER(UINT32_C(0x00489728));
     cpu->edx = ((int32_t)cpu->eax < 0) ? UINT32_C(0xFFFFFFFF) : 0u;
@@ -9767,7 +9767,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00489DE0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_LOAD32(cpu->ebp, cpu->esp + UINT32_C(0x00000008));
     LIFT_PUSH4(cpu->esi, cpu->edi, ((uint32_t)(uintptr_t)"rb"), cpu->ebp);
     cpu->esi = (uint32_t)(cpu->ecx);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_fopen, UINT32_C(0x00489DEF), UINT32_C(0x00489DF5));
+    LIFT_NATIVE_CALL(native_function_address32(&::fopen), UINT32_C(0x00489DEF), UINT32_C(0x00489DF5));
     cpu->edi = (uint32_t)(cpu->eax);
     LIFT_SP_ADD(UINT32_C(0x00000008));
     LIFT_TEST(cpu->edi, 32u);
@@ -9780,12 +9780,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00489DE0(LiftCpu* cpu, uint32_t stop_addres
     LIFT_TEST(cpu->ebx, 32u);
     LIFT_JNZ(label_00089E31, UINT32_C(0x00489E10));
     LIFT_PUSH3(UINT32_C(0x00000002), cpu->ebx, cpu->edi);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_fseek, UINT32_C(0x00489E14), UINT32_C(0x00489E1A));
+    LIFT_NATIVE_CALL(native_function_address32(&::fseek), UINT32_C(0x00489E14), UINT32_C(0x00489E1A));
     lift_push32(cpu, (uint32_t)(cpu->edi));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_ftell, UINT32_C(0x00489E1B), UINT32_C(0x00489E21));
+    LIFT_NATIVE_CALL(native_function_address32(&::ftell), UINT32_C(0x00489E1B), UINT32_C(0x00489E21));
     LIFT_PUSH3(UINT32_C(0x00000000), UINT32_C(0x00000000), cpu->edi);
     cpu->ebx = (uint32_t)(cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_fseek, UINT32_C(0x00489E28), UINT32_C(0x00489E2E));
+    LIFT_NATIVE_CALL(native_function_address32(&::fseek), UINT32_C(0x00489E28), UINT32_C(0x00489E2E));
     LIFT_SP_ADD(UINT32_C(0x0000001C));
     LIFT_BLOCK(label_00089E31, UINT32_C(0x00489E31));
     cpu->eax = (uint32_t)(lift_load16(((uint32_t)(cpu->esi + UINT32_C(0x00020C98)))));
@@ -9813,11 +9813,11 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00489DE0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = (uint32_t)(((int16_t)(lift_load16(((uint32_t)(cpu->esi + UINT32_C(0x00020C98)))))));
     LIFT_LOAD32(cpu->eax, cpu->esi + ((uint32_t)(cpu->edx) * 8u) + UINT32_C(0x00000004));
     LIFT_PUSH4(cpu->edi, UINT32_C(0x00000001), cpu->ebx, cpu->eax);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_fread, UINT32_C(0x00489E9E), UINT32_C(0x00489EA4));
+    LIFT_NATIVE_CALL(native_function_address32(&::fread), UINT32_C(0x00489E9E), UINT32_C(0x00489EA4));
     lift_push32(cpu, (uint32_t)(cpu->edi));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_fclose, UINT32_C(0x00489EA5), UINT32_C(0x00489EAB));
+    LIFT_NATIVE_CALL(native_function_address32(&::fclose), UINT32_C(0x00489EA5), UINT32_C(0x00489EAB));
     LIFT_PUSH2(UINT32_C(0x0000005C), cpu->ebp);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_strrchr, UINT32_C(0x00489EAE), UINT32_C(0x00489EB4));
+    LIFT_NATIVE_CALL(native_strrchr_address32(), UINT32_C(0x00489EAE), UINT32_C(0x00489EB4));
     LIFT_SP_ADD(UINT32_C(0x00000020));
     LIFT_TEST(cpu->eax, 32u);
     LIFT_JNZ(label_00089EBF, UINT32_C(0x00489EBB));
@@ -9931,7 +9931,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00489F30(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->edx));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000944))));
     lift_push32(cpu, (uint32_t)(cpu->eax));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_findfirst64i32, UINT32_C(0x0048A048), UINT32_C(0x0048A04E));
+    LIFT_NATIVE_CALL(native_function_address32(&::_findfirst64i32), UINT32_C(0x0048A048), UINT32_C(0x0048A04E));
     cpu->ebp = (uint32_t)(cpu->eax);
     LIFT_SP_ADD(UINT32_C(0x00000008));
     LIFT_CMP(cpu->ebp, UINT32_C(0xFFFFFFFF), 32u);
@@ -9973,7 +9973,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00489F30(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(cpu->edx));
     cpu->ecx = (uint32_t)(cpu->ebx);
     LIFT_CALL_ENTER(sfera_sub_00489DE0, UINT32_C(0x0048A0BD));
-    cpu->ebx = (uint32_t)(SFERA_IMPORT_MSVCR100_findnext64i32);
+    cpu->ebx = (uint32_t)(native_function_address32(&::_findnext64i32));
     cpu->eax = (uint32_t)(((uint32_t)(cpu->esp + UINT32_C(0x00000018))));
     LIFT_PUSH2(cpu->eax, cpu->ebp);
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->ebx), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0008A0CB)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0008A0C9)))) { return; }
@@ -10027,7 +10027,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_00489F30(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JZ_GOTO(label_0008A0E0);
     LIFT_BLOCK(label_0008A15E, UINT32_C(0x0048A15E));
     lift_push32(cpu, (uint32_t)(cpu->ebp));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_findclose, UINT32_C(0x0048A15F), UINT32_C(0x0048A165));
+    LIFT_NATIVE_CALL(native_function_address32(&::_findclose), UINT32_C(0x0048A15F), UINT32_C(0x0048A165));
     LIFT_LOAD32(cpu->eax, cpu->esp + UINT32_C(0x00000018));
     LIFT_SP_ADD(UINT32_C(0x00000004));
     goto label_0008A170;
@@ -10682,7 +10682,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0048A740(LiftCpu* cpu, uint32_t stop_addres
     lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) * (((double)lift_load_f32(((uint32_t)(cpu->esp + UINT32_C(0x00000048)))))));
     lift_x87_set(cpu, 0u, (lift_x87_get(cpu, 0u)) + (((double)lift_load_f32(((uint32_t)(cpu->esp + UINT32_C(0x0000009C)))))));
     LIFT_X87_STORE_F32_POP(cpu->esp + UINT32_C(0x0000009C));
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_rand, UINT32_C(0x0048A892), UINT32_C(0x0048A898));
+    LIFT_NATIVE_CALL(native_function_address32(&::rand), UINT32_C(0x0048A892), UINT32_C(0x0048A898));
     LIFT_LOGIC(cpu->eax, UINT32_C(0x80000001), &, 32u, cpu->eax = (uint32_t)(result););
     LIFT_JNS(label_0008A8A4, UINT32_C(0x0048A89F));
     LIFT_DEC(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
@@ -10716,7 +10716,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0048A740(LiftCpu* cpu, uint32_t stop_addres
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000084), cpu->edi);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000070), cpu->ebx);
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000078), cpu->ebp);
-    LIFT_IMPORT_CALL(SFERA_IMPORT_MSVCR100_rand, UINT32_C(0x0048A90C), UINT32_C(0x0048A912));
+    LIFT_NATIVE_CALL(native_function_address32(&::rand), UINT32_C(0x0048A90C), UINT32_C(0x0048A912));
     LIFT_LOGIC(cpu->eax, UINT32_C(0x80000001), &, 32u, cpu->eax = (uint32_t)(result););
     LIFT_JNS(label_0008A91E, UINT32_C(0x0048A919));
     LIFT_DEC(cpu->eax, 32u, cpu->eax = (uint32_t)(result););
@@ -11040,7 +11040,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_0048A740(LiftCpu* cpu, uint32_t stop_addres
     LIFT_JNP(label_0008B19D, UINT32_C(0x0048AE3E));
     LIFT_CMP(lift_load32(((uint32_t)(cpu->esp + UINT32_C(0x00000068)))), UINT32_C(0x00000000), 32u);
     LIFT_JZ(label_0008B1AC, UINT32_C(0x0048AE49));
-    cpu->edi = (uint32_t)(SFERA_IMPORT_MSVCR100_rand);
+    cpu->edi = (uint32_t)(native_function_address32(&::rand));
     if (!lift_call_indirect(cpu, (uint32_t)(cpu->edi), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0008AE51)), LIFT_CODE_TOKEN_RVA(UINT32_C(0x0008AE4F)))) { return; }
     LIFT_ENTER(UINT32_C(0x0048AE51));
     LIFT_STORE32(cpu->esp + UINT32_C(0x00000014), cpu->eax);

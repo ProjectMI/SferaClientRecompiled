@@ -14,7 +14,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include <array>
 #include <vector>
 
 namespace lifted {
@@ -30,7 +29,6 @@ struct NativeCallFrame {
     void* previous_exception_list;
     void* previous_stack_base;
     void* previous_stack_limit;
-    double native_st0;
 };
 
 struct CallbackRegisters {
@@ -45,8 +43,6 @@ struct CallbackRegisters {
     std::uint32_t eflags;
     std::uint32_t callback_function;
 };
-
-struct ResolvedImport { std::uint32_t address; ImportBehavior behavior; };
 
 class LocalStack {
 public:
@@ -72,7 +68,6 @@ public:
     std::uint32_t entry_va() noexcept;
     bool source_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
     bool code_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
-    const std::vector<ResolvedImport>& resolved_imports() const noexcept;
     bool try_read(std::uint32_t address, void* value, std::size_t size) const noexcept;
     bool try_write(std::uint32_t address, const void* value, std::size_t size) noexcept;
     void read(std::uint32_t address, void* value, std::size_t size) const;
@@ -85,10 +80,7 @@ private:
     std::uint8_t* callback_thunks_ = nullptr;
     std::uint32_t callback_thunks_size_ = 0;
     std::uint32_t callback_thunk_count_ = 0u;
-    std::vector<HMODULE> loaded_modules_;
-    std::vector<ResolvedImport> resolved_imports_;
     void allocate_runtime_regions();
-    void resolve_imports();
     void resolve_static_references();
     void initialize_callback_registry();
     std::uint32_t callback_address(LiftFunction function) const noexcept;
@@ -103,19 +95,14 @@ public:
     NativeRuntime& operator=(const NativeRuntime&) = delete;
     int execute();
     void dispatch_callback(CallbackRegisters& registers);
-    ImportBehavior find_import(std::uint32_t target) const;
     void call_native(LiftCpu& state, std::uint32_t target, std::uint32_t callsite);
 private:
     ProcessMemory memory_;
-    static constexpr std::size_t kImportLookupSize = 1024u;
-    std::array<std::uint32_t, kImportLookupSize> import_lookup_addresses_{};
-    std::array<ImportBehavior, kImportLookupSize> import_lookup_behaviors_{};    void call_native_resolved(LiftCpu& state, std::uint32_t target, std::uint32_t callsite, ImportBehavior behavior);
 };
 
 extern NativeRuntime* g_runtime;
 extern ProcessMemory* g_process_memory;
 extern "C" void __cdecl native_call_bridge(NativeCallFrame* frame);
-extern "C" void __cdecl native_call_bridge_fast(NativeCallFrame* frame);
 extern "C" void __cdecl dispatch_native_callback(CallbackRegisters* registers);
 extern "C" void callback_bridge();
 

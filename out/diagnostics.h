@@ -18,7 +18,6 @@ enum class RuntimePhase : std::uint32_t {
     startup,
     process_startup,
     static_storage,
-    load_imports,
     protect_static_storage,
     abi_self_test,
     function_map,
@@ -48,17 +47,6 @@ private:
     const LiftCpu* previous_state_;
     std::uint32_t previous_instruction_;
     const char* previous_operation_;
-};
-
-class DiagnosticNativeScope {
-public:
-    DiagnosticNativeScope(std::uint32_t target, const char* import_name) noexcept;
-    DiagnosticNativeScope(const DiagnosticNativeScope&) = delete;
-    DiagnosticNativeScope& operator=(const DiagnosticNativeScope&) = delete;
-    ~DiagnosticNativeScope();
-private:
-    std::uint32_t previous_target_;
-    const char* previous_import_name_;
 };
 
 class DiagnosticExecutionScope {

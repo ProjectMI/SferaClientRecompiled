@@ -11,14 +11,11 @@
 #include <limits>
 #include <memory>
 #include <stdexcept>
-#include <unordered_map>
 
 #if defined(_MSC_VER)
 #pragma intrinsic(__readfsdword)
 #endif
 
-extern "C" {
-}
 
 namespace lifted {
 
@@ -136,23 +133,6 @@ std::string narrow_path(const std::wstring& value) {
     return result;
 }
 
-std::wstring wide_client_filename() {
-    return L"sphereclient_patched.exe";
-}
-
-std::wstring client_executable_path() {
-    return path_join(client_root_directory(), wide_client_filename());
-}
-
-std::string client_executable_path_ansi() {
-    const std::wstring wide = client_executable_path();
-    const int required = WideCharToMultiByte(CP_ACP, 0, wide.data(), static_cast<int>(wide.size()), nullptr, 0, nullptr, nullptr);
-    if (required <= 0) { throw std::runtime_error(win32_error("WideCharToMultiByte")); }
-    std::string result(static_cast<std::size_t>(required), '\0');
-    if (WideCharToMultiByte(CP_ACP, 0, wide.data(), static_cast<int>(wide.size()), result.data(), required, nullptr, nullptr) != required) { throw std::runtime_error(win32_error("WideCharToMultiByte")); }
-    return result;
-}
-
 bool native_executable_image_address(std::uint32_t address) noexcept {
 #if defined(SFERA_PORTABLE_CHECK)
     (void)address;
@@ -203,28 +183,6 @@ void memory_write(std::uint32_t address, T value) {
 }
 
 
-class NativeCallArguments {
-public:
-    explicit NativeCallArguments(std::uint32_t stack) noexcept : stack_(stack) {}
-    NativeCallArguments(const NativeCallArguments&) = delete;
-    NativeCallArguments& operator=(const NativeCallArguments&) = delete;
-    ~NativeCallArguments() { while (patch_count_ != 0) { const Patch& patch = patches_[--patch_count_]; if (g_process_memory) { g_process_memory->try_write(patch.address, &patch.original, sizeof(patch.original)); } } }
-    std::uint32_t read(std::uint8_t index) const { return memory_read<std::uint32_t>(stack_ + static_cast<std::uint32_t>(index) * 4u); }
-    void alias(std::uint8_t index, std::uint32_t expected, std::uint32_t replacement) {
-        const std::uint32_t address = stack_ + static_cast<std::uint32_t>(index) * 4u;
-        const std::uint32_t original = memory_read<std::uint32_t>(address);
-        if (original != expected) { throw std::runtime_error("Native argument changed before aliasing"); }
-        if (patch_count_ == patches_.size()) { throw std::runtime_error("Too many native argument aliases"); }
-        if (!g_process_memory || !g_process_memory->try_write(address, &replacement, sizeof(replacement))) { throw std::runtime_error("Unable to alias native argument at " + hex_u32(address)); }
-        patches_[patch_count_++] = {address, original};
-    }
-private:
-    struct Patch { std::uint32_t address; std::uint32_t original; };
-    std::uint32_t stack_;
-    std::array<Patch, 4> patches_{};
-    std::size_t patch_count_ = 0;
-};
-
 std::uint32_t process_module_handle() {
     const HMODULE module = GetModuleHandleW(nullptr);
     if (!module) { throw std::runtime_error(win32_error("GetModuleHandleW(host)")); }
@@ -248,20 +206,6 @@ std::string local_c_string(std::uint32_t address, std::size_t limit = 2048u) noe
         else { result += value; }
     }
     return result + "<truncated>";
-}
-
-template <class Char>
-std::uint32_t write_local_path(std::uint32_t address, std::uint32_t capacity, const std::basic_string<Char>& path) {
-    if (address == 0 || capacity == 0) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return 0; }
-    const std::size_t copy_count = std::min<std::size_t>(path.size(), static_cast<std::size_t>(capacity - 1u));
-    std::vector<Char> output(copy_count + 1u, Char{});
-    std::copy_n(path.data(), copy_count, output.data());
-    const std::size_t byte_count = output.size() * sizeof(Char);
-    if (!g_process_memory) { throw std::runtime_error("Process memory is not initialized"); }
-    g_process_memory->write(address, output.data(), byte_count);
-    diagnostic_memory_write(address, static_cast<std::uint32_t>(byte_count), 0);
-    if (copy_count != path.size()) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return capacity; }
-    return static_cast<std::uint32_t>(path.size());
 }
 
 std::uint32_t align_up(std::uint32_t value, std::uint32_t alignment) noexcept {
@@ -713,8 +657,6 @@ LiftFunction ProcessMemory::callback_function(std::uint32_t address) const noexc
 
 bool ProcessMemory::is_callback_function(LiftFunction function) const noexcept { return lift_function_index(function) != UINT32_MAX; }
 
-const std::vector<ResolvedImport>& ProcessMemory::resolved_imports() const noexcept { return resolved_imports_; }
-
 bool ProcessMemory::try_read(std::uint32_t address, void* value, std::size_t size) const noexcept { if (!value) { return false; } return safe_copy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size); }
 bool ProcessMemory::try_write(std::uint32_t address, const void* value, std::size_t size) noexcept { if (!value) { return false; } return safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size); }
 
@@ -740,415 +682,8 @@ void ProcessMemory::initialize_native() {
         lift_initialize_dispatch();
         initialize_callback_registry();
         resolve_static_references();
-        { DiagnosticPhaseScope phase(RuntimePhase::load_imports); resolve_imports(); diagnostic_note("native imports resolved in the current process"); }
         { DiagnosticPhaseScope phase(RuntimePhase::protect_static_storage); protect_regions(); diagnostic_note("semantic static-region protections applied"); }
     } catch (...) { release(); throw; }
-}
-
-void ProcessMemory::resolve_imports() {
-    std::unordered_map<std::string, HMODULE> modules; resolved_imports_.clear();
-    auto module = [&](const char* dll) -> HMODULE { auto it = modules.find(dll); if (it != modules.end()) { return it->second; } HMODULE value = LoadLibraryA(dll); if (!value) { throw std::runtime_error(win32_error((std::string("LoadLibraryA(") + dll + ")").c_str())); } modules.emplace(dll, value); loaded_modules_.push_back(value); return value; };
-    auto bind = [&](std::uint32_t& import_symbol, HMODULE dll, const char* name, std::uint16_t ordinal, bool by_ordinal, ImportBehavior behavior) { const char* symbol = by_ordinal ? reinterpret_cast<const char*>(static_cast<std::uintptr_t>(ordinal)) : name; FARPROC proc = GetProcAddress(dll, symbol); if (!proc) { throw std::runtime_error(win32_error("GetProcAddress")); } import_symbol = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(proc)); resolved_imports_.push_back({import_symbol, behavior}); };
-    HMODULE mod_WINMM_dll = module("WINMM.dll");
-    bind(SFERA_IMPORT_WINMM_timeGetTime, mod_WINMM_dll, "timeGetTime", 0u, false, ImportBehavior::generic);
-    HMODULE mod_DINPUT8_dll = module("DINPUT8.dll");
-    bind(SFERA_IMPORT_DINPUT8_DirectInput8Create, mod_DINPUT8_dll, "DirectInput8Create", 0u, false, ImportBehavior::process_module_argument0);
-    HMODULE mod_COMCTL32_dll = module("COMCTL32.dll");
-    bind(SFERA_IMPORT_COMCTL32_ordinal_17, mod_COMCTL32_dll, "", 17u, true, ImportBehavior::generic);
-    HMODULE mod_WS2_32_dll = module("WS2_32.dll");
-    bind(SFERA_IMPORT_WS2_32_ordinal_19, mod_WS2_32_dll, "", 19u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_16, mod_WS2_32_dll, "", 16u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_151, mod_WS2_32_dll, "", 151u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_18, mod_WS2_32_dll, "", 18u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_116, mod_WS2_32_dll, "", 116u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_3, mod_WS2_32_dll, "", 3u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_111, mod_WS2_32_dll, "", 111u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_4, mod_WS2_32_dll, "", 4u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_52, mod_WS2_32_dll, "", 52u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_12, mod_WS2_32_dll, "", 12u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_11, mod_WS2_32_dll, "", 11u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_9, mod_WS2_32_dll, "", 9u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_115, mod_WS2_32_dll, "", 115u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_2, mod_WS2_32_dll, "", 2u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_10, mod_WS2_32_dll, "", 10u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_51, mod_WS2_32_dll, "", 51u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_23, mod_WS2_32_dll, "", 23u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_WS2_32_ordinal_21, mod_WS2_32_dll, "", 21u, true, ImportBehavior::generic);
-    HMODULE mod_d3dx9_26_dll = module("d3dx9_26.dll");
-    bind(SFERA_IMPORT_d3dx9_26_D3DXCreateTexture, mod_d3dx9_26_dll, "D3DXCreateTexture", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_d3dx9_26_D3DXGetShaderConstantTable, mod_d3dx9_26_dll, "D3DXGetShaderConstantTable", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_d3dx9_26_D3DXMatrixLookAtRH, mod_d3dx9_26_dll, "D3DXMatrixLookAtRH", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_d3dx9_26_D3DXMatrixRotationQuaternion, mod_d3dx9_26_dll, "D3DXMatrixRotationQuaternion", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_d3dx9_26_D3DXCreateCubeTextureFromFileInMemory, mod_d3dx9_26_dll, "D3DXCreateCubeTextureFromFileInMemory", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_d3dx9_26_D3DXMatrixPerspectiveFovRH, mod_d3dx9_26_dll, "D3DXMatrixPerspectiveFovRH", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_d3dx9_26_D3DXCreateTextureFromFileInMemoryEx, mod_d3dx9_26_dll, "D3DXCreateTextureFromFileInMemoryEx", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_d3dx9_26_D3DXMatrixMultiply, mod_d3dx9_26_dll, "D3DXMatrixMultiply", 0u, false, ImportBehavior::generic);
-    HMODULE mod_d3d9_dll = module("d3d9.dll");
-    bind(SFERA_IMPORT_d3d9_Direct3DCreate9, mod_d3d9_dll, "Direct3DCreate9", 0u, false, ImportBehavior::generic);
-    HMODULE mod_KERNEL32_dll = module("KERNEL32.dll");
-    bind(SFERA_IMPORT_KERNEL32_IsDebuggerPresent, mod_KERNEL32_dll, "IsDebuggerPresent", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_IsProcessorFeaturePresent, mod_KERNEL32_dll, "IsProcessorFeaturePresent", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_UnhandledExceptionFilter, mod_KERNEL32_dll, "UnhandledExceptionFilter", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetStartupInfoW, mod_KERNEL32_dll, "GetStartupInfoW", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_HeapSetInformation, mod_KERNEL32_dll, "HeapSetInformation", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_InterlockedCompareExchange, mod_KERNEL32_dll, "InterlockedCompareExchange", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_InterlockedExchange, mod_KERNEL32_dll, "InterlockedExchange", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_DecodePointer, mod_KERNEL32_dll, "DecodePointer", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_EncodePointer, mod_KERNEL32_dll, "EncodePointer", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_TryEnterCriticalSection, mod_KERNEL32_dll, "TryEnterCriticalSection", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_LocalFree, mod_KERNEL32_dll, "LocalFree", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_SetFilePointer, mod_KERNEL32_dll, "SetFilePointer", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_SetUnhandledExceptionFilter, mod_KERNEL32_dll, "SetUnhandledExceptionFilter", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_Sleep, mod_KERNEL32_dll, "Sleep", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetLocalTime, mod_KERNEL32_dll, "GetLocalTime", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_EnterCriticalSection, mod_KERNEL32_dll, "EnterCriticalSection", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_LeaveCriticalSection, mod_KERNEL32_dll, "LeaveCriticalSection", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_CloseHandle, mod_KERNEL32_dll, "CloseHandle", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_TerminateThread, mod_KERNEL32_dll, "TerminateThread", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_WaitForSingleObject, mod_KERNEL32_dll, "WaitForSingleObject", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetTickCount, mod_KERNEL32_dll, "GetTickCount", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_SetThreadPriority, mod_KERNEL32_dll, "SetThreadPriority", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetLastError, mod_KERNEL32_dll, "GetLastError", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_CreateThread, mod_KERNEL32_dll, "CreateThread", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_UnmapViewOfFile, mod_KERNEL32_dll, "UnmapViewOfFile", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetExitCodeThread, mod_KERNEL32_dll, "GetExitCodeThread", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetCurrentProcess, mod_KERNEL32_dll, "GetCurrentProcess", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetCurrentThread, mod_KERNEL32_dll, "GetCurrentThread", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_InitializeCriticalSection, mod_KERNEL32_dll, "InitializeCriticalSection", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_DeleteCriticalSection, mod_KERNEL32_dll, "DeleteCriticalSection", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GlobalFree, mod_KERNEL32_dll, "GlobalFree", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_WideCharToMultiByte, mod_KERNEL32_dll, "WideCharToMultiByte", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GlobalAlloc, mod_KERNEL32_dll, "GlobalAlloc", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_MultiByteToWideChar, mod_KERNEL32_dll, "MultiByteToWideChar", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_ExitProcess, mod_KERNEL32_dll, "ExitProcess", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetFileSize, mod_KERNEL32_dll, "GetFileSize", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_ReadFile, mod_KERNEL32_dll, "ReadFile", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_CreateFileA, mod_KERNEL32_dll, "CreateFileA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_FindClose, mod_KERNEL32_dll, "FindClose", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_FindNextFileA, mod_KERNEL32_dll, "FindNextFileA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_FindFirstFileA, mod_KERNEL32_dll, "FindFirstFileA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_Process32Next, mod_KERNEL32_dll, "Process32Next", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_Process32First, mod_KERNEL32_dll, "Process32First", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_CreateToolhelp32Snapshot, mod_KERNEL32_dll, "CreateToolhelp32Snapshot", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetVolumeInformationA, mod_KERNEL32_dll, "GetVolumeInformationA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_MapViewOfFile, mod_KERNEL32_dll, "MapViewOfFile", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_CreateFileMappingA, mod_KERNEL32_dll, "CreateFileMappingA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_CreateDirectoryA, mod_KERNEL32_dll, "CreateDirectoryA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_SetThreadAffinityMask, mod_KERNEL32_dll, "SetThreadAffinityMask", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetExitCodeProcess, mod_KERNEL32_dll, "GetExitCodeProcess", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_TerminateProcess, mod_KERNEL32_dll, "TerminateProcess", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_CreateProcessA, mod_KERNEL32_dll, "CreateProcessA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetSystemDirectoryA, mod_KERNEL32_dll, "GetSystemDirectoryA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_QueryPerformanceCounter, mod_KERNEL32_dll, "QueryPerformanceCounter", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_QueryPerformanceFrequency, mod_KERNEL32_dll, "QueryPerformanceFrequency", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetModuleHandleA, mod_KERNEL32_dll, "GetModuleHandleA", 0u, false, ImportBehavior::module_handle_a);
-    bind(SFERA_IMPORT_KERNEL32_GlobalUnlock, mod_KERNEL32_dll, "GlobalUnlock", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GlobalLock, mod_KERNEL32_dll, "GlobalLock", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_WriteFile, mod_KERNEL32_dll, "WriteFile", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_lstrlenA, mod_KERNEL32_dll, "lstrlenA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetVersionExA, mod_KERNEL32_dll, "GetVersionExA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetCurrentThreadId, mod_KERNEL32_dll, "GetCurrentThreadId", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_RaiseException, mod_KERNEL32_dll, "RaiseException", 0u, false, ImportBehavior::raise_exception);
-    bind(SFERA_IMPORT_KERNEL32_OutputDebugStringA, mod_KERNEL32_dll, "OutputDebugStringA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_FileTimeToDosDateTime, mod_KERNEL32_dll, "FileTimeToDosDateTime", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_FileTimeToLocalFileTime, mod_KERNEL32_dll, "FileTimeToLocalFileTime", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GlobalMemoryStatus, mod_KERNEL32_dll, "GlobalMemoryStatus", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetSystemInfo, mod_KERNEL32_dll, "GetSystemInfo", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_lstrcpyA, mod_KERNEL32_dll, "lstrcpyA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetModuleFileNameA, mod_KERNEL32_dll, "GetModuleFileNameA", 0u, false, ImportBehavior::module_filename_a);
-    bind(SFERA_IMPORT_KERNEL32_GetSystemTimeAsFileTime, mod_KERNEL32_dll, "GetSystemTimeAsFileTime", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_lstrcatA, mod_KERNEL32_dll, "lstrcatA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_GetCurrentProcessId, mod_KERNEL32_dll, "GetCurrentProcessId", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_KERNEL32_VirtualQuery, mod_KERNEL32_dll, "VirtualQuery", 0u, false, ImportBehavior::generic);
-    HMODULE mod_USER32_dll = module("USER32.dll");
-    bind(SFERA_IMPORT_USER32_BringWindowToTop, mod_USER32_dll, "BringWindowToTop", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_DestroyWindow, mod_USER32_dll, "DestroyWindow", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_GetSystemMetrics, mod_USER32_dll, "GetSystemMetrics", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_SendMessageA, mod_USER32_dll, "SendMessageA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_UpdateWindow, mod_USER32_dll, "UpdateWindow", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_InvalidateRect, mod_USER32_dll, "InvalidateRect", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_ShowWindow, mod_USER32_dll, "ShowWindow", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_ReleaseDC, mod_USER32_dll, "ReleaseDC", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_GetDC, mod_USER32_dll, "GetDC", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_GetWindowLongA, mod_USER32_dll, "GetWindowLongA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_GetClientRect, mod_USER32_dll, "GetClientRect", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_SetWindowLongA, mod_USER32_dll, "SetWindowLongA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_DefWindowProcA, mod_USER32_dll, "DefWindowProcA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_MessageBeep, mod_USER32_dll, "MessageBeep", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_TranslateMessage, mod_USER32_dll, "TranslateMessage", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_DispatchMessageA, mod_USER32_dll, "DispatchMessageA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_PeekMessageA, mod_USER32_dll, "PeekMessageA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_MessageBoxA, mod_USER32_dll, "MessageBoxA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_ShowCursor, mod_USER32_dll, "ShowCursor", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_SetCursorPos, mod_USER32_dll, "SetCursorPos", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_GetCursorPos, mod_USER32_dll, "GetCursorPos", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_ScreenToClient, mod_USER32_dll, "ScreenToClient", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_SetCursor, mod_USER32_dll, "SetCursor", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_ClipCursor, mod_USER32_dll, "ClipCursor", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_DestroyCursor, mod_USER32_dll, "DestroyCursor", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_CreateIconIndirect, mod_USER32_dll, "CreateIconIndirect", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_wsprintfA, mod_USER32_dll, "wsprintfA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_wvsprintfA, mod_USER32_dll, "wvsprintfA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_CreateDialogParamA, mod_USER32_dll, "CreateDialogParamA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_SetClassLongA, mod_USER32_dll, "SetClassLongA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_GetDlgCtrlID, mod_USER32_dll, "GetDlgCtrlID", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_GetWindowTextA, mod_USER32_dll, "GetWindowTextA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_SetWindowTextA, mod_USER32_dll, "SetWindowTextA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_EnableWindow, mod_USER32_dll, "EnableWindow", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_IsDialogMessageA, mod_USER32_dll, "IsDialogMessageA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_GetDlgItem, mod_USER32_dll, "GetDlgItem", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_IsClipboardFormatAvailable, mod_USER32_dll, "IsClipboardFormatAvailable", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_OpenClipboard, mod_USER32_dll, "OpenClipboard", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_GetClipboardData, mod_USER32_dll, "GetClipboardData", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_CloseClipboard, mod_USER32_dll, "CloseClipboard", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_SetFocus, mod_USER32_dll, "SetFocus", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_ClientToScreen, mod_USER32_dll, "ClientToScreen", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_CallWindowProcA, mod_USER32_dll, "CallWindowProcA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_FindWindowA, mod_USER32_dll, "FindWindowA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_LoadIconA, mod_USER32_dll, "LoadIconA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_LoadCursorA, mod_USER32_dll, "LoadCursorA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_RegisterClassExA, mod_USER32_dll, "RegisterClassExA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_PostQuitMessage, mod_USER32_dll, "PostQuitMessage", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_SetRect, mod_USER32_dll, "SetRect", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_AdjustWindowRect, mod_USER32_dll, "AdjustWindowRect", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_CreateWindowExA, mod_USER32_dll, "CreateWindowExA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_USER32_UnregisterClassA, mod_USER32_dll, "UnregisterClassA", 0u, false, ImportBehavior::generic);
-    HMODULE mod_GDI32_dll = module("GDI32.dll");
-    bind(SFERA_IMPORT_GDI32_GetObjectType, mod_GDI32_dll, "GetObjectType", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_GDI32_CreateBitmap, mod_GDI32_dll, "CreateBitmap", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_GDI32_GetStockObject, mod_GDI32_dll, "GetStockObject", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_GDI32_CreateCompatibleDC, mod_GDI32_dll, "CreateCompatibleDC", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_GDI32_CreateCompatibleBitmap, mod_GDI32_dll, "CreateCompatibleBitmap", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_GDI32_GetDIBits, mod_GDI32_dll, "GetDIBits", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_GDI32_SelectObject, mod_GDI32_dll, "SelectObject", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_GDI32_DeleteDC, mod_GDI32_dll, "DeleteDC", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_GDI32_SetPixel, mod_GDI32_dll, "SetPixel", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_GDI32_DeleteObject, mod_GDI32_dll, "DeleteObject", 0u, false, ImportBehavior::generic);
-    HMODULE mod_ADVAPI32_dll = module("ADVAPI32.dll");
-    bind(SFERA_IMPORT_ADVAPI32_GetUserNameA, mod_ADVAPI32_dll, "GetUserNameA", 0u, false, ImportBehavior::generic);
-    HMODULE mod_SHELL32_dll = module("SHELL32.dll");
-    bind(SFERA_IMPORT_SHELL32_ShellExecuteA, mod_SHELL32_dll, "ShellExecuteA", 0u, false, ImportBehavior::generic);
-    HMODULE mod_ole32_dll = module("ole32.dll");
-    bind(SFERA_IMPORT_ole32_CoInitialize, mod_ole32_dll, "CoInitialize", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_ole32_CoCreateInstance, mod_ole32_dll, "CoCreateInstance", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_ole32_CoUninitialize, mod_ole32_dll, "CoUninitialize", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_ole32_OleCreate, mod_ole32_dll, "OleCreate", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_ole32_OleSetContainedObject, mod_ole32_dll, "OleSetContainedObject", 0u, false, ImportBehavior::generic);
-    HMODULE mod_OLEAUT32_dll = module("OLEAUT32.dll");
-    bind(SFERA_IMPORT_OLEAUT32_ordinal_6, mod_OLEAUT32_dll, "", 6u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_OLEAUT32_ordinal_9, mod_OLEAUT32_dll, "", 9u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_OLEAUT32_ordinal_2, mod_OLEAUT32_dll, "", 2u, true, ImportBehavior::generic);
-    bind(SFERA_IMPORT_OLEAUT32_ordinal_8, mod_OLEAUT32_dll, "", 8u, true, ImportBehavior::generic);
-    HMODULE mod_dbghelp_dll = module("dbghelp.dll");
-    bind(SFERA_IMPORT_dbghelp_SymFromAddr, mod_dbghelp_dll, "SymFromAddr", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_dbghelp_SymGetModuleBase, mod_dbghelp_dll, "SymGetModuleBase", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_dbghelp_SymFunctionTableAccess, mod_dbghelp_dll, "SymFunctionTableAccess", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_dbghelp_StackWalk, mod_dbghelp_dll, "StackWalk", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_dbghelp_SymGetLineFromAddr, mod_dbghelp_dll, "SymGetLineFromAddr", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_dbghelp_SymSetOptions, mod_dbghelp_dll, "SymSetOptions", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_dbghelp_SymInitialize, mod_dbghelp_dll, "SymInitialize", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_dbghelp_MiniDumpWriteDump, mod_dbghelp_dll, "MiniDumpWriteDump", 0u, false, ImportBehavior::generic);
-    HMODULE mod_Sound_dll = module("Sound.dll");
-    bind(SFERA_IMPORT_Sound_SI_SetHardwareMixing_YAX_N_Z, mod_Sound_dll, "?SI_SetHardwareMixing@@YAX_N@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundListener_GetOrientation, mod_Sound_dll, "?GetOrientation@CSoundListener@@QBEXPAU_D3DVECTOR@@0@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundListener_SetPosition, mod_Sound_dll, "?SetPosition@CSoundListener@@QAEHMMMH@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundListener_SetVelocity, mod_Sound_dll, "?SetVelocity@CSoundListener@@QAEHMMMH@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundListener_SetOrientation, mod_Sound_dll, "?SetOrientation@CSoundListener@@QAEHABU_D3DVECTOR@@0H@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundInterface_UpdateSettings, mod_Sound_dll, "?UpdateSettings@CSoundInterface@@QAEHXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_SetAllParameters, mod_Sound_dll, "?SetAllParameters@CSound@@QAEHPBU_DS3DBUFFER@@H@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_LoadSound, mod_Sound_dll, "?LoadSound@CSound@@QAEHPBDK@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_SetVolume, mod_Sound_dll, "?SetVolume@CSound@@QAEHM@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_SI_GetStreamVolume_YAHXZ, mod_Sound_dll, "?SI_GetStreamVolume@@YAHXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_Rewind, mod_Sound_dll, "?Rewind@CSound@@UAEHXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_Stop, mod_Sound_dll, "?Stop@CSound@@UAEXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_ctor, mod_Sound_dll, "??0CSound@@QAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_SI_CreateInterface_YAPAVCSoundInterface_PAUHWND_HKK_Z, mod_Sound_dll, "?SI_CreateInterface@@YAPAVCSoundInterface@@PAUHWND__@@HKK@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_SetPosition, mod_Sound_dll, "?SetPosition@CSound@@QAEHMMMH@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_GetPlayTimepos, mod_Sound_dll, "?GetPlayTimepos@CSound@@QBEMXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_IsSoundPlaying, mod_Sound_dll, "?IsSoundPlaying@CSound@@QBEHXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_SetPlayTimepos, mod_Sound_dll, "?SetPlayTimepos@CSound@@QAEXM@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_Play, mod_Sound_dll, "?Play@CSound@@UAEHH@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_SI_GetInterface_YAPAVCSoundInterface_XZ, mod_Sound_dll, "?SI_GetInterface@@YAPAVCSoundInterface@@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundStream_SetDecodeSignal, mod_Sound_dll, "?SetDecodeSignal@CSoundStream@@QAEXM@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundStream_SeekToTime, mod_Sound_dll, "?SeekToTime@CSoundStream@@QAEHM@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundStream_SetPlaySignal, mod_Sound_dll, "?SetPlaySignal@CSoundStream@@QAEXM@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundStream_Stop, mod_Sound_dll, "?Stop@CSoundStream@@QAEXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundStream_IsStreamPlaying, mod_Sound_dll, "?IsStreamPlaying@CSoundStream@@QBEHXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSoundStream_PlayEx, mod_Sound_dll, "?PlayEx@CSoundStream@@QAEHMH@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_SI_Close_YAXXZ, mod_Sound_dll, "?SI_Close@@YAXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_SI_SetLogFile_YAXPBD_Z, mod_Sound_dll, "?SI_SetLogFile@@YAXPBD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_SetVelocity, mod_Sound_dll, "?SetVelocity@CSound@@QAEHMMMH@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_SI_SetStreamVolume_YAXH_Z, mod_Sound_dll, "?SI_SetStreamVolume@@YAXH@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_SI_StreamCreateFile_YAKPBDK_Z, mod_Sound_dll, "?SI_StreamCreateFile@@YAKPBDK@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_SI_StreamFree_YAXK_Z, mod_Sound_dll, "?SI_StreamFree@@YAXK@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_SI_GetHardwareMixing_YA_NXZ, mod_Sound_dll, "?SI_GetHardwareMixing@@YA_NXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_Sound_CSound_dtor, mod_Sound_dll, "??1CSound@@QAE@XZ", 0u, false, ImportBehavior::generic);
-    HMODULE mod_MSVCR100_dll = module("MSVCR100.dll");
-    bind(SFERA_IMPORT_MSVCR100_initterm, mod_MSVCR100_dll, "_initterm", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_acmdln, mod_MSVCR100_dll, "_acmdln", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_ismbblead, mod_MSVCR100_dll, "_ismbblead", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_XcptFilter, mod_MSVCR100_dll, "_XcptFilter", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_exit, mod_MSVCR100_dll, "_exit", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_cexit, mod_MSVCR100_dll, "_cexit", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_getmainargs, mod_MSVCR100_dll, "__getmainargs", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_amsg_exit, mod_MSVCR100_dll, "_amsg_exit", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_terminate_YAXXZ, mod_MSVCR100_dll, "?terminate@@YAXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_onexit, mod_MSVCR100_dll, "_onexit", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_lock, mod_MSVCR100_dll, "_lock", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_dllonexit, mod_MSVCR100_dll, "__dllonexit", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_initterm_e, mod_MSVCR100_dll, "_initterm_e", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_configthreadlocale, mod_MSVCR100_dll, "_configthreadlocale", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_setusermatherr, mod_MSVCR100_dll, "__setusermatherr", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_commode, mod_MSVCR100_dll, "_commode", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fmode, mod_MSVCR100_dll, "_fmode", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_set_app_type, mod_MSVCR100_dll, "__set_app_type", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_crt_debugger_hook, mod_MSVCR100_dll, "_crt_debugger_hook", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_type_info_type_info_dtor_internal_method, mod_MSVCR100_dll, "?_type_info_dtor_internal_method@type_info@@QAEXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_invoke_watson, mod_MSVCR100_dll, "_invoke_watson", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_isalnum, mod_MSVCR100_dll, "isalnum", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_atoi, mod_MSVCR100_dll, "atoi", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_atof, mod_MSVCR100_dll, "atof", 0u, false, ImportBehavior::float_return);
-    bind(SFERA_IMPORT_MSVCR100_utime64, mod_MSVCR100_dll, "_utime64", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_stat64i32, mod_MSVCR100_dll, "_stat64i32", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_strnicmp, mod_MSVCR100_dll, "_strnicmp", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_controlfp_s, mod_MSVCR100_dll, "_controlfp_s", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_toupper, mod_MSVCR100_dll, "toupper", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_unlock, mod_MSVCR100_dll, "_unlock", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_printf, mod_MSVCR100_dll, "printf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_calloc, mod_MSVCR100_dll, "calloc", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_isdigit, mod_MSVCR100_dll, "isdigit", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fsetpos, mod_MSVCR100_dll, "fsetpos", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fseeki64, mod_MSVCR100_dll, "_fseeki64", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_CIasin, mod_MSVCR100_dll, "_CIasin", 0u, false, ImportBehavior::ci_asin);
-    bind(SFERA_IMPORT_MSVCR100_isalpha, mod_MSVCR100_dll, "isalpha", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_unlink, mod_MSVCR100_dll, "_unlink", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_execl, mod_MSVCR100_dll, "_execl", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fflush, mod_MSVCR100_dll, "fflush", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_floor, mod_MSVCR100_dll, "floor", 0u, false, ImportBehavior::float_return);
-    bind(SFERA_IMPORT_MSVCR100_CIatan, mod_MSVCR100_dll, "_CIatan", 0u, false, ImportBehavior::ci_atan);
-    bind(SFERA_IMPORT_MSVCR100_CIacos, mod_MSVCR100_dll, "_CIacos", 0u, false, ImportBehavior::ci_acos);
-    bind(SFERA_IMPORT_MSVCR100_fgetpos, mod_MSVCR100_dll, "fgetpos", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_memcpy_s, mod_MSVCR100_dll, "memcpy_s", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_setvbuf, mod_MSVCR100_dll, "setvbuf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_unlock_file, mod_MSVCR100_dll, "_unlock_file", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_lock_file, mod_MSVCR100_dll, "_lock_file", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_ungetc, mod_MSVCR100_dll, "ungetc", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fputc, mod_MSVCR100_dll, "fputc", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_bad_cast_ctor, mod_MSVCR100_dll, "??0bad_cast@std@@QAE@ABV01@@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_bad_cast_dtor, mod_MSVCR100_dll, "??1bad_cast@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_bad_cast_ctor_272, mod_MSVCR100_dll, "??0bad_cast@std@@QAE@PBD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_strtok, mod_MSVCR100_dll, "strtok", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fgetc, mod_MSVCR100_dll, "fgetc", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_feof, mod_MSVCR100_dll, "feof", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_CItan, mod_MSVCR100_dll, "_CItan", 0u, false, ImportBehavior::ci_tan);
-    bind(SFERA_IMPORT_MSVCR100_spawnl, mod_MSVCR100_dll, "_spawnl", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_mkdir, mod_MSVCR100_dll, "_mkdir", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_getenv, mod_MSVCR100_dll, "getenv", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_atoi64, mod_MSVCR100_dll, "_atoi64", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_rename, mod_MSVCR100_dll, "rename", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_chsize, mod_MSVCR100_dll, "_chsize", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fstat64i32, mod_MSVCR100_dll, "_fstat64i32", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_locking, mod_MSVCR100_dll, "_locking", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_sopen_YAHPBDHHH_Z, mod_MSVCR100_dll, "?_sopen@@YAHPBDHHH@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_vscprintf, mod_MSVCR100_dll, "_vscprintf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_vsnprintf, mod_MSVCR100_dll, "_vsnprintf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_exit_288, mod_MSVCR100_dll, "exit", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_msize, mod_MSVCR100_dll, "_msize", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_strtime, mod_MSVCR100_dll, "_strtime", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fputs, mod_MSVCR100_dll, "fputs", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_strrchr, mod_MSVCR100_dll, "strrchr", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_futime64, mod_MSVCR100_dll, "_futime64", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_mktime64, mod_MSVCR100_dll, "_mktime64", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_difftime64, mod_MSVCR100_dll, "_difftime64", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_CIexp, mod_MSVCR100_dll, "_CIexp", 0u, false, ImportBehavior::ci_exp);
-    bind(SFERA_IMPORT_MSVCR100_CIatan2, mod_MSVCR100_dll, "_CIatan2", 0u, false, ImportBehavior::ci_atan2);
-    bind(SFERA_IMPORT_MSVCR100_strstr, mod_MSVCR100_dll, "strstr", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_vswprintf, mod_MSVCR100_dll, "_vswprintf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_memchr, mod_MSVCR100_dll, "memchr", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_access, mod_MSVCR100_dll, "_access", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_strerror, mod_MSVCR100_dll, "strerror", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_remove, mod_MSVCR100_dll, "remove", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fread, mod_MSVCR100_dll, "fread", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fwrite, mod_MSVCR100_dll, "fwrite", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_asctime, mod_MSVCR100_dll, "asctime", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_vsprintf, mod_MSVCR100_dll, "vsprintf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_stricmp, mod_MSVCR100_dll, "_stricmp", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_purecall, mod_MSVCR100_dll, "_purecall", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_close, mod_MSVCR100_dll, "_close", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_read, mod_MSVCR100_dll, "_read", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_open_YAHPBDHH_Z, mod_MSVCR100_dll, "?_open@@YAHPBDHH@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_write, mod_MSVCR100_dll, "_write", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_lseek, mod_MSVCR100_dll, "_lseek", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_memcpy, mod_MSVCR100_dll, "memcpy", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_memset, mod_MSVCR100_dll, "memset", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_sprintf, mod_MSVCR100_dll, "sprintf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_chmod, mod_MSVCR100_dll, "_chmod", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_sscanf, mod_MSVCR100_dll, "sscanf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_exception_ctor, mod_MSVCR100_dll, "??0exception@std@@QAE@ABQBD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_memmove, mod_MSVCR100_dll, "memmove", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_ldiv, mod_MSVCR100_dll, "ldiv", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_vfprintf, mod_MSVCR100_dll, "vfprintf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fprintf, mod_MSVCR100_dll, "fprintf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_ftell, mod_MSVCR100_dll, "ftell", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fseek, mod_MSVCR100_dll, "fseek", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fclose, mod_MSVCR100_dll, "fclose", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fopen, mod_MSVCR100_dll, "fopen", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_snprintf, mod_MSVCR100_dll, "_snprintf", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_rand, mod_MSVCR100_dll, "rand", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_errno, mod_MSVCR100_dll, "_errno", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_CIsqrt, mod_MSVCR100_dll, "_CIsqrt", 0u, false, ImportBehavior::ci_sqrt);
-    bind(SFERA_IMPORT_MSVCR100_CIcos, mod_MSVCR100_dll, "_CIcos", 0u, false, ImportBehavior::ci_cos);
-    bind(SFERA_IMPORT_MSVCR100_CIsin, mod_MSVCR100_dll, "_CIsin", 0u, false, ImportBehavior::ci_sin);
-    bind(SFERA_IMPORT_MSVCR100_CIpow, mod_MSVCR100_dll, "_CIpow", 0u, false, ImportBehavior::ci_pow);
-    bind(SFERA_IMPORT_MSVCR100_findclose, mod_MSVCR100_dll, "_findclose", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_findnext64i32, mod_MSVCR100_dll, "_findnext64i32", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_findfirst64i32, mod_MSVCR100_dll, "_findfirst64i32", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_localtime64, mod_MSVCR100_dll, "_localtime64", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_time64, mod_MSVCR100_dll, "_time64", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_strncpy, mod_MSVCR100_dll, "strncpy", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_strftime, mod_MSVCR100_dll, "strftime", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_strchr, mod_MSVCR100_dll, "strchr", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_filelength, mod_MSVCR100_dll, "_filelength", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_malloc, mod_MSVCR100_dll, "malloc", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_free, mod_MSVCR100_dll, "free", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_tolower, mod_MSVCR100_dll, "tolower", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_strncmp, mod_MSVCR100_dll, "strncmp", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_qsort, mod_MSVCR100_dll, "qsort", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_realloc, mod_MSVCR100_dll, "realloc", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_srand, mod_MSVCR100_dll, "srand", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_fgets, mod_MSVCR100_dll, "fgets", 0u, false, ImportBehavior::generic);
-    HMODULE mod_MSVCP100_dll = module("MSVCP100.dll");
-    bind(SFERA_IMPORT_MSVCP100_basic_ostream_dtor, mod_MSVCP100_dll, "??1?$basic_ostream@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_ios_dtor, mod_MSVCP100_dll, "??1?$basic_ios@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_ios_vftable, mod_MSVCP100_dll, "??_7?$basic_ios@DU?$char_traits@D@std@@@std@@6B@", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_ios_base_vftable, mod_MSVCP100_dll, "??_7ios_base@std@@6B@", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_codecvt_unshift, mod_MSVCP100_dll, "?unshift@?$codecvt@DDH@std@@QBEHAAHPAD1AAPAD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_codecvt_in, mod_MSVCP100_dll, "?in@?$codecvt@DDH@std@@QBEHAAHPBD1AAPBDPAD3AAPAD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_setg, mod_MSVCP100_dll, "?setg@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IAEXPAD00@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_codecvt_out, mod_MSVCP100_dll, "?out@?$codecvt@DDH@std@@QBEHAAHPBD1AAPBDPAD3AAPAD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_std_uncaught_exception, mod_MSVCP100_dll, "?uncaught_exception@std@@YA_NXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_ostream_Osfx, mod_MSVCP100_dll, "?_Osfx@?$basic_ostream@DU?$char_traits@D@std@@@std@@QAEXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_std_Fiopen, mod_MSVCP100_dll, "?_Fiopen@std@@YAPAU_iobuf@@PBDHH@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_getloc, mod_MSVCP100_dll, "?getloc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QBE?AVlocale@2@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_ctor, mod_MSVCP100_dll, "??0?$basic_streambuf@DU?$char_traits@D@std@@@std@@IAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_dtor, mod_MSVCP100_dll, "??1?$basic_streambuf@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_Lockit_ctor, mod_MSVCP100_dll, "??0_Lockit@std@@QAE@H@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_codecvt_id, mod_MSVCP100_dll, "?id@?$codecvt@DDH@std@@2V0locale@2@A", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_Lockit_dtor, mod_MSVCP100_dll, "??1_Lockit@std@@QAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_id_Id_cnt, mod_MSVCP100_dll, "?_Id_cnt@id@locale@std@@0HA", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_codecvt_Getcat, mod_MSVCP100_dll, "?_Getcat@?$codecvt@DDH@std@@SAIPAPBVfacet@locale@2@PBV42@@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_facet_Incref, mod_MSVCP100_dll, "?_Incref@facet@locale@std@@QAEXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_codecvt_base_always_noconv, mod_MSVCP100_dll, "?always_noconv@codecvt_base@std@@QBE_NXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_Init, mod_MSVCP100_dll, "?_Init@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IAEXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_locale_Getgloballocale, mod_MSVCP100_dll, "?_Getgloballocale@locale@std@@CAPAV_Locimp@12@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_facet_Decref, mod_MSVCP100_dll, "?_Decref@facet@locale@std@@QAEPAV123@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_Container_base12_dtor, mod_MSVCP100_dll, "??1_Container_base12@std@@QAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_std_Xlength_error, mod_MSVCP100_dll, "?_Xlength_error@std@@YAXPBD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_std_Xout_of_range, mod_MSVCP100_dll, "?_Xout_of_range@std@@YAXPBD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_istream_dtor, mod_MSVCP100_dll, "??1?$basic_istream@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_ios_base_Ios_base_dtor, mod_MSVCP100_dll, "?_Ios_base_dtor@ios_base@std@@CAXPAV12@@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_ostream_vftable, mod_MSVCP100_dll, "??_7?$basic_ostream@DU?$char_traits@D@std@@@std@@6B@", 0u, false, ImportBehavior::generic);
-    if (resolved_imports_.size() != 382u) { throw std::runtime_error("Resolved import count mismatch"); }
 }
 
 void ProcessMemory::resolve_static_references() {
@@ -1227,7 +762,6 @@ void ProcessMemory::protect_regions() {}
 
 void ProcessMemory::release() noexcept {
     if (g_process_memory == this) { g_process_memory = nullptr; }
-    resolved_imports_.clear(); loaded_modules_.clear();
     callback_thunk_count_ = 0u; if (callback_thunks_) { VirtualFree(callback_thunks_, 0, MEM_RELEASE); callback_thunks_ = nullptr; } callback_thunks_size_ = 0u;
 }
 
@@ -1279,7 +813,7 @@ void verify_native_bridge() {
     lift_push32(&state, 7u);
     lift_push32(&state, 5u);
     const std::uint32_t cdecl_esp = state.esp;
-    NativeCallFrame cdecl_frame{&state, reinterpret_cast<void*>(&bridge_test_cdecl), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0};
+    NativeCallFrame cdecl_frame{&state, reinterpret_cast<void*>(&bridge_test_cdecl), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr};
     native_call_bridge(&cdecl_frame);
     const std::uint32_t cdecl_exception_list = __readfsdword(0);
     const std::uint32_t cdecl_stack_base = __readfsdword(4);
@@ -1291,7 +825,7 @@ void verify_native_bridge() {
     lift_push32(&state, 0x2468ACE0u);
     lift_push32(&state, 0x10203040u);
     const std::uint32_t stdcall_esp = state.esp;
-    NativeCallFrame stdcall_frame{&state, reinterpret_cast<void*>(&bridge_test_stdcall), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0};
+    NativeCallFrame stdcall_frame{&state, reinterpret_cast<void*>(&bridge_test_stdcall), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr};
     native_call_bridge(&stdcall_frame);
     const std::uint32_t stdcall_exception_list = __readfsdword(0);
     const std::uint32_t stdcall_stack_base = __readfsdword(4);
@@ -1304,7 +838,7 @@ void verify_native_bridge() {
     state.edx = 13u;
     lift_push32(&state, 17u);
     const std::uint32_t fastcall_esp = state.esp;
-    NativeCallFrame fastcall_frame{&state, reinterpret_cast<void*>(&bridge_test_fastcall), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0};
+    NativeCallFrame fastcall_frame{&state, reinterpret_cast<void*>(&bridge_test_fastcall), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr};
     native_call_bridge(&fastcall_frame);
     const std::uint32_t fastcall_exception_list = __readfsdword(0);
     const std::uint32_t fastcall_stack_base = __readfsdword(4);
@@ -1327,38 +861,14 @@ NativeRuntime::NativeRuntime() {
     memory_.initialize_native();
     verify_native_bridge();
     DiagnosticPhaseScope phase(RuntimePhase::function_map);
-    for (const ResolvedImport& item : memory_.resolved_imports()) { std::size_t slot = ((item.address >> 4u) * UINT32_C(2654435761)) & (kImportLookupSize - 1u); while (import_lookup_addresses_[slot] != 0u && import_lookup_addresses_[slot] != item.address) { slot = (slot + 1u) & (kImportLookupSize - 1u); } if (import_lookup_addresses_[slot] == 0u) { import_lookup_addresses_[slot] = item.address; import_lookup_behaviors_[slot] = item.behavior; } }
-    diagnostic_note("native C function map initialized");
+    diagnostic_note("native function dispatch initialized");
 }
-
-ImportBehavior NativeRuntime::find_import(std::uint32_t target) const {
-    std::size_t slot = ((target >> 4u) * UINT32_C(2654435761)) & (kImportLookupSize - 1u);
-    for (std::size_t probe = 0u; probe != kImportLookupSize; ++probe) { const std::uint32_t address = import_lookup_addresses_[slot]; if (address == target) { return import_lookup_behaviors_[slot]; } if (address == 0u) { return ImportBehavior::generic; } slot = (slot + 1u) & (kImportLookupSize - 1u); }
-    return ImportBehavior::generic;
-}
-
 
 void NativeRuntime::call_native(LiftCpu& state, std::uint32_t target, std::uint32_t callsite) {
-    call_native_resolved(state, target, callsite, find_import(target));
-}
-
-void NativeRuntime::call_native_resolved(LiftCpu& state, std::uint32_t target, std::uint32_t callsite, ImportBehavior behavior) {
     struct NativeEspTrace { LiftCpu& state; NativeEspTrace(LiftCpu& value, std::uint32_t native_target, std::uint32_t native_callsite) : state(value) { g_last_native_target = native_target; g_last_native_callsite = native_callsite; g_last_native_esp_before = value.esp; g_last_native_esp_after = value.esp; } ~NativeEspTrace() { g_last_native_esp_after = state.esp; } } native_esp_trace(state, target, callsite);
     if (target < 0x10000u) { throw std::runtime_error("Invalid native call target " + hex_u32(target) + " at " + hex_u32(callsite)); }
-    if (behavior == ImportBehavior::raise_exception) { const std::string note = std::string("passing client SEH exception through native runtime; callsite=") + hex_u32(callsite) + " code=" + hex_u32(memory_read<std::uint32_t>(state.esp)) + " fs0=" + hex_u32(*reinterpret_cast<const std::uint32_t*>(state.fs_data)); diagnostic_note(note.c_str()); }
-    if ((behavior == ImportBehavior::module_handle_a || behavior == ImportBehavior::module_handle_w) && memory_read<std::uint32_t>(state.esp) == 0u) { state.eax = memory_.load_base(); state.esp += 4u; return; }
-    if ((behavior == ImportBehavior::module_filename_a || behavior == ImportBehavior::module_filename_w) && (memory_read<std::uint32_t>(state.esp) == 0u || memory_read<std::uint32_t>(state.esp) == memory_.load_base())) { const std::uint32_t buffer = memory_read<std::uint32_t>(state.esp + 4u); const std::uint32_t capacity = memory_read<std::uint32_t>(state.esp + 8u); state.eax = behavior == ImportBehavior::module_filename_w ? write_local_path(buffer, capacity, client_executable_path()) : write_local_path(buffer, capacity, client_executable_path_ansi()); state.esp += 12u; return; }
-    if (behavior == ImportBehavior::ci_atan2 || behavior == ImportBehavior::ci_pow) { require_x87(&state, 2); state.fpu[1] = behavior == ImportBehavior::ci_pow ? std::pow(state.fpu[1], state.fpu[0]) : std::atan2(state.fpu[1], state.fpu[0]); lift_x87_pop(&state); return; }
-    if (behavior >= ImportBehavior::ci_acos && behavior <= ImportBehavior::ci_tan) { require_x87(&state, 1); const double value = state.fpu[0]; switch (behavior) { case ImportBehavior::ci_acos: state.fpu[0] = std::acos(value); break; case ImportBehavior::ci_asin: state.fpu[0] = std::asin(value); break; case ImportBehavior::ci_atan: state.fpu[0] = std::atan(value); break; case ImportBehavior::ci_cos: state.fpu[0] = std::cos(value); break; case ImportBehavior::ci_exp: state.fpu[0] = std::exp(value); break; case ImportBehavior::ci_sin: state.fpu[0] = std::sin(value); break; case ImportBehavior::ci_sqrt: state.fpu[0] = std::sqrt(value); break; default: state.fpu[0] = std::tan(value); break; } return; }
-    NativeCallArguments arguments(state.esp);
-    if (behavior == ImportBehavior::process_module_argument0) { const std::uint32_t image_handle = arguments.read(0u); const std::uint32_t native_handle = process_module_handle(); if (native_handle != image_handle) { arguments.alias(0u, image_handle, native_handle); } }
-    NativeCallFrame frame{&state, reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0.0};
-    if (behavior == ImportBehavior::float_return) { native_call_bridge(&frame); lift_x87_push(&state, frame.native_st0); } else { native_call_bridge_fast(&frame); }
-}
-
-extern "C" void __cdecl lift_import_call(LiftCpu* cpu, std::uint32_t import_address, std::uint32_t callsite) {
-    if (!g_runtime || !cpu) { throw std::runtime_error("Import call without an active native runtime"); }
-    g_runtime->call_native(*cpu, import_address, callsite);
+    NativeCallFrame frame{&state, reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr};
+    native_call_bridge(&frame);
 }
 
 extern "C" void __cdecl lift_native_call(LiftCpu* cpu, std::uint32_t target, std::uint32_t callsite) {
@@ -1449,14 +959,13 @@ extern "C" void __cdecl dispatch_native_callback(CallbackRegisters* registers) {
 #if defined(SFERA_PORTABLE_CHECK)
 
 extern "C" void __cdecl native_call_bridge(NativeCallFrame*) {}
-extern "C" void __cdecl native_call_bridge_fast(NativeCallFrame*) {}
 extern "C" void callback_bridge() {}
 
 #elif defined(_M_IX86)
 
 static_assert(offsetof(LiftCpu, eax) == 0 && offsetof(LiftCpu, eflags) == 36 && offsetof(LiftCpu, fpu_control) == 114);
 static_assert(offsetof(LiftCpu, fs_data) == 120);
-static_assert(offsetof(NativeCallFrame, state) == 0 && offsetof(NativeCallFrame, native_st0) == 40);
+static_assert(offsetof(NativeCallFrame, state) == 0 && offsetof(NativeCallFrame, previous_stack_limit) == 36);
 static_assert(offsetof(CallbackRegisters, edi) == 0 && offsetof(CallbackRegisters, eax) == 28 && offsetof(CallbackRegisters, eflags) == 32 && offsetof(CallbackRegisters, callback_function) == 36);
 static_assert(sizeof(CallbackRegisters) == 40);
 
@@ -1474,9 +983,7 @@ extern "C" __declspec(naked) void __cdecl native_call_bridge(NativeCallFrame*) {
         mov [edx + 32], eax
         mov eax, fs:[8]
         mov [edx + 36], eax
-        fninit
         mov eax, [edx]
-        fldcw word ptr [eax + 114]
         mov ecx, [eax + 120]
         mov fs:[0], ecx
         mov ecx, [eax + 40]
@@ -1500,83 +1007,6 @@ extern "C" __declspec(naked) void __cdecl native_call_bridge(NativeCallFrame*) {
         cld
         ret
     native_bridge_return:
-        pushfd
-        pushad
-        mov edx, [esp + 8]
-        fst qword ptr [edx + 40]
-        mov ecx, [edx]
-        fnstcw word ptr [ecx + 114]
-        fninit
-        mov eax, [esp + 28]
-        mov [ecx], eax
-        mov eax, [esp + 24]
-        mov [ecx + 4], eax
-        mov eax, [esp + 20]
-        mov [ecx + 8], eax
-        mov eax, [esp + 16]
-        mov [ecx + 12], eax
-        mov eax, [esp + 12]
-        add eax, 4
-        mov [ecx + 16], eax
-        mov eax, [esp + 4]
-        mov [ecx + 24], eax
-        mov eax, [esp]
-        mov [ecx + 28], eax
-        mov eax, [esp + 32]
-        mov [ecx + 36], eax
-        mov eax, [edx + 28]
-        mov fs:[0], eax
-        mov eax, [edx + 32]
-        mov fs:[4], eax
-        mov eax, [edx + 36]
-        mov fs:[8], eax
-        mov esp, [edx + 8]
-        mov ebp, [edx + 12]
-        mov ebx, [edx + 16]
-        mov esi, [edx + 20]
-        mov edi, [edx + 24]
-        ret
-    }
-}
-
-extern "C" __declspec(naked) void __cdecl native_call_bridge_fast(NativeCallFrame*) {
-    __asm {
-        mov edx, [esp + 4]
-        mov [edx + 8], esp
-        mov [edx + 12], ebp
-        mov [edx + 16], ebx
-        mov [edx + 20], esi
-        mov [edx + 24], edi
-        mov eax, fs:[0]
-        mov [edx + 28], eax
-        mov eax, fs:[4]
-        mov [edx + 32], eax
-        mov eax, fs:[8]
-        mov [edx + 36], eax
-        mov eax, [edx]
-        mov ecx, [eax + 120]
-        mov fs:[0], ecx
-        mov ecx, [eax + 40]
-        mov fs:[4], ecx
-        mov ecx, [eax + 44]
-        mov fs:[8], ecx
-        mov ecx, [eax + 16]
-        sub ecx, 8
-        mov ebx, [edx + 4]
-        mov [ecx], ebx
-        mov ebx, offset native_bridge_fast_return
-        mov [ecx + 4], ebx
-        mov esp, ecx
-        mov edi, [eax + 28]
-        mov esi, [eax + 24]
-        mov ebp, edx
-        mov ebx, [eax + 12]
-        mov edx, [eax + 8]
-        mov ecx, [eax + 4]
-        mov eax, [eax]
-        cld
-        ret
-    native_bridge_fast_return:
         pushfd
         pushad
         mov edx, [esp + 8]

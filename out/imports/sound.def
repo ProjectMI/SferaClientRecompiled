@@ -1,0 +1,36 @@
+LIBRARY sound.dll
+EXPORTS
+    ??0CSound@@QAE@XZ @2
+    ??1CSound@@QAE@XZ @17
+    ?GetOrientation@CSoundListener@@QBEXPAU_D3DVECTOR@@0@Z @73
+    ?GetPlayTimepos@CSound@@QBEMXZ @76
+    ?IsSoundPlaying@CSound@@QBEHXZ @95
+    ?IsStreamPlaying@CSoundStream@@QBEHXZ @97
+    ?LoadSound@CSound@@QAEHPBDK@Z @98
+    ?Play@CSound@@UAEHH@Z @101
+    ?PlayEx@CSoundStream@@QAEHMH@Z @103
+    ?Rewind@CSound@@UAEHXZ @117
+    ?SI_Close@@YAXXZ @119
+    ?SI_CreateInterface@@YAPAVCSoundInterface@@PAUHWND__@@HKK@Z @120
+    ?SI_GetHardwareMixing@@YA_NXZ @123
+    ?SI_GetInterface@@YAPAVCSoundInterface@@XZ @124
+    ?SI_GetStreamVolume@@YAHXZ @126
+    ?SI_SetHardwareMixing@@YAX_N@Z @128
+    ?SI_SetLogFile@@YAXPBD@Z @129
+    ?SI_SetStreamVolume@@YAXH@Z @131
+    ?SI_StreamCreateFile@@YAKPBDK@Z @132
+    ?SI_StreamFree@@YAXK@Z @133
+    ?SeekToTime@CSoundStream@@QAEHM@Z @141
+    ?SetAllParameters@CSound@@QAEHPBU_DS3DBUFFER@@H@Z @145
+    ?SetDecodeSignal@CSoundStream@@QAEXM@Z @153
+    ?SetOrientation@CSoundListener@@QAEHABU_D3DVECTOR@@0H@Z @160
+    ?SetPlaySignal@CSoundStream@@QAEXM@Z @165
+    ?SetPlayTimepos@CSound@@QAEXM@Z @166
+    ?SetPosition@CSound@@QAEHMMMH@Z @168
+    ?SetPosition@CSoundListener@@QAEHMMMH@Z @170
+    ?SetVelocity@CSound@@QAEHMMMH@Z @173
+    ?SetVelocity@CSoundListener@@QAEHMMMH@Z @175
+    ?SetVolume@CSound@@QAEHM@Z @176
+    ?Stop@CSound@@UAEXXZ @182
+    ?Stop@CSoundStream@@QAEXXZ @183
+    ?UpdateSettings@CSoundInterface@@QAEHXZ @186

@@ -1,0 +1,10 @@
+LIBRARY d3dx9_26.dll
+EXPORTS
+    D3DXCreateCubeTextureFromFileInMemory@16 @42 NONAME
+    D3DXCreateTexture@32 @95 NONAME
+    D3DXCreateTextureFromFileInMemoryEx@60 @100 NONAME
+    D3DXGetShaderConstantTable@8 @160 NONAME
+    D3DXMatrixLookAtRH@16 @206 NONAME
+    D3DXMatrixMultiply@12 @207 NONAME
+    D3DXMatrixPerspectiveFovRH@20 @214 NONAME
+    D3DXMatrixRotationQuaternion@8 @221 NONAME

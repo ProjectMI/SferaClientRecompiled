@@ -21,8 +21,6 @@ thread_local RuntimePhase g_phase = RuntimePhase::startup;
 thread_local const LiftCpu* g_cpu = nullptr;
 thread_local std::uint32_t g_instruction = 0;
 thread_local const char* g_operation = nullptr;
-thread_local std::uint32_t g_native_target = 0;
-thread_local const char* g_import_name = nullptr;
 thread_local bool g_memory_probe = false;
 
 struct TraceEntry {
@@ -60,7 +58,6 @@ std::size_t memory_write_bucket(std::uint32_t address) noexcept {
         case RuntimePhase::startup: return "startup";
         case RuntimePhase::process_startup: return "process-startup";
         case RuntimePhase::static_storage: return "static-storage";
-        case RuntimePhase::load_imports: return "load-imports";
         case RuntimePhase::protect_static_storage: return "protect-static-storage";
         case RuntimePhase::abi_self_test: return "abi-self-test";
         case RuntimePhase::function_map: return "function-map";
@@ -122,7 +119,6 @@ void append_execution_context(char* report, std::size_t capacity, std::size_t& u
         append_text(report, capacity, used, "lifted eip=%08X esp=%08X ebp=%08X eax=%08X ebx=%08X ecx=%08X edx=%08X esi=%08X edi=%08X eflags=%08X\r\n", state->eip, state->esp, state->ebp, state->eax, state->ebx, state->ecx, state->edx, state->esi, state->edi, state->eflags);
     }
     if (g_instruction != 0) { append_text(report, capacity, used, "instruction=%08X operation=%s\r\n", g_instruction, g_operation ? g_operation : "unknown"); }
-    if (g_native_target != 0) { append_text(report, capacity, used, "native-target=%08X import=%s\r\n", g_native_target, g_import_name ? g_import_name : "unknown"); }
     if (g_call_count != 0) {
         append_text(report, capacity, used, "call-stack:\r\n");
         for (std::size_t index = 0; index < g_call_count; ++index) {
@@ -144,27 +140,17 @@ void append_execution_context(char* report, std::size_t capacity, std::size_t& u
 
 void write_minidump(EXCEPTION_POINTERS* pointers) noexcept {
     wchar_t dump_path[MAX_PATH]{};
-    wchar_t system_path[MAX_PATH]{};
     if (!artifact_path(L"sfera_native_crash.dmp", dump_path, MAX_PATH)) { return; }
-    const UINT system_length = GetSystemDirectoryW(system_path, MAX_PATH);
-    constexpr wchar_t suffix[] = L"\\dbghelp.dll";
-    if (system_length == 0 || system_length + std::size(suffix) > MAX_PATH) { return; }
-    std::memcpy(system_path + system_length, suffix, sizeof(suffix));
-    HMODULE dbghelp = LoadLibraryW(system_path);
-    if (!dbghelp) { return; }
-    using MiniDumpWriteDumpFn = BOOL(WINAPI*)(HANDLE, DWORD, HANDLE, MINIDUMP_TYPE, const MINIDUMP_EXCEPTION_INFORMATION*, const MINIDUMP_USER_STREAM_INFORMATION*, const MINIDUMP_CALLBACK_INFORMATION*);
-    auto write_dump = reinterpret_cast<MiniDumpWriteDumpFn>(GetProcAddress(dbghelp, "MiniDumpWriteDump"));
     HANDLE file = CreateFileW(dump_path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (write_dump && file != INVALID_HANDLE_VALUE) {
+    if (file != INVALID_HANDLE_VALUE) {
         MINIDUMP_EXCEPTION_INFORMATION information{};
         information.ThreadId = GetCurrentThreadId();
         information.ExceptionPointers = pointers;
         information.ClientPointers = FALSE;
         const MINIDUMP_TYPE type = static_cast<MINIDUMP_TYPE>(MiniDumpWithDataSegs | MiniDumpWithHandleData | MiniDumpWithUnloadedModules | MiniDumpWithThreadInfo);
-        write_dump(GetCurrentProcess(), GetCurrentProcessId(), file, type, &information, nullptr, nullptr);
+        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file, type, &information, nullptr, nullptr);
+        CloseHandle(file);
     }
-    if (file != INVALID_HANDLE_VALUE) { CloseHandle(file); }
-    FreeLibrary(dbghelp);
 }
 
 void write_crash_report(EXCEPTION_POINTERS* pointers) noexcept {
@@ -220,16 +206,6 @@ DiagnosticRunScope::~DiagnosticRunScope() {
     g_cpu = previous_state_;
     g_instruction = previous_instruction_;
     g_operation = previous_operation_;
-}
-
-DiagnosticNativeScope::DiagnosticNativeScope(std::uint32_t target, const char* import_name) noexcept : previous_target_(g_native_target), previous_import_name_(g_import_name) {
-    g_native_target = target;
-    g_import_name = import_name;
-}
-
-DiagnosticNativeScope::~DiagnosticNativeScope() {
-    g_native_target = previous_target_;
-    g_import_name = previous_import_name_;
 }
 
 DiagnosticExecutionScope::DiagnosticExecutionScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp) noexcept : previous_depth_(g_call_count) {

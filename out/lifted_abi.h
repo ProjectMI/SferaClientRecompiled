@@ -138,7 +138,6 @@ void LIFT_CDECL lift_scas8(LiftCpu* cpu, uint32_t repeated, uint32_t repeat_not_
 void LIFT_CDECL lift_scas16(LiftCpu* cpu, uint32_t repeated, uint32_t repeat_not_equal);
 void LIFT_CDECL lift_scas32(LiftCpu* cpu, uint32_t repeated, uint32_t repeat_not_equal);
 
-void LIFT_CDECL lift_import_call(LiftCpu* cpu, uint32_t import_address, uint32_t callsite);
 void LIFT_CDECL lift_native_call(LiftCpu* cpu, uint32_t target, uint32_t callsite);
 uint32_t LIFT_CDECL lift_source_rva(uint32_t address);
 uint32_t LIFT_CDECL lift_code_rva(uint32_t address);
@@ -151,7 +150,7 @@ void LIFT_CDECL lift_dispatch(LiftCpu* cpu, uint32_t target, uint32_t stop_addre
 int LIFT_CDECL lift_call_indirect(LiftCpu* cpu, uint32_t target, uint32_t return_address, uint32_t callsite);
 void LIFT_CDECL lift_tail_indirect(LiftCpu* cpu, uint32_t target, uint32_t stop_address, uint32_t callsite);
 void LIFT_CDECL lift_return(LiftCpu* cpu, uint32_t stack_cleanup, uint32_t stop_address);
-void LIFT_CDECL lift_import_call_return(LiftCpu* cpu, uint32_t import_address, uint32_t callsite, uint32_t stop_address);
+void LIFT_CDECL lift_native_call_return(LiftCpu* cpu, uint32_t target, uint32_t callsite, uint32_t stop_address);
 
 #ifdef __cplusplus
 }

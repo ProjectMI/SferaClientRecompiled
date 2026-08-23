@@ -2,21 +2,14 @@
 
 #include "lifted_fast_ops.h"
 #include "semantic_static.h"
+#include "import_bridge.h"
 #ifdef __cplusplus
 #include <memory>
 #endif
 
-#ifndef DIRECTINPUT_VERSION
-#define DIRECTINPUT_VERSION 0x0800
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
 #include <oleidl.h>
 #include <exdisp.h>
 #include <mshtmhst.h>
-#include <dinput.h>
 #include <mshtml.h>
 
 namespace {
@@ -31,8 +24,8 @@ namespace {
 #define LIFT_BLOCK(label, address) label: cpu->eip = LIFT_CODE_TOKEN_VA(address)
 #define LIFT_CALL(function, return_address) do { lift_push32(cpu, (return_address)); function(cpu, (return_address)); if (cpu->eip != (return_address)) return; } while (0)
 #define LIFT_CALL_ENTER(function, image_address) do { LIFT_CALL(function, LIFT_CODE_TOKEN_VA(image_address)); } while (0)
-#define LIFT_IMPORT_CALL(import_address, callsite, next_address) do { lift_import_call(cpu, (uint32_t)(import_address), LIFT_CODE_TOKEN_VA(callsite)); cpu->eip = LIFT_CODE_TOKEN_VA(next_address); } while (0)
-#define LIFT_IMPORT_CALL_RETURN(import_address, callsite) do { lift_import_call_return(cpu, (uint32_t)(import_address), LIFT_CODE_TOKEN_VA(callsite), stop_address); return; } while (0)
+#define LIFT_NATIVE_CALL(target, callsite, next_address) do { lift_native_call(cpu, (uint32_t)(target), LIFT_CODE_TOKEN_VA(callsite)); cpu->eip = LIFT_CODE_TOKEN_VA(next_address); } while (0)
+#define LIFT_NATIVE_CALL_RETURN(target, callsite) do { lift_native_call_return(cpu, (uint32_t)(target), LIFT_CODE_TOKEN_VA(callsite), stop_address); return; } while (0)
 #define LIFT_TAIL(function) do { function(cpu, stop_address); return; } while (0)
 #define LIFT_TAIL_INDIRECT(target, callsite) do { lift_tail_indirect(cpu, (target), stop_address, (callsite)); return; } while (0)
 #define LIFT_TRAP_RETURN(address, reason) do { lift_trap(cpu, (address), (reason)); return; } while (0)

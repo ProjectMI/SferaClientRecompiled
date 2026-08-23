@@ -1,0 +1,188 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="lifted_dispatch.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_flag_ops.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_000.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_001.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_002.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_003.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_004.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_005.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_006.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_007.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_008.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_009.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_010.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_011.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_012.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_013.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_014.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_015.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_016.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_017.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_018.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_019.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_020.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_021.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_022.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_023.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_024.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="lifted_functions_025.c">
+      <Filter>lifted</Filter>
+    </ClCompile>
+    <ClCompile Include="semantic_classes.cpp">
+      <Filter>semantic</Filter>
+    </ClCompile>
+    <ClCompile Include="semantic_static.cpp">
+      <Filter>semantic</Filter>
+    </ClCompile>
+    <ClCompile Include="semantic_zlib.cpp">
+      <Filter>semantic</Filter>
+    </ClCompile>
+    <ClCompile Include="diagnostics.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="lifted_fast_ops.h">
+      <Filter>lifted</Filter>
+    </ClInclude>
+    <ClInclude Include="lifted_functions.h">
+      <Filter>lifted</Filter>
+    </ClInclude>
+    <ClInclude Include="lifted_normalized_ops.h">
+      <Filter>lifted</Filter>
+    </ClInclude>
+    <ClInclude Include="semantic_classes.h">
+      <Filter>semantic</Filter>
+    </ClInclude>
+    <ClInclude Include="semantic_static.h">
+      <Filter>semantic</Filter>
+    </ClInclude>
+    <ClInclude Include="semantic_zlib.h">
+      <Filter>semantic</Filter>
+    </ClInclude>
+    <ClInclude Include="runtime.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="diagnostics.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="lifted_abi.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="import_bridge.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>core</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="imports\d3dx9_26.def">
+      <Filter>imports</Filter>
+    </None>
+    <None Include="runtime_dlls\d3dx9_26.dll">
+      <Filter>imports</Filter>
+    </None>
+    <None Include="runtime_dlls\d3dx9_30.dll">
+      <Filter>imports</Filter>
+    </None>
+    <None Include="runtime_dlls\dbghelp.dll">
+      <Filter>imports</Filter>
+    </None>
+    <None Include="runtime_dlls\msvcr100.dll">
+      <Filter>imports</Filter>
+    </None>
+    <None Include="runtime_dlls\msvcp71.dll">
+      <Filter>imports</Filter>
+    </None>
+    <None Include="runtime_dlls\msvcp100.dll">
+      <Filter>imports</Filter>
+    </None>
+    <None Include="runtime_dlls\msvcr71.dll">
+      <Filter>imports</Filter>
+    </None>
+    <None Include="runtime_dlls\sound.dll">
+      <Filter>imports</Filter>
+    </None>
+    <None Include="imports\sound.def">
+      <Filter>imports</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="imports">
+      <UniqueIdentifier>{21f70185-4287-4368-bb2f-f5dc1bfbf80c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lifted">
+      <UniqueIdentifier>{6669e551-9d73-4497-81ed-24adfa43af67}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="semantic">
+      <UniqueIdentifier>{5fe1d1c2-bc4c-41bf-b8e8-159b946abb23}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core">
+      <UniqueIdentifier>{24bf44e0-41a2-4b07-b9a9-c2a28aa80c8a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

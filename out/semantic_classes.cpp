@@ -4,6 +4,10 @@
 
 #include <cstdint>
 
+namespace {
+[[noreturn]] void semantic_pure_virtual(LiftCpu* cpu) { lift_trap(cpu, cpu ? cpu->eip : 0u, "pure virtual method called"); }
+}
+
 void BloodEffListener::onEffectAttached(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
     LIFT_CALL(sfera_sub_0041A090, LIFT_CALLBACK_SENTINEL);
@@ -21,12 +25,12 @@ void BloodEffListener::onEffectChanged(LiftCpu* cpu) {
 
 void IEffectManager::initializeEffect(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void IEffectManager::updateEffect(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void IEffectManager::queryEffectState(LiftCpu* cpu) {
@@ -36,27 +40,27 @@ void IEffectManager::queryEffectState(LiftCpu* cpu) {
 
 void IEffectManager::activateEffect(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void IEffectManager::deactivateEffect(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void IEffectManager::renderEffect(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void IEffectManager::createEffectResources(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void IEffectManager::setParameter(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void IEffectManager::resetEffect(LiftCpu* cpu) {
@@ -376,7 +380,7 @@ void CLightEffect::destroyEffect(LiftCpu* cpu) {
 
 void IOutputDevice::write(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void COutputLogDevice::write(LiftCpu* cpu) {
@@ -459,89 +463,80 @@ void LightingListener::onLightDisabled(LiftCpu* cpu) {
     LIFT_CALL(sfera_sub_0047F5C0, LIFT_CALLBACK_SENTINEL);
 }
 
-void CSoundFX::play(LiftCpu* cpu) {
-    cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EE7F2, LIFT_CALLBACK_SENTINEL);
-}
+void CSoundFX::play(LiftCpu* cpu) { cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<CSound*>(this)->CSound::Play(static_cast<int>(lift_load32(cpu->esp)))); cpu->esp += 4u; }
 
-void CSoundFX::stop(LiftCpu* cpu) {
-    cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EE7F8, LIFT_CALLBACK_SENTINEL);
-}
+void CSoundFX::stop(LiftCpu* cpu) { reinterpret_cast<CSound*>(this)->CSound::Stop(); }
 
-void CSoundFX::rewind(LiftCpu* cpu) {
-    cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EE7FE, LIFT_CALLBACK_SENTINEL);
-}
+void CSoundFX::rewind(LiftCpu* cpu) { cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<CSound*>(this)->CSound::Rewind()); }
 
 void CCursor::destroy(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::copyStateFrom(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::activate(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::deactivate(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::apply(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::setVisible(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::getPosition(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::setPosition(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::show(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::isInsideViewport(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::isSystemCursorVisible(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::setSystemCursorVisible(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::cursorKind(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CCursor::setCursorKind(LiftCpu* cpu) {
     cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this));
-    LIFT_CALL(sfera_sub_004EEB22, LIFT_CALLBACK_SENTINEL);
+    semantic_pure_virtual(cpu);
 }
 
 void CHardwareCursor::destroy(LiftCpu* cpu) {
