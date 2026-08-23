@@ -30,10 +30,6 @@ extern "C" {
 #define LIFT_FLAG_OF UINT32_C(0x00000800)
 #define LIFT_CALLBACK_SENTINEL UINT32_C(0xFFF0FFF0)
 
-typedef struct SferaMsvcVbtable2 { int32_t self_offset; int32_t virtual_base_offset; } SferaMsvcVbtable2;
-typedef union SferaMsvcStringStorage32 { char inline_buffer[16]; uint32_t heap_pointer; } SferaMsvcStringStorage32;
-typedef struct SferaMsvcString32 { SferaMsvcStringStorage32 storage; uint32_t size; uint32_t capacity; } SferaMsvcString32;
-
 typedef struct LiftCpu {
     uint32_t eax;
     uint32_t ecx;
@@ -57,9 +53,6 @@ typedef struct LiftCpu {
 } LiftCpu;
 
 #if defined(__cplusplus)
-static_assert(offsetof(SferaMsvcString32, size) == 16, "SferaMsvcString32.size ABI offset changed");
-static_assert(offsetof(SferaMsvcString32, capacity) == 20, "SferaMsvcString32.capacity ABI offset changed");
-static_assert(sizeof(SferaMsvcString32) == 24, "SferaMsvcString32 ABI size changed");
 static_assert(offsetof(LiftCpu, eax) == 0, "LiftCpu.eax ABI offset changed");
 static_assert(offsetof(LiftCpu, eflags) == 36, "LiftCpu.eflags ABI offset changed");
 static_assert(offsetof(LiftCpu, stack_base) == 40, "LiftCpu.stack_base ABI offset changed");
@@ -68,9 +61,6 @@ static_assert(offsetof(LiftCpu, fpu_control) == 114, "LiftCpu.fpu_control ABI of
 static_assert(offsetof(LiftCpu, fs_data) == 120, "LiftCpu.fs_data ABI offset changed");
 static_assert(sizeof(LiftCpu) == 184, "LiftCpu ABI size changed");
 #else
-_Static_assert(offsetof(SferaMsvcString32, size) == 16, "SferaMsvcString32.size ABI offset changed");
-_Static_assert(offsetof(SferaMsvcString32, capacity) == 20, "SferaMsvcString32.capacity ABI offset changed");
-_Static_assert(sizeof(SferaMsvcString32) == 24, "SferaMsvcString32 ABI size changed");
 _Static_assert(offsetof(LiftCpu, eax) == 0, "LiftCpu.eax ABI offset changed");
 _Static_assert(offsetof(LiftCpu, eflags) == 36, "LiftCpu.eflags ABI offset changed");
 _Static_assert(offsetof(LiftCpu, stack_base) == 40, "LiftCpu.stack_base ABI offset changed");

@@ -8,20 +8,8 @@
 
 inline uint32_t sfera_f32_bits(float value) { return std::bit_cast<uint32_t>(value); }
 
-inline uint32_t g_sfera_msvcp100_vtable_basic_filebuf[15];
-inline uint32_t g_sfera_msvcp100_vtable_basic_ofstream[1];
-inline uint32_t g_sfera_msvcp100_vtable_basic_ifstream[1];
-inline uint32_t g_sfera_msvcp100_vtable_basic_stringbuf[15];
-inline uint32_t g_sfera_msvcp100_vtable_basic_ostringstream[1];
-inline uint32_t g_sfera_legacy_vtable_bad_alloc[2];
-inline uint32_t g_sfera_legacy_vtable_com_error[1];
-
 namespace {
 inline uint32_t address32(const void* pointer) { return static_cast<uint32_t>(reinterpret_cast<std::uintptr_t>(pointer)); }
-
-const SferaMsvcVbtable2 g_sfera_vbtable_basic_ofstream{0, 0x60};
-const SferaMsvcVbtable2 g_sfera_vbtable_basic_ifstream{0, 0x68};
-const SferaMsvcVbtable2 g_sfera_vbtable_basic_ostringstream{0, 0x50};
 
 const uint32_t kDynamicIndexScratchCount = 3000;
 const uint32_t kErrorMessageCapacity = 0x3EC;
@@ -41,17 +29,8 @@ const uint32_t kTransformBoundsStorageSize = 0xC0;
 const uint32_t kUiSortIndexCount = 100;
 const uint32_t kWeatherInterpolationOffsetCount = 8;
 const uint32_t kStackReserve = 0x00100000;
-
-const uint32_t kMsvcp100VptrBasicFilebuf = address32(g_sfera_msvcp100_vtable_basic_filebuf);
-const uint32_t kMsvcp100VptrBasicOfstream = address32(g_sfera_msvcp100_vtable_basic_ofstream);
-const uint32_t kMsvcp100VptrBasicIfstream = address32(g_sfera_msvcp100_vtable_basic_ifstream);
-const uint32_t kMsvcp100VptrBasicStringbuf = address32(g_sfera_msvcp100_vtable_basic_stringbuf);
-const uint32_t kMsvcp100VptrBasicOstringstream = address32(g_sfera_msvcp100_vtable_basic_ostringstream);
-const uint32_t kLegacyVptrBadAlloc = address32(g_sfera_legacy_vtable_bad_alloc);
-const uint32_t kLegacyVptrComError = address32(g_sfera_legacy_vtable_com_error);
 }
 
-int sfera_bind_legacy_cpp_vtables();
 uint32_t sfera_cursor_texture_name(uint32_t slot);
 
 inline uint32_t SFERA_IMPORT_WINMM_timeGetTime;
@@ -374,10 +353,7 @@ inline uint32_t SFERA_IMPORT_MSVCR100_sprintf;
 inline uint32_t SFERA_IMPORT_MSVCR100_chmod;
 inline uint32_t SFERA_IMPORT_MSVCR100_sscanf;
 inline uint32_t SFERA_IMPORT_MSVCR100_exception_ctor;
-inline uint32_t SFERA_IMPORT_MSVCR100_exception_what;
-inline uint32_t SFERA_IMPORT_MSVCR100_exception_dtor;
 inline uint32_t SFERA_IMPORT_MSVCR100_memmove;
-inline uint32_t SFERA_IMPORT_MSVCR100_exception_ctor_325;
 inline uint32_t SFERA_IMPORT_MSVCR100_ldiv;
 inline uint32_t SFERA_IMPORT_MSVCR100_vfprintf;
 inline uint32_t SFERA_IMPORT_MSVCR100_fprintf;
@@ -409,37 +385,20 @@ inline uint32_t SFERA_IMPORT_MSVCR100_qsort;
 inline uint32_t SFERA_IMPORT_MSVCR100_realloc;
 inline uint32_t SFERA_IMPORT_MSVCR100_srand;
 inline uint32_t SFERA_IMPORT_MSVCR100_fgets;
-inline uint32_t SFERA_IMPORT_MSVCP100_6_basic_ostream_DU_char_traits_D_std_std_QAEAAV01_I_Z;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_sgetc;
-inline uint32_t SFERA_IMPORT_MSVCP100_std_BADOFF;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_imbue;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_sync;
 inline uint32_t SFERA_IMPORT_MSVCP100_basic_ostream_dtor;
 inline uint32_t SFERA_IMPORT_MSVCP100_basic_ios_dtor;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_ostream_ctor;
 inline uint32_t SFERA_IMPORT_MSVCP100_basic_ios_vftable;
 inline uint32_t SFERA_IMPORT_MSVCP100_ios_base_vftable;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_sbumpc;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_snextc;
 inline uint32_t SFERA_IMPORT_MSVCP100_codecvt_unshift;
 inline uint32_t SFERA_IMPORT_MSVCP100_codecvt_in;
 inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_setg;
 inline uint32_t SFERA_IMPORT_MSVCP100_codecvt_out;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_ios_clear;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_sputc;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_sputn;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_ios_setstate;
 inline uint32_t SFERA_IMPORT_MSVCP100_std_uncaught_exception;
 inline uint32_t SFERA_IMPORT_MSVCP100_basic_ostream_Osfx;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_ostream_flush;
 inline uint32_t SFERA_IMPORT_MSVCP100_std_Fiopen;
 inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_getloc;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_xsputn;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_xsgetn;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_showmanyc;
 inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_ctor;
 inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_dtor;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_istream_Ipfx;
 inline uint32_t SFERA_IMPORT_MSVCP100_Lockit_ctor;
 inline uint32_t SFERA_IMPORT_MSVCP100_codecvt_id;
 inline uint32_t SFERA_IMPORT_MSVCP100_Lockit_dtor;
@@ -453,18 +412,9 @@ inline uint32_t SFERA_IMPORT_MSVCP100_facet_Decref;
 inline uint32_t SFERA_IMPORT_MSVCP100_Container_base12_dtor;
 inline uint32_t SFERA_IMPORT_MSVCP100_std_Xlength_error;
 inline uint32_t SFERA_IMPORT_MSVCP100_std_Xout_of_range;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_Pninc;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_setbuf;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_uflow;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_Unlock;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_streambuf_Lock;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_istream_vftable;
-inline uint32_t SFERA_IMPORT_MSVCP100_basic_istream_ctor;
 inline uint32_t SFERA_IMPORT_MSVCP100_basic_istream_dtor;
 inline uint32_t SFERA_IMPORT_MSVCP100_ios_base_Ios_base_dtor;
 inline uint32_t SFERA_IMPORT_MSVCP100_basic_ostream_vftable;
-inline uint32_t g_sfera_security_cookie = UINT32_C(0xBB40E64E);
-inline uint32_t g_sfera_security_cookie_complement = UINT32_C(0x44BF19B1);
 inline uint32_t g_sfera_log_first_write = 1u;
 
 struct SferaItemArray {
@@ -2356,15 +2306,10 @@ inline SferaMbcRuntime* g_sfera_mbc_runtime = &g_sfera_mbc_runtime_storage;
 inline SferaMbcInterpreterStorage g_sfera_mbc_interpreter_storage;
 inline SferaMbcModuleMemoryStats g_sfera_mbc_module_memory_stats[4000];
 inline char g_sfera_array_error_buffer[256];
-inline SferaMsvcString32 g_sfera_shared_parser_whitespace;
-inline SferaMsvcString32 g_sfera_shared_parser_path_separators;
-inline SferaMsvcString32 g_sfera_server_parser_whitespace;
-inline SferaMsvcString32 g_sfera_server_parser_path_separators;
-inline SferaMsvcString32 g_sfera_menu_parser_whitespace;
-inline SferaMsvcString32 g_sfera_menu_parser_path_separators;
-inline SferaMsvcString32 g_sfera_menu_list_missing_parameter_message;
-inline SferaMsvcString32 g_sfera_menu_not_enough_arguments_message;
-inline SferaMsvcString32 g_sfera_menu_sprite_not_found_message;
+inline constexpr char g_sfera_server_parser_whitespace[] = "\t\n\r ";
+inline constexpr char g_sfera_menu_list_missing_parameter_message[] = "%s(): MenuList control must have '%s' parameter in file '%s', lines: [%d, %d]";
+inline constexpr char g_sfera_menu_not_enough_arguments_message[] = "%s(): Not enough args in '%s' in file '%s', lines: [%d, %d]";
+inline constexpr char g_sfera_menu_sprite_not_found_message[] = "%s(): failed to find sprite '%s'";
 
 inline uint32_t sfera_calendar_days_in_month(uint32_t month) {
     if (month < 1u || month > 12u) {

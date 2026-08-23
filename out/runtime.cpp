@@ -1085,10 +1085,7 @@ void ProcessMemory::resolve_imports() {
     bind(SFERA_IMPORT_MSVCR100_chmod, mod_MSVCR100_dll, "_chmod", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_sscanf, mod_MSVCR100_dll, "sscanf", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_exception_ctor, mod_MSVCR100_dll, "??0exception@std@@QAE@ABQBD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_exception_what, mod_MSVCR100_dll, "?what@exception@std@@UBEPBDXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_exception_dtor, mod_MSVCR100_dll, "??1exception@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_memmove, mod_MSVCR100_dll, "memmove", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCR100_exception_ctor_325, mod_MSVCR100_dll, "??0exception@std@@QAE@ABV01@@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_ldiv, mod_MSVCR100_dll, "ldiv", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_vfprintf, mod_MSVCR100_dll, "vfprintf", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_fprintf, mod_MSVCR100_dll, "fprintf", 0u, false, ImportBehavior::generic);
@@ -1121,37 +1118,20 @@ void ProcessMemory::resolve_imports() {
     bind(SFERA_IMPORT_MSVCR100_srand, mod_MSVCR100_dll, "srand", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCR100_fgets, mod_MSVCR100_dll, "fgets", 0u, false, ImportBehavior::generic);
     HMODULE mod_MSVCP100_dll = module("MSVCP100.dll");
-    bind(SFERA_IMPORT_MSVCP100_6_basic_ostream_DU_char_traits_D_std_std_QAEAAV01_I_Z, mod_MSVCP100_dll, "??6?$basic_ostream@DU?$char_traits@D@std@@@std@@QAEAAV01@I@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_sgetc, mod_MSVCP100_dll, "?sgetc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QAEHXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_std_BADOFF, mod_MSVCP100_dll, "?_BADOFF@std@@3_JB", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_imbue, mod_MSVCP100_dll, "?imbue@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAEXABVlocale@2@@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_sync, mod_MSVCP100_dll, "?sync@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAEHXZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_ostream_dtor, mod_MSVCP100_dll, "??1?$basic_ostream@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_ios_dtor, mod_MSVCP100_dll, "??1?$basic_ios@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_ostream_ctor, mod_MSVCP100_dll, "??0?$basic_ostream@DU?$char_traits@D@std@@@std@@QAE@PAV?$basic_streambuf@DU?$char_traits@D@std@@@1@_N@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_ios_vftable, mod_MSVCP100_dll, "??_7?$basic_ios@DU?$char_traits@D@std@@@std@@6B@", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_ios_base_vftable, mod_MSVCP100_dll, "??_7ios_base@std@@6B@", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_sbumpc, mod_MSVCP100_dll, "?sbumpc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QAEHXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_snextc, mod_MSVCP100_dll, "?snextc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QAEHXZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_codecvt_unshift, mod_MSVCP100_dll, "?unshift@?$codecvt@DDH@std@@QBEHAAHPAD1AAPAD@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_codecvt_in, mod_MSVCP100_dll, "?in@?$codecvt@DDH@std@@QBEHAAHPBD1AAPBDPAD3AAPAD@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_streambuf_setg, mod_MSVCP100_dll, "?setg@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IAEXPAD00@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_codecvt_out, mod_MSVCP100_dll, "?out@?$codecvt@DDH@std@@QBEHAAHPBD1AAPBDPAD3AAPAD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_ios_clear, mod_MSVCP100_dll, "?clear@?$basic_ios@DU?$char_traits@D@std@@@std@@QAEXH_N@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_sputc, mod_MSVCP100_dll, "?sputc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QAEHD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_sputn, mod_MSVCP100_dll, "?sputn@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QAE_JPBD_J@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_ios_setstate, mod_MSVCP100_dll, "?setstate@?$basic_ios@DU?$char_traits@D@std@@@std@@QAEXH_N@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_std_uncaught_exception, mod_MSVCP100_dll, "?uncaught_exception@std@@YA_NXZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_ostream_Osfx, mod_MSVCP100_dll, "?_Osfx@?$basic_ostream@DU?$char_traits@D@std@@@std@@QAEXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_ostream_flush, mod_MSVCP100_dll, "?flush@?$basic_ostream@DU?$char_traits@D@std@@@std@@QAEAAV12@XZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_std_Fiopen, mod_MSVCP100_dll, "?_Fiopen@std@@YAPAU_iobuf@@PBDHH@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_streambuf_getloc, mod_MSVCP100_dll, "?getloc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@QBE?AVlocale@2@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_xsputn, mod_MSVCP100_dll, "?xsputn@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAE_JPBD_J@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_xsgetn, mod_MSVCP100_dll, "?xsgetn@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAE_JPAD_J@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_showmanyc, mod_MSVCP100_dll, "?showmanyc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAE_JXZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_streambuf_ctor, mod_MSVCP100_dll, "??0?$basic_streambuf@DU?$char_traits@D@std@@@std@@IAE@XZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_streambuf_dtor, mod_MSVCP100_dll, "??1?$basic_streambuf@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_istream_Ipfx, mod_MSVCP100_dll, "?_Ipfx@?$basic_istream@DU?$char_traits@D@std@@@std@@QAE_N_N@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_Lockit_ctor, mod_MSVCP100_dll, "??0_Lockit@std@@QAE@H@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_codecvt_id, mod_MSVCP100_dll, "?id@?$codecvt@DDH@std@@2V0locale@2@A", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_Lockit_dtor, mod_MSVCP100_dll, "??1_Lockit@std@@QAE@XZ", 0u, false, ImportBehavior::generic);
@@ -1165,21 +1145,13 @@ void ProcessMemory::resolve_imports() {
     bind(SFERA_IMPORT_MSVCP100_Container_base12_dtor, mod_MSVCP100_dll, "??1_Container_base12@std@@QAE@XZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_std_Xlength_error, mod_MSVCP100_dll, "?_Xlength_error@std@@YAXPBD@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_std_Xout_of_range, mod_MSVCP100_dll, "?_Xout_of_range@std@@YAXPBD@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_Pninc, mod_MSVCP100_dll, "?_Pninc@?$basic_streambuf@DU?$char_traits@D@std@@@std@@IAEPADXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_setbuf, mod_MSVCP100_dll, "?setbuf@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAEPAV12@PAD_J@Z", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_uflow, mod_MSVCP100_dll, "?uflow@?$basic_streambuf@DU?$char_traits@D@std@@@std@@MAEHXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_Unlock, mod_MSVCP100_dll, "?_Unlock@?$basic_streambuf@DU?$char_traits@D@std@@@std@@UAEXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_streambuf_Lock, mod_MSVCP100_dll, "?_Lock@?$basic_streambuf@DU?$char_traits@D@std@@@std@@UAEXXZ", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_istream_vftable, mod_MSVCP100_dll, "??_7?$basic_istream@DU?$char_traits@D@std@@@std@@6B@", 0u, false, ImportBehavior::generic);
-    bind(SFERA_IMPORT_MSVCP100_basic_istream_ctor, mod_MSVCP100_dll, "??0?$basic_istream@DU?$char_traits@D@std@@@std@@QAE@PAV?$basic_streambuf@DU?$char_traits@D@std@@@1@_N@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_istream_dtor, mod_MSVCP100_dll, "??1?$basic_istream@DU?$char_traits@D@std@@@std@@UAE@XZ", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_ios_base_Ios_base_dtor, mod_MSVCP100_dll, "?_Ios_base_dtor@ios_base@std@@CAXPAV12@@Z", 0u, false, ImportBehavior::generic);
     bind(SFERA_IMPORT_MSVCP100_basic_ostream_vftable, mod_MSVCP100_dll, "??_7?$basic_ostream@DU?$char_traits@D@std@@@std@@6B@", 0u, false, ImportBehavior::generic);
-    if (resolved_imports_.size() != 409u) { throw std::runtime_error("Resolved import count mismatch"); }
+    if (resolved_imports_.size() != 382u) { throw std::runtime_error("Resolved import count mismatch"); }
 }
 
 void ProcessMemory::resolve_static_references() {
-    if (!sfera_bind_legacy_cpp_vtables()) { throw std::runtime_error("Failed to bind legacy external C++ vtables"); }
     enum class ComAbiInterface : std::uint32_t { storage, inplace_frame, client_site, inplace_site, doc_host_ui_handler };
     auto com_method_function = [](ComAbiInterface interface_id, std::uint32_t slot) noexcept -> LiftFunction {
         switch (interface_id) {
