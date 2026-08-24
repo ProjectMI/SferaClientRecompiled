@@ -1,21 +1,12 @@
 #pragma once
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef DIRECTINPUT_VERSION
-#define DIRECTINPUT_VERSION 0x0800
-#endif
-
 #include <winsock2.h>
 #include <windows.h>
 #include <tlhelp32.h>
 #include <commctrl.h>
 #include <dinput.h>
 #include <d3d9.h>
+#include <mmsystem.h>
 #include <dbghelp.h>
 #include <shellapi.h>
 #include <ole2.h>
@@ -23,7 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <ctime>
+#include <time.h>
 #include <cctype>
 #include <cerrno>
 #include <cwchar>
@@ -44,7 +35,6 @@
 
 struct _DS3DBUFFER;
 using DS3DBUFFER = _DS3DBUFFER;
-extern "C" __declspec(dllimport) DWORD WINAPI timeGetTime(void);
 
 #ifdef Process32First
 #undef Process32First
@@ -65,14 +55,16 @@ struct D3DXVECTOR3;
 struct D3DXQUATERNION;
 struct D3DXCONSTANTTABLE;
 struct D3DXIMAGE_INFO;
-extern "C" HRESULT WINAPI D3DXCreateTexture(IDirect3DDevice9*, UINT, UINT, UINT, DWORD, D3DFORMAT, D3DPOOL, IDirect3DTexture9**);
-extern "C" HRESULT WINAPI D3DXGetShaderConstantTable(const DWORD*, D3DXCONSTANTTABLE**);
-extern "C" D3DXMATRIX* WINAPI D3DXMatrixLookAtRH(D3DXMATRIX*, const D3DXVECTOR3*, const D3DXVECTOR3*, const D3DXVECTOR3*);
-extern "C" D3DXMATRIX* WINAPI D3DXMatrixRotationQuaternion(D3DXMATRIX*, const D3DXQUATERNION*);
-extern "C" HRESULT WINAPI D3DXCreateCubeTextureFromFileInMemory(IDirect3DDevice9*, const void*, UINT, IDirect3DCubeTexture9**);
-extern "C" D3DXMATRIX* WINAPI D3DXMatrixPerspectiveFovRH(D3DXMATRIX*, FLOAT, FLOAT, FLOAT, FLOAT);
-extern "C" HRESULT WINAPI D3DXCreateTextureFromFileInMemoryEx(IDirect3DDevice9*, const void*, UINT, UINT, UINT, UINT, DWORD, D3DFORMAT, D3DPOOL, DWORD, DWORD, D3DCOLOR, D3DXIMAGE_INFO*, PALETTEENTRY*, IDirect3DTexture9**);
-extern "C" D3DXMATRIX* WINAPI D3DXMatrixMultiply(D3DXMATRIX*, const D3DXMATRIX*, const D3DXMATRIX*);
+extern "C" {
+HRESULT WINAPI D3DXCreateTexture(IDirect3DDevice9*, UINT, UINT, UINT, DWORD, D3DFORMAT, D3DPOOL, IDirect3DTexture9**);
+HRESULT WINAPI D3DXGetShaderConstantTable(const DWORD*, D3DXCONSTANTTABLE**);
+D3DXMATRIX* WINAPI D3DXMatrixLookAtRH(D3DXMATRIX*, const D3DXVECTOR3*, const D3DXVECTOR3*, const D3DXVECTOR3*);
+D3DXMATRIX* WINAPI D3DXMatrixRotationQuaternion(D3DXMATRIX*, const D3DXQUATERNION*);
+HRESULT WINAPI D3DXCreateCubeTextureFromFileInMemory(IDirect3DDevice9*, const void*, UINT, IDirect3DCubeTexture9**);
+D3DXMATRIX* WINAPI D3DXMatrixPerspectiveFovRH(D3DXMATRIX*, FLOAT, FLOAT, FLOAT, FLOAT);
+HRESULT WINAPI D3DXCreateTextureFromFileInMemoryEx(IDirect3DDevice9*, const void*, UINT, UINT, UINT, UINT, DWORD, D3DFORMAT, D3DPOOL, DWORD, DWORD, D3DCOLOR, D3DXIMAGE_INFO*, PALETTEENTRY*, IDirect3DTexture9**);
+D3DXMATRIX* WINAPI D3DXMatrixMultiply(D3DXMATRIX*, const D3DXMATRIX*, const D3DXMATRIX*);
+}
 
 class CSoundListener { public: void GetOrientation(D3DVECTOR*, D3DVECTOR*) const; int SetPosition(float, float, float, int); int SetVelocity(float, float, float, int); int SetOrientation(const D3DVECTOR&, const D3DVECTOR&, int); };
 class CSoundInterface { public: int UpdateSettings(); };

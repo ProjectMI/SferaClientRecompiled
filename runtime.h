@@ -1,14 +1,7 @@
 #pragma once
 
 #include "lifted_abi.h"
-#include "semantic_static.h"
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <windows.h>
 
 #include <cstddef>
@@ -99,12 +92,6 @@ public:
 private:
     ProcessMemory memory_;
 };
-
-extern NativeRuntime* g_runtime;
-extern ProcessMemory* g_process_memory;
-extern "C" void __cdecl native_call_bridge(NativeCallFrame* frame);
-extern "C" void __cdecl dispatch_native_callback(CallbackRegisters* registers);
-extern "C" void callback_bridge();
 
 std::string win32_error(const char* operation, DWORD error = GetLastError());
 std::string hex_u32(std::uint32_t value);

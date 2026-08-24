@@ -1,6 +1,5 @@
 #pragma once
 
-#include "lifted_abi.h"
 #include "semantic_classes.h"
 #include <bit>
 #include <cstddef>

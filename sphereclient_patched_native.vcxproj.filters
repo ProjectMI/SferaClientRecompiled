@@ -1,88 +1,82 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="lifted_dispatch.c">
+    <ClCompile Include="lifted_functions_000.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_flag_ops.c">
+    <ClCompile Include="lifted_functions_001.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_000.c">
+    <ClCompile Include="lifted_functions_002.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_001.c">
+    <ClCompile Include="lifted_functions_003.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_002.c">
+    <ClCompile Include="lifted_functions_004.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_003.c">
+    <ClCompile Include="lifted_functions_005.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_004.c">
+    <ClCompile Include="lifted_functions_006.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_005.c">
+    <ClCompile Include="lifted_functions_007.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_006.c">
+    <ClCompile Include="lifted_functions_008.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_007.c">
+    <ClCompile Include="lifted_functions_009.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_008.c">
+    <ClCompile Include="lifted_functions_010.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_009.c">
+    <ClCompile Include="lifted_functions_011.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_010.c">
+    <ClCompile Include="lifted_functions_012.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_011.c">
+    <ClCompile Include="lifted_functions_013.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_012.c">
+    <ClCompile Include="lifted_functions_014.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_013.c">
+    <ClCompile Include="lifted_functions_015.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_014.c">
+    <ClCompile Include="lifted_functions_016.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_015.c">
+    <ClCompile Include="lifted_functions_017.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_016.c">
+    <ClCompile Include="lifted_functions_018.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_017.c">
+    <ClCompile Include="lifted_functions_019.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_018.c">
+    <ClCompile Include="lifted_functions_020.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_019.c">
+    <ClCompile Include="lifted_functions_021.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_020.c">
+    <ClCompile Include="lifted_functions_022.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_021.c">
+    <ClCompile Include="lifted_functions_023.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_022.c">
+    <ClCompile Include="lifted_functions_024.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_023.c">
-      <Filter>lifted</Filter>
-    </ClCompile>
-    <ClCompile Include="lifted_functions_024.c">
-      <Filter>lifted</Filter>
-    </ClCompile>
-    <ClCompile Include="lifted_functions_025.c">
+    <ClCompile Include="lifted_functions_025.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
     <ClCompile Include="semantic_classes.cpp">
@@ -105,13 +99,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="lifted_fast_ops.h">
-      <Filter>lifted</Filter>
-    </ClInclude>
     <ClInclude Include="lifted_functions.h">
-      <Filter>lifted</Filter>
-    </ClInclude>
-    <ClInclude Include="lifted_normalized_ops.h">
       <Filter>lifted</Filter>
     </ClInclude>
     <ClInclude Include="semantic_classes.h">
@@ -129,11 +117,11 @@
     <ClInclude Include="diagnostics.h">
       <Filter>core</Filter>
     </ClInclude>
-    <ClInclude Include="lifted_abi.h">
-      <Filter>core</Filter>
-    </ClInclude>
     <ClInclude Include="import_bridge.h">
       <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="lifted_abi.h">
+      <Filter>lifted</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

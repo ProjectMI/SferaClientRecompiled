@@ -13,7 +13,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{A39E9674-6287-43D1-893D-8D27E20E8064}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>sphereclient_patched_native_c</RootNamespace>
+    <RootNamespace>sphereclient_patched_native</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -55,10 +55,9 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;UNICODE;_UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;DIRECTINPUT_VERSION=0x0800;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <LanguageStandard_C>stdc17</LanguageStandard_C>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -114,197 +113,157 @@ if errorlevel 1 exit /b 1</Command>
     <ClCompile Include="semantic_classes.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="runtime.cpp" />
-    <ClCompile Include="lifted_functions_000.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_000.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_001.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_001.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_002.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_002.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_003.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_003.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_004.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_004.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_005.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_005.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_006.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_006.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_007.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_007.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_008.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_008.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_009.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_009.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_010.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_010.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_011.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_011.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_012.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_012.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_013.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_013.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_014.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_014.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_015.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_015.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_016.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_016.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_017.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_017.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_018.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_018.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_019.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_019.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_020.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_020.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_021.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_021.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_022.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_022.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_023.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_023.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_024.c">
-      <CompileAs>CompileAsCpp</CompileAs>
+    <ClCompile Include="lifted_functions_024.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_025.c">
-      <CompileAs>CompileAsCpp</CompileAs>
-      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <SDLCheck>false</SDLCheck>
-      <FunctionLevelLinking>false</FunctionLevelLinking>
-      <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
-    </ClCompile>
-    <ClCompile Include="lifted_flag_ops.c">
-      <CompileAs>CompileAsC</CompileAs>
-      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <SDLCheck>false</SDLCheck>
-      <FunctionLevelLinking>false</FunctionLevelLinking>
-      <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
-    </ClCompile>
-    <ClCompile Include="lifted_dispatch.c">
-      <CompileAs>CompileAsC</CompileAs>
+    <ClCompile Include="lifted_functions_025.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
@@ -316,11 +275,9 @@ if errorlevel 1 exit /b 1</Command>
     <ClInclude Include="semantic_static.h" />
     <ClInclude Include="semantic_zlib.h" />
     <ClInclude Include="semantic_classes.h" />
-    <ClInclude Include="lifted_fast_ops.h" />
     <ClInclude Include="runtime.h" />
     <ClInclude Include="lifted_abi.h" />
     <ClInclude Include="lifted_functions.h" />
-    <ClInclude Include="lifted_normalized_ops.h" />
     <ClInclude Include="import_bridge.h" />
   </ItemGroup>
   <ItemGroup>

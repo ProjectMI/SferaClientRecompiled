@@ -286,7 +286,7 @@ void diagnostic_failure(const LiftCpu& state, const char* message) noexcept {
     report[0] = '\0';
     append_text(report, sizeof(report), used, "Sfera native-C execution failure\r\n");
     append_text(report, sizeof(report), used, "pid=%lu tid=%lu phase=%s\r\n", GetCurrentProcessId(), GetCurrentThreadId(), phase_name(g_phase));
-    append_text(report, sizeof(report), used, "%s\r\n", message ? message : "native C execution failure");
+    append_text(report, sizeof(report), used, "%s\r\n", message ? message : "native execution failure");
     append_execution_context(report, sizeof(report), used, &state);
     write_bytes(L"sfera_native_failure.txt", report, used, CREATE_ALWAYS);
     OutputDebugStringA(report);

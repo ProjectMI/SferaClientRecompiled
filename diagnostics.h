@@ -1,9 +1,9 @@
 #pragma once
 
-#include "lifted_abi.h"
-
 #include <cstddef>
 #include <cstdint>
+
+struct LiftCpu;
 
 namespace lifted {
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "lifted_abi.h"
+struct LiftCpu;
 
 class BloodEffListener {
 public:
