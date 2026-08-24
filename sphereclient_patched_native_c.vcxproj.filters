@@ -135,9 +135,6 @@
     <ClInclude Include="import_bridge.h">
       <Filter>core</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>core</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="imports\d3dx9_26.def">

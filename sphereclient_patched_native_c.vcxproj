@@ -313,7 +313,6 @@ if errorlevel 1 exit /b 1</Command>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="diagnostics.h" />
-    <ClInclude Include="resource.h" />
     <ClInclude Include="semantic_static.h" />
     <ClInclude Include="semantic_zlib.h" />
     <ClInclude Include="semantic_classes.h" />
