@@ -4477,15 +4477,6 @@ static LiftFunction resolve_lifted_function(uint32_t target) {
 
 static int target_is_local(uint32_t target) { return lift_callback_function(target) != (LiftFunction)0 || lift_code_rva(target) != UINT32_MAX; }
 
-static int target_is_recovered_function(uint32_t target) { LiftFunction callback = lift_callback_function(target); uint32_t rva; if (callback) { return 1; } rva = lift_code_rva(target); return rva != UINT32_MAX && lift_has_function_rva(rva); }
-
-static void dispatch_return_target(LiftCpu* cpu, uint32_t target, uint32_t stop_address, uint32_t origin, uint32_t esp_before, uint32_t stack_cleanup, const char* kind) {
-    cpu->eip = target;
-    if (target == stop_address) { return; }
-    if (!resolve_lifted_function(target)) { lift_trap_transfer(cpu, origin, target, esp_before, stack_cleanup, stop_address, kind); }
-    lift_dispatch(cpu, target, stop_address);
-}
-
 void LIFT_CDECL lift_dispatch(LiftCpu* cpu, uint32_t target, uint32_t stop_address) {
     LiftFunction function = resolve_lifted_function(target);
     if (!function) {
@@ -4515,28 +4506,19 @@ int LIFT_CDECL lift_call_indirect(LiftCpu* cpu, uint32_t target, uint32_t return
 void LIFT_CDECL lift_tail_indirect(LiftCpu* cpu, uint32_t target, uint32_t stop_address, uint32_t callsite) {
     LiftFunction function = resolve_lifted_function(target);
     if (function) { function(cpu, stop_address); return; }
-    if (target_is_local(target)) {
-        lift_trap_transfer(cpu, callsite, target, cpu ? cpu->esp : 0u, 0u, stop_address, "indirect-jump-middle");
-    }
-    uint32_t origin = cpu->eip;
-    uint32_t esp_before = cpu->esp;
-    uint32_t return_address = lift_pop32(cpu);
+    if (target_is_local(target)) { lift_trap_transfer(cpu, callsite, target, cpu ? cpu->esp : 0u, 0u, stop_address, "indirect-jump-middle"); }
+    cpu->esp += 4u;
     lift_native_call(cpu, target, callsite);
-    dispatch_return_target(cpu, return_address, stop_address, origin, esp_before, 0u, "native-tail-return");
+    cpu->eip = stop_address;
 }
 
 void LIFT_CDECL lift_return(LiftCpu* cpu, uint32_t stack_cleanup, uint32_t stop_address) {
-    uint32_t origin = cpu->eip;
-    uint32_t esp_before = cpu->esp;
-    uint32_t target = lift_pop32(cpu);
-    cpu->esp += stack_cleanup;
-    dispatch_return_target(cpu, target, stop_address, origin, esp_before, stack_cleanup, "ret");
+    cpu->esp += 4u + stack_cleanup;
+    cpu->eip = stop_address;
 }
 
 void LIFT_CDECL lift_native_call_return(LiftCpu* cpu, uint32_t target, uint32_t callsite, uint32_t stop_address) {
-    uint32_t origin = cpu->eip;
-    uint32_t esp_before = cpu->esp;
-    uint32_t return_address = lift_pop32(cpu);
+    cpu->esp += 4u;
     lift_native_call(cpu, target, callsite);
-    dispatch_return_target(cpu, return_address, stop_address, origin, esp_before, 0u, "native-tail-return");
+    cpu->eip = stop_address;
 }

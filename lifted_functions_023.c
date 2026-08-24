@@ -7,13 +7,11 @@
 static uint32_t sfera_zlib_low_mask(uint32_t bit_count) { if (bit_count == 0u) { return 0u; } return bit_count >= 32u ? UINT32_MAX : (UINT32_C(1) << bit_count) - 1u; }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0259(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0259u);
     cpu->eax = sfera_zlib_deflate_slow(lift_load32(cpu->esp + 4u), (int32_t)lift_load32(cpu->esp + 8u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0950(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0950u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     if ((uint32_t)(lift_load32(cpu->ebp + 0x10u)) == (uint32_t)(0u)) goto label_000E0964;
@@ -21,12 +19,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0950(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0x3Cu);
     lift_store32(cpu->eax, cpu->edx);
-    label_000E0964: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0964u);
+    label_000E0964:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     if ((uint32_t)(lift_load32(cpu->eax)) == (uint32_t)(4u)) goto label_000E0974;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     if ((uint32_t)(lift_load32(cpu->ecx)) != (uint32_t)(5u)) goto label_000E098B;
-    label_000E0974: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0974u);
+    label_000E0974:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0xCu);
     lift_push32(cpu, cpu->eax);
@@ -35,9 +33,8 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0950(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->eax + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE0988u), LIFT_CODE_TOKEN_RVA(0xE0985u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0988u);
     cpu->esp += 8u;
-    label_000E098B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E098Bu);
+    label_000E098B:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     if ((uint32_t)(lift_load32(cpu->ecx)) != (uint32_t)(6u)) goto label_000E09A6;
     cpu->edx = lift_load32(cpu->ebp + 0xCu);
@@ -45,9 +42,9 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0950(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 4u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E09A3u); lift_push32(cpu, r); sfera_sub_004E63BD(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E09A3u)); sfera_sub_004E63BD(cpu, LIFT_CODE_TOKEN_VA(0x4E09A3u));
     cpu->esp += 8u;
-    label_000E09A6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E09A6u);
+    label_000E09A6:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->edx, 0u);
     cpu->eax = lift_load32(cpu->ebp + 8u);
@@ -67,7 +64,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0950(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, 0u); lift_push32(cpu, 0u); lift_push32(cpu, 0u);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->eax + 0x38u)), LIFT_CODE_TOKEN_RVA(0xE09F0u), LIFT_CODE_TOKEN_RVA(0xE09EDu))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E09F0u);
     cpu->esp += 0xCu;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->ecx + 0x3Cu, cpu->eax);
@@ -75,12 +71,11 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0950(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x3Cu);
     lift_store32(cpu->edx + 0x30u, cpu->ecx);
-    label_000E0A05: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0A05u);
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    label_000E0A05:
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0A07(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0A07u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, 0x40u); lift_push32(cpu, 1u);
@@ -89,20 +84,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0A07(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->edx + 0x20u)), LIFT_CODE_TOKEN_RVA(0xE0A1Cu), LIFT_CODE_TOKEN_RVA(0xE0A19u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0A1Cu);
     cpu->esp += 0xCu;
     lift_store32(cpu->ebp + 0xFFFFFFFCu, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) != (uint32_t)(0u)) goto label_000E0A30;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     goto label_000E0AFB;
-    label_000E0A30: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0A30u);
+    label_000E0A30:
     lift_push32(cpu, 0x5A0u); lift_push32(cpu, 8u);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x28u);
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->edx + 0x20u)), LIFT_CODE_TOKEN_RVA(0xE0A44u), LIFT_CODE_TOKEN_RVA(0xE0A41u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0A44u);
     cpu->esp += 0xCu;
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     lift_store32(cpu->ecx + 0x24u, cpu->eax);
@@ -115,11 +108,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0A07(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->eax + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE0A67u), LIFT_CODE_TOKEN_RVA(0xE0A64u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0A67u);
     cpu->esp += 8u;
     cpu->eax = 0u;
     goto label_000E0AFB;
-    label_000E0A71: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0A71u);
+    label_000E0A71:
     cpu->ecx = lift_load32(cpu->ebp + 0x10u);
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, 1u);
     cpu->edx = lift_load32(cpu->ebp + 8u);
@@ -127,7 +119,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0A07(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->ecx + 0x20u)), LIFT_CODE_TOKEN_RVA(0xE0A84u), LIFT_CODE_TOKEN_RVA(0xE0A81u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0A84u);
     cpu->esp += 0xCu;
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     lift_store32(cpu->edx + 0x28u, cpu->eax);
@@ -141,7 +132,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0A07(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->edx + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE0AAAu), LIFT_CODE_TOKEN_RVA(0xE0AA7u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0AAAu);
     cpu->esp += 8u;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     lift_push32(cpu, cpu->eax);
@@ -150,11 +140,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0A07(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->eax + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE0ABEu), LIFT_CODE_TOKEN_RVA(0xE0ABBu))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0ABEu);
     cpu->esp += 8u;
     cpu->eax = 0u;
     goto label_000E0AFB;
-    label_000E0AC5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0AC5u);
+    label_000E0AC5:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     cpu->edx = lift_load32(cpu->ecx + 0x28u);
     cpu->edx += lift_load32(cpu->ebp + 0x10u);
@@ -170,16 +159,15 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0A07(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E0AF5u); lift_push32(cpu, r); sfera_sub_004E0950(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E0AF5u)); sfera_sub_004E0950(cpu, LIFT_CODE_TOKEN_VA(0x4E0AF5u));
     cpu->esp += 0xCu;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFFCu);
-    label_000E0AFB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0AFBu);
+    label_000E0AFB:
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0AFFu);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->esp -= 0x7Cu;
@@ -207,15 +195,15 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFACu, cpu->ecx);
     goto label_000E0B59;
-    label_000E0B4D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0B4Du);
+    label_000E0B4D:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0x2Cu);
     cpu->eax -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFACu, cpu->eax);
-    label_000E0B59: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0B59u);
+    label_000E0B59:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFACu);
     lift_store32(cpu->ebp + 0xFFFFFFE8u, cpu->ecx);
-    label_000E0B5F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0B5Fu);
+    label_000E0B5F:
     cpu->edx = 1u;
     if ((uint32_t)(cpu->edx) == 0u) goto label_000E1E36;
     cpu->eax = lift_load32(cpu->ebp + 8u);
@@ -241,12 +229,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
         case 13u: goto label_000E0D87;
         default: lift_trap(cpu, 0x4E0B81u, "resolved jump-table index out of range"); return;
     }
-    label_000E0B88: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0B88u);
+    label_000E0B88:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFECu)) >= (uint32_t)(3u)) goto label_000E0C30;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE4u)) == (uint32_t)(0u)) goto label_000E0BA1;
     lift_store32(cpu->ebp + 0x10u, 0u);
     goto label_000E0BFC;
-    label_000E0BA1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0BA1u);
+    label_000E0BA1:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->eax + 0x20u, cpu->ecx);
@@ -276,10 +264,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E0BF4u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E0BF4u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E0BF4u));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E0BFC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0BFCu);
+    label_000E0BFC:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFE4u);
     cpu->eax -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFE4u, cpu->eax);
@@ -298,7 +286,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->edx);
     goto label_000E0B88;
-    label_000E0C30: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0C30u);
+    label_000E0C30:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->eax &= 7u;
     lift_store32(cpu->ebp + 0xFFFFFFF0u, cpu->eax);
@@ -319,7 +307,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
         case 3u: goto label_000E0D87;
         default: lift_trap(cpu, 0x4E0C5Au, "resolved jump-table index out of range"); return;
     }
-    label_000E0C61: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0C61u);
+    label_000E0C61:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->edx = lift_shift_right(cpu, cpu->edx, (uint32_t)(3u), 32u);
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->edx);
@@ -339,7 +327,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->ecx, 1u);
     goto label_000E0E0E;
-    label_000E0C9E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0C9Eu);
+    label_000E0C9E:
     cpu->edx = lift_load32(cpu->ebp + 0xCu);
     lift_push32(cpu, cpu->edx);
     cpu->eax = (uint32_t)(cpu->ebp + 0xFFFFFFD4u);
@@ -350,7 +338,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = (uint32_t)(cpu->ebp + 0xFFFFFFD8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E0CB7u); lift_push32(cpu, r); sfera_sub_004E6EDB(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E0CB7u)); sfera_sub_004E6EDB(cpu, LIFT_CODE_TOKEN_VA(0x4E0CB7u));
     cpu->esp += 0x14u;
     cpu->ecx = lift_load32(cpu->ebp + 0xCu);
     lift_push32(cpu, cpu->ecx);
@@ -362,7 +350,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFD8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E0CD3u); lift_push32(cpu, r); sfera_sub_004E5600(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E0CD3u)); sfera_sub_004E5600(cpu, LIFT_CODE_TOKEN_VA(0x4E0CD3u));
     cpu->esp += 0x14u;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->ecx + 4u, cpu->eax);
@@ -399,10 +387,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E0D3Fu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E0D3Fu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E0D3Fu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E0D47: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0D47u);
+    label_000E0D47:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->eax = lift_shift_right(cpu, cpu->eax, (uint32_t)(3u), 32u);
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->eax);
@@ -412,7 +400,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->edx, 6u);
     goto label_000E0E0E;
-    label_000E0D67: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0D67u);
+    label_000E0D67:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->eax = lift_shift_right(cpu, cpu->eax, (uint32_t)(3u), 32u);
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->eax);
@@ -422,7 +410,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->edx, 3u);
     goto label_000E0E0E;
-    label_000E0D87: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0D87u);
+    label_000E0D87:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->eax = lift_shift_right(cpu, cpu->eax, (uint32_t)(3u), 32u);
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->eax);
@@ -463,18 +451,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E0E06u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E0E06u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E0E06u));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E0E0E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0E0Eu);
+    label_000E0E0E:
     goto label_000E1E31;
-    label_000E0E13: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0E13u);
+    label_000E0E13:
     { uint64_t l=(uint64_t)(lift_load32(cpu->ebp + 0xFFFFFFECu)), r=(uint64_t)(0x20u), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if ((cpu->eflags & LIFT_FLAG_CF) == 0u) goto label_000E0EBB;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE4u)) == (uint32_t)(0u)) goto label_000E0E2C;
     lift_store32(cpu->ebp + 0x10u, 0u);
     goto label_000E0E87;
-    label_000E0E2C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0E2Cu);
+    label_000E0E2C:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->ecx + 0x20u, cpu->edx);
@@ -504,10 +492,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E0E7Fu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E0E7Fu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E0E7Fu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E0E87: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0E87u);
+    label_000E0E87:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFE4u);
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFE4u, cpu->ecx);
@@ -526,7 +514,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->eax);
     goto label_000E0E13;
-    label_000E0EBB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0EBBu);
+    label_000E0EBB:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->ecx = ~((uint64_t)(cpu->ecx));
     cpu->ecx = lift_shift_right(cpu, cpu->ecx, (uint32_t)(0x10u), 32u);
@@ -568,10 +556,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E0F43u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E0F43u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E0F43u));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E0F4B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0F4Bu);
+    label_000E0F4B:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->edx &= 0xFFFFu;
     cpu->eax = lift_load32(cpu->ebp + 8u);
@@ -583,19 +571,19 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     if ((uint32_t)(lift_load32(cpu->edx + 4u)) == (uint32_t)(0u)) goto label_000E0F79;
     lift_store32(cpu->ebp + 0xFFFFFFA0u, 2u);
     goto label_000E0F89;
-    label_000E0F79: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0F79u);
+    label_000E0F79:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x18u);
     { uint64_t x=(uint64_t)(cpu->ecx), v=0u-x; lift_flags_sub(cpu,0u,x,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | (x != 0u ? LIFT_FLAG_CF : 0u); cpu->ecx = v; }
     cpu->ecx = (uint64_t)(cpu->ecx) - (uint64_t)(cpu->ecx) - (uint64_t)(((cpu->eflags & LIFT_FLAG_CF) != 0u ? 1u : 0u));
     cpu->ecx &= 7u;
     lift_store32(cpu->ebp + 0xFFFFFFA0u, cpu->ecx);
-    label_000E0F89: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0F89u);
+    label_000E0F89:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFA0u);
     lift_store32(cpu->edx, cpu->eax);
     goto label_000E1E31;
-    label_000E0F96: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0F96u);
+    label_000E0F96:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE4u)) != (uint32_t)(0u)) goto label_000E0FF7;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -626,10 +614,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E0FEFu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E0FEFu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E0FEFu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E0FF7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E0FF7u);
+    label_000E0FF7:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE8u)) != (uint32_t)(0u)) goto label_000E1163;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
@@ -650,15 +638,15 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFF9Cu, cpu->edx);
     goto label_000E104B;
-    label_000E103F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E103Fu);
+    label_000E103F:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x2Cu);
     cpu->ecx -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFF9Cu, cpu->ecx);
-    label_000E104B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E104Bu);
+    label_000E104B:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFF9Cu);
     lift_store32(cpu->ebp + 0xFFFFFFE8u, cpu->edx);
-    label_000E1051: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1051u);
+    label_000E1051:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE8u)) != (uint32_t)(0u)) goto label_000E1163;
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
@@ -669,7 +657,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1075u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1075u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1075u));
     cpu->esp += 0xCu;
     lift_store32(cpu->ebp + 0x10u, cpu->eax);
     cpu->edx = lift_load32(cpu->ebp + 8u);
@@ -684,12 +672,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFF98u, cpu->ecx);
     goto label_000E10AC;
-    label_000E10A0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E10A0u);
+    label_000E10A0:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0x2Cu);
     cpu->eax -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFF98u, cpu->eax);
-    label_000E10AC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E10ACu);
+    label_000E10AC:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFF98u);
     lift_store32(cpu->ebp + 0xFFFFFFE8u, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
@@ -711,15 +699,15 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFF94u, cpu->eax);
     goto label_000E10FC;
-    label_000E10F0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E10F0u);
+    label_000E10F0:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0x2Cu);
     cpu->edx -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFF94u, cpu->edx);
-    label_000E10FC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E10FCu);
+    label_000E10FC:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFF94u);
     lift_store32(cpu->ebp + 0xFFFFFFE8u, cpu->eax);
-    label_000E1102: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1102u);
+    label_000E1102:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE8u)) != (uint32_t)(0u)) goto label_000E1163;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -750,10 +738,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E115Bu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E115Bu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E115Bu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1163: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1163u);
+    label_000E1163:
     lift_store32(cpu->ebp + 0x10u, 0u);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 4u);
@@ -762,19 +750,19 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     if ((uint32_t)(cpu->eax) <= (uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE4u))) goto label_000E1181;
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFE4u);
     lift_store32(cpu->ebp + 0xFFFFFFF0u, cpu->ecx);
-    label_000E1181: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1181u);
+    label_000E1181:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     if ((uint32_t)(cpu->edx) <= (uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE8u))) goto label_000E118F;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFE8u);
     lift_store32(cpu->ebp + 0xFFFFFFF0u, cpu->eax);
-    label_000E118F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E118Fu);
+    label_000E118F:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_push32(cpu, cpu->eax);
-    lift_native_call(cpu, native_function_address32(&::memcpy), LIFT_CODE_TOKEN_VA(0x4E119Bu)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4E11A0u);
+    lift_native_call(cpu, native_function_address32(&::memcpy), LIFT_CODE_TOKEN_VA(0x4E119Bu));
     cpu->esp += 0xCu;
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     cpu->ecx += lift_load32(cpu->ebp + 0xFFFFFFF0u);
@@ -796,7 +784,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = lift_load32(cpu->ebp + 8u);
     if ((uint32_t)(lift_load32(cpu->edx + 4u)) == (uint32_t)(0u)) goto label_000E11E4;
     goto label_000E1E31;
-    label_000E11E4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E11E4u);
+    label_000E11E4:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x18u);
     { uint64_t x=(uint64_t)(cpu->ecx), v=0u-x; lift_flags_sub(cpu,0u,x,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | (x != 0u ? LIFT_FLAG_CF : 0u); cpu->ecx = v; }
@@ -805,12 +793,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->edx, cpu->ecx);
     goto label_000E1E31;
-    label_000E11FB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E11FBu);
+    label_000E11FB:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFECu)) >= (uint32_t)(0xEu)) goto label_000E12A3;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE4u)) == (uint32_t)(0u)) goto label_000E1214;
     lift_store32(cpu->ebp + 0x10u, 0u);
     goto label_000E126F;
-    label_000E1214: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1214u);
+    label_000E1214:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->eax + 0x20u, cpu->ecx);
@@ -840,10 +828,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1267u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1267u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1267u));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E126F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E126Fu);
+    label_000E126F:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFE4u);
     cpu->eax -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFE4u, cpu->eax);
@@ -862,7 +850,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->edx);
     goto label_000E11FB;
-    label_000E12A3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E12A3u);
+    label_000E12A3:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->eax &= 0x3FFFu;
     lift_store32(cpu->ebp + 0xFFFFFFF0u, cpu->eax);
@@ -877,7 +865,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_shift_right(cpu, cpu->ecx, (uint32_t)(5u), 32u);
     cpu->ecx &= 0x1Fu;
     if ((uint32_t)(cpu->ecx) <= (uint32_t)(0x1Du)) goto label_000E1345;
-    label_000E12D0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E12D0u);
+    label_000E12D0:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->edx, 9u);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
@@ -912,10 +900,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E133Du); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E133Du)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E133Du));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1345: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1345u);
+    label_000E1345:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     { uint64_t l=(uint64_t)(cpu->ecx), r=(uint64_t)(0x1Fu), v=l & r; lift_flags_logic(cpu,v,32u); cpu->ecx = v; }
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
@@ -931,7 +919,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0xCu);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->ecx + 0x20u)), LIFT_CODE_TOKEN_RVA(0xE1371u), LIFT_CODE_TOKEN_RVA(0xE136Eu))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1371u);
     cpu->esp += 0xCu;
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->edx + 0xCu, cpu->eax);
@@ -968,10 +955,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E13DDu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E13DDu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E13DDu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E13E5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E13E5u);
+    label_000E13E5:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->ecx = lift_shift_right(cpu, cpu->ecx, (uint32_t)(0xEu), 32u);
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->ecx);
@@ -982,19 +969,19 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->eax + 8u, 0u);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->ecx, 4u);
-    label_000E140A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E140Au);
+    label_000E140A:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 4u);
     cpu->eax = lift_shift_right(cpu, cpu->eax, (uint32_t)(0xAu), 32u);
     cpu->eax += 4u;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     if ((uint32_t)(lift_load32(cpu->ecx + 8u)) >= (uint32_t)(cpu->eax)) goto label_000E150E;
-    label_000E1422: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1422u);
+    label_000E1422:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFECu)) >= (uint32_t)(3u)) goto label_000E14CC;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE4u)) == (uint32_t)(0u)) goto label_000E143B;
     lift_store32(cpu->ebp + 0x10u, 0u);
     goto label_000E1496;
-    label_000E143B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E143Bu);
+    label_000E143B:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->edx + 0x20u, cpu->eax);
@@ -1024,10 +1011,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E148Eu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E148Eu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E148Eu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1496: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1496u);
+    label_000E1496:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFE4u);
     cpu->edx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFE4u, cpu->edx);
@@ -1047,7 +1034,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->edx);
     goto label_000E1422;
-    label_000E14CC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E14CCu);
+    label_000E14CC:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->eax &= 7u;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
@@ -1068,7 +1055,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     { uint64_t l=(uint64_t)(cpu->ecx), r=(uint64_t)(3u), c=(uint64_t)(0u), v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->ecx);
     goto label_000E140A;
-    label_000E150E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E150Eu);
+    label_000E150E:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     if ((uint32_t)(lift_load32(cpu->edx + 8u)) >= (uint32_t)(0x13u)) goto label_000E1542;
     cpu->eax = lift_load32(cpu->ebp + 8u);
@@ -1083,7 +1070,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->ecx + 8u, cpu->eax);
     goto label_000E150E;
-    label_000E1542: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1542u);
+    label_000E1542:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->edx + 0x10u, 7u);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
@@ -1100,7 +1087,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0xCu);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1571u); lift_push32(cpu, r); sfera_sub_004E63E0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1571u)); sfera_sub_004E63E0(cpu, LIFT_CODE_TOKEN_VA(0x4E1571u));
     cpu->esp += 0x14u;
     lift_store32(cpu->ebp + 0xFFFFFFF0u, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFF0u)) == (uint32_t)(0u)) goto label_000E1608;
@@ -1112,14 +1099,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xCu);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->edx + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE1595u), LIFT_CODE_TOKEN_RVA(0xE1592u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1595u);
     cpu->esp += 8u;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->ebp + 0x10u, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0x10u)) != (uint32_t)(0xFFFFFFFDu)) goto label_000E15AD;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->ecx, 9u);
-    label_000E15AD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E15ADu);
+    label_000E15AD:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->edx + 0x20u, cpu->eax);
@@ -1149,15 +1135,15 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1600u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1600u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1600u));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1608: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1608u);
+    label_000E1608:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->edx + 8u, 0u);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->eax, 5u);
-    label_000E161B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E161Bu);
+    label_000E161B:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 4u);
     lift_store32(cpu->ebp + 0xFFFFFFF0u, cpu->edx);
@@ -1173,13 +1159,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0x10u);
     lift_store32(cpu->ebp + 0xFFFFFFF0u, cpu->edx);
-    label_000E164F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E164Fu);
+    label_000E164F:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFECu);
     if ((uint32_t)(cpu->eax) >= (uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFF0u))) goto label_000E16F9;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE4u)) == (uint32_t)(0u)) goto label_000E166A;
     lift_store32(cpu->ebp + 0x10u, 0u);
     goto label_000E16C5;
-    label_000E166A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E166Au);
+    label_000E166A:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->ecx + 0x20u, cpu->edx);
@@ -1209,10 +1195,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E16BDu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E16BDu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E16BDu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E16C5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E16C5u);
+    label_000E16C5:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFE4u);
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFE4u, cpu->ecx);
@@ -1231,7 +1217,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->eax);
     goto label_000E164F;
-    label_000E16F9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E16F9u);
+    label_000E16F9:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     { uint64_t l=(uint64_t)(cpu->edx), r=(uint64_t)(sfera_zlib_low_mask(cpu->ecx)), v=l & r; lift_flags_logic(cpu,v,32u); cpu->edx = v; }
@@ -1267,15 +1253,15 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->eax + 8u, cpu->edx);
     goto label_000E19A9;
-    label_000E1766: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1766u);
+    label_000E1766:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD0u)) != (uint32_t)(0x12u)) goto label_000E1775;
     lift_store32(cpu->ebp + 0xFFFFFF90u, 7u);
     goto label_000E177E;
-    label_000E1775: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1775u);
+    label_000E1775:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFD0u);
     cpu->ecx -= 0xEu;
     lift_store32(cpu->ebp + 0xFFFFFF90u, cpu->ecx);
-    label_000E177E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E177Eu);
+    label_000E177E:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFF90u);
     lift_store32(cpu->ebp + 0xFFFFFFC8u, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFD0u);
@@ -1285,7 +1271,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)(((uint64_t)((cpu->eax & 0xFFu)) & (uint64_t)(0xF8u))) & 0xFFu);
     cpu->eax += 0xBu;
     lift_store32(cpu->ebp + 0xFFFFFFC4u, cpu->eax);
-    label_000E1796: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1796u);
+    label_000E1796:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->ecx += lift_load32(cpu->ebp + 0xFFFFFFC8u);
     { uint64_t l=(uint64_t)(lift_load32(cpu->ebp + 0xFFFFFFECu)), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
@@ -1293,7 +1279,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE4u)) == (uint32_t)(0u)) goto label_000E17B4;
     lift_store32(cpu->ebp + 0x10u, 0u);
     goto label_000E180F;
-    label_000E17B4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E17B4u);
+    label_000E17B4:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->edx + 0x20u, cpu->eax);
@@ -1323,10 +1309,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1807u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1807u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1807u));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E180F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E180Fu);
+    label_000E180F:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFE4u);
     cpu->edx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFE4u, cpu->edx);
@@ -1346,7 +1332,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->edx);
     goto label_000E1796;
-    label_000E1845: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1845u);
+    label_000E1845:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->eax = lift_shift_right(cpu, cpu->eax, (uint32_t)((cpu->ecx & 0xFFu)), 32u);
@@ -1384,7 +1370,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     if ((uint32_t)(cpu->edx) > (uint32_t)(cpu->eax)) goto label_000E18C8;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD0u)) != (uint32_t)(0x10u)) goto label_000E1954;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFC8u)) >= (uint32_t)(1u)) goto label_000E1954;
-    label_000E18C8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E18C8u);
+    label_000E18C8:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0xCu);
     lift_push32(cpu, cpu->edx);
@@ -1393,7 +1379,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xCu);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->edx + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE18DCu), LIFT_CODE_TOKEN_RVA(0xE18D9u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E18DCu);
     cpu->esp += 8u;
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->eax, 9u);
@@ -1429,10 +1414,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E194Cu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E194Cu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E194Cu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1954: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1954u);
+    label_000E1954:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD0u)) != (uint32_t)(0x10u)) goto label_000E196C;
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0xCu);
@@ -1440,12 +1425,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = lift_load32(cpu->eax + ((uint32_t)(cpu->ecx) * 4u) + 0xFFFFFFFCu);
     lift_store32(cpu->ebp + 0xFFFFFF8Cu, cpu->edx);
     goto label_000E1973;
-    label_000E196C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E196Cu);
+    label_000E196C:
     lift_store32(cpu->ebp + 0xFFFFFF8Cu, 0u);
-    label_000E1973: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1973u);
+    label_000E1973:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFF8Cu);
     lift_store32(cpu->ebp + 0xFFFFFFD0u, cpu->eax);
-    label_000E1979: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1979u);
+    label_000E1979:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0xCu);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFC8u);
@@ -1461,9 +1446,9 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFC8u);
     lift_store32(cpu->ecx + 8u, cpu->edx);
-    label_000E19A9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E19A9u);
+    label_000E19A9:
     goto label_000E161B;
-    label_000E19AE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E19AEu);
+    label_000E19AE:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->eax + 0x14u, 0u);
     lift_store32(cpu->ebp + 0xFFFFFFB4u, 9u);
@@ -1496,7 +1481,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx &= 0x1Fu;
     cpu->ecx += 0x101u;
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1A10u); lift_push32(cpu, r); sfera_sub_004E6D56(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1A10u)); sfera_sub_004E6D56(cpu, LIFT_CODE_TOKEN_VA(0x4E1A10u));
     cpu->esp += 0x24u;
     lift_store32(cpu->ebp + 0xFFFFFFF0u, cpu->eax);
     cpu->edx = lift_load32(cpu->ebp + 8u);
@@ -1507,13 +1492,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->eax + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE1A2Au), LIFT_CODE_TOKEN_RVA(0xE1A27u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1A2Au);
     cpu->esp += 8u;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFF0u)) == (uint32_t)(0u)) goto label_000E1AA3;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFF0u)) != (uint32_t)(0xFFFFFFFDu)) goto label_000E1A42;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->ecx, 9u);
-    label_000E1A42: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1A42u);
+    label_000E1A42:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->ebp + 0x10u, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
@@ -1545,10 +1529,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1A9Bu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1A9Bu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1A9Bu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1AA3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1AA3u);
+    label_000E1AA3:
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFB0u);
@@ -1559,7 +1543,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFB4u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1ABCu); lift_push32(cpu, r); sfera_sub_004E5600(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1ABCu)); sfera_sub_004E5600(cpu, LIFT_CODE_TOKEN_VA(0x4E1ABCu));
     cpu->esp += 0x14u;
     lift_store32(cpu->ebp + 0xFFFFFFBCu, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFBCu)) != (uint32_t)(0u)) goto label_000E1B2A;
@@ -1593,16 +1577,16 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1B22u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1B22u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1B22u));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1B2A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1B2Au);
+    label_000E1B2A:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFBCu);
     lift_store32(cpu->edx + 4u, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->ecx, 6u);
-    label_000E1B3C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1B3Cu);
+    label_000E1B3C:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->edx + 0x20u, cpu->eax);
@@ -1632,7 +1616,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1B8Fu); lift_push32(cpu, r); sfera_sub_004E5655(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1B8Fu)); sfera_sub_004E5655(cpu, LIFT_CODE_TOKEN_VA(0x4E1B8Fu));
     cpu->esp += 0xCu;
     lift_store32(cpu->ebp + 0x10u, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0x10u)) == (uint32_t)(1u)) goto label_000E1BB4;
@@ -1642,17 +1626,17 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1BACu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1BACu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1BACu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1BB4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1BB4u);
+    label_000E1BB4:
     lift_store32(cpu->ebp + 0x10u, 0u);
     cpu->edx = lift_load32(cpu->ebp + 0xCu);
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 4u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1BCBu); lift_push32(cpu, r); sfera_sub_004E63BD(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1BCBu)); sfera_sub_004E63BD(cpu, LIFT_CODE_TOKEN_VA(0x4E1BCBu));
     cpu->esp += 8u;
     cpu->edx = lift_load32(cpu->ebp + 0xCu);
     cpu->eax = lift_load32(cpu->edx);
@@ -1678,12 +1662,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFF88u, cpu->eax);
     goto label_000E1C22;
-    label_000E1C16: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1C16u);
+    label_000E1C16:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0x2Cu);
     cpu->edx -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFF88u, cpu->edx);
-    label_000E1C22: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1C22u);
+    label_000E1C22:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFF88u);
     lift_store32(cpu->ebp + 0xFFFFFFE8u, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
@@ -1691,10 +1675,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->edx, 0u);
     goto label_000E1E31;
-    label_000E1C3F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1C3Fu);
+    label_000E1C3F:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->eax, 7u);
-    label_000E1C48: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1C48u);
+    label_000E1C48:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ecx + 0x34u, cpu->edx);
@@ -1704,7 +1688,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1C62u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1C62u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1C62u));
     cpu->esp += 0xCu;
     lift_store32(cpu->ebp + 0x10u, cpu->eax);
     cpu->eax = lift_load32(cpu->ebp + 8u);
@@ -1719,12 +1703,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFF84u, cpu->edx);
     goto label_000E1C99;
-    label_000E1C8D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1C8Du);
+    label_000E1C8D:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x2Cu);
     cpu->ecx -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFF84u, cpu->ecx);
-    label_000E1C99: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1C99u);
+    label_000E1C99:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFF84u);
     lift_store32(cpu->ebp + 0xFFFFFFE8u, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
@@ -1760,13 +1744,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1D00u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1D00u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1D00u));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1D08: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1D08u);
+    label_000E1D08:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->eax, 8u);
-    label_000E1D11: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1D11u);
+    label_000E1D11:
     lift_store32(cpu->ebp + 0x10u, 1u);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -1797,10 +1781,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1D6Bu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1D6Bu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1D6Bu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1D73: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1D73u);
+    label_000E1D73:
     lift_store32(cpu->ebp + 0x10u, 0xFFFFFFFDu);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -1831,10 +1815,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1DCDu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1DCDu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1DCDu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1DD2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1DD2u);
+    label_000E1DD2:
     lift_store32(cpu->ebp + 0x10u, 0xFFFFFFFEu);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -1865,18 +1849,17 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1E2Cu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1E2Cu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E1E2Cu));
     cpu->esp += 0xCu;
     goto label_000E1E36;
-    label_000E1E31: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1E31u);
+    label_000E1E31:
     goto label_000E0B5F;
-    label_000E1E36: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1E36u);
+    label_000E1E36:
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E1E72(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1E72u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     lift_push32(cpu, 0u);
@@ -1884,7 +1867,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E1E72(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E1E84u); lift_push32(cpu, r); sfera_sub_004E0950(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E1E84u)); sfera_sub_004E0950(cpu, LIFT_CODE_TOKEN_VA(0x4E1E84u));
     cpu->esp += 0xCu;
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0x28u);
@@ -1894,7 +1877,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E1E72(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->eax + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE1E9Bu), LIFT_CODE_TOKEN_RVA(0xE1E98u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1E9Bu);
     cpu->esp += 8u;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0x24u);
@@ -1904,7 +1886,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E1E72(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xCu);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->edx + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE1EB2u), LIFT_CODE_TOKEN_RVA(0xE1EAFu))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1EB2u);
     cpu->esp += 8u;
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
@@ -1913,20 +1894,17 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E1E72(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->eax + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE1EC6u), LIFT_CODE_TOKEN_RVA(0xE1EC3u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1EC6u);
     cpu->esp += 8u;
     cpu->eax = 0u;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E1F20(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E1F20u);
     cpu->eax = sfera_zlib_adler32(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), lift_load32(cpu->esp + 12u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E21BE(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E21BEu);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     if ((uint32_t)(lift_load32(cpu->ebp + 8u)) == (uint32_t)(0u)) goto label_000E21D5;
@@ -1935,150 +1913,128 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E21BE(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 0xCu);
     cpu->ecx += cpu->eax;
     lift_store32(cpu->ebp + 0xCu, cpu->ecx);
-    label_000E21D5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E21D5u);
+    label_000E21D5:
     cpu->edx = lift_load32(cpu->ebp + 0x10u);
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     lift_push32(cpu, cpu->eax);
-    lift_native_call(cpu, native_function_address32(&::calloc), LIFT_CODE_TOKEN_VA(0x4E21DDu)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4E21E2u);
+    lift_native_call(cpu, native_function_address32(&::calloc), LIFT_CODE_TOKEN_VA(0x4E21DDu));
     cpu->esp += 8u;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E21E7(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E21E7u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     lift_push32(cpu, cpu->eax);
-    lift_native_call(cpu, native_function_address32(&::free), LIFT_CODE_TOKEN_VA(0x4E21EEu)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4E21F3u);
+    lift_native_call(cpu, native_function_address32(&::free), LIFT_CODE_TOKEN_VA(0x4E21EEu));
     cpu->esp += 4u;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E2200(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E2200u);
     sfera_zlib_tree_init(lift_load32(cpu->esp + 4u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E2296(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E2296u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E229B(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E229Bu);
     sfera_zlib_init_block(lift_load32(cpu->esp + 4u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E2364(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E2364u);
     sfera_zlib_write_stored_block(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), lift_load32(cpu->esp + 12u), lift_load32(cpu->esp + 16u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E24A3(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E24A3u);
     sfera_zlib_align_static_block(lift_load32(cpu->esp + 4u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E2992(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E2992u);
     sfera_zlib_flush_block(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), lift_load32(cpu->esp + 12u), lift_load32(cpu->esp + 16u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E2D4E(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E2D4Eu);
     sfera_zlib_build_tree(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E30EE(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E30EEu);
     sfera_zlib_pq_down_heap(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), lift_load32(cpu->esp + 12u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E328D(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E328Du);
     sfera_zlib_generate_bit_lengths(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E35C0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E35C0u);
     sfera_zlib_generate_codes(lift_load32(cpu->esp + 4u), (int32_t)lift_load32(cpu->esp + 8u), lift_load32(cpu->esp + 12u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E3685(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E3685u);
     cpu->eax = sfera_zlib_build_bit_length_tree(lift_load32(cpu->esp + 4u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E373C(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E373Cu);
     sfera_zlib_scan_tree(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), (int32_t)lift_load32(cpu->esp + 12u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E38D9(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E38D9u);
     sfera_zlib_send_all_trees(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), lift_load32(cpu->esp + 12u), lift_load32(cpu->esp + 16u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E3DFC(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E3DFCu);
     sfera_zlib_send_tree(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), (int32_t)lift_load32(cpu->esp + 12u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E4A02(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E4A02u);
     sfera_zlib_compress_block(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), lift_load32(cpu->esp + 12u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E524A(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E524Au);
     sfera_zlib_set_data_type(lift_load32(cpu->esp + 4u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E52FC(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E52FCu);
     cpu->eax = sfera_zlib_bit_reverse(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E533D(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E533Du);
     sfera_zlib_bit_flush(lift_load32(cpu->esp + 4u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E5426(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5426u);
     sfera_zlib_bit_windup(lift_load32(cpu->esp + 4u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E54E2(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E54E2u);
     sfera_zlib_copy_stored_block(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), lift_load32(cpu->esp + 12u), lift_load32(cpu->esp + 16u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E5600(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5600u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, 0x1Cu); lift_push32(cpu, 1u);
@@ -2087,7 +2043,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E5600(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0x18u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->edx + 0x20u)), LIFT_CODE_TOKEN_RVA(0xE5615u), LIFT_CODE_TOKEN_RVA(0xE5612u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5615u);
     cpu->esp += 0xCu;
     lift_store32(cpu->ebp + 0xFFFFFFFCu, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) == (uint32_t)(0u)) goto label_000E564E;
@@ -2105,14 +2060,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E5600(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     cpu->edx = lift_load32(cpu->ebp + 0x14u);
     lift_store32(cpu->ecx + 0x18u, cpu->edx);
-    label_000E564E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E564Eu);
+    label_000E564E:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E5655(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5655u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->esp -= 0x58u;
@@ -2143,15 +2097,15 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E5655(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFD0u, cpu->eax);
     goto label_000E56B8;
-    label_000E56AC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E56ACu);
+    label_000E56AC:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0x2Cu);
     cpu->edx -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFD0u, cpu->edx);
-    label_000E56B8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E56B8u);
+    label_000E56B8:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFD0u);
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->eax);
-    label_000E56BE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E56BEu);
+    label_000E56BE:
     cpu->ecx = 1u;
     if ((uint32_t)(cpu->ecx) == 0u) goto label_000E6391;
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
@@ -2216,7 +2170,7 @@ label_000E56E7: ;
     cpu->edx = 0u;
     cpu->edx = (cpu->edx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->ecx + 0x10u)) & 0xFFu);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E576Du); lift_push32(cpu, r); sfera_sub_004E70F0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E576Du)); sfera_sub_004E70F0(cpu, LIFT_CODE_TOKEN_VA(0x4E576Du));
     cpu->esp += 0x18u;
     lift_store32(cpu->ebp + 0x10u, cpu->eax);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
@@ -2243,12 +2197,12 @@ label_000E56E7: ;
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFC8u, cpu->ecx);
     goto label_000E57C7;
-    label_000E57BB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E57BBu);
+    label_000E57BB:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0x2Cu);
     cpu->eax -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFC8u, cpu->eax);
-    label_000E57C7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E57C7u);
+    label_000E57C7:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFC8u);
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->ecx);
     if ((uint32_t)(lift_load32(cpu->ebp + 0x10u)) == (uint32_t)(0u)) goto label_000E57ED;
@@ -2261,7 +2215,7 @@ label_000E56E7: ;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->eax, cpu->edx);
     goto label_000E638C;
-    label_000E57ED: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E57EDu);
+    label_000E57ED:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->edx = 0u;
     cpu->edx = (cpu->edx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->ecx + 0x10u)) & 0xFFu);
@@ -2273,17 +2227,17 @@ label_000E56E7: ;
     lift_store32(cpu->ecx + 8u, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->ecx, 1u);
-    label_000E5810: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5810u);
+    label_000E5810:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->eax = lift_load32(cpu->edx + 0xCu);
     lift_store32(cpu->ebp + 0xFFFFFFE0u, cpu->eax);
-    label_000E5819: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5819u);
+    label_000E5819:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFDCu);
     if ((uint32_t)(cpu->ecx) >= (uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE0u))) goto label_000E58C5;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD4u)) == (uint32_t)(0u)) goto label_000E5834;
     lift_store32(cpu->ebp + 0x10u, 0u);
     goto label_000E588F;
-    label_000E5834: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5834u);
+    label_000E5834:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->edx + 0x20u, cpu->eax);
@@ -2313,10 +2267,10 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E5887u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E5887u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E5887u));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E588F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E588Fu);
+    label_000E588F:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFD4u);
     cpu->edx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFD4u, cpu->edx);
@@ -2336,7 +2290,7 @@ label_000E56E7: ;
     cpu->edx += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFDCu, cpu->edx);
     goto label_000E5819;
-    label_000E58C5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E58C5u);
+    label_000E58C5:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFE0u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     { uint64_t l=(uint64_t)(cpu->ecx), r=(uint64_t)(sfera_zlib_low_mask(cpu->eax)), v=l & r; lift_flags_logic(cpu,v,32u); cpu->ecx = v; }
@@ -2369,7 +2323,7 @@ label_000E56E7: ;
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->edx, 6u);
     goto label_000E638C;
-    label_000E592A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E592Au);
+    label_000E592A:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFE8u);
     cpu->eax &= 0x10u;
     if ((uint32_t)(cpu->eax) == 0u) goto label_000E595A;
@@ -2384,7 +2338,7 @@ label_000E56E7: ;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->eax, 2u);
     goto label_000E638C;
-    label_000E595A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E595Au);
+    label_000E595A:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFE8u);
     cpu->ecx &= 0x40u;
     if ((uint32_t)(cpu->ecx) != 0u) goto label_000E5984;
@@ -2398,14 +2352,14 @@ label_000E56E7: ;
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->edx + 8u, cpu->ecx);
     goto label_000E638C;
-    label_000E5984: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5984u);
+    label_000E5984:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFE8u);
     cpu->eax &= 0x20u;
     if ((uint32_t)(cpu->eax) == 0u) goto label_000E599C;
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->ecx, 7u);
     goto label_000E638C;
-    label_000E599C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E599Cu);
+    label_000E599C:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->edx, 9u);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
@@ -2440,20 +2394,20 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E5A09u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E5A09u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E5A09u));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E5A11: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5A11u);
+    label_000E5A11:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->edx = lift_load32(cpu->ecx + 8u);
     lift_store32(cpu->ebp + 0xFFFFFFE0u, cpu->edx);
-    label_000E5A1A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5A1Au);
+    label_000E5A1A:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFDCu);
     if ((uint32_t)(cpu->eax) >= (uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE0u))) goto label_000E5AC4;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD4u)) == (uint32_t)(0u)) goto label_000E5A35;
     lift_store32(cpu->ebp + 0x10u, 0u);
     goto label_000E5A90;
-    label_000E5A35: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5A35u);
+    label_000E5A35:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->ecx + 0x20u, cpu->edx);
@@ -2483,10 +2437,10 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E5A88u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E5A88u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E5A88u));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E5A90: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5A90u);
+    label_000E5A90:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFD4u);
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFD4u, cpu->ecx);
@@ -2505,7 +2459,7 @@ label_000E56E7: ;
     cpu->eax += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFDCu, cpu->eax);
     goto label_000E5A1A;
-    label_000E5AC4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5AC4u);
+    label_000E5AC4:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFE0u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     { uint64_t l=(uint64_t)(cpu->edx), r=(uint64_t)(sfera_zlib_low_mask(cpu->ecx)), v=l & r; lift_flags_logic(cpu,v,32u); cpu->edx = v; }
@@ -2532,17 +2486,17 @@ label_000E56E7: ;
     lift_store32(cpu->edx + 8u, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->edx, 3u);
-    label_000E5B16: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5B16u);
+    label_000E5B16:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->ecx = lift_load32(cpu->eax + 0xCu);
     lift_store32(cpu->ebp + 0xFFFFFFE0u, cpu->ecx);
-    label_000E5B1F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5B1Fu);
+    label_000E5B1F:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFDCu);
     if ((uint32_t)(cpu->edx) >= (uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE0u))) goto label_000E5BC9;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD4u)) == (uint32_t)(0u)) goto label_000E5B3A;
     lift_store32(cpu->ebp + 0x10u, 0u);
     goto label_000E5B95;
-    label_000E5B3A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5B3Au);
+    label_000E5B3A:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->eax + 0x20u, cpu->ecx);
@@ -2572,10 +2526,10 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E5B8Du); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E5B8Du)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E5B8Du));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E5B95: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5B95u);
+    label_000E5B95:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFD4u);
     cpu->eax -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFD4u, cpu->eax);
@@ -2594,7 +2548,7 @@ label_000E56E7: ;
     cpu->edx += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFDCu, cpu->edx);
     goto label_000E5B1F;
-    label_000E5BC9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5BC9u);
+    label_000E5BC9:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFE0u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     { uint64_t l=(uint64_t)(cpu->ecx), r=(uint64_t)(sfera_zlib_low_mask(cpu->eax)), v=l & r; lift_flags_logic(cpu,v,32u); cpu->ecx = v; }
@@ -2633,7 +2587,7 @@ label_000E56E7: ;
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->edx, 4u);
     goto label_000E638C;
-    label_000E5C3E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5C3Eu);
+    label_000E5C3E:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFE8u);
     cpu->eax &= 0x40u;
     if ((uint32_t)(cpu->eax) != 0u) goto label_000E5C68;
@@ -2647,7 +2601,7 @@ label_000E56E7: ;
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->ecx + 8u, cpu->eax);
     goto label_000E638C;
-    label_000E5C68: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5C68u);
+    label_000E5C68:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->edx, 9u);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
@@ -2682,20 +2636,20 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E5CD5u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E5CD5u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E5CD5u));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E5CDD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5CDDu);
+    label_000E5CDD:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->edx = lift_load32(cpu->ecx + 8u);
     lift_store32(cpu->ebp + 0xFFFFFFE0u, cpu->edx);
-    label_000E5CE6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5CE6u);
+    label_000E5CE6:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFDCu);
     if ((uint32_t)(cpu->eax) >= (uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE0u))) goto label_000E5D90;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD4u)) == (uint32_t)(0u)) goto label_000E5D01;
     lift_store32(cpu->ebp + 0x10u, 0u);
     goto label_000E5D5C;
-    label_000E5D01: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5D01u);
+    label_000E5D01:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->ecx + 0x20u, cpu->edx);
@@ -2725,10 +2679,10 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E5D54u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E5D54u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E5D54u));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E5D5C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5D5Cu);
+    label_000E5D5C:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFD4u);
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFD4u, cpu->ecx);
@@ -2747,7 +2701,7 @@ label_000E56E7: ;
     cpu->eax += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFDCu, cpu->eax);
     goto label_000E5CE6;
-    label_000E5D90: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5D90u);
+    label_000E5D90:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFE0u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     { uint64_t l=(uint64_t)(cpu->edx), r=(uint64_t)(sfera_zlib_low_mask(cpu->ecx)), v=l & r; lift_flags_logic(cpu,v,32u); cpu->edx = v; }
@@ -2765,7 +2719,7 @@ label_000E56E7: ;
     lift_store32(cpu->ebp + 0xFFFFFFDCu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->edx, 5u);
-    label_000E5DC8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5DC8u);
+    label_000E5DC8:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     cpu->ecx -= lift_load32(cpu->eax + 0x28u);
@@ -2782,15 +2736,15 @@ label_000E56E7: ;
     cpu->edx -= cpu->eax;
     lift_store32(cpu->ebp + 0xFFFFFFC4u, cpu->edx);
     goto label_000E5E03;
-    label_000E5DF7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5DF7u);
+    label_000E5DF7:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     cpu->ecx -= lift_load32(cpu->eax + 0xCu);
     lift_store32(cpu->ebp + 0xFFFFFFC4u, cpu->ecx);
-    label_000E5E03: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5E03u);
+    label_000E5E03:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFC4u);
     lift_store32(cpu->ebp + 0xFFFFFFE4u, cpu->edx);
-    label_000E5E09: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5E09u);
+    label_000E5E09:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     if ((uint32_t)(lift_load32(cpu->eax + 4u)) == (uint32_t)(0u)) goto label_000E5FD6;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD8u)) != (uint32_t)(0u)) goto label_000E5F82;
@@ -2813,15 +2767,15 @@ label_000E56E7: ;
     cpu->edx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFC0u, cpu->edx);
     goto label_000E5E6A;
-    label_000E5E5E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5E5Eu);
+    label_000E5E5E:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x2Cu);
     cpu->ecx -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFC0u, cpu->ecx);
-    label_000E5E6A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5E6Au);
+    label_000E5E6A:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFC0u);
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->edx);
-    label_000E5E70: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5E70u);
+    label_000E5E70:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD8u)) != (uint32_t)(0u)) goto label_000E5F82;
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
@@ -2832,7 +2786,7 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E5E94u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E5E94u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E5E94u));
     cpu->esp += 0xCu;
     lift_store32(cpu->ebp + 0x10u, cpu->eax);
     cpu->edx = lift_load32(cpu->ebp + 8u);
@@ -2847,12 +2801,12 @@ label_000E56E7: ;
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFBCu, cpu->ecx);
     goto label_000E5ECB;
-    label_000E5EBF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5EBFu);
+    label_000E5EBF:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0x2Cu);
     cpu->eax -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFBCu, cpu->eax);
-    label_000E5ECB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5ECBu);
+    label_000E5ECB:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFBCu);
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
@@ -2874,15 +2828,15 @@ label_000E56E7: ;
     cpu->eax -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFB8u, cpu->eax);
     goto label_000E5F1B;
-    label_000E5F0F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5F0Fu);
+    label_000E5F0F:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0x2Cu);
     cpu->edx -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFB8u, cpu->edx);
-    label_000E5F1B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5F1Bu);
+    label_000E5F1B:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFB8u);
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->eax);
-    label_000E5F21: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5F21u);
+    label_000E5F21:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD8u)) != (uint32_t)(0u)) goto label_000E5F82;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -2913,10 +2867,10 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E5F7Au); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E5F7Au)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E5F7Au));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E5F82: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5F82u);
+    label_000E5F82:
     lift_store32(cpu->ebp + 0x10u, 0u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFE4u);
@@ -2937,18 +2891,18 @@ label_000E56E7: ;
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x28u);
     lift_store32(cpu->ebp + 0xFFFFFFE4u, cpu->ecx);
-    label_000E5FC2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5FC2u);
+    label_000E5FC2:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->eax = lift_load32(cpu->edx + 4u);
     cpu->eax -= 1u;
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->ecx + 4u, cpu->eax);
     goto label_000E5E09;
-    label_000E5FD6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5FD6u);
+    label_000E5FD6:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->edx, 0u);
     goto label_000E638C;
-    label_000E5FE4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E5FE4u);
+    label_000E5FE4:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD8u)) != (uint32_t)(0u)) goto label_000E6150;
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
@@ -2969,15 +2923,15 @@ label_000E56E7: ;
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFB4u, cpu->ecx);
     goto label_000E6038;
-    label_000E602C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E602Cu);
+    label_000E602C:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0x2Cu);
     cpu->eax -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFB4u, cpu->eax);
-    label_000E6038: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6038u);
+    label_000E6038:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFB4u);
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->ecx);
-    label_000E603E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E603Eu);
+    label_000E603E:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD8u)) != (uint32_t)(0u)) goto label_000E6150;
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF8u);
@@ -2988,7 +2942,7 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E6062u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E6062u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E6062u));
     cpu->esp += 0xCu;
     lift_store32(cpu->ebp + 0x10u, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
@@ -3003,12 +2957,12 @@ label_000E56E7: ;
     cpu->eax -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFB0u, cpu->eax);
     goto label_000E6099;
-    label_000E608D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E608Du);
+    label_000E608D:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0x2Cu);
     cpu->edx -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFB0u, cpu->edx);
-    label_000E6099: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6099u);
+    label_000E6099:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFB0u);
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
@@ -3030,15 +2984,15 @@ label_000E56E7: ;
     cpu->edx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFACu, cpu->edx);
     goto label_000E60E9;
-    label_000E60DD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E60DDu);
+    label_000E60DD:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x2Cu);
     cpu->ecx -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFACu, cpu->ecx);
-    label_000E60E9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E60E9u);
+    label_000E60E9:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFACu);
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->edx);
-    label_000E60EF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E60EFu);
+    label_000E60EF:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD8u)) != (uint32_t)(0u)) goto label_000E6150;
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -3069,10 +3023,10 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E6148u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E6148u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E6148u));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E6150: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6150u);
+    label_000E6150:
     lift_store32(cpu->ebp + 0x10u, 0u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
@@ -3087,7 +3041,7 @@ label_000E56E7: ;
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->edx, 0u);
     goto label_000E638C;
-    label_000E6182: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6182u);
+    label_000E6182:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFDCu)) <= (uint32_t)(7u)) goto label_000E61A3;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFDCu);
     cpu->eax -= 8u;
@@ -3098,7 +3052,7 @@ label_000E56E7: ;
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     cpu->edx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFFCu, cpu->edx);
-    label_000E61A3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E61A3u);
+    label_000E61A3:
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->eax + 0x34u, cpu->ecx);
@@ -3108,7 +3062,7 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E61BDu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E61BDu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E61BDu));
     cpu->esp += 0xCu;
     lift_store32(cpu->ebp + 0x10u, cpu->eax);
     cpu->edx = lift_load32(cpu->ebp + 8u);
@@ -3123,12 +3077,12 @@ label_000E56E7: ;
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFA8u, cpu->ecx);
     goto label_000E61F4;
-    label_000E61E8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E61E8u);
+    label_000E61E8:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0x2Cu);
     cpu->eax -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFA8u, cpu->eax);
-    label_000E61F4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E61F4u);
+    label_000E61F4:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFA8u);
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
@@ -3164,13 +3118,13 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E625Bu); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E625Bu)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E625Bu));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E6263: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6263u);
+    label_000E6263:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     lift_store32(cpu->edx, 8u);
-    label_000E626C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E626Cu);
+    label_000E626C:
     lift_store32(cpu->ebp + 0x10u, 1u);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -3201,10 +3155,10 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E62C6u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E62C6u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E62C6u));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E62CE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E62CEu);
+    label_000E62CE:
     lift_store32(cpu->ebp + 0x10u, 0xFFFFFFFDu);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -3235,10 +3189,10 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E6328u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E6328u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E6328u));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E632D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E632Du);
+    label_000E632D:
     lift_store32(cpu->ebp + 0x10u, 0xFFFFFFFEu);
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -3269,18 +3223,17 @@ label_000E56E7: ;
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E6387u); lift_push32(cpu, r); sfera_sub_004E6F10(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E6387u)); sfera_sub_004E6F10(cpu, LIFT_CODE_TOKEN_VA(0x4E6387u));
     cpu->esp += 0xCu;
     goto label_000E6391;
-    label_000E638C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E638Cu);
+    label_000E638C:
     goto label_000E56BE;
-    label_000E6391: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6391u);
+    label_000E6391:
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E63BD(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E63BDu);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->eax = lift_load32(cpu->ebp + 8u);
@@ -3290,13 +3243,11 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E63BD(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->eax + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE63D1u), LIFT_CODE_TOKEN_RVA(0xE63CEu))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E63D1u);
     cpu->esp += 8u;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E63E0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E63E0u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->esp -= 0xCu;
@@ -3307,13 +3258,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E63E0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0x18u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->edx + 0x20u)), LIFT_CODE_TOKEN_RVA(0xE63FEu), LIFT_CODE_TOKEN_RVA(0xE63FBu))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E63FEu);
     cpu->esp += 0xCu;
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFF4u)) != (uint32_t)(0u)) goto label_000E6411;
     cpu->eax = 0xFFFFFFFCu;
     goto label_000E6484;
-    label_000E6411: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6411u);
+    label_000E6411:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_push32(cpu, cpu->eax);
     cpu->ecx = (uint32_t)(cpu->ebp + 0xFFFFFFF8u);
@@ -3326,22 +3276,22 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E63E0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, 0u); lift_push32(cpu, 0u); lift_push32(cpu, 0x13u); lift_push32(cpu, 0x13u);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->edx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E6436u); lift_push32(cpu, r); sfera_sub_004E6488(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E6436u)); sfera_sub_004E6488(cpu, LIFT_CODE_TOKEN_VA(0x4E6436u));
     cpu->esp += 0x28u;
     lift_store32(cpu->ebp + 0xFFFFFFFCu, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) != (uint32_t)(0xFFFFFFFDu)) goto label_000E644E;
     cpu->eax = lift_load32(cpu->ebp + 0x18u);
     lift_store32(cpu->eax + 0x18u, (uintptr_t)"oversubscribed dynamic bit lengths tree");
     goto label_000E646D;
-    label_000E644E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E644Eu);
+    label_000E644E:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) == (uint32_t)(0xFFFFFFFBu)) goto label_000E645C;
     cpu->ecx = lift_load32(cpu->ebp + 0xCu);
     if ((uint32_t)(lift_load32(cpu->ecx)) != (uint32_t)(0u)) goto label_000E646D;
-    label_000E645C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E645Cu);
+    label_000E645C:
     cpu->edx = lift_load32(cpu->ebp + 0x18u);
     lift_store32(cpu->edx + 0x18u, (uintptr_t)"incomplete dynamic bit lengths tree");
     lift_store32(cpu->ebp + 0xFFFFFFFCu, 0xFFFFFFFDu);
-    label_000E646D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E646Du);
+    label_000E646D:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0x18u);
@@ -3349,22 +3299,19 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E63E0(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0x18u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->eax + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE647Eu), LIFT_CODE_TOKEN_RVA(0xE647Bu))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E647Eu);
     cpu->esp += 8u;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFFCu);
-    label_000E6484: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6484u);
+    label_000E6484:
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6488(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6488u);
     cpu->eax = sfera_zlib_huft_build(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), lift_load32(cpu->esp + 12u), lift_load32(cpu->esp + 16u), lift_load32(cpu->esp + 20u), lift_load32(cpu->esp + 24u), lift_load32(cpu->esp + 28u), lift_load32(cpu->esp + 32u), lift_load32(cpu->esp + 36u), lift_load32(cpu->esp + 40u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6D56(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6D56u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->esp -= 0xCu;
@@ -3375,13 +3322,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6D56(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0x28u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->edx + 0x20u)), LIFT_CODE_TOKEN_RVA(0xE6D77u), LIFT_CODE_TOKEN_RVA(0xE6D74u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6D77u);
     cpu->esp += 0xCu;
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFF4u)) != (uint32_t)(0u)) goto label_000E6D8D;
     cpu->eax = 0xFFFFFFFCu;
     goto label_000E6ED7;
-    label_000E6D8D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6D8Du);
+    label_000E6D8D:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_push32(cpu, cpu->eax);
     cpu->ecx = (uint32_t)(cpu->ebp + 0xFFFFFFF8u);
@@ -3396,23 +3342,23 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6D56(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0x10u);
     lift_push32(cpu, cpu->eax);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E6DBDu); lift_push32(cpu, r); sfera_sub_004E6488(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E6DBDu)); sfera_sub_004E6488(cpu, LIFT_CODE_TOKEN_VA(0x4E6DBDu));
     cpu->esp += 0x28u;
     lift_store32(cpu->ebp + 0xFFFFFFFCu, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) != (uint32_t)(0u)) goto label_000E6DD1;
     cpu->ecx = lift_load32(cpu->ebp + 0x14u);
     if ((uint32_t)(lift_load32(cpu->ecx)) != (uint32_t)(0u)) goto label_000E6E16;
-    label_000E6DD1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6DD1u);
+    label_000E6DD1:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) != (uint32_t)(0xFFFFFFFDu)) goto label_000E6DE3;
     cpu->edx = lift_load32(cpu->ebp + 0x28u);
     lift_store32(cpu->edx + 0x18u, (uintptr_t)"oversubscribed literal/length tree");
     goto label_000E6DFA;
-    label_000E6DE3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6DE3u);
+    label_000E6DE3:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) == (uint32_t)(0xFFFFFFFCu)) goto label_000E6DFA;
     cpu->eax = lift_load32(cpu->ebp + 0x28u);
     lift_store32(cpu->eax + 0x18u, (uintptr_t)"incomplete literal/length tree");
     lift_store32(cpu->ebp + 0xFFFFFFFCu, 0xFFFFFFFDu);
-    label_000E6DFA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6DFAu);
+    label_000E6DFA:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0x28u);
@@ -3420,11 +3366,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6D56(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0x28u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->ecx + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE6E0Bu), LIFT_CODE_TOKEN_RVA(0xE6E08u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6E0Bu);
     cpu->esp += 8u;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     goto label_000E6ED7;
-    label_000E6E16: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6E16u);
+    label_000E6E16:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_push32(cpu, cpu->edx);
     cpu->eax = (uint32_t)(cpu->ebp + 0xFFFFFFF8u);
@@ -3441,30 +3386,30 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6D56(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = lift_load32(cpu->ebp + 0x10u);
     cpu->ecx = (uint32_t)(cpu->eax + ((uint32_t)(cpu->edx) * 4u));
     lift_push32(cpu, cpu->ecx);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4E6E49u); lift_push32(cpu, r); sfera_sub_004E6488(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4E6E49u)); sfera_sub_004E6488(cpu, LIFT_CODE_TOKEN_VA(0x4E6E49u));
     cpu->esp += 0x28u;
     lift_store32(cpu->ebp + 0xFFFFFFFCu, cpu->eax);
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) != (uint32_t)(0u)) goto label_000E6E66;
     cpu->edx = lift_load32(cpu->ebp + 0x18u);
     if ((uint32_t)(lift_load32(cpu->edx)) != (uint32_t)(0u)) goto label_000E6EC1;
     if ((uint32_t)(lift_load32(cpu->ebp + 8u)) <= (uint32_t)(0x101u)) goto label_000E6EC1;
-    label_000E6E66: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6E66u);
+    label_000E6E66:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) != (uint32_t)(0xFFFFFFFDu)) goto label_000E6E78;
     cpu->eax = lift_load32(cpu->ebp + 0x28u);
     lift_store32(cpu->eax + 0x18u, (uintptr_t)"oversubscribed distance tree");
     goto label_000E6EA8;
-    label_000E6E78: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6E78u);
+    label_000E6E78:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) != (uint32_t)(0xFFFFFFFBu)) goto label_000E6E91;
     cpu->ecx = lift_load32(cpu->ebp + 0x28u);
     lift_store32(cpu->ecx + 0x18u, (uintptr_t)"incomplete distance tree");
     lift_store32(cpu->ebp + 0xFFFFFFFCu, 0xFFFFFFFDu);
     goto label_000E6EA8;
-    label_000E6E91: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6E91u);
+    label_000E6E91:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFFCu)) == (uint32_t)(0xFFFFFFFCu)) goto label_000E6EA8;
     cpu->edx = lift_load32(cpu->ebp + 0x28u);
     lift_store32(cpu->edx + 0x18u, (uintptr_t)"empty distance tree with lengths");
     lift_store32(cpu->ebp + 0xFFFFFFFCu, 0xFFFFFFFDu);
-    label_000E6EA8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6EA8u);
+    label_000E6EA8:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0x28u);
@@ -3472,11 +3417,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6D56(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0x28u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->eax + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE6EB9u), LIFT_CODE_TOKEN_RVA(0xE6EB6u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6EB9u);
     cpu->esp += 8u;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     goto label_000E6ED7;
-    label_000E6EC1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6EC1u);
+    label_000E6EC1:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0x28u);
@@ -3484,22 +3428,19 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6D56(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0x28u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->ecx + 0x24u)), LIFT_CODE_TOKEN_RVA(0xE6ED2u), LIFT_CODE_TOKEN_RVA(0xE6ECFu))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6ED2u);
     cpu->esp += 8u;
     cpu->eax = 0u;
-    label_000E6ED7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6ED7u);
+    label_000E6ED7:
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6EDB(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6EDBu);
     cpu->eax = sfera_zlib_inflate_fixed(lift_load32(cpu->esp + 4u), lift_load32(cpu->esp + 8u), lift_load32(cpu->esp + 12u), lift_load32(cpu->esp + 16u));
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6F10u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->esp -= 0x10u;
@@ -3516,11 +3457,11 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->eax + 0x34u);
     lift_store32(cpu->ebp + 0xFFFFFFF0u, cpu->ecx);
     goto label_000E6F47;
-    label_000E6F3E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6F3Eu);
+    label_000E6F3E:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0x2Cu);
     lift_store32(cpu->ebp + 0xFFFFFFF0u, cpu->eax);
-    label_000E6F47: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6F47u);
+    label_000E6F47:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->ecx -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->ecx);
@@ -3530,11 +3471,11 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 0xCu);
     cpu->edx = lift_load32(cpu->ecx + 0x10u);
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->edx);
-    label_000E6F64: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6F64u);
+    label_000E6F64:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFF4u)) == (uint32_t)(0u)) goto label_000E6F77;
     if ((uint32_t)(lift_load32(cpu->ebp + 0x10u)) != (uint32_t)(0xFFFFFFFBu)) goto label_000E6F77;
     lift_store32(cpu->ebp + 0x10u, 0u);
-    label_000E6F77: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6F77u);
+    label_000E6F77:
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     cpu->ecx = lift_load32(cpu->eax + 0x10u);
     cpu->ecx -= lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -3556,7 +3497,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->edx + 0x38u)), LIFT_CODE_TOKEN_RVA(0xE6FB3u), LIFT_CODE_TOKEN_RVA(0xE6FB0u))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6FB3u);
     cpu->esp += 0xCu;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->ecx + 0x3Cu, cpu->eax);
@@ -3564,14 +3504,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x3Cu);
     lift_store32(cpu->edx + 0x30u, cpu->ecx);
-    label_000E6FC8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6FC8u);
+    label_000E6FC8:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_push32(cpu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     lift_push32(cpu, cpu->ecx);
-    lift_native_call(cpu, native_function_address32(&::memcpy), LIFT_CODE_TOKEN_VA(0x4E6FD4u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4E6FD9u);
+    lift_native_call(cpu, native_function_address32(&::memcpy), LIFT_CODE_TOKEN_VA(0x4E6FD4u));
     cpu->esp += 0xCu;
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     cpu->edx += lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -3593,7 +3533,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = lift_load32(cpu->ebp + 8u);
     cpu->ecx = lift_load32(cpu->eax + 0x28u);
     lift_store32(cpu->edx + 0x34u, cpu->ecx);
-    label_000E7020: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7020u);
+    label_000E7020:
     cpu->edx = lift_load32(cpu->ebp + 8u);
     cpu->eax = lift_load32(cpu->edx + 0x34u);
     cpu->eax -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
@@ -3604,11 +3544,11 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     cpu->ecx = lift_load32(cpu->eax + 0x10u);
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->ecx);
-    label_000E7040: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7040u);
+    label_000E7040:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFF4u)) == (uint32_t)(0u)) goto label_000E7053;
     if ((uint32_t)(lift_load32(cpu->ebp + 0x10u)) != (uint32_t)(0xFFFFFFFBu)) goto label_000E7053;
     lift_store32(cpu->ebp + 0x10u, 0u);
-    label_000E7053: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7053u);
+    label_000E7053:
     cpu->edx = lift_load32(cpu->ebp + 0xCu);
     cpu->eax = lift_load32(cpu->edx + 0x10u);
     cpu->eax -= lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -3630,7 +3570,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     if (!lift_call_indirect(cpu, (uint32_t)(lift_load32(cpu->ecx + 0x38u)), LIFT_CODE_TOKEN_RVA(0xE708Fu), LIFT_CODE_TOKEN_RVA(0xE708Cu))) { return; }
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E708Fu);
     cpu->esp += 0xCu;
     cpu->edx = lift_load32(cpu->ebp + 8u);
     lift_store32(cpu->edx + 0x3Cu, cpu->eax);
@@ -3638,14 +3577,14 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ecx + 0x3Cu);
     lift_store32(cpu->eax + 0x30u, cpu->edx);
-    label_000E70A4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E70A4u);
+    label_000E70A4:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_push32(cpu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_push32(cpu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     lift_push32(cpu, cpu->edx);
-    lift_native_call(cpu, native_function_address32(&::memcpy), LIFT_CODE_TOKEN_VA(0x4E70B0u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4E70B5u);
+    lift_native_call(cpu, native_function_address32(&::memcpy), LIFT_CODE_TOKEN_VA(0x4E70B0u));
     cpu->esp += 0xCu;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     cpu->eax += lift_load32(cpu->ebp + 0xFFFFFFF4u);
@@ -3653,7 +3592,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     cpu->ecx += lift_load32(cpu->ebp + 0xFFFFFFF4u);
     lift_store32(cpu->ebp + 0xFFFFFFF8u, cpu->ecx);
-    label_000E70CA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E70CAu);
+    label_000E70CA:
     cpu->edx = lift_load32(cpu->ebp + 0xCu);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFFCu);
     lift_store32(cpu->edx + 0xCu, cpu->eax);
@@ -3662,11 +3601,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E6F10(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ecx + 0x30u, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0x10u);
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E70F0u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->esp -= 0x48u;
@@ -3694,12 +3632,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFC8u, cpu->ecx);
     goto label_000E714A;
-    label_000E713E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E713Eu);
+    label_000E713E:
     cpu->edx = lift_load32(cpu->ebp + 0x18u);
     cpu->eax = lift_load32(cpu->edx + 0x2Cu);
     cpu->eax -= lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->ebp + 0xFFFFFFC8u, cpu->eax);
-    label_000E714A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E714Au);
+    label_000E714A:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFC8u);
     lift_store32(cpu->ebp + 0xFFFFFFD4u, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 8u);
@@ -3708,7 +3646,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 0xCu);
     cpu->edx = sfera_zlib_low_mask(cpu->ecx);
     lift_store32(cpu->ebp + 0xFFFFFFD0u, cpu->edx);
-    label_000E716A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E716Au);
+    label_000E716A:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD8u)) >= (uint32_t)(0x14u)) goto label_000E71A1;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFCCu);
     cpu->eax -= 1u;
@@ -3728,7 +3666,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->edx);
     goto label_000E716A;
-    label_000E71A1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E71A1u);
+    label_000E71A1:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->eax &= lift_load32(cpu->ebp + 0xFFFFFFDCu);
     cpu->ecx = lift_load32(cpu->ebp + 0x10u);
@@ -3763,7 +3701,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFD4u, cpu->ecx);
     goto label_000E772A;
-    label_000E7204: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7204u);
+    label_000E7204:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFE4u);
     lift_flags_logic(cpu,0u,32u); cpu->eax = 0u;
     cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->edx + 1u)) & 0xFFu);
@@ -3797,7 +3735,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFD8u);
     cpu->ecx -= lift_load32(cpu->ebp + 0xFFFFFFE0u);
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->ecx);
-    label_000E7269: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7269u);
+    label_000E7269:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD8u)) >= (uint32_t)(0xFu)) goto label_000E72A2;
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFCCu);
     cpu->edx -= 1u;
@@ -3818,7 +3756,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->edx);
     goto label_000E7269;
-    label_000E72A2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E72A2u);
+    label_000E72A2:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->eax &= lift_load32(cpu->ebp + 0xFFFFFFD0u);
     cpu->ecx = lift_load32(cpu->ebp + 0x14u);
@@ -3828,7 +3766,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->eax)) & 0xFFu);
     lift_store32(cpu->ebp + 0xFFFFFFE0u, cpu->ecx);
-    label_000E72BB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E72BBu);
+    label_000E72BB:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFE4u);
     lift_flags_logic(cpu,0u,32u); cpu->eax = 0u;
     cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->edx + 1u)) & 0xFFu);
@@ -3848,7 +3786,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFE0u);
     cpu->ecx &= 0xFu;
     lift_store32(cpu->ebp + 0xFFFFFFE0u, cpu->ecx);
-    label_000E72F4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E72F4u);
+    label_000E72F4:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFD8u);
     if ((uint32_t)(cpu->edx) >= (uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFE0u))) goto label_000E732D;
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFCCu);
@@ -3869,7 +3807,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx += 8u;
     lift_store32(cpu->ebp + 0xFFFFFFD8u, cpu->edx);
     goto label_000E72F4;
-    label_000E732D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E732Du);
+    label_000E732D:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFE0u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     { uint64_t l=(uint64_t)(cpu->ecx), r=(uint64_t)(sfera_zlib_low_mask(cpu->eax)), v=l & r; lift_flags_logic(cpu,v,32u); cpu->ecx = v; }
@@ -3921,7 +3859,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->ecx);
     goto label_000E7427;
-    label_000E73C5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E73C5u);
+    label_000E73C5:
     cpu->edx = lift_load32(cpu->ebp + 0x18u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     cpu->eax -= lift_load32(cpu->edx + 0x28u);
@@ -3937,7 +3875,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFECu);
     cpu->edx -= lift_load32(cpu->ebp + 0xFFFFFFE0u);
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->edx);
-    label_000E73F3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E73F3u);
+    label_000E73F3:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->edx = (cpu->edx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->ecx)) & 0xFFu);
@@ -3955,7 +3893,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = lift_load32(cpu->ebp + 0x18u);
     cpu->ecx = lift_load32(cpu->eax + 0x28u);
     lift_store32(cpu->ebp + 0xFFFFFFF4u, cpu->ecx);
-    label_000E7427: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7427u);
+    label_000E7427:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->eax)) & 0xFFu);
@@ -3971,7 +3909,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->ecx);
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFECu)) != (uint32_t)(0u)) goto label_000E7427;
     goto label_000E7546;
-    label_000E7457: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7457u);
+    label_000E7457:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFE0u);
     cpu->edx &= 0x40u;
     if ((uint32_t)(cpu->edx) != 0u) goto label_000E7495;
@@ -3991,7 +3929,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->edx)) & 0xFFu);
     lift_store32(cpu->ebp + 0xFFFFFFE0u, cpu->eax);
     goto label_000E7539;
-    label_000E7495: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7495u);
+    label_000E7495:
     cpu->ecx = lift_load32(cpu->ebp + 0x1Cu);
     lift_store32(cpu->ecx + 0x18u, (uintptr_t)"invalid distance code");
     cpu->edx = lift_load32(cpu->ebp + 0x1Cu);
@@ -4006,10 +3944,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = lift_shift_right(cpu, cpu->edx, (uint32_t)(3u), 32u);
     lift_store32(cpu->ebp + 0xFFFFFFC4u, cpu->edx);
     goto label_000E74C7;
-    label_000E74C1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E74C1u);
+    label_000E74C1:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFECu);
     lift_store32(cpu->ebp + 0xFFFFFFC4u, cpu->eax);
-    label_000E74C7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E74C7u);
+    label_000E74C7:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFC4u);
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFCCu);
@@ -4048,12 +3986,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ecx + 0x34u, cpu->edx);
     cpu->eax = 0xFFFFFFFDu;
     goto label_000E77CF;
-    label_000E7539: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7539u);
+    label_000E7539:
     cpu->eax = 1u;
     if ((uint32_t)(cpu->eax) != 0u) goto label_000E72BB;
-    label_000E7546: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7546u);
+    label_000E7546:
     goto label_000E772A;
-    label_000E754B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E754Bu);
+    label_000E754B:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFE0u);
     cpu->ecx &= 0x40u;
     if ((uint32_t)(cpu->ecx) != 0u) goto label_000E75D1;
@@ -4096,9 +4034,9 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx -= 1u;
     lift_store32(cpu->ebp + 0xFFFFFFD4u, cpu->ecx);
     goto label_000E772A;
-    label_000E75CC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E75CCu);
+    label_000E75CC:
     goto label_000E771D;
-    label_000E75D1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E75D1u);
+    label_000E75D1:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFE0u);
     cpu->edx &= 0x20u;
     if ((uint32_t)(cpu->edx) == 0u) goto label_000E7679;
@@ -4114,10 +4052,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = lift_shift_right(cpu, cpu->eax, (uint32_t)(3u), 32u);
     lift_store32(cpu->ebp + 0xFFFFFFC0u, cpu->eax);
     goto label_000E7607;
-    label_000E7601: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7601u);
+    label_000E7601:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFECu);
     lift_store32(cpu->ebp + 0xFFFFFFC0u, cpu->ecx);
-    label_000E7607: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7607u);
+    label_000E7607:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFC0u);
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->edx);
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFCCu);
@@ -4156,7 +4094,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->edx + 0x34u, cpu->eax);
     cpu->eax = 1u;
     goto label_000E77CF;
-    label_000E7679: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7679u);
+    label_000E7679:
     cpu->ecx = lift_load32(cpu->ebp + 0x1Cu);
     lift_store32(cpu->ecx + 0x18u, (uintptr_t)"invalid literal/length code");
     cpu->edx = lift_load32(cpu->ebp + 0x1Cu);
@@ -4171,10 +4109,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = lift_shift_right(cpu, cpu->edx, (uint32_t)(3u), 32u);
     lift_store32(cpu->ebp + 0xFFFFFFBCu, cpu->edx);
     goto label_000E76AB;
-    label_000E76A5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E76A5u);
+    label_000E76A5:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFECu);
     lift_store32(cpu->ebp + 0xFFFFFFBCu, cpu->eax);
-    label_000E76AB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E76ABu);
+    label_000E76AB:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFBCu);
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->ecx);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFCCu);
@@ -4213,13 +4151,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ecx + 0x34u, cpu->edx);
     cpu->eax = 0xFFFFFFFDu;
     goto label_000E77CF;
-    label_000E771D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E771Du);
+    label_000E771D:
     cpu->eax = 1u;
     if ((uint32_t)(cpu->eax) != 0u) goto label_000E7204;
-    label_000E772A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E772Au);
+    label_000E772A:
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFD4u)) < (uint32_t)(0x102u)) goto label_000E773D;
     if ((uint32_t)(lift_load32(cpu->ebp + 0xFFFFFFCCu)) >= (uint32_t)(0xAu)) goto label_000E716A;
-    label_000E773D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E773Du);
+    label_000E773D:
     cpu->ecx = lift_load32(cpu->ebp + 0x1Cu);
     cpu->edx = lift_load32(cpu->ecx + 4u);
     { uint64_t l=(uint64_t)(cpu->edx), r=(uint64_t)(lift_load32(cpu->ebp + 0xFFFFFFCCu)), c=(uint64_t)(0u), v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
@@ -4232,10 +4170,10 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_shift_right(cpu, cpu->ecx, (uint32_t)(3u), 32u);
     lift_store32(cpu->ebp + 0xFFFFFFB8u, cpu->ecx);
     goto label_000E7765;
-    label_000E775F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E775Fu);
+    label_000E775F:
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFECu);
     lift_store32(cpu->ebp + 0xFFFFFFB8u, cpu->edx);
-    label_000E7765: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7765u);
+    label_000E7765:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFFB8u);
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->eax);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFCCu);
@@ -4273,9 +4211,9 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF8u);
     lift_store32(cpu->eax + 0x34u, cpu->ecx);
     cpu->eax = 0u;
-    label_000E77CF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E77CFu);
+    label_000E77CF:
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 
@@ -4307,7 +4245,6 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E70F0(LiftCpu* cpu, uint32_t stop_addres
 
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004E787C(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4E787Cu);
     cpu->edi = cpu->edi;
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
@@ -4347,22 +4284,22 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E787C(LiftCpu* cpu, uint32_t stop_addres
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80004004u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Operation aborted";
     goto label_000EA1A9;
-    label_000E792E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E792Eu);
+    label_000E792E:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid pointer";
     goto label_000EA1A9;
-    label_000E7938: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7938u);
+    label_000E7938:
     cpu->eax = (uint32_t)(uintptr_t)"The requested COM interface is not available";
     goto label_000EA1A9;
-    label_000E7942: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7942u);
+    label_000E7942:
     cpu->eax = (uint32_t)(uintptr_t)"The function called is not supported at this time";
     goto label_000EA1A9;
-    label_000E794C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E794Cu);
+    label_000E794C:
     cpu->eax = (uint32_t)(uintptr_t)"The data necessary to complete this operation is not yet available.";
     goto label_000EA1A9;
-    label_000E7956: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7956u);
+    label_000E7956:
     cpu->eax = (uint32_t)(uintptr_t)"An undetermined error occurred";
     goto label_000EA1A9;
-    label_000E7960: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7960u);
+    label_000E7960:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8000FFFFu)) goto label_000E79AF;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80040110u)) goto label_000E79A5;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80040154u)) goto label_000E799B;
@@ -4370,22 +4307,22 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E787C(LiftCpu* cpu, uint32_t stop_addres
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x800401F1u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"CoInitialize has already been called.";
     goto label_000EA1A9;
-    label_000E7991: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7991u);
+    label_000E7991:
     cpu->eax = (uint32_t)(uintptr_t)"CoInitialize has not been called.";
     goto label_000EA1A9;
-    label_000E799B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E799Bu);
+    label_000E799B:
     cpu->eax = (uint32_t)(uintptr_t)"Class not registered";
     goto label_000EA1A9;
-    label_000E79A5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E79A5u);
+    label_000E79A5:
     cpu->eax = (uint32_t)(uintptr_t)"This object does not support aggregation";
     goto label_000EA1A9;
-    label_000E79AF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E79AFu);
+    label_000E79AF:
     cpu->eax = (uint32_t)(uintptr_t)"Catastrophic failure";
     goto label_000EA1A9;
-    label_000E79B9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E79B9u);
+    label_000E79B9:
     cpu->eax = (uint32_t)(uintptr_t)"Unable to IDirectInputJoyConfig_Acquire because the user does not have sufficient privileges to change the joystick configuration. & An invalid media type was specified";
     goto label_000EA1A9;
-    label_000E79C3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E79C3u);
+    label_000E79C3:
     cpu->eax += 0x7FFBFDFFu;
     if ((uint32_t)(cpu->eax) > (uint32_t)(9u)) goto label_000EA18F;
     switch ((uint32_t)(cpu->eax)) {
@@ -4469,37 +4406,37 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004E787C(LiftCpu* cpu, uint32_t stop_addres
 label_000E79D8: ;
     cpu->eax = (uint32_t)(uintptr_t)"The device is full. & An invalid media subtype was specified.";
     goto label_000EA1A9;
-    label_000E79E2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E79E2u);
+    label_000E79E2:
     cpu->eax = (uint32_t)(uintptr_t)"Not all the requested information fit into the buffer. & This object can only be created as an aggregated object.";
     goto label_000EA1A9;
-    label_000E79EC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E79ECu);
+    label_000E79EC:
     cpu->eax = (uint32_t)(uintptr_t)"The effect is not downloaded. & The enumerator has become invalid.";
     goto label_000EA1A9;
-    label_000E79F6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E79F6u);
+    label_000E79F6:
     cpu->eax = (uint32_t)(uintptr_t)"The device cannot be reinitialized because there are still effects attached to it. & At least one of the pins involved in the operation is already connected.";
     goto label_000EA1A9;
-    label_000E7A00: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A00u);
+    label_000E7A00:
     cpu->eax = (uint32_t)(uintptr_t)"The operation cannot be performed unless the device is acquired in DISCL_EXCLUSIVE mode. & This operation cannot be performed because the filter is active.";
     goto label_000EA1A9;
-    label_000E7A0A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A0Au);
+    label_000E7A0A:
     cpu->eax = (uint32_t)(uintptr_t)"The effect could not be downloaded because essential information is missing.  For example, no axes have been associated with the effect, or no type-specific information has been created. & One of the specified pins supports no media types.";
     goto label_000EA1A9;
-    label_000E7A14: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A14u);
+    label_000E7A14:
     cpu->eax = (uint32_t)(uintptr_t)"Attempted to read buffered device data from a device that is not buffered. & There is no common media type between these pins.";
     goto label_000EA1A9;
-    label_000E7A1E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A1Eu);
+    label_000E7A1E:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt was made to modify parameters of an effect while it is playing.  Not all hardware devices support altering the parameters of an effect while it is playing. & Two pins of the same direction cannot be connected together.";
     goto label_000EA1A9;
-    label_000E7A28: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A28u);
+    label_000E7A28:
     cpu->eax = (uint32_t)(uintptr_t)"The operation could not be completed because the device is not plugged in. & The operation cannot be performed because the pins are not connected.";
     goto label_000EA1A9;
-    label_000E7A32: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A32u);
+    label_000E7A32:
     cpu->eax = (uint32_t)(uintptr_t)"SendDeviceData failed because more information was requested to be sent than can be sent to the device.  Some devices have restrictions on how much data can be sent to them.  (For example, there might be a limit on the number of buttons that can be pressed at once.) & No sample buffer allocator is available.";
     goto label_000EA1A9;
-    label_000E7A3C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A3Cu);
+    label_000E7A3C:
     cpu->eax = (uint32_t)(uintptr_t)"A mapper file function failed because reading or writing the user or IHV settings file failed. & A run-time error occurred.";
     goto label_000EA1A9;
-    label_000E7A46: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A46u);
+    label_000E7A46:
     cpu->eax += 0x7FFBFDF4u;
     if ((uint32_t)(cpu->eax) > (uint32_t)(0x14u)) goto label_000EA18F;
     switch ((uint32_t)(cpu->eax)) {
@@ -4570,73 +4507,73 @@ label_000E79D8: ;
         case 64u: goto label_000EA18F;
         default: lift_trap(cpu, 0x4E7A54u, "resolved jump-table index out of range"); return;
     }
-    label_000E7A5B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A5Bu);
+    label_000E7A5B:
     cpu->eax = (uint32_t)(uintptr_t)"No buffer space has been set";
     goto label_000EA1A9;
-    label_000E7A65: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A65u);
+    label_000E7A65:
     cpu->eax = (uint32_t)(uintptr_t)"The buffer is not big enough.";
     goto label_000EA1A9;
-    label_000E7A6F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A6Fu);
+    label_000E7A6F:
     cpu->eax = (uint32_t)(uintptr_t)"An invalid alignment was specified.";
     goto label_000EA1A9;
-    label_000E7A79: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A79u);
+    label_000E7A79:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot change allocated memory while the filter is active.";
     goto label_000EA1A9;
-    label_000E7A83: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A83u);
+    label_000E7A83:
     cpu->eax = (uint32_t)(uintptr_t)"One or more buffers are still active.";
     goto label_000EA1A9;
-    label_000E7A8D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A8Du);
+    label_000E7A8D:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot allocate a sample when the allocator is not active.";
     goto label_000EA1A9;
-    label_000E7A97: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7A97u);
+    label_000E7A97:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot allocate memory because no size has been set.";
     goto label_000EA1A9;
-    label_000E7AA1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7AA1u);
+    label_000E7AA1:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot lock for synchronization because no clock has been defined.";
     goto label_000EA1A9;
-    label_000E7AAB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7AABu);
+    label_000E7AAB:
     cpu->eax = (uint32_t)(uintptr_t)"Quality messages could not be sent because no quality sink has been defined.";
     goto label_000EA1A9;
-    label_000E7AB5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7AB5u);
+    label_000E7AB5:
     cpu->eax = (uint32_t)(uintptr_t)"A required interface has not been implemented.";
     goto label_000EA1A9;
-    label_000E7ABF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7ABFu);
+    label_000E7ABF:
     cpu->eax = (uint32_t)(uintptr_t)"An object or name was not found.";
     goto label_000EA1A9;
-    label_000E7AC9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7AC9u);
+    label_000E7AC9:
     cpu->eax = (uint32_t)(uintptr_t)"No combination of intermediate filters could be found to make the connection.";
     goto label_000EA1A9;
-    label_000E7AD3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7AD3u);
+    label_000E7AD3:
     cpu->eax = (uint32_t)(uintptr_t)"No combination of filters could be found to render the stream.";
     goto label_000EA1A9;
-    label_000E7ADD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7ADDu);
+    label_000E7ADD:
     cpu->eax = (uint32_t)(uintptr_t)"Could not change formats dynamically.";
     goto label_000EA1A9;
-    label_000E7AE7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7AE7u);
+    label_000E7AE7:
     cpu->eax = (uint32_t)(uintptr_t)"No color key has been set.";
     goto label_000EA1A9;
-    label_000E7AF1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7AF1u);
+    label_000E7AF1:
     cpu->eax = (uint32_t)(uintptr_t)"Current pin connection is not using the IOverlay transport.";
     goto label_000EA1A9;
-    label_000E7AFB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7AFBu);
+    label_000E7AFB:
     cpu->eax = (uint32_t)(uintptr_t)"Current pin connection is not using the IMemInputPin transport.";
     goto label_000EA1A9;
-    label_000E7B05: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B05u);
+    label_000E7B05:
     cpu->eax = (uint32_t)(uintptr_t)"Setting a color key would conflict with the palette already set.";
     goto label_000EA1A9;
-    label_000E7B0F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B0Fu);
+    label_000E7B0F:
     cpu->eax = (uint32_t)(uintptr_t)"Setting a palette would conflict with the color key already set.";
     goto label_000EA1A9;
-    label_000E7B19: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B19u);
+    label_000E7B19:
     cpu->eax = (uint32_t)(uintptr_t)"No matching color key is available.";
     goto label_000EA1A9;
-    label_000E7B23: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B23u);
+    label_000E7B23:
     cpu->eax = (uint32_t)(uintptr_t)"No palette is available.";
     goto label_000EA1A9;
-    label_000E7B2D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B2Du);
+    label_000E7B2D:
     cpu->eax = (uint32_t)(uintptr_t)"Display does not use a palette.";
     goto label_000EA1A9;
-    label_000E7B37: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B37u);
+    label_000E7B37:
     cpu->eax += 0x7FFBFDDEu;
     if ((uint32_t)(cpu->eax) > (uint32_t)(0x3Du)) goto label_000EA18F;
     switch ((uint32_t)(cpu->eax)) {
@@ -4685,133 +4622,133 @@ label_000E79D8: ;
         case 61u: goto label_000E7CE3;
         default: goto label_000EA18F;
     }
-    label_000E7B53: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B53u);
+    label_000E7B53:
     cpu->eax = (uint32_t)(uintptr_t)"Too many colors for the current display settings.";
     goto label_000EA1A9;
-    label_000E7B5D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B5Du);
+    label_000E7B5D:
     cpu->eax = (uint32_t)(uintptr_t)"The state changed while waiting to process the sample.";
     goto label_000EA1A9;
-    label_000E7B67: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B67u);
+    label_000E7B67:
     cpu->eax = (uint32_t)(uintptr_t)"The operation could not be performed because the filter is not stopped.";
     goto label_000EA1A9;
-    label_000E7B71: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B71u);
+    label_000E7B71:
     cpu->eax = (uint32_t)(uintptr_t)"The operation could not be performed because the filter is not paused.";
     goto label_000EA1A9;
-    label_000E7B7B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B7Bu);
+    label_000E7B7B:
     cpu->eax = (uint32_t)(uintptr_t)"The operation could not be performed because the filter is not running.";
     goto label_000EA1A9;
-    label_000E7B85: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B85u);
+    label_000E7B85:
     cpu->eax = (uint32_t)(uintptr_t)"The operation could not be performed because the filter is in the wrong state.";
     goto label_000EA1A9;
-    label_000E7B8F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B8Fu);
+    label_000E7B8F:
     cpu->eax = (uint32_t)(uintptr_t)"The sample start time is after the sample end time.";
     goto label_000EA1A9;
-    label_000E7B99: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7B99u);
+    label_000E7B99:
     cpu->eax = (uint32_t)(uintptr_t)"The supplied rectangle is invalid.";
     goto label_000EA1A9;
-    label_000E7BA3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7BA3u);
+    label_000E7BA3:
     cpu->eax = (uint32_t)(uintptr_t)"This pin cannot use the supplied media type.";
     goto label_000EA1A9;
-    label_000E7BAD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7BADu);
+    label_000E7BAD:
     cpu->eax = (uint32_t)(uintptr_t)"This sample cannot be rendered.";
     goto label_000EA1A9;
-    label_000E7BB7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7BB7u);
+    label_000E7BB7:
     cpu->eax = (uint32_t)(uintptr_t)"This sample cannot be rendered because the end of the stream has been reached.";
     goto label_000EA1A9;
-    label_000E7BC1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7BC1u);
+    label_000E7BC1:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt to add a filter with a duplicate name failed.";
     goto label_000EA1A9;
-    label_000E7BCB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7BCBu);
+    label_000E7BCB:
     cpu->eax = (uint32_t)(uintptr_t)"A time-out has expired.";
     goto label_000EA1A9;
-    label_000E7BD5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7BD5u);
+    label_000E7BD5:
     cpu->eax = (uint32_t)(uintptr_t)"The file format is invalid.";
     goto label_000EA1A9;
-    label_000E7BDF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7BDFu);
+    label_000E7BDF:
     cpu->eax = (uint32_t)(uintptr_t)"The list has already been exhausted.";
     goto label_000EA1A9;
-    label_000E7BE9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7BE9u);
+    label_000E7BE9:
     cpu->eax = (uint32_t)(uintptr_t)"The filter graph is circular.";
     goto label_000EA1A9;
-    label_000E7BF3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7BF3u);
+    label_000E7BF3:
     cpu->eax = (uint32_t)(uintptr_t)"Updates are not allowed in this state.";
     goto label_000EA1A9;
-    label_000E7BFD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7BFDu);
+    label_000E7BFD:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt was made to queue a command for a time in the past.";
     goto label_000EA1A9;
-    label_000E7C07: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C07u);
+    label_000E7C07:
     cpu->eax = (uint32_t)(uintptr_t)"The queued command has already been canceled.";
     goto label_000EA1A9;
-    label_000E7C11: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C11u);
+    label_000E7C11:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot render the file because it is corrupt.";
     goto label_000EA1A9;
-    label_000E7C1B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C1Bu);
+    label_000E7C1B:
     cpu->eax = (uint32_t)(uintptr_t)"An overlay advise link already exists.";
     goto label_000EA1A9;
-    label_000E7C25: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C25u);
+    label_000E7C25:
     cpu->eax = (uint32_t)(uintptr_t)"No full-screen modes are available.";
     goto label_000EA1A9;
-    label_000E7C2F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C2Fu);
+    label_000E7C2F:
     cpu->eax = (uint32_t)(uintptr_t)"This Advise cannot be canceled because it was not successfully set.";
     goto label_000EA1A9;
-    label_000E7C39: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C39u);
+    label_000E7C39:
     cpu->eax = (uint32_t)(uintptr_t)"A full-screen mode is not available.";
     goto label_000EA1A9;
-    label_000E7C43: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C43u);
+    label_000E7C43:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot call IVideoWindow methods while in full-screen mode.";
     goto label_000EA1A9;
-    label_000E7C4D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C4Du);
+    label_000E7C4D:
     cpu->eax = (uint32_t)(uintptr_t)"The media type of this file is not recognized.";
     goto label_000EA1A9;
-    label_000E7C57: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C57u);
+    label_000E7C57:
     cpu->eax = (uint32_t)(uintptr_t)"The source filter for this file could not be loaded.";
     goto label_000EA1A9;
-    label_000E7C61: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C61u);
+    label_000E7C61:
     cpu->eax = (uint32_t)(uintptr_t)"A file appeared to be incomplete.";
     goto label_000EA1A9;
-    label_000E7C6B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C6Bu);
+    label_000E7C6B:
     cpu->eax = (uint32_t)(uintptr_t)"The version number of the file is invalid.";
     goto label_000EA1A9;
-    label_000E7C75: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C75u);
+    label_000E7C75:
     cpu->eax = (uint32_t)(uintptr_t)"This file is corrupt: it contains an invalid class identifier.";
     goto label_000EA1A9;
-    label_000E7C7F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C7Fu);
+    label_000E7C7F:
     cpu->eax = (uint32_t)(uintptr_t)"This file is corrupt: it contains an invalid media type.";
     goto label_000EA1A9;
-    label_000E7C89: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C89u);
+    label_000E7C89:
     cpu->eax = (uint32_t)(uintptr_t)"No time stamp has been set for this sample.";
     goto label_000EA1A9;
-    label_000E7C93: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C93u);
+    label_000E7C93:
     cpu->eax = (uint32_t)(uintptr_t)"No media time stamp has been set for this sample.";
     goto label_000EA1A9;
-    label_000E7C9D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7C9Du);
+    label_000E7C9D:
     cpu->eax = (uint32_t)(uintptr_t)"No media time format has been selected.";
     goto label_000EA1A9;
-    label_000E7CA7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7CA7u);
+    label_000E7CA7:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot change balance because audio device is mono only.";
     goto label_000EA1A9;
-    label_000E7CB1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7CB1u);
+    label_000E7CB1:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot play back the audio stream: no audio hardware is available, or the hardware is not responding.";
     goto label_000EA1A9;
-    label_000E7CBB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7CBBu);
+    label_000E7CBB:
     cpu->eax = (uint32_t)(uintptr_t)"ActiveMovie cannot play MPEG movies on this processor.";
     goto label_000EA1A9;
-    label_000E7CC5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7CC5u);
+    label_000E7CC5:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot play back the audio stream: the audio format is not supported.";
     goto label_000EA1A9;
-    label_000E7CCF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7CCFu);
+    label_000E7CCF:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot play back the video stream: the video format is not supported.";
     goto label_000EA1A9;
-    label_000E7CD9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7CD9u);
+    label_000E7CD9:
     cpu->eax = (uint32_t)(uintptr_t)"ActiveMovie cannot play this video stream because it falls outside the constrained standard.";
     goto label_000EA1A9;
-    label_000E7CE3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7CE3u);
+    label_000E7CE3:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot perform the requested function on an object that is not in the filter graph.";
     goto label_000EA1A9;
-    label_000E7CED: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7CEDu);
+    label_000E7CED:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot get or set time related information on an object that is using a time format of TIME_FORMAT_NONE.";
     goto label_000EA1A9;
-    label_000E7CF7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7CF7u);
+    label_000E7CF7:
     cpu->ecx = 0x80040305u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E7EE0;
@@ -4867,136 +4804,136 @@ label_000E79D8: ;
 label_000E7D28: ;
     cpu->eax = (uint32_t)(uintptr_t)"Device driver-specific codes. Unless the specific driver has been precisely identified, no meaning should be attributed to these values other than that the driver originated the error.";
     goto label_000EA1A9;
-    label_000E7D32: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D32u);
+    label_000E7D32:
     cpu->eax = (uint32_t)(uintptr_t)"DIERR_DRIVERFIRST+1";
     goto label_000EA1A9;
-    label_000E7D3C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D3Cu);
+    label_000E7D3C:
     cpu->eax = (uint32_t)(uintptr_t)"DIERR_DRIVERFIRST+2";
     goto label_000EA1A9;
-    label_000E7D46: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D46u);
+    label_000E7D46:
     cpu->eax = (uint32_t)(uintptr_t)"DIERR_DRIVERFIRST+3";
     goto label_000EA1A9;
-    label_000E7D50: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D50u);
+    label_000E7D50:
     cpu->eax = (uint32_t)(uintptr_t)"DIERR_DRIVERFIRST+4";
     goto label_000EA1A9;
-    label_000E7D5A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D5Au);
+    label_000E7D5A:
     cpu->eax = (uint32_t)(uintptr_t)"The connection cannot be made because the stream is read only and the filter alters the data.";
     goto label_000EA1A9;
-    label_000E7D64: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D64u);
+    label_000E7D64:
     cpu->eax = (uint32_t)(uintptr_t)"The buffer is not full enough.";
     goto label_000EA1A9;
-    label_000E7D6E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D6Eu);
+    label_000E7D6E:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot play back the file.  The format is not supported.";
     goto label_000EA1A9;
-    label_000E7D78: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D78u);
+    label_000E7D78:
     cpu->eax = (uint32_t)(uintptr_t)"Pins cannot connect due to not supporting the same transport.";
     goto label_000EA1A9;
-    label_000E7D82: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D82u);
+    label_000E7D82:
     cpu->eax = (uint32_t)(uintptr_t)"The Video CD can't be read correctly by the device or is the data is corrupt.";
     goto label_000EA1A9;
-    label_000E7D8C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D8Cu);
+    label_000E7D8C:
     cpu->eax = (uint32_t)(uintptr_t)"There is not enough Video Memory at this display resolution and number of colors. Reducing resolution might help.";
     goto label_000EA1A9;
-    label_000E7D96: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7D96u);
+    label_000E7D96:
     cpu->eax = (uint32_t)(uintptr_t)"The VideoPort connection negotiation process has failed.";
     goto label_000EA1A9;
-    label_000E7DA0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7DA0u);
+    label_000E7DA0:
     cpu->eax = (uint32_t)(uintptr_t)"Either DirectDraw has not been installed or the Video Card capabilities are not suitable. Make sure the display is not in 16 color mode.";
     goto label_000EA1A9;
-    label_000E7DAA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7DAAu);
+    label_000E7DAA:
     cpu->eax = (uint32_t)(uintptr_t)"No VideoPort hardware is available, or the hardware is not responding.";
     goto label_000EA1A9;
-    label_000E7DB4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7DB4u);
+    label_000E7DB4:
     cpu->eax = (uint32_t)(uintptr_t)"No Capture hardware is available, or the hardware is not responding.";
     goto label_000EA1A9;
-    label_000E7DBE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7DBEu);
+    label_000E7DBE:
     cpu->eax = (uint32_t)(uintptr_t)"This User Operation is inhibited by DVD Content at this time.";
     goto label_000EA1A9;
-    label_000E7DC8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7DC8u);
+    label_000E7DC8:
     cpu->eax = (uint32_t)(uintptr_t)"This Operation is not permitted in the current domain.";
     goto label_000EA1A9;
-    label_000E7DD2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7DD2u);
+    label_000E7DD2:
     cpu->eax = (uint32_t)(uintptr_t)"The specified button is invalid or is not present at the current time, or there is no button present at the specified location.";
     goto label_000EA1A9;
-    label_000E7DDC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7DDCu);
+    label_000E7DDC:
     cpu->eax = (uint32_t)(uintptr_t)"DVD-Video playback graph has not been built yet.";
     goto label_000EA1A9;
-    label_000E7DE6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7DE6u);
+    label_000E7DE6:
     cpu->eax = (uint32_t)(uintptr_t)"DVD-Video playback graph building failed.";
     goto label_000EA1A9;
-    label_000E7DF0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7DF0u);
+    label_000E7DF0:
     cpu->eax = (uint32_t)(uintptr_t)"DVD-Video playback graph could not be built due to insufficient decoders.";
     goto label_000EA1A9;
-    label_000E7DFA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7DFAu);
+    label_000E7DFA:
     cpu->eax = (uint32_t)(uintptr_t)"Version number of DirectDraw not suitable. Make sure to install dx5 or higher version.";
     goto label_000EA1A9;
-    label_000E7E04: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E04u);
+    label_000E7E04:
     cpu->eax = (uint32_t)(uintptr_t)"Copy protection cannot be enabled. Please make sure any other copy protected content is not being shown now.";
     goto label_000EA1A9;
-    label_000E7E0E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E0Eu);
+    label_000E7E0E:
     cpu->eax = (uint32_t)(uintptr_t)"This object cannot be used anymore as its time has expired.";
     goto label_000EA1A9;
-    label_000E7E18: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E18u);
+    label_000E7E18:
     cpu->eax = (uint32_t)(uintptr_t)"The operation cannot be performed at the current playback speed.";
     goto label_000EA1A9;
-    label_000E7E22: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E22u);
+    label_000E7E22:
     cpu->eax = (uint32_t)(uintptr_t)"The specified menu doesn't exist.";
     goto label_000EA1A9;
-    label_000E7E2C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E2Cu);
+    label_000E7E2C:
     cpu->eax = (uint32_t)(uintptr_t)"The specified command was either cancelled or no longer exists.";
     goto label_000EA1A9;
-    label_000E7E36: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E36u);
+    label_000E7E36:
     cpu->eax = (uint32_t)(uintptr_t)"The data did not contain a recognized version.";
     goto label_000EA1A9;
-    label_000E7E40: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E40u);
+    label_000E7E40:
     cpu->eax = (uint32_t)(uintptr_t)"The state data was corrupt.";
     goto label_000EA1A9;
-    label_000E7E4A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E4Au);
+    label_000E7E4A:
     cpu->eax = (uint32_t)(uintptr_t)"The state data is from a different disc.";
     goto label_000EA1A9;
-    label_000E7E54: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E54u);
+    label_000E7E54:
     cpu->eax = (uint32_t)(uintptr_t)"The region was not compatible with the current drive.";
     goto label_000EA1A9;
-    label_000E7E5E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E5Eu);
+    label_000E7E5E:
     cpu->eax = (uint32_t)(uintptr_t)"The requested DVD stream attribute does not exist.";
     goto label_000EA1A9;
-    label_000E7E68: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E68u);
+    label_000E7E68:
     cpu->eax = (uint32_t)(uintptr_t)"Currently there is no GoUp (Annex J user function) program chain (PGC).";
     goto label_000EA1A9;
-    label_000E7E72: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E72u);
+    label_000E7E72:
     cpu->eax = (uint32_t)(uintptr_t)"The current parental level was too low.";
     goto label_000EA1A9;
-    label_000E7E7C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E7Cu);
+    label_000E7E7C:
     cpu->eax = (uint32_t)(uintptr_t)"The current audio is not karaoke content.";
     goto label_000EA1A9;
-    label_000E7E86: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E86u);
+    label_000E7E86:
     cpu->eax = (uint32_t)(uintptr_t)"Frame step is not supported on this configuration.";
     goto label_000EA1A9;
-    label_000E7E90: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E90u);
+    label_000E7E90:
     cpu->eax = (uint32_t)(uintptr_t)"The specified stream is disabled and cannot be selected.";
     goto label_000EA1A9;
-    label_000E7E9A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7E9Au);
+    label_000E7E9A:
     cpu->eax = (uint32_t)(uintptr_t)"The operation depends on the current title number, however the navigator has not yet entered the VTSM or the title domains, so the 'current' title index is unknown.";
     goto label_000EA1A9;
-    label_000E7EA4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7EA4u);
+    label_000E7EA4:
     cpu->eax = (uint32_t)(uintptr_t)"The specified path does not point to a valid DVD disc.";
     goto label_000EA1A9;
-    label_000E7EAE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7EAEu);
+    label_000E7EAE:
     cpu->eax = (uint32_t)(uintptr_t)"There is currently no resume information.";
     goto label_000EA1A9;
-    label_000E7EB8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7EB8u);
+    label_000E7EB8:
     cpu->eax = (uint32_t)(uintptr_t)"This thread has already blocked this output pin.  There is no need to call IPinFlowControl::Block() again.";
     goto label_000EA1A9;
-    label_000E7EC2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7EC2u);
+    label_000E7EC2:
     cpu->eax = (uint32_t)(uintptr_t)"IPinFlowControl::Block() has been called on another thread.  The current thread cannot make any assumptions about this pin's block state.";
     goto label_000EA1A9;
-    label_000E7ECC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7ECCu);
+    label_000E7ECC:
     cpu->eax = (uint32_t)(uintptr_t)"An operation failed due to a certification failure.";
     goto label_000EA1A9;
-    label_000E7ED6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7ED6u);
+    label_000E7ED6:
     cpu->eax = (uint32_t)(uintptr_t)"DIERR_DRIVERFIRST+5";
     goto label_000EA1A9;
-    label_000E7EE0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7EE0u);
+    label_000E7EE0:
     cpu->ecx = 0x80040909u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8050;
@@ -5023,37 +4960,37 @@ label_000E7D28: ;
 label_000E7F22: ;
     cpu->eax = (uint32_t)(uintptr_t)"Device installer errors.";
     goto label_000EA1A9;
-    label_000E7F2C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F2Cu);
+    label_000E7F2C:
     cpu->eax = (uint32_t)(uintptr_t)"Registry entry or DLL for class installer invalid or class installer not found.";
     goto label_000EA1A9;
-    label_000E7F36: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F36u);
+    label_000E7F36:
     cpu->eax = (uint32_t)(uintptr_t)"The user cancelled the install operation. & The stream already has allocated samples and the surface doesn't match the sample format.";
     goto label_000EA1A9;
-    label_000E7F40: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F40u);
+    label_000E7F40:
     cpu->eax = (uint32_t)(uintptr_t)"The INF file for the selected device could not be found or is invalid or is damaged. & The specified purpose ID can't be used for the call.";
     goto label_000EA1A9;
-    label_000E7F4A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F4Au);
+    label_000E7F4A:
     cpu->eax = (uint32_t)(uintptr_t)"A registry entry is corrupt.";
     goto label_000EA1A9;
-    label_000E7F54: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F54u);
+    label_000E7F54:
     cpu->eax = (uint32_t)(uintptr_t)"No stream can be found with the specified attributes.";
     goto label_000EA1A9;
-    label_000E7F5E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F5Eu);
+    label_000E7F5E:
     cpu->eax = (uint32_t)(uintptr_t)"Seeking not supported for this object.";
     goto label_000EA1A9;
-    label_000E7F68: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F68u);
+    label_000E7F68:
     cpu->eax = (uint32_t)(uintptr_t)"The stream formats are not compatible.";
     goto label_000EA1A9;
-    label_000E7F72: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F72u);
+    label_000E7F72:
     cpu->eax = (uint32_t)(uintptr_t)"The sample is busy.";
     goto label_000EA1A9;
-    label_000E7F7C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F7Cu);
+    label_000E7F7C:
     cpu->eax = (uint32_t)(uintptr_t)"The object can't accept the call because its initialize function or equivalent has not been called.";
     goto label_000EA1A9;
-    label_000E7F86: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F86u);
+    label_000E7F86:
     cpu->eax = (uint32_t)(uintptr_t)"MS_E_SOURCEALREADYDEFINED";
     goto label_000EA1A9;
-    label_000E7F90: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7F90u);
+    label_000E7F90:
     cpu->ecx = 0x80040904u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E7FFE;
@@ -5065,41 +5002,41 @@ label_000E7F22: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80040903u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"A media file could not be found.";
     goto label_000EA1A9;
-    label_000E7FCC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7FCCu);
+    label_000E7FCC:
     cpu->eax = (uint32_t)(uintptr_t)"No device could be found with the specified device settings.";
     goto label_000EA1A9;
-    label_000E7FD6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7FD6u);
+    label_000E7FD6:
     cpu->eax = (uint32_t)(uintptr_t)"Could not initialize Direct3D.";
     goto label_000EA1A9;
-    label_000E7FE0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7FE0u);
+    label_000E7FE0:
     cpu->eax = (uint32_t)(uintptr_t)"The object is not in running state.";
     goto label_000EA1A9;
-    label_000E7FEA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7FEAu);
+    label_000E7FEA:
     cpu->eax = (uint32_t)(uintptr_t)"The stream type is not valid for this operation.";
     goto label_000EA1A9;
-    label_000E7FF4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7FF4u);
+    label_000E7FF4:
     cpu->eax = (uint32_t)(uintptr_t)"The device interface has a non-zero reference count, meaning that some objects were not released.";
     goto label_000EA1A9;
-    label_000E7FFE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E7FFEu);
+    label_000E7FFE:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80040905u)) goto label_000E803C;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80040906u)) goto label_000E8032;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80040907u)) goto label_000E8028;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80040908u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"An error occurred in the device reset callback function.";
     goto label_000EA1A9;
-    label_000E8028: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8028u);
+    label_000E8028:
     cpu->eax = (uint32_t)(uintptr_t)"An error occurred in the device create callback function.";
     goto label_000EA1A9;
-    label_000E8032: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8032u);
+    label_000E8032:
     cpu->eax = (uint32_t)(uintptr_t)"An error occurred when attempting to reset a device.";
     goto label_000EA1A9;
-    label_000E803C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E803Cu);
+    label_000E803C:
     cpu->eax = (uint32_t)(uintptr_t)"An error occurred when attempting to create a device.";
     goto label_000EA1A9;
-    label_000E8046: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8046u);
+    label_000E8046:
     cpu->eax = (uint32_t)(uintptr_t)"Incorrect version of Direct3D or D3DX.";
     goto label_000EA1A9;
-    label_000E8050: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8050u);
+    label_000E8050:
     cpu->ecx = 0x8007000Cu;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E80F7;
@@ -5115,21 +5052,21 @@ label_000E7F22: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80070005u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Access is denied";
     goto label_000EA1A9;
-    label_000E80AD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E80ADu);
+    label_000E80AD:
     cpu->eax = (uint32_t)(uintptr_t)"The device was removed.";
     goto label_000EA1A9;
-    label_000E80B7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E80B7u);
+    label_000E80B7:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80070008u)) goto label_000E9EFD;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80070009u)) goto label_000E9F07;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8007000Au)) goto label_000E9F11;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x8007000Bu)) goto label_000EA18F;
-    label_000E80E3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E80E3u);
+    label_000E80E3:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt was made to load a program with an incorrect format.";
     goto label_000EA1A9;
-    label_000E80ED: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E80EDu);
+    label_000E80ED:
     cpu->eax = (uint32_t)(uintptr_t)"The operation cannot be performed unless the device is acquired.";
     goto label_000EA1A9;
-    label_000E80F7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E80F7u);
+    label_000E80F7:
     cpu->ecx = 0x800700AAu;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E815F;
@@ -5141,38 +5078,38 @@ label_000E7F22: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80070077u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The object could not be created due to an incompatible driver version or mismatched or incomplete driver components.";
     goto label_000EA1A9;
-    label_000E8137: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8137u);
+    label_000E8137:
     cpu->eax = (uint32_t)(uintptr_t)"An invalid parameter was passed to the returning function";
     goto label_000EA1A9;
-    label_000E8141: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8141u);
+    label_000E8141:
     cpu->eax = (uint32_t)(uintptr_t)"Access to the device has been lost.  It must be re-acquired.";
     goto label_000EA1A9;
-    label_000E814B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E814Bu);
+    label_000E814B:
     cpu->eax = (uint32_t)(uintptr_t)"Ran out of memory";
     goto label_000EA1A9;
-    label_000E8155: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8155u);
+    label_000E8155:
     cpu->eax = (uint32_t)(uintptr_t)"The operation cannot be performed while the device is acquired.";
     goto label_000EA1A9;
-    label_000E815F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E815Fu);
+    label_000E815F:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80070103u)) goto label_000E819D;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8007047Eu)) goto label_000E8193;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80070481u)) goto label_000E8189;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80070490u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The specified property ID is not supported for the specified property set.";
     goto label_000EA1A9;
-    label_000E8189: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8189u);
+    label_000E8189:
     cpu->eax = (uint32_t)(uintptr_t)"The application was written for an unsupported prerelease version of DirectInput.";
     goto label_000EA1A9;
-    label_000E8193: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8193u);
+    label_000E8193:
     cpu->eax = (uint32_t)(uintptr_t)"The application requires a newer version of DirectInput.";
     goto label_000EA1A9;
-    label_000E819D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E819Du);
+    label_000E819D:
     cpu->eax = (uint32_t)(uintptr_t)"No more items.";
     goto label_000EA1A9;
-    label_000E81A7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E81A7u);
+    label_000E81A7:
     cpu->eax = (uint32_t)(uintptr_t)"The specified property set is not supported.";
     goto label_000EA1A9;
-    label_000E81B1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E81B1u);
+    label_000E81B1:
     cpu->ecx = 0x80158440u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E871B;
@@ -5198,28 +5135,28 @@ label_000E7F22: ;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8015004Au)) goto label_000E85FB;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80150078u)) goto label_000E86BB;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80150082u)) goto label_000EA18F;
-    label_000E8241: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8241u);
+    label_000E8241:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid object";
     goto label_000EA1A9;
-    label_000E824B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E824Bu);
+    label_000E824B:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80150091u)) goto label_000E86B1;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80150096u)) goto label_000E86A7;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8015012Cu)) goto label_000E828E;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8015012Eu)) goto label_000E8284;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80150168u)) goto label_000EA18F;
-    label_000E827A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E827Au);
+    label_000E827A:
     cpu->eax = (uint32_t)(uintptr_t)"Connection lost";
     goto label_000EA1A9;
-    label_000E8284: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8284u);
+    label_000E8284:
     cpu->eax = (uint32_t)(uintptr_t)"No voice session";
     goto label_000EA1A9;
-    label_000E828E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E828Eu);
+    label_000E828E:
     cpu->eax = (uint32_t)(uintptr_t)"Session lost";
     goto label_000EA1A9;
-    label_000E8298: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8298u);
+    label_000E8298:
     cpu->eax = (uint32_t)(uintptr_t)"Not initialized";
     goto label_000EA1A9;
-    label_000E82A2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E82A2u);
+    label_000E82A2:
     cpu->eax += 0x7FEAFE96u;
     if ((uint32_t)(cpu->eax) > (uint32_t)(0xBu)) goto label_000EA18F;
     switch ((uint32_t)(cpu->eax)) {
@@ -5294,34 +5231,34 @@ label_000E7F22: ;
 label_000E82B7: ;
     cpu->eax = (uint32_t)(uintptr_t)"Connected";
     goto label_000EA1A9;
-    label_000E82C1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E82C1u);
+    label_000E82C1:
     cpu->eax = (uint32_t)(uintptr_t)"Not connected";
     goto label_000EA1A9;
-    label_000E82CB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E82CBu);
+    label_000E82CB:
     cpu->eax = (uint32_t)(uintptr_t)"Connect aborting";
     goto label_000EA1A9;
-    label_000E82D5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E82D5u);
+    label_000E82D5:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid target";
     goto label_000EA1A9;
-    label_000E82DF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E82DFu);
+    label_000E82DF:
     cpu->eax = (uint32_t)(uintptr_t)"Transport not host";
     goto label_000EA1A9;
-    label_000E82E9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E82E9u);
+    label_000E82E9:
     cpu->eax = (uint32_t)(uintptr_t)"Compression not supported";
     goto label_000EA1A9;
-    label_000E82F3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E82F3u);
+    label_000E82F3:
     cpu->eax = (uint32_t)(uintptr_t)"Already pending";
     goto label_000EA1A9;
-    label_000E82FD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E82FDu);
+    label_000E82FD:
     cpu->eax = (uint32_t)(uintptr_t)"Sound init failure";
     goto label_000EA1A9;
-    label_000E8307: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8307u);
+    label_000E8307:
     cpu->eax = (uint32_t)(uintptr_t)"Time out";
     goto label_000EA1A9;
-    label_000E8311: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8311u);
+    label_000E8311:
     cpu->eax = (uint32_t)(uintptr_t)"Connect aborted";
     goto label_000EA1A9;
-    label_000E831B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E831Bu);
+    label_000E831B:
     cpu->eax += 0x7FEAFE89u;
     if ((uint32_t)(cpu->eax) > (uint32_t)(0x18u)) goto label_000EA18F;
     switch ((uint32_t)(cpu->eax)) {
@@ -5383,64 +5320,64 @@ label_000E82B7: ;
         case 58u: goto label_000E8F07;
         default: lift_trap(cpu, 0x4E8329u, "resolved jump-table index out of range"); return;
     }
-    label_000E8330: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8330u);
+    label_000E8330:
     cpu->eax = (uint32_t)(uintptr_t)"No 3d sound";
     goto label_000EA1A9;
-    label_000E833A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E833Au);
+    label_000E833A:
     cpu->eax = (uint32_t)(uintptr_t)"Already buffered";
     goto label_000EA1A9;
-    label_000E8344: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8344u);
+    label_000E8344:
     cpu->eax = (uint32_t)(uintptr_t)"Not buffered";
     goto label_000EA1A9;
-    label_000E834E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E834Eu);
+    label_000E834E:
     cpu->eax = (uint32_t)(uintptr_t)"Not hosting";
     goto label_000EA1A9;
-    label_000E8358: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8358u);
+    label_000E8358:
     cpu->eax = (uint32_t)(uintptr_t)"Record system error";
     goto label_000EA1A9;
-    label_000E8362: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8362u);
+    label_000E8362:
     cpu->eax = (uint32_t)(uintptr_t)"Playback system error";
     goto label_000EA1A9;
-    label_000E836C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E836Cu);
+    label_000E836C:
     cpu->eax = (uint32_t)(uintptr_t)"Send error";
     goto label_000EA1A9;
-    label_000E8376: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8376u);
+    label_000E8376:
     cpu->eax = (uint32_t)(uintptr_t)"Run setup";
     goto label_000EA1A9;
-    label_000E8380: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8380u);
+    label_000E8380:
     cpu->eax = (uint32_t)(uintptr_t)"Incompatible version";
     goto label_000EA1A9;
-    label_000E838A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E838Au);
+    label_000E838A:
     cpu->eax = (uint32_t)(uintptr_t)"Initialized";
     goto label_000EA1A9;
-    label_000E8394: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8394u);
+    label_000E8394:
     cpu->eax = (uint32_t)(uintptr_t)"No transport";
     goto label_000EA1A9;
-    label_000E839E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E839Eu);
+    label_000E839E:
     cpu->eax = (uint32_t)(uintptr_t)"No callback";
     goto label_000EA1A9;
-    label_000E83A8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E83A8u);
+    label_000E83A8:
     cpu->eax = (uint32_t)(uintptr_t)"Transport not init";
     goto label_000EA1A9;
-    label_000E83B2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E83B2u);
+    label_000E83B2:
     cpu->eax = (uint32_t)(uintptr_t)"Transport no session";
     goto label_000EA1A9;
-    label_000E83BC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E83BCu);
+    label_000E83BC:
     cpu->eax = (uint32_t)(uintptr_t)"Transport no player";
     goto label_000EA1A9;
-    label_000E83C6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E83C6u);
+    label_000E83C6:
     cpu->eax = (uint32_t)(uintptr_t)"User back";
     goto label_000EA1A9;
-    label_000E83D0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E83D0u);
+    label_000E83D0:
     cpu->eax = (uint32_t)(uintptr_t)"No rec vol available";
     goto label_000EA1A9;
-    label_000E83DA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E83DAu);
+    label_000E83DA:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid buffer";
     goto label_000EA1A9;
-    label_000E83E4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E83E4u);
+    label_000E83E4:
     cpu->eax = (uint32_t)(uintptr_t)"Locked buffer";
     goto label_000EA1A9;
-    label_000E83EE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E83EEu);
+    label_000E83EE:
     cpu->ecx = 0x80158220u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E858E;
@@ -5460,41 +5397,41 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158070u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Already disconnecting";
     goto label_000EA1A9;
-    label_000E8450: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8450u);
+    label_000E8450:
     cpu->eax = (uint32_t)(uintptr_t)"Already connected";
     goto label_000EA1A9;
-    label_000E845A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E845Au);
+    label_000E845A:
     cpu->eax = (uint32_t)(uintptr_t)"Already closing";
     goto label_000EA1A9;
-    label_000E8464: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8464u);
+    label_000E8464:
     cpu->eax = (uint32_t)(uintptr_t)"Addressing";
     goto label_000EA1A9;
-    label_000E846E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E846Eu);
+    label_000E846E:
     cpu->eax = (uint32_t)(uintptr_t)"Aborted";
     goto label_000EA1A9;
-    label_000E8478: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8478u);
+    label_000E8478:
     cpu->eax = (uint32_t)(uintptr_t)"Already initialized";
     goto label_000EA1A9;
-    label_000E8482: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8482u);
+    label_000E8482:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158090u)) goto label_000E84C0;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158100u)) goto label_000E84B6;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158110u)) goto label_000E84AC;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158120u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Cant create group";
     goto label_000EA1A9;
-    label_000E84AC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E84ACu);
+    label_000E84AC:
     cpu->eax = (uint32_t)(uintptr_t)"Can not cancel";
     goto label_000EA1A9;
-    label_000E84B6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E84B6u);
+    label_000E84B6:
     cpu->eax = (uint32_t)(uintptr_t)"Buffer too small";
     goto label_000EA1A9;
-    label_000E84C0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E84C0u);
+    label_000E84C0:
     cpu->eax = (uint32_t)(uintptr_t)"Already registered";
     goto label_000EA1A9;
-    label_000E84CA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E84CAu);
+    label_000E84CA:
     cpu->eax = (uint32_t)(uintptr_t)"Cant create player";
     goto label_000EA1A9;
-    label_000E84D4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E84D4u);
+    label_000E84D4:
     cpu->ecx = 0x80158180u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E853C;
@@ -5506,38 +5443,38 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158175u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Data too large";
     goto label_000EA1A9;
-    label_000E8514: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8514u);
+    label_000E8514:
     cpu->eax = (uint32_t)(uintptr_t)"Conversion";
     goto label_000EA1A9;
-    label_000E851E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E851Eu);
+    label_000E851E:
     cpu->eax = (uint32_t)(uintptr_t)"Connecting";
     goto label_000EA1A9;
-    label_000E8528: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8528u);
+    label_000E8528:
     cpu->eax = (uint32_t)(uintptr_t)"Cant launch application";
     goto label_000EA1A9;
-    label_000E8532: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8532u);
+    label_000E8532:
     cpu->eax = (uint32_t)(uintptr_t)"Does not exist";
     goto label_000EA1A9;
-    label_000E853C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E853Cu);
+    label_000E853C:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158185u)) goto label_000E857A;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158190u)) goto label_000E8570;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158200u)) goto label_000E8566;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158210u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Enum query too large";
     goto label_000EA1A9;
-    label_000E8566: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8566u);
+    label_000E8566:
     cpu->eax = (uint32_t)(uintptr_t)"End point not receiving";
     goto label_000EA1A9;
-    label_000E8570: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8570u);
+    label_000E8570:
     cpu->eax = (uint32_t)(uintptr_t)"Duplicate command";
     goto label_000EA1A9;
-    label_000E857A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E857Au);
+    label_000E857A:
     cpu->eax = (uint32_t)(uintptr_t)"dpnsvr not available";
     goto label_000EA1A9;
-    label_000E8584: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8584u);
+    label_000E8584:
     cpu->eax = (uint32_t)(uintptr_t)"Enum response too large";
     goto label_000EA1A9;
-    label_000E858E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E858Eu);
+    label_000E858E:
     cpu->ecx = 0x80158330u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8661;
@@ -5553,41 +5490,41 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158270u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Host terminated session";
     goto label_000EA1A9;
-    label_000E85DD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E85DDu);
+    label_000E85DD:
     cpu->eax = (uint32_t)(uintptr_t)"Host rejected connection";
     goto label_000EA1A9;
-    label_000E85E7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E85E7u);
+    label_000E85E7:
     cpu->eax = (uint32_t)(uintptr_t)"Hosting";
     goto label_000EA1A9;
-    label_000E85F1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E85F1u);
+    label_000E85F1:
     cpu->eax = (uint32_t)(uintptr_t)"Group not empty";
     goto label_000EA1A9;
-    label_000E85FB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E85FBu);
+    label_000E85FB:
     cpu->eax = (uint32_t)(uintptr_t)"Exception";
     goto label_000EA1A9;
-    label_000E8605: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8605u);
+    label_000E8605:
     cpu->eax = (uint32_t)(uintptr_t)"Incomplete address";
     goto label_000EA1A9;
-    label_000E860F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E860Fu);
+    label_000E860F:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158290u)) goto label_000E864D;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158300u)) goto label_000E8643;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158310u)) goto label_000E8639;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158320u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Invalid device address";
     goto label_000EA1A9;
-    label_000E8639: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8639u);
+    label_000E8639:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid command";
     goto label_000EA1A9;
-    label_000E8643: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8643u);
+    label_000E8643:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid application";
     goto label_000EA1A9;
-    label_000E864D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E864Du);
+    label_000E864D:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid address format";
     goto label_000EA1A9;
-    label_000E8657: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8657u);
+    label_000E8657:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid end point";
     goto label_000EA1A9;
-    label_000E8661: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8661u);
+    label_000E8661:
     cpu->ecx = 0x80158390u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E86CF;
@@ -5599,38 +5536,38 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158380u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Invalid instance";
     goto label_000EA1A9;
-    label_000E869D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E869Du);
+    label_000E869D:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid host address";
     goto label_000EA1A9;
-    label_000E86A7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E86A7u);
+    label_000E86A7:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid handle";
     goto label_000EA1A9;
-    label_000E86B1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E86B1u);
+    label_000E86B1:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid group";
     goto label_000EA1A9;
-    label_000E86BB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E86BBu);
+    label_000E86BB:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid flags";
     goto label_000EA1A9;
-    label_000E86C5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E86C5u);
+    label_000E86C5:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid interface";
     goto label_000EA1A9;
-    label_000E86CF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E86CFu);
+    label_000E86CF:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158400u)) goto label_000E8241;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158410u)) goto label_000E8707;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158420u)) goto label_000E86FD;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158430u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Invalid priority";
     goto label_000EA1A9;
-    label_000E86FD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E86FDu);
+    label_000E86FD:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid player";
     goto label_000EA1A9;
-    label_000E8707: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8707u);
+    label_000E8707:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid password";
     goto label_000EA1A9;
-    label_000E8711: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8711u);
+    label_000E8711:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid string";
     goto label_000EA1A9;
-    label_000E871B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E871Bu);
+    label_000E871B:
     cpu->ecx = 0x887600DCu;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8A59;
@@ -5654,41 +5591,41 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158490u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"No host player";
     goto label_000EA1A9;
-    label_000E878E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E878Eu);
+    label_000E878E:
     cpu->eax = (uint32_t)(uintptr_t)"No connection";
     goto label_000EA1A9;
-    label_000E8798: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8798u);
+    label_000E8798:
     cpu->eax = (uint32_t)(uintptr_t)"No caps";
     goto label_000EA1A9;
-    label_000E87A2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E87A2u);
+    label_000E87A2:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid version";
     goto label_000EA1A9;
-    label_000E87AC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E87ACu);
+    label_000E87AC:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid url";
     goto label_000EA1A9;
-    label_000E87B6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E87B6u);
+    label_000E87B6:
     cpu->eax = (uint32_t)(uintptr_t)"No more address components";
     goto label_000EA1A9;
-    label_000E87C0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E87C0u);
+    label_000E87C0:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158510u)) goto label_000E87FE;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158520u)) goto label_000E87F4;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158530u)) goto label_000E87EA;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158540u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Not ready";
     goto label_000EA1A9;
-    label_000E87EA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E87EAu);
+    label_000E87EA:
     cpu->eax = (uint32_t)(uintptr_t)"Not host";
     goto label_000EA1A9;
-    label_000E87F4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E87F4u);
+    label_000E87F4:
     cpu->eax = (uint32_t)(uintptr_t)"Not allowed";
     goto label_000EA1A9;
-    label_000E87FE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E87FEu);
+    label_000E87FE:
     cpu->eax = (uint32_t)(uintptr_t)"No response";
     goto label_000EA1A9;
-    label_000E8808: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8808u);
+    label_000E8808:
     cpu->eax = (uint32_t)(uintptr_t)"Not registered";
     goto label_000EA1A9;
-    label_000E8812: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8812u);
+    label_000E8812:
     cpu->ecx = 0x80158610u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8880;
@@ -5700,39 +5637,39 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158600u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Send too large";
     goto label_000EA1A9;
-    label_000E884E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E884Eu);
+    label_000E884E:
     cpu->eax = (uint32_t)(uintptr_t)"Player not reachable";
     goto label_000EA1A9;
-    label_000E8858: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8858u);
+    label_000E8858:
     cpu->eax = (uint32_t)(uintptr_t)"Player not in group";
     goto label_000EA1A9;
-    label_000E8862: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8862u);
+    label_000E8862:
     cpu->eax = (uint32_t)(uintptr_t)"Player lost";
     goto label_000EA1A9;
-    label_000E886C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E886Cu);
+    label_000E886C:
     cpu->eax = (uint32_t)(uintptr_t)"Player already in group";
     goto label_000EA1A9;
-    label_000E8876: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8876u);
+    label_000E8876:
     cpu->eax = (uint32_t)(uintptr_t)"Session full";
     goto label_000EA1A9;
-    label_000E8880: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8880u);
+    label_000E8880:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158620u)) goto label_000E88BE;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158630u)) goto label_000E88B4;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x80158640u)) goto label_000E88AA;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x80158650u)) goto label_000EA18F;
-    label_000E88A0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E88A0u);
+    label_000E88A0:
     cpu->eax = (uint32_t)(uintptr_t)"User cancel";
     goto label_000EA1A9;
-    label_000E88AA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E88AAu);
+    label_000E88AA:
     cpu->eax = (uint32_t)(uintptr_t)"Uninitialized";
     goto label_000EA1A9;
-    label_000E88B4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E88B4u);
+    label_000E88B4:
     cpu->eax = (uint32_t)(uintptr_t)"Timed out";
     goto label_000EA1A9;
-    label_000E88BE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E88BEu);
+    label_000E88BE:
     cpu->eax = (uint32_t)(uintptr_t)"Table full";
     goto label_000EA1A9;
-    label_000E88C8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E88C8u);
+    label_000E88C8:
     cpu->ecx = 0x88760091u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8999;
@@ -5748,41 +5685,41 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x8876005Au)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Height of rectangle provided is not a multiple of reqd alignment";
     goto label_000EA1A9;
-    label_000E8915: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8915u);
+    label_000E8915:
     cpu->eax = (uint32_t)(uintptr_t)"An exception was encountered while performing the requested operation";
     goto label_000EA1A9;
-    label_000E891F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E891Fu);
+    label_000E891F:
     cpu->eax = (uint32_t)(uintptr_t)"Support is currently not available.";
     goto label_000EA1A9;
-    label_000E8929: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8929u);
+    label_000E8929:
     cpu->eax = (uint32_t)(uintptr_t)"This surface can not be detached from the requested surface.";
     goto label_000EA1A9;
-    label_000E8933: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8933u);
+    label_000E8933:
     cpu->eax = (uint32_t)(uintptr_t)"This surface can not be attached to the requested surface.";
     goto label_000EA1A9;
-    label_000E893D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E893Du);
+    label_000E893D:
     cpu->eax = (uint32_t)(uintptr_t)"Unable to match primary surface creation request with existing primary surface.";
     goto label_000EA1A9;
-    label_000E8947: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8947u);
+    label_000E8947:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760064u)) goto label_000E8985;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8876006Eu)) goto label_000E897B;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760078u)) goto label_000E8971;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88760082u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"DirectDraw received a pointer that was an invalid DIRECTDRAW object.";
     goto label_000EA1A9;
-    label_000E8971: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8971u);
+    label_000E8971:
     cpu->eax = (uint32_t)(uintptr_t)"DirectDraw does not support the requested mode";
     goto label_000EA1A9;
-    label_000E897B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E897Bu);
+    label_000E897B:
     cpu->eax = (uint32_t)(uintptr_t)"DirectDraw does not support provided Cliplist.";
     goto label_000EA1A9;
-    label_000E8985: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8985u);
+    label_000E8985:
     cpu->eax = (uint32_t)(uintptr_t)"One or more of the caps bits passed to the callback are incorrect.";
     goto label_000EA1A9;
-    label_000E898F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E898Fu);
+    label_000E898F:
     cpu->eax = (uint32_t)(uintptr_t)"pixel format was invalid as specified";
     goto label_000EA1A9;
-    label_000E8999: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8999u);
+    label_000E8999:
     cpu->ecx = 0x887600B6u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8A07;
@@ -5794,41 +5731,41 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x887600B5u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no stereo hardware present or available.";
     goto label_000EA1A9;
-    label_000E89D5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E89D5u);
+    label_000E89D5:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no alpha accleration hardware present or available.";
     goto label_000EA1A9;
-    label_000E89DF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E89DFu);
+    label_000E89DF:
     cpu->eax = (uint32_t)(uintptr_t)"There is no 3D present.";
     goto label_000EA1A9;
-    label_000E89E9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E89E9u);
+    label_000E89E9:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because one or more surfaces are locked";
     goto label_000EA1A9;
-    label_000E89F3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E89F3u);
+    label_000E89F3:
     cpu->eax = (uint32_t)(uintptr_t)"Rectangle provided was invalid.";
     goto label_000EA1A9;
-    label_000E89FD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E89FDu);
+    label_000E89FD:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no hardware present which supports stereo surfaces";
     goto label_000EA1A9;
-    label_000E8A07: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8A07u);
+    label_000E8A07:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887600CDu)) goto label_000E8A45;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887600D2u)) goto label_000E8A3B;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887600D4u)) goto label_000E8A31;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x887600D7u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Surface doesn't currently have a color key";
     goto label_000EA1A9;
-    label_000E8A31: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8A31u);
+    label_000E8A31:
     cpu->eax = (uint32_t)(uintptr_t)"Create function called without DirectDraw object method SetCooperativeLevel being called.";
     goto label_000EA1A9;
-    label_000E8A3B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8A3Bu);
+    label_000E8A3B:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no color conversion hardware present or available.";
     goto label_000EA1A9;
-    label_000E8A45: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8A45u);
+    label_000E8A45:
     cpu->eax = (uint32_t)(uintptr_t)"no clip list available";
     goto label_000EA1A9;
-    label_000E8A4F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8A4Fu);
+    label_000E8A4F:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no hardware support of the dest color key.";
     goto label_000EA1A9;
-    label_000E8A59: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8A59u);
+    label_000E8A59:
     cpu->ecx = 0x88760180u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8BFD;
@@ -5848,41 +5785,41 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x887600FAu)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no hardware present or available.";
     goto label_000EA1A9;
-    label_000E8AB9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8AB9u);
+    label_000E8AB9:
     cpu->eax = (uint32_t)(uintptr_t)"There is no GDI present.";
     goto label_000EA1A9;
-    label_000E8AC3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8AC3u);
+    label_000E8AC3:
     cpu->eax = (uint32_t)(uintptr_t)"Flipping visible surfaces is not supported.";
     goto label_000EA1A9;
-    label_000E8ACD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8ACDu);
+    label_000E8ACD:
     cpu->eax = (uint32_t)(uintptr_t)"Operation requires the application to have exclusive mode but the application does not have exclusive mode.";
     goto label_000EA1A9;
-    label_000E8AD7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8AD7u);
+    label_000E8AD7:
     cpu->eax = (uint32_t)(uintptr_t)"No DirectDraw support possible with current display driver";
     goto label_000EA1A9;
-    label_000E8AE1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8AE1u);
+    label_000E8AE1:
     cpu->eax = (uint32_t)(uintptr_t)"Requested item was not found";
     goto label_000EA1A9;
-    label_000E8AEB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8AEBu);
+    label_000E8AEB:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760104u)) goto label_000E8B29;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8876010Eu)) goto label_000E8B1F;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760118u)) goto label_000E8B15;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88760122u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no rotation hardware present or available.";
     goto label_000EA1A9;
-    label_000E8B15: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8B15u);
+    label_000E8B15:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no appropriate raster op hardware present or available.";
     goto label_000EA1A9;
-    label_000E8B1F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8B1Fu);
+    label_000E8B1F:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because the source and destination rectangles are on the same surface and overlap each other.";
     goto label_000EA1A9;
-    label_000E8B29: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8B29u);
+    label_000E8B29:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no overlay hardware present or available.";
     goto label_000EA1A9;
-    label_000E8B33: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8B33u);
+    label_000E8B33:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no hardware support for stretching";
     goto label_000EA1A9;
-    label_000E8B3D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8B3Du);
+    label_000E8B3D:
     cpu->ecx = 0x88760154u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8BAB;
@@ -5894,41 +5831,41 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x8876014Fu)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no hardware support for vertical blank synchronized operations.";
     goto label_000EA1A9;
-    label_000E8B79: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8B79u);
+    label_000E8B79:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no texture mapping hardware present or available.";
     goto label_000EA1A9;
-    label_000E8B83: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8B83u);
+    label_000E8B83:
     cpu->eax = (uint32_t)(uintptr_t)"DirectDraw Surface is not in 8 bit color mode and the requested operation requires 8 bit color.";
     goto label_000EA1A9;
-    label_000E8B8D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8B8Du);
+    label_000E8B8D:
     cpu->eax = (uint32_t)(uintptr_t)"DirectDrawSurface is not in 4 bit color index palette and the requested operation requires 4 bit color index palette.";
     goto label_000EA1A9;
-    label_000E8B97: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8B97u);
+    label_000E8B97:
     cpu->eax = (uint32_t)(uintptr_t)"DirectDrawSurface is not in 4 bit color palette and the requested operation requires 4 bit color palette.";
     goto label_000EA1A9;
-    label_000E8BA1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8BA1u);
+    label_000E8BA1:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no hardware support for zbuffer blting.";
     goto label_000EA1A9;
-    label_000E8BAB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8BABu);
+    label_000E8BAB:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8876015Eu)) goto label_000E8BE9;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760168u)) goto label_000E8BDF;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8876017Cu)) goto label_000E8BD5;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x8876017Eu)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"hardware does not support clipped overlays";
     goto label_000EA1A9;
-    label_000E8BD5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8BD5u);
+    label_000E8BD5:
     cpu->eax = (uint32_t)(uintptr_t)"Out of video memory";
     goto label_000EA1A9;
-    label_000E8BDF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8BDFu);
+    label_000E8BDF:
     cpu->eax = (uint32_t)(uintptr_t)"The hardware needed for the requested operation has already been allocated.";
     goto label_000EA1A9;
-    label_000E8BE9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8BE9u);
+    label_000E8BE9:
     cpu->eax = (uint32_t)(uintptr_t)"Overlay surfaces could not be z layered based on their BltOrder because the hardware does not support z layering of overlays.";
     goto label_000EA1A9;
-    label_000E8BF3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8BF3u);
+    label_000E8BF3:
     cpu->eax = (uint32_t)(uintptr_t)"Can only have ony color key active at one time for overlays";
     goto label_000EA1A9;
-    label_000E8BFD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8BFDu);
+    label_000E8BFD:
     cpu->ecx = 0x887601E0u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8CCE;
@@ -5944,41 +5881,41 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x887601AEu)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Access to this surface is being refused because the surface is already locked by another thread.";
     goto label_000EA1A9;
-    label_000E8C4A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8C4Au);
+    label_000E8C4A:
     cpu->eax = (uint32_t)(uintptr_t)"This surface is already a dependency of the surface it is being made a dependency of.";
     goto label_000EA1A9;
-    label_000E8C54: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8C54u);
+    label_000E8C54:
     cpu->eax = (uint32_t)(uintptr_t)"This surface is already attached to the surface it is being attached to.";
     goto label_000EA1A9;
-    label_000E8C5E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8C5Eu);
+    label_000E8C5E:
     cpu->eax = (uint32_t)(uintptr_t)"No src color key specified for this operation.";
     goto label_000EA1A9;
-    label_000E8C68: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8C68u);
+    label_000E8C68:
     cpu->eax = (uint32_t)(uintptr_t)"Access to this palette is being refused because the palette is already locked by another thread.";
     goto label_000EA1A9;
-    label_000E8C72: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8C72u);
+    label_000E8C72:
     cpu->eax = (uint32_t)(uintptr_t)"Access to this surface is being refused because no driver exists which can supply a pointer to the surface. This is most likely to happen when attempting to lock the primary surface when no DCI provider is present. Will also happen on attempts to lock an optimized surface.";
     goto label_000EA1A9;
-    label_000E8C7C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8C7Cu);
+    label_000E8C7C:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887601B8u)) goto label_000E8CBA;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887601C2u)) goto label_000E8CB0;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887601CCu)) goto label_000E8CA6;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x887601D6u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Height requested by DirectDraw is too large.";
     goto label_000EA1A9;
-    label_000E8CA6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8CA6u);
+    label_000E8CA6:
     cpu->eax = (uint32_t)(uintptr_t)"The requested surface is not attached.";
     goto label_000EA1A9;
-    label_000E8CB0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8CB0u);
+    label_000E8CB0:
     cpu->eax = (uint32_t)(uintptr_t)"Access to this surface is being refused because the surface is gone. The DIRECTDRAWSURFACE object representing this surface should have Restore called on it.";
     goto label_000EA1A9;
-    label_000E8CBA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8CBAu);
+    label_000E8CBA:
     cpu->eax = (uint32_t)(uintptr_t)"Access to Surface refused because Surface is obscured.";
     goto label_000EA1A9;
-    label_000E8CC4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8CC4u);
+    label_000E8CC4:
     cpu->eax = (uint32_t)(uintptr_t)"Size requested by DirectDraw is too large --  The individual height and width are OK.";
     goto label_000EA1A9;
-    label_000E8CCE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8CCEu);
+    label_000E8CCE:
     cpu->ecx = 0x8876021Cu;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8D3C;
@@ -5990,41 +5927,41 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88760219u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"vertical blank is in progress";
     goto label_000EA1A9;
-    label_000E8D0A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D0Au);
+    label_000E8D0A:
     cpu->eax = (uint32_t)(uintptr_t)"The specified stream contains invalid data";
     goto label_000EA1A9;
-    label_000E8D14: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D14u);
+    label_000E8D14:
     cpu->eax = (uint32_t)(uintptr_t)"Bitmask in the pixel format requested is unsupported by DirectDraw";
     goto label_000EA1A9;
-    label_000E8D1E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D1Eu);
+    label_000E8D1E:
     cpu->eax = (uint32_t)(uintptr_t)"Pixel format requested is unsupported by DirectDraw";
     goto label_000EA1A9;
-    label_000E8D28: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D28u);
+    label_000E8D28:
     cpu->eax = (uint32_t)(uintptr_t)"Width requested by DirectDraw is too large.";
     goto label_000EA1A9;
-    label_000E8D32: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D32u);
+    label_000E8D32:
     cpu->eax = (uint32_t)(uintptr_t)"Was still drawing";
     goto label_000EA1A9;
-    label_000E8D3C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D3Cu);
+    label_000E8D3C:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8876021Eu)) goto label_000E8D7A;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760230u)) goto label_000E8D70;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760231u)) goto label_000E8D66;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88760232u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"A DirectDraw object representing this driver has already been created for this process.";
     goto label_000EA1A9;
-    label_000E8D66: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D66u);
+    label_000E8D66:
     cpu->eax = (uint32_t)(uintptr_t)"The GUID passed to DirectDrawCreate is not a valid DirectDraw driver identifier.";
     goto label_000EA1A9;
-    label_000E8D70: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D70u);
+    label_000E8D70:
     cpu->eax = (uint32_t)(uintptr_t)"Rectangle provided was not horizontally aligned on reqd. boundary";
     goto label_000EA1A9;
-    label_000E8D7A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D7Au);
+    label_000E8D7A:
     cpu->eax = (uint32_t)(uintptr_t)"The specified surface type requires specification of the COMPLEX flag";
     goto label_000EA1A9;
-    label_000E8D84: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D84u);
+    label_000E8D84:
     cpu->eax = (uint32_t)(uintptr_t)"A hardware only DirectDraw object creation was attempted but the driver did not support any hardware.";
     goto label_000EA1A9;
-    label_000E8D8E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8D8Eu);
+    label_000E8D8E:
     cpu->ecx = 0x88760276u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E8F1B;
@@ -6068,112 +6005,112 @@ label_000E82B7: ;
         case 56u: goto label_000E8F07;
         default: goto label_000EA18F;
     }
-    label_000E8DBD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8DBDu);
+    label_000E8DBD:
     cpu->eax = (uint32_t)(uintptr_t)"this process already has created a primary surface";
     goto label_000EA1A9;
-    label_000E8DC7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8DC7u);
+    label_000E8DC7:
     cpu->eax = (uint32_t)(uintptr_t)"software emulation not available.";
     goto label_000EA1A9;
-    label_000E8DD1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8DD1u);
+    label_000E8DD1:
     cpu->eax = (uint32_t)(uintptr_t)"region passed to Clipper::GetClipList is too small.";
     goto label_000EA1A9;
-    label_000E8DDB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8DDBu);
+    label_000E8DDB:
     cpu->eax = (uint32_t)(uintptr_t)"an attempt was made to set a clip list for a clipper objec that is already monitoring an hwnd.";
     goto label_000EA1A9;
-    label_000E8DE5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8DE5u);
+    label_000E8DE5:
     cpu->eax = (uint32_t)(uintptr_t)"No clipper object attached to surface object";
     goto label_000EA1A9;
-    label_000E8DEF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8DEFu);
+    label_000E8DEF:
     cpu->eax = (uint32_t)(uintptr_t)"Clipper notification requires an HWND or no HWND has previously been set as the CooperativeLevel HWND.";
     goto label_000EA1A9;
-    label_000E8DF9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8DF9u);
+    label_000E8DF9:
     cpu->eax = (uint32_t)(uintptr_t)"HWND used by DirectDraw CooperativeLevel has been subclassed, this prevents DirectDraw from restoring state.";
     goto label_000EA1A9;
-    label_000E8E03: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E03u);
+    label_000E8E03:
     cpu->eax = (uint32_t)(uintptr_t)"The CooperativeLevel HWND has already been set. It can not be reset while the process has surfaces or palettes created.";
     goto label_000EA1A9;
-    label_000E8E0D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E0Du);
+    label_000E8E0D:
     cpu->eax = (uint32_t)(uintptr_t)"No palette object attached to this surface.";
     goto label_000EA1A9;
-    label_000E8E17: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E17u);
+    label_000E8E17:
     cpu->eax = (uint32_t)(uintptr_t)"No hardware support for 16 or 256 color palettes.";
     goto label_000EA1A9;
-    label_000E8E21: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E21u);
+    label_000E8E21:
     cpu->eax = (uint32_t)(uintptr_t)"If a clipper object is attached to the source surface passed into a BltFast call.";
     goto label_000EA1A9;
-    label_000E8E2B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E2Bu);
+    label_000E8E2B:
     cpu->eax = (uint32_t)(uintptr_t)"No blter.";
     goto label_000EA1A9;
-    label_000E8E35: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E35u);
+    label_000E8E35:
     cpu->eax = (uint32_t)(uintptr_t)"No DirectDraw ROP hardware.";
     goto label_000EA1A9;
-    label_000E8E3F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E3Fu);
+    label_000E8E3F:
     cpu->eax = (uint32_t)(uintptr_t)"returned when GetOverlayPosition is called on a hidden overlay";
     goto label_000EA1A9;
-    label_000E8E49: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E49u);
+    label_000E8E49:
     cpu->eax = (uint32_t)(uintptr_t)"returned when GetOverlayPosition is called on a overlay that UpdateOverlay has never been called on to establish a destionation.";
     goto label_000EA1A9;
-    label_000E8E53: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E53u);
+    label_000E8E53:
     cpu->eax = (uint32_t)(uintptr_t)"returned when the position of the overlay on the destionation is no longer legal for that destionation.";
     goto label_000EA1A9;
-    label_000E8E5D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E5Du);
+    label_000E8E5D:
     cpu->eax = (uint32_t)(uintptr_t)"returned when an overlay member is called for a non-overlay surface";
     goto label_000EA1A9;
-    label_000E8E67: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E67u);
+    label_000E8E67:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt was made to set the cooperative level when it was already set to exclusive.";
     goto label_000EA1A9;
-    label_000E8E71: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E71u);
+    label_000E8E71:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt has been made to flip a surface that is not flippable.";
     goto label_000EA1A9;
-    label_000E8E7B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E7Bu);
+    label_000E8E7B:
     cpu->eax = (uint32_t)(uintptr_t)"Can't duplicate primary & 3D surfaces, or surfaces that are implicitly created.";
     goto label_000EA1A9;
-    label_000E8E85: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E85u);
+    label_000E8E85:
     cpu->eax = (uint32_t)(uintptr_t)"Surface was not locked.  An attempt to unlock a surface that was not locked at all, or by this process, has been attempted.";
     goto label_000EA1A9;
-    label_000E8E8F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E8Fu);
+    label_000E8E8F:
     cpu->eax = (uint32_t)(uintptr_t)"Windows can not create any more DCs, or a DC was requested for a paltte-indexed surface when the surface had no palette AND the display mode was not palette-indexed (in this case DirectDraw cannot select a proper palette into the DC)";
     goto label_000EA1A9;
-    label_000E8E99: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8E99u);
+    label_000E8E99:
     cpu->eax = (uint32_t)(uintptr_t)"No DC was ever created for this surface.";
     goto label_000EA1A9;
-    label_000E8EA3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8EA3u);
+    label_000E8EA3:
     cpu->eax = (uint32_t)(uintptr_t)"This surface can not be restored because it was created in a different mode.";
     goto label_000EA1A9;
-    label_000E8EAD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8EADu);
+    label_000E8EAD:
     cpu->eax = (uint32_t)(uintptr_t)"This surface can not be restored because it is an implicitly created surface.";
     goto label_000EA1A9;
-    label_000E8EB7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8EB7u);
+    label_000E8EB7:
     cpu->eax = (uint32_t)(uintptr_t)"The surface being used is not a palette-based surface";
     goto label_000EA1A9;
-    label_000E8EC1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8EC1u);
+    label_000E8EC1:
     cpu->eax = (uint32_t)(uintptr_t)"The display is currently in an unsupported mode";
     goto label_000EA1A9;
-    label_000E8ECB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8ECBu);
+    label_000E8ECB:
     cpu->eax = (uint32_t)(uintptr_t)"Operation could not be carried out because there is no mip-map texture mapping hardware present or available.";
     goto label_000EA1A9;
-    label_000E8ED5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8ED5u);
+    label_000E8ED5:
     cpu->eax = (uint32_t)(uintptr_t)"The requested action could not be performed because the surface was of the wrong type.";
     goto label_000EA1A9;
-    label_000E8EDF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8EDFu);
+    label_000E8EDF:
     cpu->eax = (uint32_t)(uintptr_t)"Device does not support optimized surfaces, therefore no video memory optimized surfaces";
     goto label_000EA1A9;
-    label_000E8EE9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8EE9u);
+    label_000E8EE9:
     cpu->eax = (uint32_t)(uintptr_t)"Surface is an optimized surface, but has not yet been allocated any memory";
     goto label_000EA1A9;
-    label_000E8EF3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8EF3u);
+    label_000E8EF3:
     cpu->eax = (uint32_t)(uintptr_t)"Attempt was made to create or set a device window without first setting the focus window";
     goto label_000EA1A9;
-    label_000E8EFD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8EFDu);
+    label_000E8EFD:
     cpu->eax = (uint32_t)(uintptr_t)"Attempt was made to set a palette on a mipmap sublevel";
     goto label_000EA1A9;
-    label_000E8F07: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8F07u);
+    label_000E8F07:
     cpu->eax = (uint32_t)(uintptr_t)"A DC has already been returned for this surface. Only one DC can be retrieved per surface.";
     goto label_000EA1A9;
-    label_000E8F11: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8F11u);
+    label_000E8F11:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt was made to allocate non-local video memory from a device that does not support non-local video memory.";
     goto label_000EA1A9;
-    label_000E8F1B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8F1Bu);
+    label_000E8F1B:
     cpu->ecx = 0x88781205u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9875;
@@ -6204,38 +6141,38 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x887602B2u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"There is more data available than the specified buffer size could hold";
     goto label_000EA1A9;
-    label_000E8FAD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8FADu);
+    label_000E8FAD:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt was made to page unlock a surface with no outstanding page locks.";
     goto label_000EA1A9;
-    label_000E8FB7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8FB7u);
+    label_000E8FB7:
     cpu->eax = (uint32_t)(uintptr_t)"The attempt to page unlock a surface failed.";
     goto label_000EA1A9;
-    label_000E8FC1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8FC1u);
+    label_000E8FC1:
     cpu->eax = (uint32_t)(uintptr_t)"The attempt to page lock a surface failed.";
     goto label_000EA1A9;
-    label_000E8FCB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8FCBu);
+    label_000E8FCB:
     cpu->eax = (uint32_t)(uintptr_t)"The data has expired and is therefore no longer valid.";
     goto label_000EA1A9;
-    label_000E8FD5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8FD5u);
+    label_000E8FD5:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887602B4u)) goto label_000E9013;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887602B5u)) goto label_000E9009;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887602B6u)) goto label_000E8FFF;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x887602B7u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The video port is not active";
     goto label_000EA1A9;
-    label_000E8FFF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E8FFFu);
+    label_000E8FFF:
     cpu->eax = (uint32_t)(uintptr_t)"D3D has not yet been initialized.";
     goto label_000EA1A9;
-    label_000E9009: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9009u);
+    label_000E9009:
     cpu->eax = (uint32_t)(uintptr_t)"The mode test has switched to a new mode.";
     goto label_000EA1A9;
-    label_000E9013: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9013u);
+    label_000E9013:
     cpu->eax = (uint32_t)(uintptr_t)"The mode test has finished executing.";
     goto label_000EA1A9;
-    label_000E901D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E901Du);
+    label_000E901D:
     cpu->eax = (uint32_t)(uintptr_t)"The monitor does not have EDID data.";
     goto label_000EA1A9;
-    label_000E9027: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9027u);
+    label_000E9027:
     cpu->ecx = 0x88760366u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E907E;
@@ -6244,33 +6181,33 @@ label_000E82B7: ;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887602BBu)) goto label_000E9060;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760364u)) goto label_000E9168;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88760365u)) goto label_000EA18F;
-    label_000E9056: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9056u);
+    label_000E9056:
     cpu->eax = (uint32_t)(uintptr_t)"Bad data reference";
     goto label_000EA1A9;
-    label_000E9060: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9060u);
+    label_000E9060:
     cpu->eax = (uint32_t)(uintptr_t)"Surfaces created by one direct draw device cannot be used directly by another direct draw device.";
     goto label_000EA1A9;
-    label_000E906A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E906Au);
+    label_000E906A:
     cpu->eax = (uint32_t)(uintptr_t)"The driver does not enumerate display mode refresh rates.";
     goto label_000EA1A9;
-    label_000E9074: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9074u);
+    label_000E9074:
     cpu->eax = (uint32_t)(uintptr_t)"Internal error";
     goto label_000EA1A9;
-    label_000E907E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E907Eu);
+    label_000E907E:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760367u)) goto label_000E9172;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760368u)) goto label_000E90B6;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760369u)) goto label_000E90AC;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x8876036Au)) goto label_000EA18F;
-    label_000E90A2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E90A2u);
+    label_000E90A2:
     cpu->eax = (uint32_t)(uintptr_t)"No more data";
     goto label_000EA1A9;
-    label_000E90AC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E90ACu);
+    label_000E90AC:
     cpu->eax = (uint32_t)(uintptr_t)"No more stream handles";
     goto label_000EA1A9;
-    label_000E90B6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E90B6u);
+    label_000E90B6:
     cpu->eax = (uint32_t)(uintptr_t)"Bad intrinsics";
     goto label_000EA1A9;
-    label_000E90C0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E90C0u);
+    label_000E90C0:
     cpu->eax += 0x7789FC94u;
     if ((uint32_t)(cpu->eax) > (uint32_t)(0x29u)) goto label_000EA18F;
     switch ((uint32_t)(cpu->eax)) {
@@ -6298,58 +6235,58 @@ label_000E82B7: ;
 label_000E90DC: ;
     cpu->eax = (uint32_t)(uintptr_t)"No internet";
     goto label_000EA1A9;
-    label_000E90E6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E90E6u);
+    label_000E90E6:
     cpu->eax = (uint32_t)(uintptr_t)"Bad object";
     goto label_000EA1A9;
-    label_000E90F0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E90F0u);
+    label_000E90F0:
     cpu->eax = (uint32_t)(uintptr_t)"Bad value";
     goto label_000EA1A9;
-    label_000E90FA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E90FAu);
+    label_000E90FA:
     cpu->eax = (uint32_t)(uintptr_t)"Bad type";
     goto label_000EA1A9;
-    label_000E9104: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9104u);
+    label_000E9104:
     cpu->eax = (uint32_t)(uintptr_t)"Not found";
     goto label_000EA1A9;
-    label_000E910E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E910Eu);
+    label_000E910E:
     cpu->eax = (uint32_t)(uintptr_t)"Not done yet";
     goto label_000EA1A9;
-    label_000E9118: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9118u);
+    label_000E9118:
     cpu->eax = (uint32_t)(uintptr_t)"File not found";
     goto label_000EA1A9;
-    label_000E9122: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9122u);
+    label_000E9122:
     cpu->eax = (uint32_t)(uintptr_t)"Resource not found";
     goto label_000EA1A9;
-    label_000E912C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E912Cu);
+    label_000E912C:
     cpu->eax = (uint32_t)(uintptr_t)"Bad resource";
     goto label_000EA1A9;
-    label_000E9136: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9136u);
+    label_000E9136:
     cpu->eax = (uint32_t)(uintptr_t)"Bad file type";
     goto label_000EA1A9;
-    label_000E9140: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9140u);
+    label_000E9140:
     cpu->eax = (uint32_t)(uintptr_t)"Bad file version";
     goto label_000EA1A9;
-    label_000E914A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E914Au);
+    label_000E914A:
     cpu->eax = (uint32_t)(uintptr_t)"Bad file float size";
     goto label_000EA1A9;
-    label_000E9154: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9154u);
+    label_000E9154:
     cpu->eax = (uint32_t)(uintptr_t)"Bad file";
     goto label_000EA1A9;
-    label_000E915E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E915Eu);
+    label_000E915E:
     cpu->eax = (uint32_t)(uintptr_t)"Parse error";
     goto label_000EA1A9;
-    label_000E9168: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9168u);
+    label_000E9168:
     cpu->eax = (uint32_t)(uintptr_t)"Bad array size";
     goto label_000EA1A9;
-    label_000E9172: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9172u);
+    label_000E9172:
     cpu->eax = (uint32_t)(uintptr_t)"No more objects";
     goto label_000EA1A9;
-    label_000E917C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E917Cu);
+    label_000E917C:
     cpu->eax = (uint32_t)(uintptr_t)"Bad cache file";
     goto label_000EA1A9;
-    label_000E9186: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9186u);
+    label_000E9186:
     cpu->eax = (uint32_t)(uintptr_t)"Wrong texture format";
     goto label_000EA1A9;
-    label_000E9190: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9190u);
+    label_000E9190:
     cpu->ecx = 0x88760866u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9226;
@@ -6383,37 +6320,37 @@ label_000E90DC: ;
 label_000E91B8: ;
     cpu->eax = (uint32_t)(uintptr_t)"Unsupported color operation";
     goto label_000EA1A9;
-    label_000E91C2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E91C2u);
+    label_000E91C2:
     cpu->eax = (uint32_t)(uintptr_t)"Unsupported color arg";
     goto label_000EA1A9;
-    label_000E91CC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E91CCu);
+    label_000E91CC:
     cpu->eax = (uint32_t)(uintptr_t)"Unsupported alpha operation";
     goto label_000EA1A9;
-    label_000E91D6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E91D6u);
+    label_000E91D6:
     cpu->eax = (uint32_t)(uintptr_t)"Unsupported alpha arg";
     goto label_000EA1A9;
-    label_000E91E0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E91E0u);
+    label_000E91E0:
     cpu->eax = (uint32_t)(uintptr_t)"Too many operations";
     goto label_000EA1A9;
-    label_000E91EA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E91EAu);
+    label_000E91EA:
     cpu->eax = (uint32_t)(uintptr_t)"Conflicting texture filter";
     goto label_000EA1A9;
-    label_000E91F4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E91F4u);
+    label_000E91F4:
     cpu->eax = (uint32_t)(uintptr_t)"Unsupported factor value";
     goto label_000EA1A9;
-    label_000E91FE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E91FEu);
+    label_000E91FE:
     cpu->eax = (uint32_t)(uintptr_t)"Conflicting render state";
     goto label_000EA1A9;
-    label_000E9208: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9208u);
+    label_000E9208:
     cpu->eax = (uint32_t)(uintptr_t)"Unsupported texture filter";
     goto label_000EA1A9;
-    label_000E9212: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9212u);
+    label_000E9212:
     cpu->eax = (uint32_t)(uintptr_t)"Conflicting texture palette";
     goto label_000EA1A9;
-    label_000E921C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E921Cu);
+    label_000E921C:
     cpu->eax = (uint32_t)(uintptr_t)"Driver internal error";
     goto label_000EA1A9;
-    label_000E9226: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9226u);
+    label_000E9226:
     cpu->ecx = 0x88760B5Au;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E932C;
@@ -6430,25 +6367,25 @@ label_000E91B8: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x8876086Cu)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Invalid call";
     goto label_000EA1A9;
-    label_000E927C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E927Cu);
+    label_000E927C:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid device";
     goto label_000EA1A9;
-    label_000E9286: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9286u);
+    label_000E9286:
     cpu->eax = (uint32_t)(uintptr_t)"Not available";
     goto label_000EA1A9;
-    label_000E9290: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9290u);
+    label_000E9290:
     cpu->eax = (uint32_t)(uintptr_t)"Device not reset";
     goto label_000EA1A9;
-    label_000E929A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E929Au);
+    label_000E929A:
     cpu->eax = (uint32_t)(uintptr_t)"Device lost";
     goto label_000EA1A9;
-    label_000E92A4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E92A4u);
+    label_000E92A4:
     cpu->eax = (uint32_t)(uintptr_t)"More data";
     goto label_000EA1A9;
-    label_000E92AE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E92AEu);
+    label_000E92AE:
     cpu->eax = (uint32_t)(uintptr_t)"Driver invalid call";
     goto label_000EA1A9;
-    label_000E92B8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E92B8u);
+    label_000E92B8:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760B54u)) goto label_000E9318;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760B55u)) goto label_000E930E;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88760B56u)) goto label_000E9304;
@@ -6457,25 +6394,25 @@ label_000E91B8: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88760B59u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Invalid data";
     goto label_000EA1A9;
-    label_000E92F0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E92F0u);
+    label_000E92F0:
     cpu->eax = (uint32_t)(uintptr_t)"Too many influences";
     goto label_000EA1A9;
-    label_000E92FA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E92FAu);
+    label_000E92FA:
     cpu->eax = (uint32_t)(uintptr_t)"Skinning not supported";
     goto label_000EA1A9;
-    label_000E9304: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9304u);
+    label_000E9304:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot attr sort";
     goto label_000EA1A9;
-    label_000E930E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E930Eu);
+    label_000E930E:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid mesh";
     goto label_000EA1A9;
-    label_000E9318: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9318u);
+    label_000E9318:
     cpu->eax = (uint32_t)(uintptr_t)"Can not modify index buffer";
     goto label_000EA1A9;
-    label_000E9322: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9322u);
+    label_000E9322:
     cpu->eax = (uint32_t)(uintptr_t)"Loaded mesh has no data";
     goto label_000EA1A9;
-    label_000E932C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E932Cu);
+    label_000E932C:
     cpu->ecx = 0x88780064u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E93AB;
@@ -6488,25 +6425,25 @@ label_000E91B8: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88780046u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The caller does not have the priority level required for the function to succeed";
     goto label_000EA1A9;
-    label_000E936F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E936Fu);
+    label_000E936F:
     cpu->eax = (uint32_t)(uintptr_t)"This call is not valid for the current state of this object";
     goto label_000EA1A9;
-    label_000E9379: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9379u);
+    label_000E9379:
     cpu->eax = (uint32_t)(uintptr_t)"The control (vol, pan, etc.) requested by the caller is not available";
     goto label_000EA1A9;
-    label_000E9383: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9383u);
+    label_000E9383:
     cpu->eax = (uint32_t)(uintptr_t)"The call failed because resources (such as a priority level) were already being used by another caller";
     goto label_000EA1A9;
-    label_000E938D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E938Du);
+    label_000E938D:
     cpu->eax = (uint32_t)(uintptr_t)"Can Not remove last item";
     goto label_000EA1A9;
-    label_000E9397: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9397u);
+    label_000E9397:
     cpu->eax = (uint32_t)(uintptr_t)"Duplicate named fragment";
     goto label_000EA1A9;
-    label_000E93A1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E93A1u);
+    label_000E93A1:
     cpu->eax = (uint32_t)(uintptr_t)"The specified WAVE format is not supported";
     goto label_000EA1A9;
-    label_000E93AB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E93ABu);
+    label_000E93AB:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88780078u)) goto label_000E940B;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88780082u)) goto label_000E9401;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88780096u)) goto label_000E93F7;
@@ -6515,25 +6452,25 @@ label_000E91B8: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x887800B4u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Tried to create a DSBCAPS_CTRLFX buffer shorter than DSBSIZE_FX_MIN milliseconds";
     goto label_000EA1A9;
-    label_000E93E3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E93E3u);
+    label_000E93E3:
     cpu->eax = (uint32_t)(uintptr_t)"This object has not been initialized";
     goto label_000EA1A9;
-    label_000E93ED: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E93EDu);
+    label_000E93ED:
     cpu->eax = (uint32_t)(uintptr_t)"Another app has a higher priority level, preventing this call from succeeding";
     goto label_000EA1A9;
-    label_000E93F7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E93F7u);
+    label_000E93F7:
     cpu->eax = (uint32_t)(uintptr_t)"The buffer memory has been lost, and must be restored";
     goto label_000EA1A9;
-    label_000E9401: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9401u);
+    label_000E9401:
     cpu->eax = (uint32_t)(uintptr_t)"This object is already initialized";
     goto label_000EA1A9;
-    label_000E940B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E940Bu);
+    label_000E940B:
     cpu->eax = (uint32_t)(uintptr_t)"No sound driver is available for use";
     goto label_000EA1A9;
-    label_000E9415: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9415u);
+    label_000E9415:
     cpu->eax = (uint32_t)(uintptr_t)"Attempt to use DirectSound 8 functionality on an older DirectSound object";
     goto label_000EA1A9;
-    label_000E941F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E941Fu);
+    label_000E941F:
     cpu->ecx = 0x88781136u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9660;
@@ -6556,38 +6493,38 @@ label_000E91B8: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88781102u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The requested operation cannot be performed while there are  instantiated ports in any process in the system.";
     goto label_000EA1A9;
-    label_000E9489: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9489u);
+    label_000E9489:
     cpu->eax = (uint32_t)(uintptr_t)"An unexpected error was returned from a device driver, indicating possible failure of the driver or hardware.";
     goto label_000EA1A9;
-    label_000E9493: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9493u);
+    label_000E9493:
     cpu->eax = (uint32_t)(uintptr_t)"The GUID specified in an audiopath file does not match a valid MIXIN buffer";
     goto label_000EA1A9;
-    label_000E949D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E949Du);
+    label_000E949D:
     cpu->eax = (uint32_t)(uintptr_t)"A circular loop of send effects was detected";
     goto label_000EA1A9;
-    label_000E94A7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E94A7u);
+    label_000E94A7:
     cpu->eax = (uint32_t)(uintptr_t)"The requested device is already in use (possibly by a non-DirectMusic client) and cannot be opened again.";
     goto label_000EA1A9;
-    label_000E94B1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E94B1u);
+    label_000E94B1:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88781104u)) goto label_000E94EF;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88781105u)) goto label_000E94E5;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88781106u)) goto label_000E94DB;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88781108u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Error parsing DLS collection. File is corrupt.";
     goto label_000EA1A9;
-    label_000E94DB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E94DBu);
+    label_000E94DB:
     cpu->eax = (uint32_t)(uintptr_t)"Download failed due to inability to access or create download buffer.";
     goto label_000EA1A9;
-    label_000E94E5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E94E5u);
+    label_000E94E5:
     cpu->eax = (uint32_t)(uintptr_t)"No buffer was prepared for the download data.";
     goto label_000EA1A9;
-    label_000E94EF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E94EFu);
+    label_000E94EF:
     cpu->eax = (uint32_t)(uintptr_t)"Buffer is not large enough for requested operation.";
     goto label_000EA1A9;
-    label_000E94F9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E94F9u);
+    label_000E94F9:
     cpu->eax = (uint32_t)(uintptr_t)"Wave chunks in DLS collection file are at incorrect offsets.";
     goto label_000EA1A9;
-    label_000E9503: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9503u);
+    label_000E9503:
     cpu->eax += 0x7787EEEFu;
     if ((uint32_t)(cpu->eax) > (uint32_t)(0x10u)) goto label_000EA18F;
     switch ((uint32_t)(cpu->eax)) {
@@ -6602,37 +6539,37 @@ label_000E91B8: ;
         case 16u: goto label_000E956F;
         default: goto label_000EA18F;
     }
-    label_000E951F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E951Fu);
+    label_000E951F:
     cpu->eax = (uint32_t)(uintptr_t)"Second attempt to load a DLS collection that is currently open. ";
     goto label_000EA1A9;
-    label_000E9529: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9529u);
+    label_000E9529:
     cpu->eax = (uint32_t)(uintptr_t)"Error reading wave data from DLS collection. Indicates bad file.";
     goto label_000EA1A9;
-    label_000E9533: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9533u);
+    label_000E9533:
     cpu->eax = (uint32_t)(uintptr_t)"There is no instrument in the collection that matches patch number.";
     goto label_000EA1A9;
-    label_000E953D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E953Du);
+    label_000E953D:
     cpu->eax = (uint32_t)(uintptr_t)"The IStream* doesn't support Seek().";
     goto label_000EA1A9;
-    label_000E9547: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9547u);
+    label_000E9547:
     cpu->eax = (uint32_t)(uintptr_t)"The IStream* doesn't support Write().";
     goto label_000EA1A9;
-    label_000E9551: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9551u);
+    label_000E9551:
     cpu->eax = (uint32_t)(uintptr_t)"The RIFF parser doesn't contain a required chunk while parsing file.";
     goto label_000EA1A9;
-    label_000E955B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E955Bu);
+    label_000E955B:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid download id was used in the process of creating a download buffer.";
     goto label_000EA1A9;
-    label_000E9565: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9565u);
+    label_000E9565:
     cpu->eax = (uint32_t)(uintptr_t)"Tried to unload an object that was not downloaded or previously unloaded.";
     goto label_000EA1A9;
-    label_000E956F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E956Fu);
+    label_000E956F:
     cpu->eax = (uint32_t)(uintptr_t)"Buffer was already downloaded to synth.";
     goto label_000EA1A9;
-    label_000E9579: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9579u);
+    label_000E9579:
     cpu->eax = (uint32_t)(uintptr_t)"The specified property item was not recognized by the target object.";
     goto label_000EA1A9;
-    label_000E9583: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9583u);
+    label_000E9583:
     cpu->eax += 0x7787EEDDu;
     if ((uint32_t)(cpu->eax) > (uint32_t)(0x12u)) goto label_000EA18F;
     switch ((uint32_t)(cpu->eax)) {
@@ -6686,64 +6623,64 @@ label_000E91B8: ;
 label_000E9598: ;
     cpu->eax = (uint32_t)(uintptr_t)"The specified property item may not be set on the target object.";
     goto label_000EA1A9;
-    label_000E95A2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E95A2u);
+    label_000E95A2:
     cpu->eax = (uint32_t)(uintptr_t)"* The specified property item may not be retrieved from the target object.";
     goto label_000EA1A9;
-    label_000E95AC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E95ACu);
+    label_000E95AC:
     cpu->eax = (uint32_t)(uintptr_t)"Wave chunk has more than one interleaved channel. DLS format requires MONO.";
     goto label_000EA1A9;
-    label_000E95B6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E95B6u);
+    label_000E95B6:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid articulation chunk in DLS collection.";
     goto label_000EA1A9;
-    label_000E95C0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E95C0u);
+    label_000E95C0:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid instrument chunk in DLS collection.";
     goto label_000EA1A9;
-    label_000E95CA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E95CAu);
+    label_000E95CA:
     cpu->eax = (uint32_t)(uintptr_t)"Wavelink chunk in DLS collection points to invalid wave.";
     goto label_000EA1A9;
-    label_000E95D4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E95D4u);
+    label_000E95D4:
     cpu->eax = (uint32_t)(uintptr_t)"Articulation missing from instrument in DLS collection.";
     goto label_000EA1A9;
-    label_000E95DE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E95DEu);
+    label_000E95DE:
     cpu->eax = (uint32_t)(uintptr_t)"Downoaded DLS wave is not in PCM format. ";
     goto label_000EA1A9;
-    label_000E95E8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E95E8u);
+    label_000E95E8:
     cpu->eax = (uint32_t)(uintptr_t)"Bad wave chunk in DLS collection";
     goto label_000EA1A9;
-    label_000E95F2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E95F2u);
+    label_000E95F2:
     cpu->eax = (uint32_t)(uintptr_t)"Offset Table for download buffer has errors. ";
     goto label_000EA1A9;
-    label_000E95FC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E95FCu);
+    label_000E95FC:
     cpu->eax = (uint32_t)(uintptr_t)"Attempted to download unknown data type.";
     goto label_000EA1A9;
-    label_000E9606: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9606u);
+    label_000E9606:
     cpu->eax = (uint32_t)(uintptr_t)"The operation could not be completed because no sink was connected to the synthesizer.";
     goto label_000EA1A9;
-    label_000E9610: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9610u);
+    label_000E9610:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt was made to open the software synthesizer while it was already  open.";
     goto label_000EA1A9;
-    label_000E961A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E961Au);
+    label_000E961A:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt was made to close the software synthesizer while it was already  open.";
     goto label_000EA1A9;
-    label_000E9624: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9624u);
+    label_000E9624:
     cpu->eax = (uint32_t)(uintptr_t)"The operation could not be completed because the software synth has not  yet been fully configured.";
     goto label_000EA1A9;
-    label_000E962E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E962Eu);
+    label_000E962E:
     cpu->eax = (uint32_t)(uintptr_t)"The operation cannot be carried out while the synthesizer is active.";
     goto label_000EA1A9;
-    label_000E9638: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9638u);
+    label_000E9638:
     cpu->eax = (uint32_t)(uintptr_t)"An error occurred while attempting to read from the IStream* object.";
     goto label_000EA1A9;
-    label_000E9642: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9642u);
+    label_000E9642:
     cpu->eax = (uint32_t)(uintptr_t)"The operation cannot be performed because the final instance of the DirectMusic object was released. Ports cannot be used after final  release of the DirectMusic object.";
     goto label_000EA1A9;
-    label_000E964C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E964Cu);
+    label_000E964C:
     cpu->eax = (uint32_t)(uintptr_t)"There was no data in the referenced buffer.";
     goto label_000EA1A9;
-    label_000E9656: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9656u);
+    label_000E9656:
     cpu->eax = (uint32_t)(uintptr_t)"There is insufficient space to insert the given event into the buffer.";
     goto label_000EA1A9;
-    label_000E9660: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9660u);
+    label_000E9660:
     cpu->ecx = 0x88781170u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9793;
@@ -6778,85 +6715,85 @@ label_000E9598: ;
         case 48u: goto label_000E977F;
         default: goto label_000EA18F;
     }
-    label_000E968F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E968Fu);
+    label_000E968F:
     cpu->eax = (uint32_t)(uintptr_t)"The object requested was not found (numerically equal to DMUS_E_NOT_FOUND)";
     goto label_000EA1A9;
-    label_000E9699: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9699u);
+    label_000E9699:
     cpu->eax = (uint32_t)(uintptr_t)"The given operation could not be carried out because the port is a capture port.";
     goto label_000EA1A9;
-    label_000E96A3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E96A3u);
+    label_000E96A3:
     cpu->eax = (uint32_t)(uintptr_t)"The given operation could not be carried out because the port is a render port.";
     goto label_000EA1A9;
-    label_000E96AD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E96ADu);
+    label_000E96AD:
     cpu->eax = (uint32_t)(uintptr_t)"The port could not be created because no DirectSound has been specified. Specify a DirectSound interface via the IDirectMusic::SetDirectSound method; pass NULL to have DirectMusic manage usage of DirectSound.";
     goto label_000EA1A9;
-    label_000E96B7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E96B7u);
+    label_000E96B7:
     cpu->eax = (uint32_t)(uintptr_t)"The operation cannot be carried out while the port is active.";
     goto label_000EA1A9;
-    label_000E96C1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E96C1u);
+    label_000E96C1:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid DirectSound buffer was handed to port. ";
     goto label_000EA1A9;
-    label_000E96CB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E96CBu);
+    label_000E96CB:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid buffer format was handed to the synth sink.";
     goto label_000EA1A9;
-    label_000E96D5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E96D5u);
+    label_000E96D5:
     cpu->eax = (uint32_t)(uintptr_t)"The operation cannot be carried out while the synthesizer is inactive.";
     goto label_000EA1A9;
-    label_000E96DF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E96DFu);
+    label_000E96DF:
     cpu->eax = (uint32_t)(uintptr_t)"IDirectMusic::SetDirectSound has already been called. It may not be changed while in use.";
     goto label_000EA1A9;
-    label_000E96E9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E96E9u);
+    label_000E96E9:
     cpu->eax = (uint32_t)(uintptr_t)"The given event is invalid (either it is not a valid MIDI message or it makes use of running status). The event cannot be packed into the buffer.";
     goto label_000EA1A9;
-    label_000E96F3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E96F3u);
+    label_000E96F3:
     cpu->eax = (uint32_t)(uintptr_t)"The IStream* object does not contain data supported by the loading object.";
     goto label_000EA1A9;
-    label_000E96FD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E96FDu);
+    label_000E96FD:
     cpu->eax = (uint32_t)(uintptr_t)"The object has already been initialized.";
     goto label_000EA1A9;
-    label_000E9707: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9707u);
+    label_000E9707:
     cpu->eax = (uint32_t)(uintptr_t)"The file does not contain a valid band.";
     goto label_000EA1A9;
-    label_000E9711: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9711u);
+    label_000E9711:
     cpu->eax = (uint32_t)(uintptr_t)"The IStream* object's data does not have a track header as the first chunk, and therefore can not be read by the segment object.";
     goto label_000EA1A9;
-    label_000E971B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E971Bu);
+    label_000E971B:
     cpu->eax = (uint32_t)(uintptr_t)"The IStream* object's data does not have a tool header as the first chunk, and therefore can not be read by the graph object.";
     goto label_000EA1A9;
-    label_000E9725: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9725u);
+    label_000E9725:
     cpu->eax = (uint32_t)(uintptr_t)"The IStream* object's data contains an invalid track header (ckid is 0 and fccType is NULL,) and therefore can not be read by the segment object.";
     goto label_000EA1A9;
-    label_000E972F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E972Fu);
+    label_000E972F:
     cpu->eax = (uint32_t)(uintptr_t)"The IStream* object's data contains an invalid tool header (ckid is 0 and fccType is NULL,) and therefore can not be read by the graph object.";
     goto label_000EA1A9;
-    label_000E9739: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9739u);
+    label_000E9739:
     cpu->eax = (uint32_t)(uintptr_t)"The graph object was unable to load all tools from the IStream* object data. This may be due to errors in the stream, or the tools being incorrectly registered on the client.";
     goto label_000EA1A9;
-    label_000E9743: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9743u);
+    label_000E9743:
     cpu->eax = (uint32_t)(uintptr_t)"The segment object was unable to load all tracks from the IStream* object data. This may be due to errors in the stream, or the tracks being incorrectly registered on the client.";
     goto label_000EA1A9;
-    label_000E974D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E974Du);
+    label_000E974D:
     cpu->eax = (uint32_t)(uintptr_t)"A required object is not initialized or failed to initialize.";
     goto label_000EA1A9;
-    label_000E9757: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9757u);
+    label_000E9757:
     cpu->eax = (uint32_t)(uintptr_t)"The requested parameter type is currently disabled. Parameter types may be enabled and disabled by certain calls to SetParam().";
     goto label_000EA1A9;
-    label_000E9761: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9761u);
+    label_000E9761:
     cpu->eax = (uint32_t)(uintptr_t)"The requested parameter type is not supported on the object.";
     goto label_000EA1A9;
-    label_000E976B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E976Bu);
+    label_000E976B:
     cpu->eax = (uint32_t)(uintptr_t)"The time is in the past, and the operation can not succeed.";
     goto label_000EA1A9;
-    label_000E9775: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9775u);
+    label_000E9775:
     cpu->eax = (uint32_t)(uintptr_t)"The requested track is not contained by the segment.";
     goto label_000EA1A9;
-    label_000E977F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E977Fu);
+    label_000E977F:
     cpu->eax = (uint32_t)(uintptr_t)"The track does not support clock time playback or getparam.";
     goto label_000EA1A9;
-    label_000E9789: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9789u);
+    label_000E9789:
     cpu->eax = (uint32_t)(uintptr_t)"There is no master clock in the performance. Be sure to call IDirectMusicPerformance::Init().";
     goto label_000EA1A9;
-    label_000E9793: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9793u);
+    label_000E9793:
     cpu->ecx = 0x88781186u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9812;
@@ -6869,25 +6806,25 @@ label_000E9598: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88781185u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Object was not found.";
     goto label_000EA1A9;
-    label_000E97D6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E97D6u);
+    label_000E97D6:
     cpu->eax = (uint32_t)(uintptr_t)"Unable to find or create object.";
     goto label_000EA1A9;
-    label_000E97E0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E97E0u);
+    label_000E97E0:
     cpu->eax = (uint32_t)(uintptr_t)"Search data type is not supported.";
     goto label_000EA1A9;
-    label_000E97EA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E97EAu);
+    label_000E97EA:
     cpu->eax = (uint32_t)(uintptr_t)"File open failed - either file doesn't exist or is locked.";
     goto label_000EA1A9;
-    label_000E97F4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E97F4u);
+    label_000E97F4:
     cpu->eax = (uint32_t)(uintptr_t)"The requested file path is invalid.";
     goto label_000EA1A9;
-    label_000E97FE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E97FEu);
+    label_000E97FE:
     cpu->eax = (uint32_t)(uintptr_t)"The class id field is required and missing in the DMUS_OBJECTDESC.";
     goto label_000EA1A9;
-    label_000E9808: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9808u);
+    label_000E9808:
     cpu->eax = (uint32_t)(uintptr_t)"The file name is missing from the DMUS_OBJECTDESC.";
     goto label_000EA1A9;
-    label_000E9812: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9812u);
+    label_000E9812:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88781200u)) goto label_000E9861;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88781201u)) goto label_000E9857;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x88781202u)) goto label_000E984D;
@@ -6895,22 +6832,22 @@ label_000E9598: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x88781204u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The DMUS_PMSG has already been sent to the performance object via IDirectMusicPerformance::SendPMsg().";
     goto label_000EA1A9;
-    label_000E9843: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9843u);
+    label_000E9843:
     cpu->eax = (uint32_t)(uintptr_t)"Segment initialization failed, most likely due to a critical memory situation.";
     goto label_000EA1A9;
-    label_000E984D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E984Du);
+    label_000E984D:
     cpu->eax = (uint32_t)(uintptr_t)"Value is out of range, for instance the requested length is longer than the segment.";
     goto label_000EA1A9;
-    label_000E9857: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9857u);
+    label_000E9857:
     cpu->eax = (uint32_t)(uintptr_t)"The tool is already contained in the graph. Create a new instance.";
     goto label_000EA1A9;
-    label_000E9861: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9861u);
+    label_000E9861:
     cpu->eax = (uint32_t)(uintptr_t)"The file requested is not a valid file.";
     goto label_000EA1A9;
-    label_000E986B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E986Bu);
+    label_000E986B:
     cpu->eax = (uint32_t)(uintptr_t)"The DMUS_PMSG was either not allocated by the performance via IDirectMusicPerformance::AllocPMsg(), or it was already freed via IDirectMusicPerformance::FreePMsg().";
     goto label_000EA1A9;
-    label_000E9875: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9875u);
+    label_000E9875:
     cpu->ecx = 0xC8770BC0u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9D66;
@@ -7011,64 +6948,64 @@ label_000E9598: ;
 label_000E98C3: ;
     cpu->eax = (uint32_t)(uintptr_t)"The default system port could not be opened.";
     goto label_000EA1A9;
-    label_000E98CD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E98CDu);
+    label_000E98CD:
     cpu->eax = (uint32_t)(uintptr_t)"A call to MIDIToMusic() or MusicToMIDI() resulted in an error because the requested conversion could not happen. This usually occurs when the provided DMUS_CHORD_KEY structure has an invalid chord or scale pattern.";
     goto label_000EA1A9;
-    label_000E98D7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E98D7u);
+    label_000E98D7:
     cpu->eax = (uint32_t)(uintptr_t)"DMUS_E_DESCEND_CHUNK_FAIL is returned when the end of the file  was reached before the desired chunk was found.";
     goto label_000EA1A9;
-    label_000E98E1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E98E1u);
+    label_000E98E1:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt to use this object failed because it first needs to be loaded.";
     goto label_000EA1A9;
-    label_000E98EB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E98EBu);
+    label_000E98EB:
     cpu->eax = (uint32_t)(uintptr_t)"The activeX scripting engine for the script's language is not compatible with DirectMusic.";
     goto label_000EA1A9;
-    label_000E98F5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E98F5u);
+    label_000E98F5:
     cpu->eax = (uint32_t)(uintptr_t)"A varient was used that had a type that is not supported by DirectMusic.";
     goto label_000EA1A9;
-    label_000E98FF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E98FFu);
+    label_000E98FF:
     cpu->eax = (uint32_t)(uintptr_t)"An error was encountered while parsing or executing the script. The pErrorInfo parameter (if supplied) was filled with information about the error.";
     goto label_000EA1A9;
-    label_000E9909: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9909u);
+    label_000E9909:
     cpu->eax = (uint32_t)(uintptr_t)"Loading of oleaut32.dll failed.  VBScript and other activeX scripting languages require use of oleaut32.dll.  On platforms where oleaut32.dll is not present, only the DirectMusicScript language, which doesn't require oleaut32.dll can be used.";
     goto label_000EA1A9;
-    label_000E9913: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9913u);
+    label_000E9913:
     cpu->eax = (uint32_t)(uintptr_t)"An error occured while parsing a script loaded using LoadScript.  The script that was loaded contains an error.";
     goto label_000EA1A9;
-    label_000E991D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E991Du);
+    label_000E991D:
     cpu->eax = (uint32_t)(uintptr_t)"The script file is invalid.";
     goto label_000EA1A9;
-    label_000E9927: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9927u);
+    label_000E9927:
     cpu->eax = (uint32_t)(uintptr_t)"The file contains an invalid script track.";
     goto label_000EA1A9;
-    label_000E9931: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9931u);
+    label_000E9931:
     cpu->eax = (uint32_t)(uintptr_t)"The script does not contain a variable with the specified name.";
     goto label_000EA1A9;
-    label_000E993B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E993Bu);
+    label_000E993B:
     cpu->eax = (uint32_t)(uintptr_t)"The script does not contain a routine with the specified name.";
     goto label_000EA1A9;
-    label_000E9945: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9945u);
+    label_000E9945:
     cpu->eax = (uint32_t)(uintptr_t)"Scripts variables for content referenced or embedded in a script cannot be set.";
     goto label_000EA1A9;
-    label_000E994F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E994Fu);
+    label_000E994F:
     cpu->eax = (uint32_t)(uintptr_t)"Attempt was made to set a script's variable by reference to a value that was not an object type.";
     goto label_000EA1A9;
-    label_000E9959: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9959u);
+    label_000E9959:
     cpu->eax = (uint32_t)(uintptr_t)"Attempt was made to set a script's variable by value to an object that does not support a default value property.";
     goto label_000EA1A9;
-    label_000E9963: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9963u);
+    label_000E9963:
     cpu->eax = (uint32_t)(uintptr_t)"The file contains an invalid segment trigger track.";
     goto label_000EA1A9;
-    label_000E996D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E996Du);
+    label_000E996D:
     cpu->eax = (uint32_t)(uintptr_t)"The file contains an invalid lyrics track.";
     goto label_000EA1A9;
-    label_000E9977: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9977u);
+    label_000E9977:
     cpu->eax = (uint32_t)(uintptr_t)"The file contains an invalid parameter control track.";
     goto label_000EA1A9;
-    label_000E9981: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9981u);
+    label_000E9981:
     cpu->eax = (uint32_t)(uintptr_t)"A script written in AudioVBScript could not be read because it contained a statement that is not allowed by the AudioVBScript language.";
     goto label_000EA1A9;
-    label_000E998B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E998Bu);
+    label_000E998B:
     cpu->ecx = 0x88790001u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9A35;
@@ -7138,46 +7075,46 @@ label_000E98C3: ;
         case 61u: goto label_000E9F1B;
         default: lift_trap(cpu, 0x4E99ACu, "resolved jump-table index out of range"); return;
     }
-    label_000E99B3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E99B3u);
+    label_000E99B3:
     cpu->eax = (uint32_t)(uintptr_t)"A script routine written in AudioVBScript failed because an invalid operation occurred.  For example, adding the number 3 to a segment object would produce this error.  So would attempting to call a routine that doesn't exist.";
     goto label_000EA1A9;
-    label_000E99BD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E99BDu);
+    label_000E99BD:
     cpu->eax = (uint32_t)(uintptr_t)"A script routine written in AudioVBScript failed because a function outside of a script failed to complete. For example, a call to PlaySegment that fails to play because of low memory would return this error.";
     goto label_000EA1A9;
-    label_000E99C7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E99C7u);
+    label_000E99C7:
     cpu->eax = (uint32_t)(uintptr_t)"The Performance has set up some PChannels using the AssignPChannel command, which makes it not capable of supporting audio paths.";
     goto label_000EA1A9;
-    label_000E99D1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E99D1u);
+    label_000E99D1:
     cpu->eax = (uint32_t)(uintptr_t)"This is the inverse of the previous error. The Performance has set up some audio paths, which makes is incompatible with the calls to allocate pchannels, etc. ";
     goto label_000EA1A9;
-    label_000E99DB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E99DBu);
+    label_000E99DB:
     cpu->eax = (uint32_t)(uintptr_t)"A segment or song was asked for its embedded audio path configuration, but there isn't any. ";
     goto label_000EA1A9;
-    label_000E99E5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E99E5u);
+    label_000E99E5:
     cpu->eax = (uint32_t)(uintptr_t)"An audiopath is inactive, perhaps because closedown was called.";
     goto label_000EA1A9;
-    label_000E99EF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E99EFu);
+    label_000E99EF:
     cpu->eax = (uint32_t)(uintptr_t)"An audiopath failed to create because a requested buffer could not be created.";
     goto label_000EA1A9;
-    label_000E99F9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E99F9u);
+    label_000E99F9:
     cpu->eax = (uint32_t)(uintptr_t)"An audiopath could not be used for playback because it lacked port assignments.";
     goto label_000EA1A9;
-    label_000E9A03: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A03u);
+    label_000E9A03:
     cpu->eax = (uint32_t)(uintptr_t)"Attempt was made to play segment in audiopath mode and there was no audiopath.";
     goto label_000EA1A9;
-    label_000E9A0D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A0Du);
+    label_000E9A0D:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid data was found in a RIFF file chunk.";
     goto label_000EA1A9;
-    label_000E9A17: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A17u);
+    label_000E9A17:
     cpu->eax = (uint32_t)(uintptr_t)"Attempt was made to create an audiopath that sends to a global effects buffer which did not exist.";
     goto label_000EA1A9;
-    label_000E9A21: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A21u);
+    label_000E9A21:
     cpu->eax = (uint32_t)(uintptr_t)"The file does not contain a valid container object.";
     goto label_000EA1A9;
-    label_000E9A2B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A2Bu);
+    label_000E9A2B:
     cpu->eax = (uint32_t)(uintptr_t)"There are too many unique state objects.";
     goto label_000EA1A9;
-    label_000E9A35: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A35u);
+    label_000E9A35:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887A0001u)) goto label_000E9A95;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887A0002u)) goto label_000E9A8B;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x887A0003u)) goto label_000E9A81;
@@ -7186,25 +7123,25 @@ label_000E98C3: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x887A0006u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Device hung.";
     goto label_000EA1A9;
-    label_000E9A6D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A6Du);
+    label_000E9A6D:
     cpu->eax = (uint32_t)(uintptr_t)"Device removed.";
     goto label_000EA1A9;
-    label_000E9A77: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A77u);
+    label_000E9A77:
     cpu->eax = (uint32_t)(uintptr_t)"Unsupported.";
     goto label_000EA1A9;
-    label_000E9A81: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A81u);
+    label_000E9A81:
     cpu->eax = (uint32_t)(uintptr_t)"The specified size of the destination buffer is too small to hold the requested data.";
     goto label_000EA1A9;
-    label_000E9A8B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A8Bu);
+    label_000E9A8B:
     cpu->eax = (uint32_t)(uintptr_t)"The item requested was not found. For GetPrivateData calls, this means that the specified GUID had not been previously associated with the object.";
     goto label_000EA1A9;
-    label_000E9A95: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A95u);
+    label_000E9A95:
     cpu->eax = (uint32_t)(uintptr_t)"The application has made an erroneous API call that it had enough information to avoid. This error is intended to denote that the application should be altered to avoid the error. Use of the debug version of the DXGI.DLL will provide run-time debug output with further information.";
     goto label_000EA1A9;
-    label_000E9A9F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9A9Fu);
+    label_000E9A9F:
     cpu->eax = (uint32_t)(uintptr_t)"Device reset.";
     goto label_000EA1A9;
-    label_000E9AA9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9AA9u);
+    label_000E9AA9:
     cpu->ecx = 0x8AC70011u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9BF5;
@@ -7223,38 +7160,38 @@ label_000E98C3: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x8AC70001u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The engine is already initialized.";
     goto label_000EA1A9;
-    label_000E9B02: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B02u);
+    label_000E9B02:
     cpu->eax = (uint32_t)(uintptr_t)"The application attempted to perform an operation on an DXGI output that is only legal after the output has been claimed for exclusive owenership.";
     goto label_000EA1A9;
-    label_000E9B0C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B0Cu);
+    label_000E9B0C:
     cpu->eax = (uint32_t)(uintptr_t)"An internal driver error occurred.";
     goto label_000EA1A9;
-    label_000E9B16: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B16u);
+    label_000E9B16:
     cpu->eax = (uint32_t)(uintptr_t)"Was still drawing.";
     goto label_000EA1A9;
-    label_000E9B20: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B20u);
+    label_000E9B20:
     cpu->eax = (uint32_t)(uintptr_t)"The engine has not been initialized.";
     goto label_000EA1A9;
-    label_000E9B2A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B2Au);
+    label_000E9B2A:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8AC70003u)) goto label_000E9B68;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8AC70004u)) goto label_000E9B5E;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8AC70005u)) goto label_000E9B54;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x8AC70006u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Invalid usage.";
     goto label_000EA1A9;
-    label_000E9B54: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B54u);
+    label_000E9B54:
     cpu->eax = (uint32_t)(uintptr_t)"Notification already registered.";
     goto label_000EA1A9;
-    label_000E9B5E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B5Eu);
+    label_000E9B5E:
     cpu->eax = (uint32_t)(uintptr_t)"No notification callback.";
     goto label_000EA1A9;
-    label_000E9B68: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B68u);
+    label_000E9B68:
     cpu->eax = (uint32_t)(uintptr_t)"The engine has expired (demo or pre-release version).";
     goto label_000EA1A9;
-    label_000E9B72: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B72u);
+    label_000E9B72:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid data.";
     goto label_000EA1A9;
-    label_000E9B7C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B7Cu);
+    label_000E9B7C:
     cpu->eax += 0x7538FFF8u;
     if ((uint32_t)(cpu->eax) > (uint32_t)(8u)) goto label_000EA18F;
     switch ((uint32_t)(cpu->eax)) {
@@ -7308,37 +7245,37 @@ label_000E98C3: ;
         case 49u: goto label_000E9F1B;
         default: lift_trap(cpu, 0x4E9B8Au, "resolved jump-table index out of range"); return;
     }
-    label_000E9B91: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B91u);
+    label_000E9B91:
     cpu->eax = (uint32_t)(uintptr_t)"Fail to play due to instance limit.";
     goto label_000EA1A9;
-    label_000E9B9B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9B9Bu);
+    label_000E9B9B:
     cpu->eax = (uint32_t)(uintptr_t)"Global Settings not loaded.";
     goto label_000EA1A9;
-    label_000E9BA5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9BA5u);
+    label_000E9BA5:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid variable index.";
     goto label_000EA1A9;
-    label_000E9BAF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9BAFu);
+    label_000E9BAF:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid category.";
     goto label_000EA1A9;
-    label_000E9BB9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9BB9u);
+    label_000E9BB9:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid cue index.";
     goto label_000EA1A9;
-    label_000E9BC3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9BC3u);
+    label_000E9BC3:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid wave index.";
     goto label_000EA1A9;
-    label_000E9BCD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9BCDu);
+    label_000E9BCD:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid track index.";
     goto label_000EA1A9;
-    label_000E9BD7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9BD7u);
+    label_000E9BD7:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid sound offset or index.";
     goto label_000EA1A9;
-    label_000E9BE1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9BE1u);
+    label_000E9BE1:
     cpu->eax = (uint32_t)(uintptr_t)"Error reading a file.";
     goto label_000EA1A9;
-    label_000E9BEB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9BEBu);
+    label_000E9BEB:
     cpu->eax = (uint32_t)(uintptr_t)"Unknown event type.";
     goto label_000EA1A9;
-    label_000E9BF5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9BF5u);
+    label_000E9BF5:
     cpu->ecx = 0x8AC70105u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9CB7;
@@ -7353,38 +7290,38 @@ label_000E98C3: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x8AC70015u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"There can be only one audition engine.";
     goto label_000EA1A9;
-    label_000E9C3D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9C3Du);
+    label_000E9C3D:
     cpu->eax = (uint32_t)(uintptr_t)"Unable to select a variation.";
     goto label_000EA1A9;
-    label_000E9C47: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9C47u);
+    label_000E9C47:
     cpu->eax = (uint32_t)(uintptr_t)"No wavebank exists for desired operation.";
     goto label_000EA1A9;
-    label_000E9C51: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9C51u);
+    label_000E9C51:
     cpu->eax = (uint32_t)(uintptr_t)"Invalid call of method of function from callback.";
     goto label_000EA1A9;
-    label_000E9C5B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9C5Bu);
+    label_000E9C5B:
     cpu->eax = (uint32_t)(uintptr_t)"The wavebank is not prepared.";
     goto label_000EA1A9;
-    label_000E9C65: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9C65u);
+    label_000E9C65:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8AC70101u)) goto label_000E9CA3;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8AC70102u)) goto label_000E9C99;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x8AC70103u)) goto label_000E9C8F;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x8AC70104u)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Missing data for an audition command.";
     goto label_000EA1A9;
-    label_000E9C8F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9C8Fu);
+    label_000E9C8F:
     cpu->eax = (uint32_t)(uintptr_t)"Missing an RPC curve.";
     goto label_000EA1A9;
-    label_000E9C99: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9C99u);
+    label_000E9C99:
     cpu->eax = (uint32_t)(uintptr_t)"Missing a soundbank.";
     goto label_000EA1A9;
-    label_000E9CA3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9CA3u);
+    label_000E9CA3:
     cpu->eax = (uint32_t)(uintptr_t)"Error writing a file during auditioning.";
     goto label_000EA1A9;
-    label_000E9CAD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9CADu);
+    label_000E9CAD:
     cpu->eax = (uint32_t)(uintptr_t)"Unknown command.";
     goto label_000EA1A9;
-    label_000E9CB7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9CB7u);
+    label_000E9CB7:
     cpu->ecx = 0xC8770BBBu;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9D14;
@@ -7395,38 +7332,38 @@ label_000E98C3: ;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0xC8770BBAu)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The Device Index passed in is invalid";
     goto label_000EA1A9;
-    label_000E9CEC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9CECu);
+    label_000E9CEC:
     cpu->eax = (uint32_t)(uintptr_t)"A NULL pointer was passed as a parameter";
     goto label_000EA1A9;
-    label_000E9CF6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9CF6u);
+    label_000E9CF6:
     cpu->eax = (uint32_t)(uintptr_t)"Out of memory";
     goto label_000EA1A9;
-    label_000E9D00: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D00u);
+    label_000E9D00:
     cpu->eax = (uint32_t)(uintptr_t)"Missing a DSP parameter.";
     goto label_000EA1A9;
-    label_000E9D0A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D0Au);
+    label_000E9D0A:
     cpu->eax = (uint32_t)(uintptr_t)"DirectDraw has not been created";
     goto label_000EA1A9;
-    label_000E9D14: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D14u);
+    label_000E9D14:
     if ((uint32_t)(cpu->eax) == (uint32_t)(0xC8770BBCu)) goto label_000E9D52;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0xC8770BBDu)) goto label_000E9D48;
     if ((uint32_t)(cpu->eax) == (uint32_t)(0xC8770BBEu)) goto label_000E9D3E;
     if ((uint32_t)(cpu->eax) != (uint32_t)(0xC8770BBFu)) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Z buffer has not been created";
     goto label_000EA1A9;
-    label_000E9D3E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D3Eu);
+    label_000E9D3E:
     cpu->eax = (uint32_t)(uintptr_t)"Primary surface has not been created";
     goto label_000EA1A9;
-    label_000E9D48: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D48u);
+    label_000E9D48:
     cpu->eax = (uint32_t)(uintptr_t)"Direct3D device has not been created";
     goto label_000EA1A9;
-    label_000E9D52: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D52u);
+    label_000E9D52:
     cpu->eax = (uint32_t)(uintptr_t)"Direct3D has not been created";
     goto label_000EA1A9;
-    label_000E9D5C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D5Cu);
+    label_000E9D5C:
     cpu->eax = (uint32_t)(uintptr_t)"Backbuffer has not been created";
     goto label_000EA1A9;
-    label_000E9D66: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D66u);
+    label_000E9D66:
     { uint64_t v=(uint64_t)(cpu->eax); lift_flags_logic(cpu,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9EA1;
     if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000E9E97;
@@ -7474,91 +7411,91 @@ label_000E98C3: ;
         case 40u: goto label_000E9F1B;
         default: lift_trap(cpu, 0x4E9D82u, "resolved jump-table index out of range"); return;
     }
-    label_000E9D89: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D89u);
+    label_000E9D89:
     cpu->eax = (uint32_t)(uintptr_t)"Failed to update caps database after changing display mode";
     goto label_000EA1A9;
-    label_000E9D93: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D93u);
+    label_000E9D93:
     cpu->eax = (uint32_t)(uintptr_t)"Could not create Z buffer";
     goto label_000EA1A9;
-    label_000E9D9D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9D9Du);
+    label_000E9D9D:
     cpu->eax = (uint32_t)(uintptr_t)"Display mode is not valid";
     goto label_000EA1A9;
-    label_000E9DA7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9DA7u);
+    label_000E9DA7:
     cpu->eax = (uint32_t)(uintptr_t)"One or more of the parameters passed is invalid";
     goto label_000EA1A9;
-    label_000E9DB1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9DB1u);
+    label_000E9DB1:
     cpu->eax = (uint32_t)(uintptr_t)"D3DX failed to initialize itself";
     goto label_000EA1A9;
-    label_000E9DBB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9DBBu);
+    label_000E9DBB:
     cpu->eax = (uint32_t)(uintptr_t)"D3DX failed to start up";
     goto label_000EA1A9;
-    label_000E9DC5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9DC5u);
+    label_000E9DC5:
     cpu->eax = (uint32_t)(uintptr_t)"D3DXInitialize() must be called first";
     goto label_000EA1A9;
-    label_000E9DCF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9DCFu);
+    label_000E9DCF:
     cpu->eax = (uint32_t)(uintptr_t)"D3DX is not initialized yet";
     goto label_000EA1A9;
-    label_000E9DD9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9DD9u);
+    label_000E9DD9:
     cpu->eax = (uint32_t)(uintptr_t)"Failed to render text to the surface";
     goto label_000EA1A9;
-    label_000E9DE3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9DE3u);
+    label_000E9DE3:
     cpu->eax = (uint32_t)(uintptr_t)"Bad D3DX context";
     goto label_000EA1A9;
-    label_000E9DED: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9DEDu);
+    label_000E9DED:
     cpu->eax = (uint32_t)(uintptr_t)"The requested device capabilities are not supported";
     goto label_000EA1A9;
-    label_000E9DF7: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9DF7u);
+    label_000E9DF7:
     cpu->eax = (uint32_t)(uintptr_t)"The image file format is unrecognized";
     goto label_000EA1A9;
-    label_000E9E01: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E01u);
+    label_000E9E01:
     cpu->eax = (uint32_t)(uintptr_t)"The image file loading library error";
     goto label_000EA1A9;
-    label_000E9E0B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E0Bu);
+    label_000E9E0B:
     cpu->eax = (uint32_t)(uintptr_t)"Could not obtain device caps";
     goto label_000EA1A9;
-    label_000E9E15: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E15u);
+    label_000E9E15:
     cpu->eax = (uint32_t)(uintptr_t)"Resize does not work for full-screen";
     goto label_000EA1A9;
-    label_000E9E1F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E1Fu);
+    label_000E9E1F:
     cpu->eax = (uint32_t)(uintptr_t)"Resize does not work for non-windowed contexts";
     goto label_000EA1A9;
-    label_000E9E29: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E29u);
+    label_000E9E29:
     cpu->eax = (uint32_t)(uintptr_t)"Front buffer already exists";
     goto label_000EA1A9;
-    label_000E9E33: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E33u);
+    label_000E9E33:
     cpu->eax = (uint32_t)(uintptr_t)"The app is using the primary in full-screen mode";
     goto label_000EA1A9;
-    label_000E9E3D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E3Du);
+    label_000E9E3D:
     cpu->eax = (uint32_t)(uintptr_t)"Could not get device context";
     goto label_000EA1A9;
-    label_000E9E47: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E47u);
+    label_000E9E47:
     cpu->eax = (uint32_t)(uintptr_t)"Could not bitBlt";
     goto label_000EA1A9;
-    label_000E9E51: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E51u);
+    label_000E9E51:
     cpu->eax = (uint32_t)(uintptr_t)"There is no surface backing up this texture";
     goto label_000EA1A9;
-    label_000E9E5B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E5Bu);
+    label_000E9E5B:
     cpu->eax = (uint32_t)(uintptr_t)"There is no such miplevel for this surface";
     goto label_000EA1A9;
-    label_000E9E65: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E65u);
+    label_000E9E65:
     cpu->eax = (uint32_t)(uintptr_t)"The surface is not paletted";
     goto label_000EA1A9;
-    label_000E9E6F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E6Fu);
+    label_000E9E6F:
     cpu->eax = (uint32_t)(uintptr_t)"An error occured while enumerating surface formats";
     goto label_000EA1A9;
-    label_000E9E79: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E79u);
+    label_000E9E79:
     cpu->eax = (uint32_t)(uintptr_t)"D3DX only supports color depths of 16 bit or greater";
     goto label_000EA1A9;
-    label_000E9E83: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E83u);
+    label_000E9E83:
     cpu->eax = (uint32_t)(uintptr_t)"The file format is invalid";
     goto label_000EA1A9;
-    label_000E9E8D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E8Du);
+    label_000E9E8D:
     cpu->eax = (uint32_t)(uintptr_t)"No suitable match found";
     goto label_000EA1A9;
-    label_000E9E97: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9E97u);
+    label_000E9E97:
     cpu->eax = (uint32_t)(uintptr_t)"The function completed successfully";
     goto label_000EA1A9;
-    label_000E9EA1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9EA1u);
+    label_000E9EA1:
     cpu->ecx = 0x40003u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000E9F2F;
@@ -7580,40 +7517,40 @@ label_000E98C3: ;
         case 13u: goto label_000E9F1B;
         default: lift_trap(cpu, 0x4E9EBAu, "resolved jump-table index out of range"); return;
     }
-    label_000E9EC1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9EC1u);
+    label_000E9EC1:
     cpu->eax = (uint32_t)(uintptr_t)"Call successful, but returned FALSE";
     goto label_000EA1A9;
-    label_000E9ECB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9ECBu);
+    label_000E9ECB:
     cpu->eax = (uint32_t)(uintptr_t)"The system cannot find the file specified.";
     goto label_000EA1A9;
-    label_000E9ED5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9ED5u);
+    label_000E9ED5:
     cpu->eax = (uint32_t)(uintptr_t)"The system cannot find the path specified.";
     goto label_000EA1A9;
-    label_000E9EDF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9EDFu);
+    label_000E9EDF:
     cpu->eax = (uint32_t)(uintptr_t)"The system cannot open the file.";
     goto label_000EA1A9;
-    label_000E9EE9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9EE9u);
+    label_000E9EE9:
     cpu->eax = (uint32_t)(uintptr_t)"Access is denied.";
     goto label_000EA1A9;
-    label_000E9EF3: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9EF3u);
+    label_000E9EF3:
     cpu->eax = (uint32_t)(uintptr_t)"The handle is invalid.";
     goto label_000EA1A9;
-    label_000E9EFD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9EFDu);
+    label_000E9EFD:
     cpu->eax = (uint32_t)(uintptr_t)"Not enough storage is available to process this command.";
     goto label_000EA1A9;
-    label_000E9F07: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9F07u);
+    label_000E9F07:
     cpu->eax = (uint32_t)(uintptr_t)"The storage control block address is invalid.";
     goto label_000EA1A9;
-    label_000E9F11: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9F11u);
+    label_000E9F11:
     cpu->eax = (uint32_t)(uintptr_t)"The environment is incorrect.";
     goto label_000EA1A9;
-    label_000E9F1B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9F1Bu);
+    label_000E9F1B:
     cpu->eax = (uint32_t)(uintptr_t)"The system cannot find the drive specified.";
     goto label_000EA1A9;
-    label_000E9F25: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9F25u);
+    label_000E9F25:
     cpu->eax = (uint32_t)(uintptr_t)"End of stream. Sample not updated.";
     goto label_000EA1A9;
-    label_000E9F2F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9F2Fu);
+    label_000E9F2F:
     cpu->ecx = 0x4028Du;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000EA09A;
@@ -7636,19 +7573,19 @@ label_000E98C3: ;
     if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Some of the streams in this movie are in an unsupported format.";
     goto label_000EA1A9;
-    label_000E9F84: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9F84u);
+    label_000E9F84:
     cpu->eax = (uint32_t)(uintptr_t)"The state transition has not completed.";
     goto label_000EA1A9;
-    label_000E9F8E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9F8Eu);
+    label_000E9F8E:
     cpu->eax = (uint32_t)(uintptr_t)"An attempt to add a filter with a duplicate name succeeded with a modified name.";
     goto label_000EA1A9;
-    label_000E9F98: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9F98u);
+    label_000E9F98:
     cpu->eax = (uint32_t)(uintptr_t)"The end of the list has been reached.";
     goto label_000EA1A9;
-    label_000E9FA2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9FA2u);
+    label_000E9FA2:
     cpu->eax = (uint32_t)(uintptr_t)"The file contained some property settings that were not used.";
     goto label_000EA1A9;
-    label_000E9FAC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9FACu);
+    label_000E9FAC:
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(0x40246u), c=(uint64_t)(0u), v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000E9FE4;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(0xAu), c=(uint64_t)(0u), v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
@@ -7657,22 +7594,22 @@ label_000E98C3: ;
     if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000E9FD0;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(3u), c=(uint64_t)(0u), v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000EA18F;
-    label_000E9FC6: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9FC6u);
+    label_000E9FC6:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot play back the video stream: no suitable decompressor could be found.";
     goto label_000EA1A9;
-    label_000E9FD0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9FD0u);
+    label_000E9FD0:
     cpu->eax = (uint32_t)(uintptr_t)"A connection could not be made with the media type in the persistent graph, but has been made with a negotiated media type.";
     goto label_000EA1A9;
-    label_000E9FDA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9FDAu);
+    label_000E9FDA:
     cpu->eax = (uint32_t)(uintptr_t)"The resource specified is no longer needed.";
     goto label_000EA1A9;
-    label_000E9FE4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9FE4u);
+    label_000E9FE4:
     cpu->eax = (uint32_t)(uintptr_t)"Some connections have failed and have been deferred.";
     goto label_000EA1A9;
-    label_000E9FEE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9FEEu);
+    label_000E9FEE:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot play back the audio stream: no audio hardware is available.";
     goto label_000EA1A9;
-    label_000E9FF8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4E9FF8u);
+    label_000E9FF8:
     cpu->ecx = 0x40268u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000EA04F;
@@ -7687,19 +7624,19 @@ label_000E98C3: ;
     if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The stream has been turned off.";
     goto label_000EA1A9;
-    label_000EA027: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA027u);
+    label_000EA027:
     cpu->eax = (uint32_t)(uintptr_t)"This success code is reserved for internal purposes within ActiveMovie.";
     goto label_000EA1A9;
-    label_000EA031: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA031u);
+    label_000EA031:
     cpu->eax = (uint32_t)(uintptr_t)"The value returned had to be estimated.  It's accuracy can not be guaranteed.";
     goto label_000EA1A9;
-    label_000EA03B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA03Bu);
+    label_000EA03B:
     cpu->eax = (uint32_t)(uintptr_t)"Cannot play back the video stream: format 'RPZA' is not supported.";
     goto label_000EA1A9;
-    label_000EA045: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA045u);
+    label_000EA045:
     cpu->eax = (uint32_t)(uintptr_t)"The graph can't be cued because of lack of or corrupt data.";
     goto label_000EA1A9;
-    label_000EA04F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA04Fu);
+    label_000EA04F:
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(0x40270u), c=(uint64_t)(0u), v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000EA086;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(0xEu), c=(uint64_t)(0u), v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
@@ -7711,19 +7648,19 @@ label_000E98C3: ;
     if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The audio stream did not contain sufficient information to determine the contents of each channel.";
     goto label_000EA1A9;
-    label_000EA072: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA072u);
+    label_000EA072:
     cpu->eax = (uint32_t)(uintptr_t)"The current title was not a sequential set of chapters (PGC), and the returned timing information might not be continuous.";
     goto label_000EA1A9;
-    label_000EA07C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA07Cu);
+    label_000EA07C:
     cpu->eax = (uint32_t)(uintptr_t)"There was no preview pin available, so the capture pin output is being split to provide both capture and preview.";
     goto label_000EA1A9;
-    label_000EA086: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA086u);
+    label_000EA086:
     cpu->eax = (uint32_t)(uintptr_t)"The stop time for the sample was not set.";
     goto label_000EA1A9;
-    label_000EA090: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA090u);
+    label_000EA090:
     cpu->eax = (uint32_t)(uintptr_t)"The seek into the movie was not frame accurate.";
     goto label_000EA1A9;
-    label_000EA09A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA09Au);
+    label_000EA09A:
     cpu->ecx = 0x8781202u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000EA140;
@@ -7742,19 +7679,19 @@ label_000E98C3: ;
     if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"The call succeeded but there won't be any mipmaps generated";
     goto label_000EA1A9;
-    label_000EA0DE: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA0DEu);
+    label_000EA0DE:
     cpu->eax = (uint32_t)(uintptr_t)"Pending";
     goto label_000EA1A9;
-    label_000EA0E8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA0E8u);
+    label_000EA0E8:
     cpu->eax = (uint32_t)(uintptr_t)"Half duplex";
     goto label_000EA1A9;
-    label_000EA0F2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA0F2u);
+    label_000EA0F2:
     cpu->eax = (uint32_t)(uintptr_t)"Full duplex";
     goto label_000EA1A9;
-    label_000EA0FC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA0FCu);
+    label_000EA0FC:
     cpu->eax = (uint32_t)(uintptr_t)"The call succeeded, but we had to substitute the 3D algorithm";
     goto label_000EA1A9;
-    label_000EA106: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA106u);
+    label_000EA106:
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(0x8781091u), c=(uint64_t)(0u), v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000EA132;
     { uint64_t l=(uint64_t)(cpu->eax), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->eax = v; }
@@ -7765,19 +7702,19 @@ label_000E98C3: ;
     if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Return value from IDirectMusicTool::ProcessPMsg() which indicates to the performance that it should free the PMsg automatically.";
     goto label_000EA1A9;
-    label_000EA124: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA124u);
+    label_000EA124:
     cpu->eax = (uint32_t)(uintptr_t)"Return value from IDirectMusicTool::ProcessPMsg() which indicates to the performance that it should cue the PMsg again automatically.";
     goto label_000EA1A9;
-    label_000EA12B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA12Bu);
+    label_000EA12B:
     cpu->eax = (uint32_t)(uintptr_t)"Return value from IDirectMusicBand::Download() which indicates that some of the instruments safely downloaded, but others failed. This usually occurs when some instruments are on PChannels not supported by the performance or port.";
     goto label_000EA1A9;
-    label_000EA132: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA132u);
+    label_000EA132:
     cpu->eax = (uint32_t)(uintptr_t)"The object could only load partially. This can happen if some components are not registered properly, such as embedded tracks and tools. This can also happen if some content is missing. For example, if a segment uses a DLS collection that is not in the loader's current search directory.";
     goto label_000EA1A9;
-    label_000EA139: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA139u);
+    label_000EA139:
     cpu->eax = (uint32_t)(uintptr_t)"Return value from IDirectMusicTrack::Play() which indicates to the segment that the track has no more data after mtEnd.";
     goto label_000EA1A9;
-    label_000EA140: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA140u);
+    label_000EA140:
     cpu->ecx = 0x8781214u;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(cpu->ecx), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_000EA17E;
@@ -7792,45 +7729,44 @@ label_000E98C3: ;
     if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000EA18F;
     cpu->eax = (uint32_t)(uintptr_t)"Returned from IDirectMusicPerformance::MIDIToMusic(),  and IDirectMusicPerformance::MusicToMIDI(), this indicates  that the note conversion generated a note value that is below 0,  so it has been bumped up one or more octaves to be in the proper MIDI range of 0 through 127.  Note that this is valid for MIDIToMusic() when using play modes DMUS_PLAYMODE_FIXEDTOCHORD and DMUS_PLAYMODE_FIXEDTOKEY, both of which store MIDI values in wMusicValue. With MusicToMIDI(), it is valid for all play modes. Ofcourse, DMUS_PLAYMODE_FIXED will never return this success code.";
     goto label_000EA1A9;
-    label_000EA162: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA162u);
+    label_000EA162:
     cpu->eax = (uint32_t)(uintptr_t)"Returned from IDirectMusicPerformance::MusicToMIDI(), this indicates  that no note has been calculated because the music value has the note  at a position higher than the top note of the chord. This applies only to DMUS_PLAYMODE_NORMALCHORD play mode. This success code indicates that the caller should not do anything with the note. It is not meant to be played against this chord.";
     goto label_000EA1A9;
-    label_000EA169: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA169u);
+    label_000EA169:
     cpu->eax = (uint32_t)(uintptr_t)"Returned from IDirectMusicGraph::StampPMsg(), this indicates that the PMsg is already stamped with the last tool in the graph. The returned PMsg's tool pointer is now NULL.";
     goto label_000EA1A9;
-    label_000EA170: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA170u);
+    label_000EA170:
     cpu->eax = (uint32_t)(uintptr_t)"Returned string has been truncated to fit the buffer size.";
     goto label_000EA1A9;
-    label_000EA177: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA177u);
+    label_000EA177:
     cpu->eax = (uint32_t)(uintptr_t)"Returned from IDirectMusicPerformance::MIDIToMusic(),  and IDirectMusicPerformance::MusicToMIDI(), this indicates  that the note conversion generated a note value that is above 127, so it has been bumped down one or more octaves to be in the proper MIDI range of 0 through 127.  Note that this is valid for MIDIToMusic() when using play modes DMUS_PLAYMODE_FIXEDTOCHORD and DMUS_PLAYMODE_FIXEDTOKEY, both of which store MIDI values in wMusicValue. With MusicToMIDI(), it is valid for all play modes. Ofcourse, DMUS_PLAYMODE_FIXED will never return this success code.";
     goto label_000EA1A9;
-    label_000EA17E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA17Eu);
+    label_000EA17E:
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(0x8781215u), c=(uint64_t)(0u), v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000EA1A4;
     { uint64_t l=(uint64_t)(cpu->eax), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000EA19D;
     { uint64_t l=(uint64_t)(cpu->eax), r=(uint64_t)(0x1EDEBu), c=(uint64_t)(0u), v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000EA196;
-    label_000EA18F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA18Fu);
+    label_000EA18F:
     cpu->eax = (uint32_t)(uintptr_t)"n/a";
     goto label_000EA1A9;
-    label_000EA196: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA196u);
+    label_000EA196:
     cpu->eax = (uint32_t)(uintptr_t)"The target window or output has been occluded. The application should suspend rendering operations if possible.";
     goto label_000EA1A9;
-    label_000EA19D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA19Du);
+    label_000EA19D:
     cpu->eax = (uint32_t)(uintptr_t)"The requested operation was not performed because during CollectGarbage the loader determined that the object had been released.";
     goto label_000EA1A9;
-    label_000EA1A4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA1A4u);
+    label_000EA1A4:
     cpu->eax = (uint32_t)(uintptr_t)"Although the audio output from the port will be routed to the same device as the given DirectSound buffer, buffer controls such as pan and volume will not affect the output.";
-    label_000EA1A9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA1A9u);
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 4u, stop_address); return;
+    label_000EA1A9:
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 8u; cpu->eip = stop_address; return;
 }
 
 
 
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004EA990(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA990u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->esp -= 0x84u;
@@ -7839,28 +7775,27 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EA990(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = (uint32_t)(cpu->ebp + 0xFFFFFF7Cu);
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_memory_source_hash_runtime;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EA9BEu); lift_push32(cpu, r); sfera_sub_004EDCE0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EA9BEu)); sfera_sub_004EDCE0(cpu, LIFT_CODE_TOKEN_VA(0x4EA9BEu));
     if ((uint8_t)(lift_load8(cpu->ebp + 0xFFFFFF7Cu)) == (uint8_t)(0u)) goto label_000EA9EC;
     cpu->edx = lift_load32(cpu->esi + 0x10u);
     lift_push32(cpu, cpu->edx);
     cpu->eax = (uint32_t)(cpu->ebp + 0xFFFFFF7Cu);
     lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)"alloced: %s %d"); lift_push32(cpu, 0x80u); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]);
-    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EA9E1u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA9E7u);
+    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EA9E1u));
     cpu->esp += 0x14u;
     goto label_000EAA04;
-    label_000EA9EC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EA9ECu);
+    label_000EA9EC:
     lift_push32(cpu, (uintptr_t)"alloced: <Source info is corrupted>"); lift_push32(cpu, 0x80u); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]);
-    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EA9FBu)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAA01u);
+    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EA9FBu));
     cpu->esp += 0xCu;
-    label_000EAA04: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAA04u);
+    label_000EAA04:
     cpu->eax = (uint32_t)(uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0];
     g_sfera_critical_diagnostics_runtime.allocation_context[127] = (uint8_t)(0u);
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 0u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAA20u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->esp -= 0x94u;
@@ -7872,7 +7807,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ebp + 0xFFFFFF74u, 0u);
     if ((uint32_t)(cpu->eax) == (uint32_t)(0x3B9ACA00u)) goto label_000EACD8;
     (void)cpu;
-    label_000EAA60: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAA60u);
+    label_000EAA60:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFF6Cu);
     if ((int32_t)(uint32_t)(lift_load32(cpu->ebp + 0xFFFFFF74u)) >= (int32_t)(uint32_t)(cpu->ecx)) goto label_000EACD8;
     cpu->edx = g_sfera_allocation_hash_runtime.records;
@@ -7887,37 +7822,37 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     cpu->eax = cpu->edi;
     g_sfera_memory_runtime.diagnostics_dirty = (uint8_t)(1u);
     cpu->edx = (uint32_t)(cpu->eax + 1u);
-    label_000EAAB2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAAB2u);
+    label_000EAAB2:
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->eax)) & 0xFFu);
     ++cpu->eax;
     if ((uint8_t)((cpu->ecx & 0xFFu)) != 0u) goto label_000EAAB2;
     cpu->eax -= cpu->edx;
     cpu->esi = (uint32_t)(cpu->eax + 0xFFFFFFFFu);
     if ((int32_t)(uint32_t)(cpu->esi) < 0) goto label_000EAACB;
-    label_000EAAC2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAAC2u);
+    label_000EAAC2:
     if ((uint8_t)(lift_load8(cpu->esi + cpu->edi)) == (uint8_t)(0x5Cu)) goto label_000EAACB;
     { uint64_t l=(uint64_t)(cpu->esi), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->esi = v; }
     if ((cpu->eflags & LIFT_FLAG_SF) == 0u) goto label_000EAAC2;
-    label_000EAACB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAACBu);
+    label_000EAACB:
     cpu->eax = lift_load16(cpu->ebx + 0x14u);
     lift_push32(cpu, 0x80u);
     cpu->edx = (uint32_t)(cpu->ebp + 0xFFFFFF7Cu);
     lift_push32(cpu, cpu->edx); lift_push32(cpu, cpu->eax);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_memory_source_hash_runtime;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAAE6u); lift_push32(cpu, r); sfera_sub_004EDCE0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAAE6u)); sfera_sub_004EDCE0(cpu, LIFT_CODE_TOKEN_VA(0x4EAAE6u));
     if ((uint8_t)(lift_load8(cpu->ebp + 0xFFFFFF7Cu)) == (uint8_t)(0u)) goto label_000EAB14;
     cpu->ecx = lift_load32(cpu->ebx + 0x10u);
     lift_push32(cpu, cpu->ecx);
     cpu->edx = (uint32_t)(cpu->ebp + 0xFFFFFF7Cu);
     lift_push32(cpu, cpu->edx); lift_push32(cpu, (uintptr_t)"alloced: %s %d"); lift_push32(cpu, 0x80u); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]);
-    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAB09u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAB0Fu);
+    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAB09u));
     cpu->esp += 0x14u;
     goto label_000EAB2C;
-    label_000EAB14: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAB14u);
+    label_000EAB14:
     lift_push32(cpu, (uintptr_t)"alloced: <Source info is corrupted>"); lift_push32(cpu, 0x80u); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]);
-    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAB23u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAB29u);
+    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAB23u));
     cpu->esp += 0xCu;
-    label_000EAB2C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAB2Cu);
+    label_000EAB2C:
     cpu->eax = g_sfera_diagnostic_log_byte;
     cpu->ecx = lift_load32(cpu->ebp + 0x10u);
     lift_push32(cpu, cpu->eax);
@@ -7927,24 +7862,24 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->edx); lift_push32(cpu, (uintptr_t)". "); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]); lift_push32(cpu, (uintptr_t)" (underflow). "); lift_push32(cpu, cpu->eax);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_log_memory_object;
     g_sfera_critical_diagnostics_runtime.allocation_context[127] = (uint8_t)(0u);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAB6Du); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAB6Du)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAB6Du));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAB74u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAB74u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAB74u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAB7Bu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAB7Bu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAB7Bu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAB82u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAB82u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAB82u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAB89u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAB89u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAB89u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAB90u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAB90u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAB90u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAB97u); lift_push32(cpu, r); sfera_sub_004ED390(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAB97u)); sfera_sub_004ED390(cpu, LIFT_CODE_TOKEN_VA(0x4EAB97u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAB9Eu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAB9Eu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAB9Eu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_RVA(0xEABA5u); lift_push32(cpu, r); sfera_sub_004ED380(cpu,r); if (cpu->eip != r) return; }
-    label_000EABA5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EABA5u);
+    lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0xEABA5u)); sfera_sub_004ED380(cpu, LIFT_CODE_TOKEN_RVA(0xEABA5u));
+    label_000EABA5:
     if ((uint8_t)(lift_load8(cpu->ebp + 0xFFFFFF7Bu)) == (uint8_t)(0u)) goto label_000EACC4;
     cpu->edx = lift_load32(cpu->ebx);
     cpu->ecx = lift_load32(cpu->ebx + 4u);
@@ -7952,37 +7887,37 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ecx + cpu->edx + 4u, 0x61CCC864u);
     g_sfera_memory_runtime.diagnostics_dirty = (uint8_t)(1u);
     cpu->edx = (uint32_t)(cpu->eax + 1u);
-    label_000EABD0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EABD0u);
+    label_000EABD0:
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->eax)) & 0xFFu);
     ++cpu->eax;
     if ((uint8_t)((cpu->ecx & 0xFFu)) != 0u) goto label_000EABD0;
     cpu->eax -= cpu->edx;
     cpu->esi = (uint32_t)(cpu->eax + 0xFFFFFFFFu);
     if ((int32_t)(uint32_t)(cpu->esi) < 0) goto label_000EABE9;
-    label_000EABE0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EABE0u);
+    label_000EABE0:
     if ((uint8_t)(lift_load8(cpu->esi + cpu->edi)) == (uint8_t)(0x5Cu)) goto label_000EABE9;
     { uint64_t l=(uint64_t)(cpu->esi), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->esi = v; }
     if ((cpu->eflags & LIFT_FLAG_SF) == 0u) goto label_000EABE0;
-    label_000EABE9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EABE9u);
+    label_000EABE9:
     cpu->ecx = lift_load16(cpu->ebx + 0x14u);
     lift_push32(cpu, 0x80u);
     cpu->eax = (uint32_t)(cpu->ebp + 0xFFFFFF7Cu);
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_memory_source_hash_runtime;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAC04u); lift_push32(cpu, r); sfera_sub_004EDCE0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAC04u)); sfera_sub_004EDCE0(cpu, LIFT_CODE_TOKEN_VA(0x4EAC04u));
     if ((uint8_t)(lift_load8(cpu->ebp + 0xFFFFFF7Cu)) == (uint8_t)(0u)) goto label_000EAC32;
     cpu->edx = lift_load32(cpu->ebx + 0x10u);
     lift_push32(cpu, cpu->edx);
     cpu->eax = (uint32_t)(cpu->ebp + 0xFFFFFF7Cu);
     lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)"alloced: %s %d"); lift_push32(cpu, 0x80u); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]);
-    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAC27u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAC2Du);
+    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAC27u));
     cpu->esp += 0x14u;
     goto label_000EAC4A;
-    label_000EAC32: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAC32u);
+    label_000EAC32:
     lift_push32(cpu, (uintptr_t)"alloced: <Source info is corrupted>"); lift_push32(cpu, 0x80u); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]);
-    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAC41u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAC47u);
+    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAC41u));
     cpu->esp += 0xCu;
-    label_000EAC4A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAC4Au);
+    label_000EAC4A:
     cpu->ecx = g_sfera_diagnostic_log_byte;
     cpu->edx = lift_load32(cpu->ebp + 0x10u);
     lift_push32(cpu, cpu->ecx);
@@ -7992,41 +7927,41 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)". "); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]); lift_push32(cpu, (uintptr_t)" (overflow). "); lift_push32(cpu, cpu->ecx);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_log_memory_object;
     g_sfera_critical_diagnostics_runtime.allocation_context[127] = (uint8_t)(0u);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAC8Cu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAC8Cu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAC8Cu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAC93u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAC93u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAC93u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAC9Au); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAC9Au)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAC9Au));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EACA1u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EACA1u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EACA1u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EACA8u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EACA8u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EACA8u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EACAFu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EACAFu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EACAFu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EACB6u); lift_push32(cpu, r); sfera_sub_004ED390(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EACB6u)); sfera_sub_004ED390(cpu, LIFT_CODE_TOKEN_VA(0x4EACB6u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EACBDu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EACBDu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EACBDu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_RVA(0xEACC4u); lift_push32(cpu, r); sfera_sub_004ED380(cpu,r); if (cpu->eip != r) return; }
-    label_000EACC4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EACC4u);
+    lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0xEACC4u)); sfera_sub_004ED380(cpu, LIFT_CODE_TOKEN_RVA(0xEACC4u));
+    label_000EACC4:
     cpu->eax = lift_load32(cpu->ebx + 0xCu);
     lift_store32(cpu->ebp + 0xFFFFFF74u, (uint64_t)(lift_load32(cpu->ebp + 0xFFFFFF74u)) + 1u);
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x3B9ACA00u)) goto label_000EAA60;
-    label_000EACD8: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EACD8u);
+    label_000EACD8:
     { uint64_t l=(uint64_t)(lift_load32(cpu->ebp + 0xFFFFFF70u)), r=(uint64_t)(0u), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     lift_store32(cpu->ebp + 0xFFFFFF74u, 0u);
     if (((cpu->eflags & LIFT_FLAG_ZF) != 0u) || ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) != 0u)) goto label_000EAED5;
     cpu->esi = g_sfera_memory_runtime.tracker_floor;
-    label_000EACF5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EACF5u);
+    label_000EACF5:
     if ((uint32_t)(cpu->esi) == (uint32_t)(0x3B9ACA00u)) goto label_000EAD09;
     if ((int32_t)(uint32_t)(g_sfera_memory_runtime.validation_pass_count) < (int32_t)(uint32_t)(0x3E8u)) goto label_000EAD2B;
-    label_000EAD09: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAD09u);
+    label_000EAD09:
     cpu->esi = g_sfera_memory_runtime.tracker_primary;
     if ((uint32_t)(cpu->esi) == (uint32_t)(0x3B9ACA00u)) goto label_000EAEDB;
     g_sfera_memory_runtime.tracker_floor = (uint32_t)(cpu->esi);
     g_sfera_memory_runtime.validation_pass_count = (uint32_t)(0u);
-    label_000EAD2B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAD2Bu);
+    label_000EAD2B:
     cpu->edx = g_sfera_allocation_hash_runtime.records;
     cpu->esi = (int64_t)(int32_t)(cpu->esi) * (int64_t)(int32_t)(0x1Au);
     cpu->eax = lift_load32(cpu->esi + cpu->edx + 4u);
@@ -8040,7 +7975,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     g_sfera_memory_runtime.diagnostics_dirty = (uint8_t)(1u);
     cpu->edx = (uint32_t)(cpu->eax + 1u);
     cpu->esp = (uint32_t)(cpu->esp);
-    label_000EAD70: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAD70u);
+    label_000EAD70:
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->eax)) & 0xFFu);
     ++cpu->eax;
     if ((uint8_t)((cpu->ecx & 0xFFu)) != 0u) goto label_000EAD70;
@@ -8048,39 +7983,39 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     { uint64_t l=(uint64_t)(cpu->eax), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_SF) != 0u) goto label_000EAD89;
     cpu->esp = (uint32_t)(cpu->esp);
-    label_000EAD80: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAD80u);
+    label_000EAD80:
     if ((uint8_t)(lift_load8(cpu->eax + cpu->edi)) == (uint8_t)(0x5Cu)) goto label_000EAD89;
     { uint64_t l=(uint64_t)(cpu->eax), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_SF) == 0u) goto label_000EAD80;
-    label_000EAD89: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAD89u);
+    label_000EAD89:
     cpu->edx = g_sfera_diagnostic_log_byte;
     cpu->ecx = lift_load32(cpu->ebp + 0x10u);
     lift_push32(cpu, cpu->edx); lift_push32(cpu, (uintptr_t)"\n"); lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)" ");
     cpu->edx = (uint32_t)(cpu->eax + cpu->edi + 1u);
     lift_push32(cpu, cpu->edx); lift_push32(cpu, (uintptr_t)". ");
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EADAEu); lift_push32(cpu, r); sfera_sub_004EA990(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EADAEu)); sfera_sub_004EA990(cpu, LIFT_CODE_TOKEN_VA(0x4EADAEu));
     lift_push32(cpu, cpu->eax);
     cpu->eax = (uint32_t)(uintptr_t)"test_ptr1: MEM CORRUPTED! ";
     lift_push32(cpu, (uintptr_t)" (underflow). "); lift_push32(cpu, cpu->eax);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_log_memory_object;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EADC4u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EADC4u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EADC4u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EADCBu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EADCBu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EADCBu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EADD2u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EADD2u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EADD2u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EADD9u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EADD9u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EADD9u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EADE0u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EADE0u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EADE0u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EADE7u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EADE7u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EADE7u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EADEEu); lift_push32(cpu, r); sfera_sub_004ED390(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EADEEu)); sfera_sub_004ED390(cpu, LIFT_CODE_TOKEN_VA(0x4EADEEu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EADF5u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EADF5u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EADF5u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_RVA(0xEADFCu); lift_push32(cpu, r); sfera_sub_004ED380(cpu,r); if (cpu->eip != r) return; }
-    label_000EADFC: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EADFCu);
+    lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0xEADFCu)); sfera_sub_004ED380(cpu, LIFT_CODE_TOKEN_RVA(0xEADFCu));
+    label_000EADFC:
     if ((uint8_t)((cpu->ebx & 0xFFu)) == 0u) goto label_000EAEAD;
     cpu->edx = lift_load32(cpu->esi);
     cpu->ecx = lift_load32(cpu->esi + 4u);
@@ -8089,7 +8024,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     g_sfera_memory_runtime.diagnostics_dirty = (uint8_t)(1u);
     cpu->edx = (uint32_t)(cpu->eax + 1u);
     cpu->ecx = (uint32_t)(cpu->ecx);
-    label_000EAE20: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAE20u);
+    label_000EAE20:
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->eax)) & 0xFFu);
     ++cpu->eax;
     if ((uint8_t)((cpu->ecx & 0xFFu)) != 0u) goto label_000EAE20;
@@ -8097,38 +8032,38 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     { uint64_t l=(uint64_t)(cpu->eax), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_SF) != 0u) goto label_000EAE39;
     cpu->esp = (uint32_t)(cpu->esp);
-    label_000EAE30: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAE30u);
+    label_000EAE30:
     if ((uint8_t)(lift_load8(cpu->eax + cpu->edi)) == (uint8_t)(0x5Cu)) goto label_000EAE39;
     { uint64_t l=(uint64_t)(cpu->eax), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->eax = v; }
     if ((cpu->eflags & LIFT_FLAG_SF) == 0u) goto label_000EAE30;
-    label_000EAE39: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAE39u);
+    label_000EAE39:
     cpu->ecx = g_sfera_diagnostic_log_byte;
     cpu->edx = lift_load32(cpu->ebp + 0x10u);
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)"\n"); lift_push32(cpu, cpu->edx); lift_push32(cpu, (uintptr_t)" ");
     cpu->eax = (uint32_t)(cpu->eax + cpu->edi + 1u);
     lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)". ");
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAE5Eu); lift_push32(cpu, r); sfera_sub_004EA990(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAE5Eu)); sfera_sub_004EA990(cpu, LIFT_CODE_TOKEN_VA(0x4EAE5Eu));
     cpu->ecx = (uint32_t)(uintptr_t)"test_ptr1: MEM CORRUPTED! ";
     lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)" (overflow). "); lift_push32(cpu, cpu->ecx);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_log_memory_object;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAE75u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAE75u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAE75u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAE7Cu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAE7Cu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAE7Cu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAE83u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAE83u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAE83u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAE8Au); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAE8Au)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAE8Au));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAE91u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAE91u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAE91u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAE98u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAE98u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAE98u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAE9Fu); lift_push32(cpu, r); sfera_sub_004ED390(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAE9Fu)); sfera_sub_004ED390(cpu, LIFT_CODE_TOKEN_VA(0x4EAE9Fu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAEA6u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAEA6u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EAEA6u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_RVA(0xEAEADu); lift_push32(cpu, r); sfera_sub_004ED380(cpu,r); if (cpu->eip != r) return; }
-    label_000EAEAD: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAEADu);
+    lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0xEAEADu)); sfera_sub_004ED380(cpu, LIFT_CODE_TOKEN_RVA(0xEAEADu));
+    label_000EAEAD:
     cpu->eax = lift_load32(cpu->ebp + 0xFFFFFF74u);
     cpu->esi = lift_load32(cpu->esi + 0xCu);
     lift_store32((uint32_t)(uintptr_t)&g_sfera_memory_runtime.validation_pass_count, (uint64_t)(g_sfera_memory_runtime.validation_pass_count) + 1u);
@@ -8136,26 +8071,26 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     g_sfera_memory_runtime.tracker_floor = (uint32_t)(cpu->esi);
     lift_store32(cpu->ebp + 0xFFFFFF74u, cpu->eax);
     if ((int32_t)(uint32_t)(cpu->eax) < (int32_t)(uint32_t)(lift_load32(cpu->ebp + 0xFFFFFF70u))) goto label_000EACF5;
-    label_000EAED5: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAED5u);
+    label_000EAED5:
     cpu->esi = g_sfera_memory_runtime.tracker_primary;
-    label_000EAEDB: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAEDBu);
+    label_000EAEDB:
     if ((uint32_t)(lift_load32(cpu->ebp + 8u)) != (uint32_t)(0xFFFFFFFFu)) goto label_000EAEEA;
     cpu->edx = g_sfera_memory_runtime.live_allocation_count;
     lift_store32(cpu->ebp + 8u, cpu->edx);
-    label_000EAEEA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAEEAu);
+    label_000EAEEA:
     { uint64_t l=(uint64_t)(lift_load32(cpu->ebp + 8u)), r=(uint64_t)(0u), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     lift_store32(cpu->ebp + 0xFFFFFF74u, 0u);
     if (((cpu->eflags & LIFT_FLAG_ZF) != 0u) || ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) != 0u)) goto label_000EB1A2;
     cpu->eax = g_sfera_memory_runtime.tracker_ceiling;
     goto label_000EAF16;
-    label_000EAF10: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAF10u);
+    label_000EAF10:
     cpu->esi = g_sfera_memory_runtime.tracker_primary;
-    label_000EAF16: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAF16u);
+    label_000EAF16:
     if ((uint32_t)(cpu->eax) != (uint32_t)(0x3B9ACA00u)) goto label_000EAF2C;
     if ((uint32_t)(cpu->esi) == (uint32_t)(cpu->eax)) goto label_000EB1A2;
     cpu->eax = cpu->esi;
     g_sfera_memory_runtime.tracker_ceiling = (uint32_t)(cpu->eax);
-    label_000EAF2C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAF2Cu);
+    label_000EAF2C:
     cpu->ecx = g_sfera_allocation_hash_runtime.records;
     cpu->eax = (int64_t)(int32_t)(cpu->eax) * (int64_t)(int32_t)(0x1Au);
     cpu->edx = lift_load32(cpu->eax + cpu->ecx + 8u);
@@ -8169,37 +8104,37 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     g_sfera_memory_runtime.diagnostics_dirty = (uint8_t)(1u);
     cpu->edx = (uint32_t)(cpu->eax + 1u);
     cpu->esp = (uint32_t)(cpu->esp);
-    label_000EAF70: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAF70u);
+    label_000EAF70:
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->eax)) & 0xFFu);
     ++cpu->eax;
     if ((uint8_t)((cpu->ecx & 0xFFu)) != 0u) goto label_000EAF70;
     cpu->eax -= cpu->edx;
     cpu->esi = (uint32_t)(cpu->eax + 0xFFFFFFFFu);
     if ((int32_t)(uint32_t)(cpu->esi) < 0) goto label_000EAF89;
-    label_000EAF80: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAF80u);
+    label_000EAF80:
     if ((uint8_t)(lift_load8(cpu->esi + cpu->edi)) == (uint8_t)(0x5Cu)) goto label_000EAF89;
     { uint64_t l=(uint64_t)(cpu->esi), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->esi = v; }
     if ((cpu->eflags & LIFT_FLAG_SF) == 0u) goto label_000EAF80;
-    label_000EAF89: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAF89u);
+    label_000EAF89:
     cpu->ecx = lift_load16(cpu->ebx + 0x14u);
     lift_push32(cpu, 0x80u);
     cpu->eax = (uint32_t)(cpu->ebp + 0xFFFFFF7Cu);
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_memory_source_hash_runtime;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EAFA4u); lift_push32(cpu, r); sfera_sub_004EDCE0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EAFA4u)); sfera_sub_004EDCE0(cpu, LIFT_CODE_TOKEN_VA(0x4EAFA4u));
     if ((uint8_t)(lift_load8(cpu->ebp + 0xFFFFFF7Cu)) == (uint8_t)(0u)) goto label_000EAFD2;
     cpu->edx = lift_load32(cpu->ebx + 0x10u);
     lift_push32(cpu, cpu->edx);
     cpu->eax = (uint32_t)(cpu->ebp + 0xFFFFFF7Cu);
     lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)"alloced: %s %d"); lift_push32(cpu, 0x80u); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]);
-    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAFC7u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAFCDu);
+    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAFC7u));
     cpu->esp += 0x14u;
     goto label_000EAFEA;
-    label_000EAFD2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAFD2u);
+    label_000EAFD2:
     lift_push32(cpu, (uintptr_t)"alloced: <Source info is corrupted>"); lift_push32(cpu, 0x80u); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]);
-    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAFE1u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAFE7u);
+    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EAFE1u));
     cpu->esp += 0xCu;
-    label_000EAFEA: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EAFEAu);
+    label_000EAFEA:
     cpu->ecx = g_sfera_diagnostic_log_byte;
     cpu->edx = lift_load32(cpu->ebp + 0x10u);
     lift_push32(cpu, cpu->ecx);
@@ -8209,24 +8144,24 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)". "); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]); lift_push32(cpu, (uintptr_t)" (underflow). "); lift_push32(cpu, cpu->ecx);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_log_memory_object;
     g_sfera_critical_diagnostics_runtime.allocation_context[127] = (uint8_t)(0u);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB02Cu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB02Cu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB02Cu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB033u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB033u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB033u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB03Au); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB03Au)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB03Au));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB041u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB041u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB041u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB048u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB048u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB048u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB04Fu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB04Fu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB04Fu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB056u); lift_push32(cpu, r); sfera_sub_004ED390(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB056u)); sfera_sub_004ED390(cpu, LIFT_CODE_TOKEN_VA(0x4EB056u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB05Du); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB05Du)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB05Du));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_RVA(0xEB064u); lift_push32(cpu, r); sfera_sub_004ED380(cpu,r); if (cpu->eip != r) return; }
-    label_000EB064: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB064u);
+    lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0xEB064u)); sfera_sub_004ED380(cpu, LIFT_CODE_TOKEN_RVA(0xEB064u));
+    label_000EB064:
     if ((uint8_t)(lift_load8(cpu->ebp + 0xFFFFFF7Bu)) == (uint8_t)(0u)) goto label_000EB184;
     cpu->edx = lift_load32(cpu->ebx + 4u);
     cpu->eax = lift_load32(cpu->ebx);
@@ -8235,37 +8170,37 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     g_sfera_memory_runtime.diagnostics_dirty = (uint8_t)(1u);
     cpu->edx = (uint32_t)(cpu->eax + 1u);
     cpu->ebx = (uint32_t)(cpu->ebx);
-    label_000EB090: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB090u);
+    label_000EB090:
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)(lift_load8(cpu->eax)) & 0xFFu);
     ++cpu->eax;
     if ((uint8_t)((cpu->ecx & 0xFFu)) != 0u) goto label_000EB090;
     cpu->eax -= cpu->edx;
     cpu->esi = (uint32_t)(cpu->eax + 0xFFFFFFFFu);
     if ((int32_t)(uint32_t)(cpu->esi) < 0) goto label_000EB0A9;
-    label_000EB0A0: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB0A0u);
+    label_000EB0A0:
     if ((uint8_t)(lift_load8(cpu->esi + cpu->edi)) == (uint8_t)(0x5Cu)) goto label_000EB0A9;
     { uint64_t l=(uint64_t)(cpu->esi), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->esi = v; }
     if ((cpu->eflags & LIFT_FLAG_SF) == 0u) goto label_000EB0A0;
-    label_000EB0A9: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB0A9u);
+    label_000EB0A9:
     cpu->edx = lift_load16(cpu->ebx + 0x14u);
     lift_push32(cpu, 0x80u);
     cpu->ecx = (uint32_t)(cpu->ebp + 0xFFFFFF7Cu);
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->edx);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_memory_source_hash_runtime;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB0C4u); lift_push32(cpu, r); sfera_sub_004EDCE0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB0C4u)); sfera_sub_004EDCE0(cpu, LIFT_CODE_TOKEN_VA(0x4EB0C4u));
     if ((uint8_t)(lift_load8(cpu->ebp + 0xFFFFFF7Cu)) == (uint8_t)(0u)) goto label_000EB0F2;
     cpu->eax = lift_load32(cpu->ebx + 0x10u);
     lift_push32(cpu, cpu->eax);
     cpu->ecx = (uint32_t)(cpu->ebp + 0xFFFFFF7Cu);
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)"alloced: %s %d"); lift_push32(cpu, 0x80u); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]);
-    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EB0E7u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB0EDu);
+    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EB0E7u));
     cpu->esp += 0x14u;
     goto label_000EB10A;
-    label_000EB0F2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB0F2u);
+    label_000EB0F2:
     lift_push32(cpu, (uintptr_t)"alloced: <Source info is corrupted>"); lift_push32(cpu, 0x80u); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]);
-    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EB101u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB107u);
+    lift_native_call(cpu, native_function_address32(&::_snprintf), LIFT_CODE_TOKEN_VA(0x4EB101u));
     cpu->esp += 0xCu;
-    label_000EB10A: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB10Au);
+    label_000EB10A:
     cpu->edx = g_sfera_diagnostic_log_byte;
     cpu->eax = lift_load32(cpu->ebp + 0x10u);
     lift_push32(cpu, cpu->edx);
@@ -8275,46 +8210,44 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EAA20(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)". "); lift_push32(cpu, (uintptr_t)&g_sfera_critical_diagnostics_runtime.allocation_context[0]); lift_push32(cpu, (uintptr_t)" (overflow). "); lift_push32(cpu, cpu->edx);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_log_memory_object;
     g_sfera_critical_diagnostics_runtime.allocation_context[127] = (uint8_t)(0u);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB14Cu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB14Cu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB14Cu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB153u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB153u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB153u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB15Au); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB15Au)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB15Au));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB161u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB161u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB161u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB168u); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB168u)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB168u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB16Fu); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB16Fu)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB16Fu));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB176u); lift_push32(cpu, r); sfera_sub_004ED390(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB176u)); sfera_sub_004ED390(cpu, LIFT_CODE_TOKEN_VA(0x4EB176u));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB17Du); lift_push32(cpu, r); sfera_sub_004ED410(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB17Du)); sfera_sub_004ED410(cpu, LIFT_CODE_TOKEN_VA(0x4EB17Du));
     cpu->ecx = cpu->eax;
-    { uint32_t r=LIFT_CODE_TOKEN_RVA(0xEB184u); lift_push32(cpu, r); sfera_sub_004ED380(cpu,r); if (cpu->eip != r) return; }
-    label_000EB184: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB184u);
+    lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0xEB184u)); sfera_sub_004ED380(cpu, LIFT_CODE_TOKEN_RVA(0xEB184u));
+    label_000EB184:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFF74u);
     cpu->eax = lift_load32(cpu->ebx + 0xCu);
     ++cpu->ecx;
     g_sfera_memory_runtime.tracker_ceiling = (uint32_t)(cpu->eax);
     lift_store32(cpu->ebp + 0xFFFFFF74u, cpu->ecx);
     if ((int32_t)(uint32_t)(cpu->ecx) < (int32_t)(uint32_t)(lift_load32(cpu->ebp + 8u))) goto label_000EAF10;
-    label_000EB1A2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB1A2u);
+    label_000EB1A2:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->ebx = lift_pop32(cpu);
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 12u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 0x10u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB1C0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB1C0u);
     g_sfera_memory_runtime.allocation_source_file = (uint32_t)(cpu->ecx);
     g_sfera_memory_runtime.allocation_source_line = (uint32_t)(cpu->edx);
-    lift_return(cpu, 0u, stop_address); return;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB1D0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB1D0u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
@@ -8337,18 +8270,18 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB1D0(LiftCpu* cpu, uint32_t stop_addres
     if ((uint32_t)(cpu->esi) == (uint32_t)(cpu->edi)) goto label_000EB251;
     if ((uint8_t)(g_sfera_memory_runtime.lock_initialized) != (uint8_t)(0u)) goto label_000EB22F;
     lift_push32(cpu, (uint32_t)(uintptr_t)g_sfera_memory_runtime.lock_words);
-    lift_native_call(cpu, native_function_address32(&::InitializeCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB222u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB228u);
+    lift_native_call(cpu, native_function_address32(&::InitializeCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB222u));
     g_sfera_memory_runtime.lock_initialized = (uint8_t)(1u);
-    label_000EB22F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB22Fu);
+    label_000EB22F:
     lift_push32(cpu, (uint32_t)(uintptr_t)g_sfera_memory_runtime.lock_words);
     if ((uint32_t)(cpu->esi) != (uint32_t)(1u)) goto label_000EB248;
-    lift_native_call(cpu, native_function_address32(&::EnterCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB239u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB23Fu);
+    lift_native_call(cpu, native_function_address32(&::EnterCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB239u));
     g_sfera_memory_runtime.lock_held = (uint8_t)(1u);
     goto label_000EB251;
-    label_000EB248: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB248u);
-    lift_native_call(cpu, native_function_address32(&::TryEnterCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB248u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB24Eu);
+    label_000EB248:
+    lift_native_call(cpu, native_function_address32(&::TryEnterCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB248u));
     lift_store32(cpu->ebp + 0xFFFFFFE8u, cpu->eax);
-    label_000EB251: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB251u);
+    label_000EB251:
     cpu->ebx = lift_load32(cpu->ebp + 0xCu);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
@@ -8356,22 +8289,22 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB1D0(LiftCpu* cpu, uint32_t stop_addres
     cpu->edi = lift_load32(cpu->ebp + 0x10u);
     lift_push32(cpu, cpu->edi); lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ecx);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFECu);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB26Bu); lift_push32(cpu, r); sfera_sub_004EAA20(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB26Bu)); sfera_sub_004EAA20(cpu, LIFT_CODE_TOKEN_VA(0x4EB26Bu));
     if ((uint8_t)(g_sfera_memory_runtime.diagnostics_dirty) != (uint8_t)(0u)) goto label_000EB28C;
     if ((uint32_t)(cpu->esi) == 0u) goto label_000EB2DF;
     if ((uint32_t)(cpu->esi) != (uint32_t)(1u)) goto label_000EB286;
-    label_000EB27D: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB27Du);
+    label_000EB27D:
     g_sfera_memory_runtime.lock_held = (uint8_t)(0u);
     goto label_000EB2D4;
-    label_000EB286: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB286u);
+    label_000EB286:
     { uint64_t l=(uint64_t)(lift_load32(cpu->ebp + 0xFFFFFFE8u)), r=(uint64_t)(1u), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     goto label_000EB2D2;
-    label_000EB28C: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB28Cu);
+    label_000EB28C:
     lift_push32(cpu, cpu->edi); lift_push32(cpu, cpu->ebx); lift_push32(cpu, 0xFFFFFFFFu);
     cpu->edx = 0u;
     cpu->ecx = 0u;
     g_sfera_memory_runtime.diagnostics_dirty = (uint8_t)(0u);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB2A0u); lift_push32(cpu, r); sfera_sub_004EAA20(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB2A0u)); sfera_sub_004EAA20(cpu, LIFT_CODE_TOKEN_VA(0x4EB2A0u));
     cpu->edx = (uint32_t)(cpu->ebp + 0xFFFFFFD8u);
     lift_push32(cpu, (uint32_t)(uintptr_t)"Memory corruption!");
     cpu->edi = 1u;
@@ -8379,27 +8312,25 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB1D0(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ebp + 0xFFFFFFD8u, (uintptr_t)"Memory\\MemoryMgr.cpp");
     lift_store32(cpu->ebp + 0xFFFFFFDCu, 0x1BDu);
     lift_store32(cpu->ebp + 0xFFFFFFE0u, cpu->edi);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB2C4u); lift_push32(cpu, r); sfera_sub_004EC2E0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB2C4u)); sfera_sub_004EC2E0(cpu, LIFT_CODE_TOKEN_VA(0x4EB2C4u));
     cpu->esp += 8u;
     if ((uint32_t)(cpu->esi) == 0u) goto label_000EB2DF;
     if ((uint32_t)(cpu->esi) == (uint32_t)(cpu->edi)) goto label_000EB27D;
     { uint64_t l=(uint64_t)(lift_load32(cpu->ebp + 0xFFFFFFE8u)), r=(uint64_t)(cpu->edi), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    label_000EB2D2: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB2D2u);
+    label_000EB2D2:
     if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000EB2DF;
-    label_000EB2D4: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB2D4u);
+    label_000EB2D4:
     lift_push32(cpu, (uint32_t)(uintptr_t)g_sfera_memory_runtime.lock_words);
     lift_native_call(cpu, native_function_address32(&::LeaveCriticalSection), LIFT_CODE_TOKEN_RVA(0xEB2D9u));
-    cpu->eip = LIFT_CODE_TOKEN_RVA(0xEB2DFu);
-    label_000EB2DF: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB2DFu);
+    label_000EB2DF:
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 16u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 0x14u; cpu->eip = stop_address; return;
 }
 
 LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB300(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB300u);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
@@ -8418,30 +8349,30 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB300(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ebp + 0xFFFFFFECu, cpu->esi);
     if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000EB351;
     lift_push32(cpu, (uint32_t)(uintptr_t)g_sfera_memory_runtime.lock_words);
-    lift_native_call(cpu, native_function_address32(&::InitializeCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB345u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB34Bu);
+    lift_native_call(cpu, native_function_address32(&::InitializeCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB345u));
     g_sfera_memory_runtime.lock_initialized = (uint8_t)((cpu->ebx & 0xFFu));
-    label_000EB351: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB351u);
+    label_000EB351:
     lift_push32(cpu, (uint32_t)(uintptr_t)g_sfera_memory_runtime.lock_words);
-    lift_native_call(cpu, native_function_address32(&::EnterCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB356u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB35Cu);
+    lift_native_call(cpu, native_function_address32(&::EnterCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB356u));
     g_sfera_memory_runtime.lock_held = (uint8_t)((cpu->ebx & 0xFFu));
     { uint64_t l=(uint64_t)(g_sfera_memory_runtime.tracking_initialized), r=(uint64_t)(0u), v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
     lift_store32(cpu->ebp + 0xFFFFFFFCu, cpu->esi);
     if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000EB38F;
     lift_push32(cpu, 0x1388u);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_allocation_hash_runtime;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB37Du); lift_push32(cpu, r); sfera_sub_004EDD40(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB37Du)); sfera_sub_004EDD40(cpu, LIFT_CODE_TOKEN_VA(0x4EB37Du));
     lift_push32(cpu, 0x32u);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_memory_source_hash_runtime;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB389u); lift_push32(cpu, r); sfera_sub_004EDA60(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB389u)); sfera_sub_004EDA60(cpu, LIFT_CODE_TOKEN_VA(0x4EB389u));
     g_sfera_memory_runtime.tracking_initialized = (uint8_t)((cpu->ebx & 0xFFu));
-    label_000EB38F: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB38Fu);
+    label_000EB38F:
     cpu->eax = lift_load32(cpu->ebp + 0xCu);
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->edx = 5u;
     lift_push32(cpu, 0xAu);
     cpu->ecx = cpu->edx;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB3A6u); lift_push32(cpu, r); sfera_sub_004EB1D0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB3A6u)); sfera_sub_004EB1D0(cpu, LIFT_CODE_TOKEN_VA(0x4EB3A6u));
     if ((int32_t)(uint32_t)(cpu->edi) >= (int32_t)(uint32_t)(cpu->esi)) goto label_000EB3D1;
     lift_push32(cpu, cpu->edi);
     cpu->edx = (uint32_t)(cpu->ebp + 0xFFFFFFDCu);
@@ -8449,12 +8380,12 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB300(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ebp + 0xFFFFFFDCu, (uintptr_t)"Memory\\MemoryMgr.cpp");
     lift_store32(cpu->ebp + 0xFFFFFFE0u, 0x1CCu);
     lift_store32(cpu->ebp + 0xFFFFFFE4u, 2u);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB3CEu); lift_push32(cpu, r); sfera_sub_004EC2E0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB3CEu)); sfera_sub_004EC2E0(cpu, LIFT_CODE_TOKEN_VA(0x4EB3CEu));
     cpu->esp += 0xCu;
-    label_000EB3D1: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB3D1u);
+    label_000EB3D1:
     cpu->eax = (uint32_t)(cpu->edi + 8u);
     lift_push32(cpu, cpu->eax);
-    lift_native_call(cpu, native_function_address32(&::malloc), LIFT_CODE_TOKEN_VA(0x4EB3D5u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB3DBu);
+    lift_native_call(cpu, native_function_address32(&::malloc), LIFT_CODE_TOKEN_VA(0x4EB3D5u));
     cpu->esi = cpu->eax;
     cpu->esp += 4u;
     if ((uint32_t)(cpu->esi) != 0u) goto label_000EB40B;
@@ -8464,9 +8395,9 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB300(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ebp + 0xFFFFFFDCu, (uintptr_t)"Memory\\MemoryMgr.cpp");
     lift_store32(cpu->ebp + 0xFFFFFFE0u, 0x1D0u);
     lift_store32(cpu->ebp + 0xFFFFFFE4u, 2u);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB408u); lift_push32(cpu, r); sfera_sub_004EC2E0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB408u)); sfera_sub_004EC2E0(cpu, LIFT_CODE_TOKEN_VA(0x4EB408u));
     cpu->esp += 0xCu;
-    label_000EB40B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB40Bu);
+    label_000EB40B:
     cpu->edx = (uint32_t)(cpu->ebp + 0xFFFFFFF0u);
     lift_push32(cpu, cpu->edx);
     lift_store32(cpu->esi, 0x61CCC864u);
@@ -8474,7 +8405,7 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB300(LiftCpu* cpu, uint32_t stop_addres
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_allocation_hash_runtime;
     lift_store32(cpu->esi + cpu->edi + 4u, 0x61CCC864u);
     lift_store32(cpu->ebp + 0xFFFFFFF0u, 0u);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB42Fu); lift_push32(cpu, r); sfera_sub_004EDEF0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB42Fu)); sfera_sub_004EDEF0(cpu, LIFT_CODE_TOKEN_VA(0x4EB42Fu));
     cpu->ebx = cpu->eax;
     if ((int32_t)(uint32_t)(cpu->ebx) >= 0) goto label_000EB45B;
     cpu->eax = (uint32_t)(cpu->ebp + 0xFFFFFFDCu);
@@ -8482,13 +8413,13 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB300(LiftCpu* cpu, uint32_t stop_addres
     lift_store32(cpu->ebp + 0xFFFFFFDCu, (uintptr_t)"Memory\\MemoryMgr.cpp");
     lift_store32(cpu->ebp + 0xFFFFFFE0u, 0xFEu);
     lift_store32(cpu->ebp + 0xFFFFFFE4u, 2u);
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB458u); lift_push32(cpu, r); sfera_sub_004EC2E0(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB458u)); sfera_sub_004EC2E0(cpu, LIFT_CODE_TOKEN_VA(0x4EB458u));
     cpu->esp += 8u;
-    label_000EB45B: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB45Bu);
+    label_000EB45B:
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ecx);
     cpu->ecx = (uint32_t)(uintptr_t)&g_sfera_memory_source_hash_runtime;
-    { uint32_t r=LIFT_CODE_TOKEN_VA(0x4EB469u); lift_push32(cpu, r); sfera_sub_004EDC70(cpu,r); if (cpu->eip != r) return; }
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EB469u)); sfera_sub_004EDC70(cpu, LIFT_CODE_TOKEN_VA(0x4EB469u));
     cpu->edx = g_sfera_memory_runtime.tracker_primary;
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
     cpu->eax = cpu->eax & 0xFFFFu;
@@ -8500,9 +8431,9 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB300(LiftCpu* cpu, uint32_t stop_addres
     cpu->edx = g_sfera_memory_runtime.tracker_primary;
     cpu->ecx = lift_load32(cpu->ebp + 8u);
     goto label_000EB49E;
-    label_000EB498: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB498u);
+    label_000EB498:
     g_sfera_memory_runtime.tracker_auxiliary = (uint32_t)(cpu->ebx);
-    label_000EB49E: cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB49Eu);
+    label_000EB49E:
     lift_store32(cpu->ecx + 0xCu, cpu->edx);
     lift_store32(cpu->ecx + 8u, 0x3B9ACA00u);
     cpu->edx = lift_load32(cpu->ebp + 0xFFFFFFF0u);
@@ -8524,11 +8455,11 @@ LIFT_ENTRY void LIFT_CDECL sfera_sub_004EB300(LiftCpu* cpu, uint32_t stop_addres
     lift_push32(cpu, (uint32_t)(uintptr_t)g_sfera_memory_runtime.lock_words);
     g_sfera_memory_runtime.tracker_primary = (uint32_t)(cpu->ebx);
     g_sfera_memory_runtime.lock_held = (uint8_t)(0u);
-    lift_native_call(cpu, native_function_address32(&::LeaveCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB4F6u)); cpu->eip = LIFT_CODE_TOKEN_VA(0x4EB4FCu);
+    lift_native_call(cpu, native_function_address32(&::LeaveCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB4F6u));
     cpu->eax = (uint32_t)(cpu->esi + 4u);
     cpu->ecx = lift_load32(cpu->ebp + 0xFFFFFFF4u);
     (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); lift_return(cpu, 8u, stop_address); return;
+    cpu->ebp = lift_pop32(cpu); cpu->esp += 0xCu; cpu->eip = stop_address; return;
 }
