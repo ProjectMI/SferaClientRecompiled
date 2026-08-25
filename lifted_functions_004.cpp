@@ -110,15 +110,11 @@ __declspec(noinline) void sfera_sub_00426780(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->edi + 0x10u;
     lift_push32(cpu, (uintptr_t)"%f %f %f %f"); lift_push32(cpu, cpu->ecx);
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x26831u), LIFT_CODE_TOKEN_RVA(0x2682Fu))) { return; }
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x40u));
-    *(float*)(cpu->esi + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x1Cu) = (double)*(float*)(cpu->esp + 0x40u);
     cpu->esp += 0x18u;
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x24u));
-    *(float*)(cpu->esi + 0x20u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x20u));
-    *(float*)(cpu->esi + 0x24u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x2Cu));
-    *(float*)(cpu->esi + 0x28u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x20u) = (double)*(float*)(cpu->esp + 0x24u);
+    *(float*)(cpu->esi + 0x24u) = (double)*(float*)(cpu->esp + 0x20u);
+    *(float*)(cpu->esi + 0x28u) = (double)*(float*)(cpu->esp + 0x2Cu);
     label_00026850:
     lift_push32(cpu, cpu->ebp); lift_push32(cpu, (uintptr_t)"random_color");
     cpu->ecx = cpu->edi;
@@ -263,7 +259,7 @@ __declspec(noinline) void sfera_sub_00426780(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x44u;
     cpu->esp += 0x10u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[18];
     cpu->esp -= 0x20u;
     cpu->eax = *(uint32_t*)(cpu->esp + 0x24u);
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->esi);
@@ -272,8 +268,7 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = cpu->edx;
     *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->ebp;
     *(uint32_t*)(cpu->esp + 0x28u) = 0u;
-    { uint64_t l=cpu->eax, r=7u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) != 0u) goto label_000272B3;
+    if ((int32_t)(cpu->eax) < (int32_t)(7u)) goto label_000272B3;
     label_00026A74:
     cpu->edi = cpu->eax;
     cpu->edi = (int32_t)(cpu->edi) >> 1u;
@@ -285,7 +280,7 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     if ((int32_t)cpu->eax <= (int32_t)0x28u) goto label_00026F26;
     cpu->edx = ((int32_t)cpu->eax < 0) ? 0xFFFFFFFFu : 0u;
     cpu->edx &= 7u;
-    { uint64_t l=cpu->eax, r=cpu->edx, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->eax = v; }
+    cpu->eax += cpu->edx;
     cpu->edx = *(uint16_t*)(cpu->esi);
     cpu->eax = (int32_t)(cpu->eax) >> 3u;
     cpu->edx = (int64_t)(int32_t)(cpu->edx) * (int64_t)(int32_t)(0x9Cu);
@@ -298,15 +293,15 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->edx + 0x98u);
     cpu->edx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->edx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
+    cpu->edx -= cpu->ebx;
     *(uint32_t*)(cpu->esp + 0x2Cu) = cpu->eax;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026C0C;
+    if (cpu->edx != 0u) goto label_00026C0C;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x24u);
     cpu->edx = *(uint32_t*)(cpu->edx + 0x90u);
     cpu->ebx = *(uint32_t*)(cpu->ecx + 0x90u);
-    { uint64_t l=cpu->edx, r=cpu->ebx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026AFA;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026C14;
+    sub_pred[1] = cpu->edx <= cpu->ebx;
+    if (cpu->edx < cpu->ebx) goto label_00026AFA;
+    if (!sub_pred[1]) goto label_00026C14;
     label_00026AFA:
     cpu->edx = cpu->eax + cpu->eax;
     cpu->edi = *(uint16_t*)(cpu->esi + (cpu->edx * 2u));
@@ -316,8 +311,7 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edi += cpu->ebp;
     cpu->edx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->edx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026CBC;
+    if ((cpu->edx -= cpu->ebx) != 0u) goto label_00026CBC;
     cpu->ecx = *(uint32_t*)(cpu->ecx + 0x90u);
     if (cpu->ecx < *(uint32_t*)(cpu->edi + 0x90u)) goto label_00026CC4;
     label_00026B36:
@@ -326,13 +320,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = *(uint32_t*)(cpu->edi + 0x98u);
     cpu->ecx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->ecx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026CD1;
+    if ((cpu->ecx -= cpu->ebx) != 0u) goto label_00026CD1;
     cpu->ecx = *(uint32_t*)(cpu->edx + 0x90u);
     cpu->edi = *(uint32_t*)(cpu->edi + 0x90u);
-    { uint64_t l=cpu->ecx, r=cpu->edi, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026B6A;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026CD9;
+    sub_pred[4] = cpu->ecx <= cpu->edi;
+    if (cpu->ecx < cpu->edi) goto label_00026B6A;
+    if (!sub_pred[4]) goto label_00026CD9;
     label_00026B6A:
     cpu->edi = *(uint32_t*)(cpu->esp + 0x10u);
     label_00026B6E:
@@ -353,14 +346,14 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->eax += cpu->ebp;
     cpu->edx &= 1u;
     cpu->edi &= 1u;
-    { uint64_t l=cpu->edx, r=cpu->edi, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
+    cpu->edx -= cpu->edi;
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->ebx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026CEA;
+    if (cpu->edx != 0u) goto label_00026CEA;
     cpu->edx = *(uint32_t*)(cpu->eax + 0x90u);
     cpu->edi = *(uint32_t*)(cpu->ecx + 0x90u);
-    { uint64_t l=cpu->edx, r=cpu->edi, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026BCE;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026CF2;
+    sub_pred[6] = cpu->edx <= cpu->edi;
+    if (cpu->edx < cpu->edi) goto label_00026BCE;
+    if (!sub_pred[6]) goto label_00026CF2;
     label_00026BCE:
     cpu->edi = *(uint16_t*)(cpu->esi + (cpu->ebx * 2u));
     cpu->edx = *(uint32_t*)(cpu->ecx + 0x98u);
@@ -369,8 +362,7 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edi += cpu->ebp;
     cpu->edx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->edx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026D69;
+    if ((cpu->edx -= cpu->ebx) != 0u) goto label_00026D69;
     cpu->ecx = *(uint32_t*)(cpu->ecx + 0x90u);
     if (cpu->ecx < *(uint32_t*)(cpu->edi + 0x90u)) goto label_00026DA5;
     goto label_00026D6D;
@@ -386,14 +378,13 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = *(uint32_t*)(cpu->ebx + 0x98u);
     cpu->edx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->edx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026C55;
+    if ((cpu->edx -= cpu->ebx) != 0u) goto label_00026C55;
     cpu->ebx = *(uint32_t*)(cpu->esp + 0x20u);
     cpu->ecx = *(uint32_t*)(cpu->ecx + 0x90u);
     cpu->edx = *(uint32_t*)(cpu->ebx + 0x90u);
-    { uint64_t l=cpu->ecx, r=cpu->edx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026C66;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026C59;
+    sub_pred[8] = cpu->ecx <= cpu->edx;
+    if (cpu->ecx < cpu->edx) goto label_00026C66;
+    if (!sub_pred[8]) goto label_00026C59;
     goto label_00026C66;
     label_00026C55:
     if ((int32_t)cpu->edx >= 0) goto label_00026C62;
@@ -408,14 +399,13 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->ebx + 0x98u);
     cpu->ecx &= 1u;
     cpu->edx &= 1u;
-    { uint64_t l=cpu->ecx, r=cpu->edx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026CA7;
+    if ((cpu->ecx -= cpu->edx) != 0u) goto label_00026CA7;
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x24u);
     cpu->ecx = *(uint32_t*)(cpu->ecx + 0x90u);
     cpu->edx = *(uint32_t*)(cpu->ebx + 0x90u);
-    { uint64_t l=cpu->ecx, r=cpu->edx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026CAF;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026B6E;
+    sub_pred[10] = cpu->ecx <= cpu->edx;
+    if (cpu->ecx < cpu->edx) goto label_00026CAF;
+    if (!sub_pred[10]) goto label_00026B6E;
     *(uint32_t*)(cpu->esp + 0x18u) = 0u;
     goto label_00026B75;
     label_00026CA7:
@@ -445,13 +435,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edi += cpu->ebp;
     cpu->edx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->edx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026D29;
+    if ((cpu->edx -= cpu->ebx) != 0u) goto label_00026D29;
     cpu->ecx = *(uint32_t*)(cpu->ecx + 0x90u);
     cpu->edx = *(uint32_t*)(cpu->edi + 0x90u);
-    { uint64_t l=cpu->ecx, r=cpu->edx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026D2D;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026DA5;
+    sub_pred[12] = cpu->ecx <= cpu->edx;
+    if (cpu->ecx < cpu->edx) goto label_00026D2D;
+    if (!sub_pred[12]) goto label_00026DA5;
     goto label_00026D2D;
     label_00026D29:
     if ((int32_t)cpu->edx < 0) goto label_00026DA5;
@@ -460,13 +449,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->edi + 0x98u);
     cpu->ecx &= 1u;
     cpu->edx &= 1u;
-    { uint64_t l=cpu->ecx, r=cpu->edx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026D5B;
+    if ((cpu->ecx -= cpu->edx) != 0u) goto label_00026D5B;
     cpu->eax = *(uint32_t*)(cpu->eax + 0x90u);
     cpu->edi = *(uint32_t*)(cpu->edi + 0x90u);
-    { uint64_t l=cpu->eax, r=cpu->edi, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026D55;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026D5F;
+    sub_pred[15] = cpu->eax <= cpu->edi;
+    if (cpu->eax < cpu->edi) goto label_00026D55;
+    if (!sub_pred[15]) goto label_00026D5F;
     label_00026D55:
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x24u);
     goto label_00026DA1;
@@ -483,13 +471,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->edi + 0x98u);
     cpu->ecx &= 1u;
     cpu->edx &= 1u;
-    { uint64_t l=cpu->ecx, r=cpu->edx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026E45;
+    if ((cpu->ecx -= cpu->edx) != 0u) goto label_00026E45;
     cpu->eax = *(uint32_t*)(cpu->eax + 0x90u);
     cpu->edi = *(uint32_t*)(cpu->edi + 0x90u);
-    { uint64_t l=cpu->eax, r=cpu->edi, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026D9D;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026E4D;
+    sub_pred[16] = cpu->eax <= cpu->edi;
+    if (cpu->eax < cpu->edi) goto label_00026D9D;
+    if (!sub_pred[16]) goto label_00026E4D;
     label_00026D9D:
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
     label_00026DA1:
@@ -512,13 +499,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edi += cpu->ebp;
     cpu->ecx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->ecx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026E5A;
+    if ((cpu->ecx -= cpu->ebx) != 0u) goto label_00026E5A;
     cpu->ecx = *(uint32_t*)(cpu->edi + 0x90u);
     cpu->ebx = *(uint32_t*)(cpu->eax + 0x90u);
-    { uint64_t l=cpu->ecx, r=cpu->ebx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026DFC;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026E5E;
+    sub_pred[17] = cpu->ecx <= cpu->ebx;
+    if (cpu->ecx < cpu->ebx) goto label_00026DFC;
+    if (!sub_pred[17]) goto label_00026E5E;
     label_00026DFC:
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
     cpu->ebx = *(uint16_t*)(cpu->esi + (cpu->ecx * 2u));
@@ -529,8 +515,7 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = *(uint32_t*)(cpu->ebx + 0x98u);
     cpu->ecx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->ecx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026EDE;
+    if ((cpu->ecx -= cpu->ebx) != 0u) goto label_00026EDE;
     cpu->eax = *(uint32_t*)(cpu->eax + 0x90u);
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
     if (cpu->eax < *(uint32_t*)(cpu->ecx + 0x90u)) goto label_00026EE2;
@@ -553,14 +538,13 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = *(uint32_t*)(cpu->ebx + 0x98u);
     cpu->ecx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->ecx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026EA0;
+    if ((cpu->ecx -= cpu->ebx) != 0u) goto label_00026EA0;
     cpu->ebx = *(uint32_t*)(cpu->esp + 0x20u);
     cpu->eax = *(uint32_t*)(cpu->eax + 0x90u);
     cpu->ecx = *(uint32_t*)(cpu->ebx + 0x90u);
-    { uint64_t l=cpu->eax, r=cpu->ecx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026EAE;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026EA4;
+    sub_pred[0] = cpu->eax <= cpu->ecx;
+    if (cpu->eax < cpu->ecx) goto label_00026EAE;
+    if (!sub_pred[0]) goto label_00026EA4;
     goto label_00026EAE;
     label_00026EA0:
     if ((int32_t)cpu->ecx >= 0) goto label_00026EAA;
@@ -574,13 +558,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->ebx + 0x98u);
     cpu->eax &= 1u;
     cpu->edx &= 1u;
-    { uint64_t l=cpu->eax, r=cpu->edx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026ED8;
+    if ((cpu->eax -= cpu->edx) != 0u) goto label_00026ED8;
     cpu->edi = *(uint32_t*)(cpu->edi + 0x90u);
     cpu->eax = *(uint32_t*)(cpu->ebx + 0x90u);
-    { uint64_t l=cpu->edi, r=cpu->eax, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026F1A;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026F22;
+    sub_pred[2] = cpu->edi <= cpu->eax;
+    if (cpu->edi < cpu->eax) goto label_00026F1A;
+    if (!sub_pred[2]) goto label_00026F22;
     goto label_00026F1A;
     label_00026ED8:
     if ((int32_t)cpu->eax < 0) goto label_00026F22;
@@ -597,13 +580,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->ecx + 0x98u);
     cpu->eax &= 1u;
     cpu->edx &= 1u;
-    { uint64_t l=cpu->eax, r=cpu->edx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026F16;
+    if ((cpu->eax -= cpu->edx) != 0u) goto label_00026F16;
     cpu->edi = *(uint32_t*)(cpu->edi + 0x90u);
     cpu->ecx = *(uint32_t*)(cpu->ecx + 0x90u);
-    { uint64_t l=cpu->edi, r=cpu->ecx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026F22;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026F1A;
+    sub_pred[5] = cpu->edi <= cpu->ecx;
+    if (cpu->edi < cpu->ecx) goto label_00026F22;
+    if (!sub_pred[5]) goto label_00026F1A;
     goto label_00026F22;
     label_00026F16:
     if ((int32_t)cpu->eax >= 0) goto label_00026F22;
@@ -624,14 +606,14 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->eax += cpu->ebp;
     cpu->ecx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->ecx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
+    cpu->ecx -= cpu->ebx;
     *(uint32_t*)(cpu->esp + 0x24u) = cpu->edx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026FB2;
+    if (cpu->ecx != 0u) goto label_00026FB2;
     cpu->edx = *(uint32_t*)(cpu->edx + 0x90u);
     cpu->ecx = *(uint32_t*)(cpu->eax + 0x90u);
-    { uint64_t l=cpu->edx, r=cpu->ecx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026F70;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00026FB6;
+    sub_pred[7] = cpu->edx <= cpu->ecx;
+    if (cpu->edx < cpu->ecx) goto label_00026F70;
+    if (!sub_pred[7]) goto label_00026FB6;
     label_00026F70:
     cpu->edx = *(uint32_t*)(cpu->esp + 0x14u);
     cpu->edx = *(uint16_t*)(cpu->esi + (cpu->edx * 2u));
@@ -641,8 +623,7 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edx += cpu->ebp;
     cpu->ecx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->ecx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000270DA;
+    if ((cpu->ecx -= cpu->ebx) != 0u) goto label_000270DA;
     cpu->eax = *(uint32_t*)(cpu->eax + 0x90u);
     if (cpu->eax < *(uint32_t*)(cpu->edx + 0x90u)) goto label_00027031;
     goto label_000270E2;
@@ -657,13 +638,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edx += cpu->ebp;
     cpu->ecx &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->ecx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00026FF1;
+    if ((cpu->ecx -= cpu->ebx) != 0u) goto label_00026FF1;
     cpu->eax = *(uint32_t*)(cpu->eax + 0x90u);
     cpu->ecx = *(uint32_t*)(cpu->edx + 0x90u);
-    { uint64_t l=cpu->eax, r=cpu->ecx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00026FF5;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_00027031;
+    sub_pred[9] = cpu->eax <= cpu->ecx;
+    if (cpu->eax < cpu->ecx) goto label_00026FF5;
+    if (!sub_pred[9]) goto label_00027031;
     goto label_00026FF5;
     label_00026FF1:
     if ((int32_t)cpu->ecx < 0) goto label_00027031;
@@ -673,13 +653,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = *(uint32_t*)(cpu->edx + 0x98u);
     cpu->eax &= 1u;
     cpu->edi &= 1u;
-    { uint64_t l=cpu->eax, r=cpu->edi, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000270C9;
+    if ((cpu->eax -= cpu->edi) != 0u) goto label_000270C9;
     cpu->eax = *(uint32_t*)(cpu->ecx + 0x90u);
     cpu->edx = *(uint32_t*)(cpu->edx + 0x90u);
-    { uint64_t l=cpu->eax, r=cpu->edx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_000270D1;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) != 0u) goto label_000270D1;
+    sub_pred[11] = cpu->eax <= cpu->edx;
+    if (cpu->eax < cpu->edx) goto label_000270D1;
+    if (sub_pred[11]) goto label_000270D1;
     label_0002702D:
     cpu->edi = *(uint32_t*)(cpu->esp + 0x14u);
     label_00027031:
@@ -704,13 +683,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->ebp = *(uint32_t*)(cpu->eax + 0x98u);
     cpu->edx &= 1u;
     cpu->ebp &= 1u;
-    { uint64_t l=cpu->edx, r=cpu->ebp, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00027128;
+    if ((cpu->edx -= cpu->ebp) != 0u) goto label_00027128;
     cpu->ecx = *(uint32_t*)(cpu->ecx + 0x90u);
     cpu->eax = *(uint32_t*)(cpu->eax + 0x90u);
-    { uint64_t l=cpu->ecx, r=cpu->eax, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_0002712C;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_000270C2;
+    sub_pred[13] = cpu->ecx <= cpu->eax;
+    if (cpu->ecx < cpu->eax) goto label_0002712C;
+    if (!sub_pred[13]) goto label_000270C2;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x20u);
     cpu->eax = *(uint16_t*)(cpu->esi + (cpu->edi * 2u));
     cpu->ecx = *(uint16_t*)(cpu->esi + (cpu->edx * 2u));
@@ -736,13 +714,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = *(uint32_t*)(cpu->edx + 0x98u);
     cpu->eax &= 1u;
     cpu->edi &= 1u;
-    { uint64_t l=cpu->eax, r=cpu->edi, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00027117;
+    if ((cpu->eax -= cpu->edi) != 0u) goto label_00027117;
     cpu->eax = *(uint32_t*)(cpu->ecx + 0x90u);
     cpu->edx = *(uint32_t*)(cpu->edx + 0x90u);
-    { uint64_t l=cpu->eax, r=cpu->edx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_0002702D;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_0002711F;
+    sub_pred[14] = cpu->eax <= cpu->edx;
+    if (cpu->eax < cpu->edx) goto label_0002702D;
+    if (!sub_pred[14]) goto label_0002711F;
     goto label_0002702D;
     label_00027117:
     if ((int32_t)cpu->eax >= 0) goto label_0002702D;
@@ -765,13 +742,12 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->ecx + 0x98u);
     cpu->edx &= 1u;
     cpu->ebp &= 1u;
-    { uint64_t l=cpu->edx, r=cpu->ebp, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000271BF;
+    if ((cpu->edx -= cpu->ebp) != 0u) goto label_000271BF;
     cpu->ecx = *(uint32_t*)(cpu->ecx + 0x90u);
     cpu->eax = *(uint32_t*)(cpu->eax + 0x90u);
-    { uint64_t l=cpu->ecx, r=cpu->eax, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_CF) != 0u) goto label_00027195;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) == 0u) goto label_000271C3;
+    sub_pred[3] = cpu->ecx <= cpu->eax;
+    if (cpu->ecx < cpu->eax) goto label_00027195;
+    if (!sub_pred[3]) goto label_000271C3;
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x24u);
     cpu->eax = *(uint16_t*)(cpu->esi + (cpu->ebx * 2u));
     cpu->edx = (cpu->edx & 0xFFFF0000u) | (*(uint16_t*)(cpu->esi + (cpu->ecx * 2u)));
@@ -871,8 +847,7 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = cpu->esi + (cpu->ecx * 2u);
     *(uint32_t*)(cpu->esp + 0x34u) = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x28u) = 0u;
-    { uint64_t l=cpu->eax, r=7u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u) goto label_00026A74;
+    if ((int32_t)(cpu->eax) >= (int32_t)(7u)) goto label_00026A74;
     label_000272B3:
     cpu->edx = 1u;
     *(uint32_t*)(cpu->esp + 0x38u) = cpu->edx;
@@ -888,8 +863,7 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = *(uint32_t*)(cpu->ecx + cpu->ebp + 0x98u);
     cpu->edi &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->edi, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edi = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002730F;
+    if ((cpu->edi -= cpu->ebx) != 0u) goto label_0002730F;
     cpu->ecx = *(uint32_t*)(cpu->ecx + cpu->ebp + 0x90u);
     if (cpu->ecx >= *(uint32_t*)(cpu->eax + cpu->ebp + 0x90u)) goto label_0002732A;
     goto label_00027313;
@@ -927,8 +901,7 @@ __declspec(noinline) void sfera_sub_00426A50(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = *(uint32_t*)(cpu->ecx + cpu->ebp + 0x98u);
     cpu->edi &= 1u;
     cpu->ebx &= 1u;
-    { uint64_t l=cpu->edi, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edi = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002739F;
+    if ((cpu->edi -= cpu->ebx) != 0u) goto label_0002739F;
     cpu->ecx = *(uint32_t*)(cpu->ecx + cpu->ebp + 0x90u);
     if (cpu->ecx >= *(uint32_t*)(cpu->eax + cpu->ebp + 0x90u)) goto label_000273BA;
     goto label_000273A3;
@@ -1050,11 +1023,11 @@ __declspec(noinline) void sfera_sub_004273E0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_00427550(LiftCpu* cpu, uint32_t stop_address) {
-    { uint64_t l=g_sfera_effect_manager.render_slots.capacity, r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+__declspec(noinline) void sfera_sub_00427550(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[2];
+    sub_pred[0] = (uint32_t)(g_sfera_effect_manager.render_slots.capacity) == 0u; sub_pred[1] = (int32_t)((uint32_t)(g_sfera_effect_manager.render_slots.capacity)) < (int32_t)(0u);
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
-    if (((cpu->eflags & LIFT_FLAG_ZF) == 0u) && ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) == 0u)) goto label_00027576;
+    if ((!sub_pred[0]) && (!sub_pred[1])) goto label_00027576;
     cpu->edx = 0u;
     cpu->ecx = (uintptr_t)g_sfera_effect_manager.render_slots.debug_file;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x427568u)); sfera_sub_00401120(cpu, LIFT_CODE_TOKEN_VA(0x427568u));
@@ -1068,12 +1041,12 @@ __declspec(noinline) void sfera_sub_00427550(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = g_sfera_effect_manager.render_slot_count;
     cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_00427590(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_00427590(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
-    { uint64_t l=*(uint32_t*)(cpu->esi + 4u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->esi + 4u) == 0u;
     std::construct_at(reinterpret_cast<IEffectManager*>(cpu->esi));
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000275C0;
+    if (sub_pred[0]) goto label_000275C0;
     if (*(uint8_t*)(cpu->esi + 0xCu) != 0u) goto label_000275C0;
     cpu->edx = 0x67Du;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
@@ -1095,9 +1068,7 @@ __declspec(noinline) void sfera_sub_004275E0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp -= 0x88u;
     cpu->eax = cpu->ecx;
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x8Cu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->ecx));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax + 0x48u)));
-    *(float*)(cpu->esp) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp) = ((((double)*(float*)(cpu->ecx))) + (((double)*(float*)(cpu->eax + 0x48u))));
     cpu->edx = *(uint32_t*)(cpu->esp);
     lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x4Cu));
     *(uint32_t*)(cpu->esp + 0x18u) = cpu->edx;
@@ -1113,9 +1084,7 @@ __declspec(noinline) void sfera_sub_004275E0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->edx;
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax + 0x3Cu)));
     *(float*)(cpu->esp) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x40u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->ecx + 4u)));
-    *(float*)(cpu->esp + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 4u) = ((((double)*(float*)(cpu->eax + 0x40u))) + (((double)*(float*)(cpu->ecx + 4u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x44u));
     cpu->eax = *(uint32_t*)(cpu->esp);
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->ecx + 8u)));
@@ -1131,8 +1100,8 @@ __declspec(noinline) void sfera_sub_004275E0(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = 8u;
     cpu->ecx = cpu->esp + 0x24u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42767Eu)); sfera_sub_0044C370(cpu, LIFT_CODE_TOKEN_VA(0x42767Eu));
-    { uint64_t x=cpu->eax, v=0u-x; lift_flags_sub(cpu,0u,x,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | (x != 0u ? LIFT_FLAG_CF : 0u); cpu->eax = v; }
-    cpu->eax = (uint64_t)(cpu->eax) - (uint64_t)(cpu->eax) - (uint64_t)(((cpu->eflags & LIFT_FLAG_CF) != 0u ? 1u : 0u));
+    cpu->eax = -cpu->eax;
+    cpu->eax = (cpu->eax != 0u) ? 0xFFFFFFFFu : 0u;
     cpu->eax = 0u - (uint64_t)(cpu->eax);
     cpu->esp += 0x88u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -1182,12 +1151,12 @@ __declspec(noinline) void sfera_sub_004276A0(LiftCpu* cpu, uint32_t stop_address
     reinterpret_cast<CScriptedEffect*>(cpu->edi)->destroyEffect(cpu);
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ecx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_00427750(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_00427750(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     lift_push32(cpu, cpu->edi);
     cpu->edi = cpu->ecx;
     if (*(uint8_t*)(cpu->edi + 0xDu) != 0u) goto label_000277B9;
-    { uint64_t l=*(uint8_t*)(cpu->esp + 8u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000277AF;
+    sub_pred[0] = *(uint8_t*)(cpu->esp + 8u) == 0u;
+    if (*(uint8_t*)(cpu->esp + 8u) != 0u) goto label_000277AF;
     lift_push32(cpu, cpu->ebx);
     cpu->ebx = 0u;
     if (*(uint32_t*)(cpu->edi + 0xBCu) <= cpu->ebx) goto label_0002779A;
@@ -1211,20 +1180,20 @@ __declspec(noinline) void sfera_sub_00427750(LiftCpu* cpu, uint32_t stop_address
     if (cpu->ecx == 0u) goto label_000277AA;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x277AAu)); sfera_sub_00496870(cpu, LIFT_CODE_TOKEN_RVA(0x277AAu));
     label_000277AA:
-    { uint64_t l=*(uint8_t*)(cpu->esp + 8u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
+    sub_pred[0] = *(uint8_t*)(cpu->esp + 8u) == 0u;
     label_000277AF:
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_ZF) != 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (sub_pred[0]);
     *(uint8_t*)(cpu->edi + 0xEu) = cpu->eax & 0xFFu;
     *(uint8_t*)(cpu->edi + 0xDu) = 1u;
     label_000277B9:
     cpu->edi = lift_pop32(cpu); cpu->esp += 8u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004277C0(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_004277C0(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
-    { uint64_t l=*(uint32_t*)(cpu->esi + 0x2Cu), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->esi + 0x2Cu) == 0u;
     lift_push32(cpu, cpu->edi);
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00027850;
+    if (!sub_pred[0]) goto label_00027850;
     if (*(uint32_t*)(cpu->esi) == 0u) goto label_000277F8;
     cpu->edx = 0xA3Eu;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
@@ -1303,7 +1272,7 @@ __declspec(noinline) void sfera_sub_00427870(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     cpu->esi = lift_pop32(cpu); cpu->esp += 0xCu; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address) { bool lift_test[1]; bool sub_pred[3];
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -1366,11 +1335,9 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->ebx + 0x14u) = cpu->ecx;
     cpu->edx = *(uint32_t*)(cpu->ebp + 0xACu);
     *(uint32_t*)(cpu->ebx + 0xACu) = cpu->edx;
-    lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 0x1Cu));
-    *(float*)(cpu->ebx + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->ebx + 0x1Cu) = (double)*(float*)(cpu->ebp + 0x1Cu);
     cpu->edi |= 0xFFFFFFFFu;
-    lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 0x18u));
-    *(float*)(cpu->ebx + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->ebx + 0x18u) = (double)*(float*)(cpu->ebp + 0x18u);
     cpu->eax = *(uint32_t*)(cpu->ebp + 0xD4u);
     *(uint32_t*)(cpu->ebx + 0xD4u) = cpu->eax;
     cpu->ecx = *(uint32_t*)(cpu->ebp + 0xD8u);
@@ -1399,13 +1366,13 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     if (*(uint32_t*)(cpu->ebp + 0xD4u) == cpu->edi) goto label_00027AC2;
     cpu->esi = native_function_address32(&::rand);
     if (!lift_call_indirect(cpu, cpu->esi, LIFT_CODE_TOKEN_RVA(0x27A6Fu), LIFT_CODE_TOKEN_RVA(0x27A6Du))) { return; }
-    { uint64_t l=cpu->eax, r=0x80000001u, v=l & r; lift_flags_logic(cpu,v,32u); cpu->eax = v; }
-    if ((cpu->eflags & LIFT_FLAG_SF) == 0u) goto label_00027A7B;
+    cpu->eax&=0x80000001u; lift_test[0]=cpu->eax==0u;
+    if (((cpu->eax)&0x80000000u)==0u) goto label_00027A7B;
     --cpu->eax;
     cpu->eax |= 0xFFFFFFFEu;
-    { uint64_t l=cpu->eax, v=l + 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_add(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->eax = v; }
+    ++cpu->eax; lift_test[0]=cpu->eax == 0u;
     label_00027A7B:
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00027A87;
+    if (!lift_test[0]) goto label_00027A87;
     *(uint32_t*)(cpu->ebx + 0xE4u) = 1u;
     label_00027A87:
     if (*(uint32_t*)(cpu->ebx + 0xE4u) != 0u) goto label_00027AA5;
@@ -1453,7 +1420,7 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x427B36u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x427B36u));
     cpu->esi = *(uint32_t*)(cpu->ebp + 0xBCu);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->eax = cpu->esi;
     cpu->edx = 0x64u;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
@@ -1461,8 +1428,8 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0u - (uint64_t)(cpu->ecx);
     cpu->ecx |= cpu->eax;
     cpu->eax = 0u;
-    { uint64_t l=cpu->ecx, r=4u, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_CF) != 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx += 4u;
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (cpu->ecx < 4u);
     cpu->eax = 0u - (uint64_t)(cpu->eax);
     cpu->eax |= cpu->ecx;
     lift_push32(cpu, cpu->eax);
@@ -1481,10 +1448,10 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = 0u;
     label_00027B8F:
     *(uint32_t*)(cpu->ebx + 0xECu) = cpu->edi;
-    { uint64_t l=*(uint32_t*)(cpu->ebp + 0xBCu), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->ebp + 0xBCu) <= 0u;
     *(uint32_t*)(cpu->esp + 0x2Cu) = 0xFFFFFFFFu;
     *(uint32_t*)(cpu->esp + 0x14u) = 0u;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) != 0u) goto label_00027BE4;
+    if (sub_pred[0]) goto label_00027BE4;
     cpu->edx = 0u;
     label_00027BB0:
     cpu->eax = *(uint32_t*)(cpu->ebx + 0xECu);
@@ -1506,7 +1473,7 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x427C00u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x427C00u));
     cpu->esi = *(uint32_t*)(cpu->ebp + 0xB8u);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->eax = cpu->esi;
     cpu->edx = 0x9Cu;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
@@ -1514,8 +1481,8 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0u - (uint64_t)(cpu->ecx);
     cpu->ecx |= cpu->eax;
     cpu->eax = 0u;
-    { uint64_t l=cpu->ecx, r=4u, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_CF) != 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx += 4u;
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (cpu->ecx < 4u);
     cpu->eax = 0u - (uint64_t)(cpu->eax);
     cpu->eax |= cpu->ecx;
     lift_push32(cpu, cpu->eax);
@@ -1534,10 +1501,10 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = 0u;
     label_00027C5C:
     *(uint32_t*)(cpu->ebx + 0xE8u) = cpu->edi;
-    { uint64_t l=*(uint32_t*)(cpu->ebp + 0xB8u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[1] = *(uint32_t*)(cpu->ebp + 0xB8u) <= 0u;
     *(uint32_t*)(cpu->esp + 0x2Cu) = 0xFFFFFFFFu;
     *(uint32_t*)(cpu->esp + 0x18u) = 0u;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) != 0u) goto label_00027CD4;
+    if (sub_pred[1]) goto label_00027CD4;
     cpu->ecx = 0u;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->ecx;
     goto label_00027C94;
@@ -1565,7 +1532,7 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x427CF0u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x427CF0u));
     cpu->esi = *(uint32_t*)(cpu->ebp + 0xC4u);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->eax = cpu->esi;
     cpu->edx = 0x19Cu;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
@@ -1573,8 +1540,8 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0u - (uint64_t)(cpu->ecx);
     cpu->ecx |= cpu->eax;
     cpu->eax = 0u;
-    { uint64_t l=cpu->ecx, r=4u, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_CF) != 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx += 4u;
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (cpu->ecx < 4u);
     cpu->eax = 0u - (uint64_t)(cpu->eax);
     cpu->eax |= cpu->ecx;
     lift_push32(cpu, cpu->eax);
@@ -1593,10 +1560,10 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = 0u;
     label_00027D4C:
     *(uint32_t*)(cpu->ebx + 0xF0u) = cpu->edi;
-    { uint64_t l=*(uint32_t*)(cpu->ebp + 0xC4u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[2] = *(uint32_t*)(cpu->ebp + 0xC4u) <= 0u;
     *(uint32_t*)(cpu->esp + 0x2Cu) = 0xFFFFFFFFu;
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0u;
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) != 0u) goto label_00027E1F;
+    if (sub_pred[2]) goto label_00027E1F;
     cpu->eax = 0u;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->eax;
     goto label_00027D84;
@@ -1616,7 +1583,7 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x427DB2u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x427DB2u));
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
     cpu->eax = *(uint32_t*)(cpu->ecx + 0x5Cu);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->edx = 0x50u;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_OF) != 0u)) ? 1u : 0u) & 0xFFu);
@@ -1649,7 +1616,7 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x427E48u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x427E48u));
     cpu->esi = *(uint32_t*)(cpu->ebp + 0xC8u);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->eax = cpu->esi;
     cpu->edx = 0x19Cu;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
@@ -1657,8 +1624,8 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0u - (uint64_t)(cpu->ecx);
     cpu->ecx |= cpu->eax;
     cpu->eax = 0u;
-    { uint64_t l=cpu->ecx, r=4u, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_CF) != 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx += 4u;
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (cpu->ecx < 4u);
     cpu->eax = 0u - (uint64_t)(cpu->eax);
     cpu->eax |= cpu->ecx;
     lift_push32(cpu, cpu->eax);
@@ -1682,7 +1649,7 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->ebx + 0xF8u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x427EC1u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x427EC1u));
     cpu->eax = *(uint32_t*)(cpu->ebp + 0xCCu);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->edx = 0x50u;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_OF) != 0u)) ? 1u : 0u) & 0xFFu);
@@ -1703,6 +1670,7 @@ __declspec(noinline) void sfera_sub_004278E0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address) {
+    bool lift_cmp[1];
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -1742,7 +1710,7 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
     *(uint32_t*)(cpu->esi + 0xB8u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x427FD5u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x427FD5u));
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->eax = cpu->edi;
     cpu->edx = 0x9Cu;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
@@ -1750,8 +1718,8 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0u - (uint64_t)(cpu->ecx);
     cpu->ecx |= cpu->eax;
     cpu->eax = 0u;
-    { uint64_t l=cpu->ecx, r=4u, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_CF) != 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx += 4u;
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (cpu->ecx < 4u);
     cpu->eax = 0u - (uint64_t)(cpu->eax);
     cpu->eax |= cpu->ecx;
     lift_push32(cpu, cpu->eax);
@@ -1820,7 +1788,7 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
     *(uint32_t*)(cpu->esi + 0xC4u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4280F2u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x4280F2u));
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->eax = cpu->edi;
     cpu->edx = 0x19Cu;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
@@ -1828,8 +1796,8 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0u - (uint64_t)(cpu->ecx);
     cpu->ecx |= cpu->eax;
     cpu->eax = 0u;
-    { uint64_t l=cpu->ecx, r=4u, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_CF) != 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx += 4u;
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (cpu->ecx < 4u);
     cpu->eax = 0u - (uint64_t)(cpu->eax);
     cpu->eax |= cpu->ecx;
     lift_push32(cpu, cpu->eax);
@@ -1879,9 +1847,8 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     goto label_000281D9;
     label_000281C0:
     cpu->ecx = *(uint32_t*)(cpu->esi + 0xF0u);
-    { uint64_t l=*(uint32_t*)(cpu->edi + cpu->ecx + 0x18Cu), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     cpu->eax = cpu->edi + cpu->ecx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000281D9;
+    if (*(uint32_t*)(cpu->edi + cpu->ecx + 0x18Cu) != 0u) goto label_000281D9;
     cpu->edx = *(uint32_t*)(cpu->eax + 0x5Cu);
     *(uint32_t*)(cpu->esi + 0x58u) = (uint64_t)(*(uint32_t*)(cpu->esi + 0x58u)) + (uint64_t)(cpu->edx) + (uint64_t)(0u);
     label_000281D9:
@@ -1949,7 +1916,7 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4282FBu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x4282FBu));
     cpu->edi = *(uint32_t*)(cpu->esi + 0xC8u);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->eax = cpu->edi;
     cpu->edx = 0x19Cu;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
@@ -1957,8 +1924,8 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0u - (uint64_t)(cpu->ecx);
     cpu->ecx |= cpu->eax;
     cpu->eax = 0u;
-    { uint64_t l=cpu->ecx, r=4u, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_CF) != 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx += 4u;
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (cpu->ecx < 4u);
     cpu->eax = 0u - (uint64_t)(cpu->eax);
     cpu->eax |= cpu->ecx;
     lift_push32(cpu, cpu->eax);
@@ -1982,7 +1949,7 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xF8u) = cpu->ebx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42837Au)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42837Au));
     cpu->eax = *(uint32_t*)(cpu->esi + 0xCCu);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->edx = 0x50u;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_OF) != 0u)) ? 1u : 0u) & 0xFFu);
@@ -2105,12 +2072,11 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u)); lift_x87_push(cpu, cpu->fpu[0u]);
     lift_x87_push(cpu, 0.0);
     lift_x87_push(cpu, cpu->fpu[0u]);
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[2u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
+    lift_cmp[0]=cpu->fpu[0u]==cpu->fpu[2u];
+    lift_x87_pop(cpu);
     cpu->fpu[1u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     lift_x87_push(cpu, 24.0);
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x44u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002853E;
+    if (lift_cmp[0]) goto label_0002853E;
     cpu->fpu[2u] = (cpu->fpu[2u]) / (cpu->fpu[0u]);
     label_0002853E:
     { double temporary = cpu->fpu[0u]; cpu->fpu[0u] = cpu->fpu[2u]; cpu->fpu[2u] = temporary; }
@@ -2118,11 +2084,7 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u));
     *(float*)(cpu->esi + 0x18u) = cpu->fpu[0u];
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x20u)); lift_x87_push(cpu, cpu->fpu[0u]);
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[3u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    cpu->fpu[2u] = cpu->fpu[0u]; lift_x87_pop(cpu);
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x44u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_00028562;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[3u]; lift_x87_pop(cpu); cpu->fpu[2u]=cpu->fpu[0u]; lift_x87_pop(cpu); if (lift_left==lift_right) goto label_00028562; }
     { double temporary = cpu->fpu[0u]; cpu->fpu[0u] = cpu->fpu[1u]; cpu->fpu[1u] = temporary; }
     cpu->fpu[2u] = cpu->fpu[0u] / cpu->fpu[2u]; lift_x87_pop(cpu);
     goto label_00028566;
@@ -2221,7 +2183,7 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
     *(uint32_t*)(cpu->esi + 0xBCu) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4286C3u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x4286C3u));
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->eax = cpu->edi;
     cpu->edx = 0x64u;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
@@ -2229,8 +2191,8 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0u - (uint64_t)(cpu->ecx);
     cpu->ecx |= cpu->eax;
     cpu->eax = 0u;
-    { uint64_t l=cpu->ecx, r=4u, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_CF) != 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx += 4u;
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (cpu->ecx < 4u);
     cpu->eax = 0u - (uint64_t)(cpu->eax);
     cpu->eax |= cpu->ecx;
     lift_push32(cpu, cpu->eax);
@@ -2310,7 +2272,7 @@ __declspec(noinline) void sfera_sub_00427F10(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x428800u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x428800u));
     cpu->eax = *(uint32_t*)(cpu->esi + 0xC0u);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->edx = 4u;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_OF) != 0u)) ? 1u : 0u) & 0xFFu);
@@ -2480,12 +2442,9 @@ __declspec(noinline) void sfera_sub_00428A10(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     *(float*)(cpu->esp) = cpu->fpu[0u]; lift_x87_pop(cpu);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x428A7Fu)); sfera_sub_0042D180(cpu, LIFT_CODE_TOKEN_VA(0x428A7Fu));
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu));
-    *(float*)(cpu->esi + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    *(float*)(cpu->esi + 0x20u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u));
-    *(float*)(cpu->esi + 0x24u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x1Cu) = (double)*(float*)(cpu->esp + 0xCu);
+    *(float*)(cpu->esi + 0x20u) = (double)*(float*)(cpu->esp + 0x10u);
+    *(float*)(cpu->esi + 0x24u) = (double)*(float*)(cpu->esp + 0x14u);
     label_00028A94:
     cpu->ecx = *(uint32_t*)(cpu->esi + 8u);
     if (cpu->ecx == 0u) goto label_00028AB7;
@@ -2506,44 +2465,23 @@ __declspec(noinline) void sfera_sub_00428A10(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = *(uint32_t*)(cpu->esp + 0x24u);
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax)));
     *(float*)(cpu->edi) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esi + 0x14u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax + 4u)));
-    *(float*)(cpu->edi + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esi + 0x18u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax + 8u)));
-    *(float*)(cpu->edi + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->edi + 4u) = ((((double)*(float*)(cpu->esi + 0x14u))) + (((double)*(float*)(cpu->eax + 4u))));
+    *(float*)(cpu->edi + 8u) = ((((double)*(float*)(cpu->esi + 0x18u))) + (((double)*(float*)(cpu->eax + 8u))));
     if (((*(uint8_t*)(cpu->esi + 0x34u)) & (1u)) == 0u) goto label_00028B4E;
     if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x28AEDu), LIFT_CODE_TOKEN_RVA(0x28AEBu))) { return; }
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0xCu)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x44u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x38u)))));
-    *(float*)(cpu->esi + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0xCu) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0xCu)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esi + 0x1Cu) = (((((((double)*(float*)(cpu->esp + 0xCu))) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x44u)))))))) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x38u))))));
     if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x28B0Eu), LIFT_CODE_TOKEN_RVA(0x28B0Cu))) { return; }
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0xCu)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x48u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x3Cu)))));
-    *(float*)(cpu->esi + 0x20u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0xCu) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0xCu)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esi + 0x20u) = (((((((double)*(float*)(cpu->esp + 0xCu))) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x48u)))))))) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x3Cu))))));
     if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x28B2Fu), LIFT_CODE_TOKEN_RVA(0x28B2Du))) { return; }
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0xCu)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x4Cu)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x40u)))));
-    *(float*)(cpu->esi + 0x24u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0xCu) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0xCu)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esi + 0x24u) = (((((((double)*(float*)(cpu->esp + 0xCu))) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x4Cu)))))))) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x40u))))));
     label_00028B4E:
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x2Cu)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (0.00390625);
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0xCu) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x2Cu)))))) * (0.00390625));
     lift_x87_push(cpu, (double)*(float*)(cpu->esi + 0x1Cu));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -2565,13 +2503,8 @@ __declspec(noinline) void sfera_sub_00428A10(LiftCpu* cpu, uint32_t stop_address
     if (cpu->edx != 0u) goto label_00028BD3;
     if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x28B99u), LIFT_CODE_TOKEN_RVA(0x28B97u))) { return; }
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0xCu)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esi + 0x54u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esi + 0x50u)));
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0xCu) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0xCu)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esp + 0xCu) = (((((((double)*(float*)(cpu->esp + 0xCu))) * (((double)*(float*)(cpu->esi + 0x54u)))))) + (((double)*(float*)(cpu->esi + 0x50u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->edi + 0xCu)));
     *(float*)(cpu->edi + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -2617,8 +2550,7 @@ __declspec(noinline) void sfera_sub_00428BF0(LiftCpu* cpu, uint32_t stop_address
     label_00028C65:
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->edi + 1u));
     ++cpu->edi;
-    { uint64_t v= cpu->ecx & 0xFFu; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00028C65;
+    if ((cpu->ecx & 0xFFu)!=0u) goto label_00028C65;
     cpu->ecx = cpu->eax;
     cpu->ecx >>= 2u;
     cpu->esi = cpu->edx;
@@ -2682,8 +2614,7 @@ __declspec(noinline) void sfera_sub_00428BF0(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, 1.0);
     cpu->fpu[1u] = cpu->fpu[0u] / cpu->fpu[1u]; lift_x87_pop(cpu);
     *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, 0.0);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = (double)(0.0);
     if (cpu->ebx == 0xFFFFFFFFu) goto label_00028E88;
     label_00028D54:
     if (((*(uint8_t*)(cpu->esp + 0x1Cu)) & (0x10u)) != 0u) goto label_00028E74;
@@ -2719,8 +2650,7 @@ __declspec(noinline) void sfera_sub_00428BF0(LiftCpu* cpu, uint32_t stop_address
     label_00028DD0:
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->edi + 1u));
     ++cpu->edi;
-    { uint64_t v= cpu->ecx & 0xFFu; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00028DD0;
+    if ((cpu->ecx & 0xFFu)!=0u) goto label_00028DD0;
     cpu->ecx = cpu->eax;
     cpu->ecx >>= 2u;
     cpu->esi = cpu->edx;
@@ -2761,9 +2691,7 @@ __declspec(noinline) void sfera_sub_00428BF0(LiftCpu* cpu, uint32_t stop_address
     label_00028E4F:
     *(uint32_t*)(cpu->ebp + 0x20u) = cpu->edx;
     label_00028E52:
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x14u)));
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)*(float*)(cpu->esp + 0x10u))) + (((double)*(float*)(cpu->esp + 0x14u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
     cpu->fpu[0u] = (cpu->fpu[0u]) * (30.0);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x428E6Du)); sfera_sub_004EE940(cpu, LIFT_CODE_TOKEN_VA(0x428E6Du));
@@ -2818,8 +2746,7 @@ __declspec(noinline) void sfera_sub_00428BF0(LiftCpu* cpu, uint32_t stop_address
     label_00028F27:
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->edi + 1u));
     ++cpu->edi;
-    { uint64_t v= cpu->ecx & 0xFFu; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00028F27;
+    if ((cpu->ecx & 0xFFu)!=0u) goto label_00028F27;
     cpu->ecx = cpu->eax;
     cpu->ecx >>= 2u;
     cpu->esi = cpu->edx;
@@ -2859,9 +2786,7 @@ __declspec(noinline) void sfera_sub_00428BF0(LiftCpu* cpu, uint32_t stop_address
     label_00028F9F:
     *(uint32_t*)(cpu->ebp + 0x20u) = cpu->ebx;
     label_00028FA2:
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x14u)));
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)*(float*)(cpu->esp + 0x10u))) + (((double)*(float*)(cpu->esp + 0x14u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
     cpu->fpu[0u] = (cpu->fpu[0u]) * (30.0);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x428FBDu)); sfera_sub_004EE940(cpu, LIFT_CODE_TOKEN_VA(0x428FBDu));
@@ -2880,7 +2805,7 @@ __declspec(noinline) void sfera_sub_00428BF0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x390u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[2];
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
@@ -2890,9 +2815,9 @@ __declspec(noinline) void sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     std::construct_at(reinterpret_cast<CScriptedEffect*>(cpu->esi));
-    { uint64_t l=*(uint32_t*)(cpu->esi + 0xF4u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->esi + 0xF4u) == 0u;
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0u;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002905F;
+    if (sub_pred[0]) goto label_0002905F;
     cpu->edx = 0x6F6u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x429050u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x429050u));
@@ -3005,10 +2930,10 @@ __declspec(noinline) void sfera_sub_00429000(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x429234u)); sfera_sub_004EBE20(cpu, LIFT_CODE_TOKEN_VA(0x429234u));
     cpu->esp += 4u;
     label_00029237:
-    { uint64_t l=*(uint32_t*)(cpu->esi + 4u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[1] = *(uint32_t*)(cpu->esi + 4u) == 0u;
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0xFFFFFFFFu;
     std::construct_at(reinterpret_cast<IEffectManager*>(cpu->esi));
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002926C;
+    if (sub_pred[1]) goto label_0002926C;
     if (*(uint8_t*)(cpu->esi + 0xCu) != 0u) goto label_0002926C;
     cpu->edx = 0x67Du;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectManager.cpp";
@@ -3039,9 +2964,8 @@ __declspec(noinline) void sfera_sub_00429280(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = *(uint8_t*)(cpu->esi + 0x60u);
     cpu->ecx = cpu->eax + (cpu->eax * 2u);
     cpu->edi |= 0xFFFFFFFFu;
-    { uint64_t l=*(uint32_t*)(cpu->esi + 0x30u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     cpu->ebp = cpu->edx + (cpu->ecx * 4u);
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000292D2;
+    if (*(uint32_t*)(cpu->esi + 0x30u) == 0u) goto label_000292D2;
     if (*(uint32_t*)(cpu->esi + 0xCu) != cpu->edi) goto label_00029329;
     label_000292D2:
     cpu->ecx = *(uint32_t*)(cpu->esi + 0xCu);
@@ -3089,12 +3013,9 @@ __declspec(noinline) void sfera_sub_00429280(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     *(float*)(cpu->esp) = cpu->fpu[0u]; lift_x87_pop(cpu);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x429360u)); sfera_sub_0042D180(cpu, LIFT_CODE_TOKEN_VA(0x429360u));
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x1Cu));
-    *(float*)(cpu->esi + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x20u));
-    *(float*)(cpu->esi + 0x20u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x24u));
-    *(float*)(cpu->esi + 0x24u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x1Cu) = (double)*(float*)(cpu->esp + 0x1Cu);
+    *(float*)(cpu->esi + 0x20u) = (double)*(float*)(cpu->esp + 0x20u);
+    *(float*)(cpu->esi + 0x24u) = (double)*(float*)(cpu->esp + 0x24u);
     label_00029375:
     cpu->ecx = *(uint32_t*)(cpu->esi + 8u);
     if (cpu->ecx == 0u) goto label_00029398;
@@ -3112,9 +3033,7 @@ __declspec(noinline) void sfera_sub_00429280(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->ebp)));
     cpu->edi = cpu->eax;
     *(float*)(cpu->edi) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 4u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esi + 0x14u)));
-    *(float*)(cpu->edi + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->edi + 4u) = ((((double)*(float*)(cpu->ebp + 4u))) + (((double)*(float*)(cpu->esi + 0x14u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 8u));
     cpu->ebp = native_function_address32(&::rand);
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esi + 0x18u)));
@@ -3122,31 +3041,16 @@ __declspec(noinline) void sfera_sub_00429280(LiftCpu* cpu, uint32_t stop_address
     if (((*(uint8_t*)(cpu->esi + 0x34u)) & (1u)) == 0u) goto label_0002942B;
     if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x293CAu), LIFT_CODE_TOKEN_RVA(0x293C8u))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x44u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x38u)))));
-    *(float*)(cpu->esi + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esi + 0x1Cu) = (((((((double)*(float*)(cpu->esp + 0x10u))) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x44u)))))))) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x38u))))));
     if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x293EBu), LIFT_CODE_TOKEN_RVA(0x293E9u))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x48u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x3Cu)))));
-    *(float*)(cpu->esi + 0x20u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esi + 0x20u) = (((((((double)*(float*)(cpu->esp + 0x10u))) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x48u)))))))) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x3Cu))))));
     if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x2940Cu), LIFT_CODE_TOKEN_RVA(0x2940Au))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x4Cu)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x40u)))));
-    *(float*)(cpu->esi + 0x24u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esi + 0x24u) = (((((((double)*(float*)(cpu->esp + 0x10u))) * ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x4Cu)))))))) + ((double)(((int32_t)(*(uint32_t*)(cpu->esi + 0x40u))))));
     label_0002942B:
     lift_x87_push(cpu, (double)*(float*)(cpu->esi + 0x1Cu));
     lift_x87_push(cpu, 0.99609375);
@@ -3169,13 +3073,8 @@ __declspec(noinline) void sfera_sub_00429280(LiftCpu* cpu, uint32_t stop_address
     if (cpu->edx != 0u) goto label_000294A6;
     if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x29468u), LIFT_CODE_TOKEN_RVA(0x29466u))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esi + 0x54u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esi + 0x50u)));
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esp + 0x10u) = (((((((double)*(float*)(cpu->esp + 0x10u))) * (((double)*(float*)(cpu->esi + 0x54u)))))) + (((double)*(float*)(cpu->esi + 0x50u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0xCu));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -3201,7 +3100,7 @@ __declspec(noinline) void sfera_sub_00429280(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x1Cu;
     cpu->esp += 0xCu; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004294E0(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_004294E0(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     cpu->esp -= 8u;
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
@@ -3239,9 +3138,7 @@ __declspec(noinline) void sfera_sub_004294E0(LiftCpu* cpu, uint32_t stop_address
     lift_native_call(cpu, native_function_address32(&::rand), LIFT_CODE_TOKEN_VA(0x42957Au));
     cpu->ecx = *(uint32_t*)(cpu->esi + 0xD8u);
     *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x1Cu)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x1Cu) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x1Cu)))))) * (3.0518509447574615e-05));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x1Cu));
     lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esi + 0xD8u)))));
     if ((int32_t)cpu->ecx >= 0) goto label_000295AC;
@@ -3337,7 +3234,7 @@ __declspec(noinline) void sfera_sub_004294E0(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = (int16_t)(*(uint16_t*)(cpu->edx + (cpu->eax * 4u)));
     cpu->eax = cpu->edx + (cpu->eax * 4u);
     if (cpu->edi == 0xFFFFFFFFu) goto label_0002979C;
-    { uint64_t l=*(uint8_t*)(cpu->eax + 2u), r=1u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
+    sub_pred[0] = *(uint8_t*)(cpu->eax + 2u) == 1u;
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x24u));
     cpu->eax = *(uint8_t*)(cpu->eax + 3u);
     lift_push32(cpu, cpu->ecx);
@@ -3345,7 +3242,7 @@ __declspec(noinline) void sfera_sub_004294E0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     *(float*)(cpu->esp) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->eax = cpu->ebx + (cpu->edx * 4u);
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00029775;
+    if (!sub_pred[0]) goto label_00029775;
     { int64_t v=(int64_t)(int32_t)(cpu->edi) * (int64_t)(int32_t)(0x9Cu); cpu->edi= v; uint32_t ov= (int64_t)(int32_t)v != v; cpu->eflags=(cpu->eflags & ~(LIFT_FLAG_CF | LIFT_FLAG_OF)) | (ov ? LIFT_FLAG_CF | LIFT_FLAG_OF : 0u); }
     cpu->ecx <<= 6u;
     cpu->ecx += cpu->ebp;
@@ -3394,7 +3291,7 @@ __declspec(noinline) void sfera_sub_004294E0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx &= 0xFFFFu;
     cpu->ecx = (int64_t)(int32_t)(cpu->ecx) * (int64_t)(int32_t)(0x19Cu);
     *(float*)(cpu->esp) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    { uint64_t l=cpu->ecx, r=*(uint32_t*)(cpu->esi + 0xF0u), c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->ecx = v; }
+    cpu->ecx += *(uint32_t*)(cpu->esi + 0xF0u);
     cpu->edx = cpu->eax;
     cpu->edx <<= 6u;
     cpu->edx += cpu->ebp;
@@ -3423,7 +3320,7 @@ __declspec(noinline) void sfera_sub_00429830(LiftCpu* cpu, uint32_t stop_address
     lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x429830u), "std::length_error");
     label_0002984B:
     cpu->eax = *(uint32_t*)(cpu->esi + 8u);
-    { uint64_t l=cpu->eax, r=*(uint32_t*)(cpu->esi), c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
+    cpu->eax -= *(uint32_t*)(cpu->esi);
     cpu->eax = (int32_t)(cpu->eax) >> 2u;
     if (cpu->eax >= cpu->ebp) goto label_000298A5;
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->edi); lift_push32(cpu, cpu->ebp);
@@ -3432,7 +3329,7 @@ __declspec(noinline) void sfera_sub_00429830(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = *(uint32_t*)(cpu->esi + 4u);
     cpu->ebx = cpu->eax;
     cpu->eax = *(uint32_t*)(cpu->esi);
-    { uint64_t l=cpu->ecx, r=cpu->eax, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
+    cpu->ecx -= cpu->eax;
     cpu->ecx = (int32_t)(cpu->ecx) >> 2u;
     cpu->ecx += cpu->ecx;
     cpu->ecx += cpu->ecx;
@@ -3441,7 +3338,7 @@ __declspec(noinline) void sfera_sub_00429830(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = *(uint32_t*)(cpu->esi);
     cpu->edi = *(uint32_t*)(cpu->esi + 4u);
     cpu->edi -= cpu->eax;
-    { uint64_t l=cpu->esp, r=0xCu, v=l + r; lift_flags_add(cpu,l,r,0u,v,32u); cpu->esp= v; }
+    cpu->esp += 0xCu;
     cpu->edi = (int32_t)(cpu->edi) >> 2u;
     if (cpu->eax == 0u) goto label_00029895;
     lift_push32(cpu, cpu->eax);
@@ -3458,31 +3355,28 @@ __declspec(noinline) void sfera_sub_00429830(LiftCpu* cpu, uint32_t stop_address
     label_000298A5:
     cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->esp += 8u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004298B0(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_004298B0(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     lift_push32(cpu, cpu->ebx);
     cpu->ebx = *(uint32_t*)(cpu->esp + 0xCu);
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->ecx;
     cpu->ecx = *(uint32_t*)(cpu->ebp + 4u);
     cpu->eax = *(uint32_t*)(cpu->ecx + 4u);
-    { uint64_t l=*(uint8_t*)(cpu->eax + 0x15u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
+    sub_pred[0] = *(uint8_t*)(cpu->eax + 0x15u) == 0u;
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (1u & 0xFFu);
     lift_push32(cpu, cpu->edi);
     *(uint8_t*)(cpu->esp + 0x18u) = cpu->ecx & 0xFFu;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_000298FD;
+    if (!sub_pred[0]) goto label_000298FD;
     cpu->edx = *(uint32_t*)(cpu->ebx + 0xCu);
     label_000298D1:
-    { uint64_t l=*(uint8_t*)(cpu->esp + 0x1Cu), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
     cpu->esi = cpu->eax;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_000298E2;
-    { uint64_t l=*(uint32_t*)(cpu->eax + 0xCu), r=cpu->edx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_CF) == 0u)) ? 1u : 0u) & 0xFFu);
+    if (*(uint8_t*)(cpu->esp + 0x1Cu) == 0u) goto label_000298E2;
+    cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint32_t*)(cpu->eax + 0xCu) >= cpu->edx);
     goto label_000298E8;
     label_000298E2:
-    { uint64_t l=cpu->edx, r=*(uint32_t*)(cpu->eax + 0xCu), v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_CF) != 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (cpu->edx < *(uint32_t*)(cpu->eax + 0xCu));
     label_000298E8:
     *(uint8_t*)(cpu->esp + 0x18u) = cpu->ecx & 0xFFu;
     if ((cpu->ecx & 0xFFu) == 0u) goto label_000298F4;
@@ -3594,9 +3488,8 @@ __declspec(noinline) void sfera_sub_00429A30(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = cpu->ecx;
     cpu->eax = *(uint32_t*)(cpu->edi + 4u);
     cpu->ebx = *(uint32_t*)(cpu->eax + 4u);
-    { uint64_t l=*(uint8_t*)(cpu->ebx + 0x15u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
     cpu->esi = cpu->ebx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00029A61;
+    if (*(uint8_t*)(cpu->ebx + 0x15u) != 0u) goto label_00029A61;
     label_00029A43:
     cpu->ecx = *(uint32_t*)(cpu->esi + 8u);
     lift_push32(cpu, cpu->ecx);
@@ -3606,9 +3499,8 @@ __declspec(noinline) void sfera_sub_00429A30(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x429A56u)); sfera_sub_004EBE20(cpu, LIFT_CODE_TOKEN_VA(0x429A56u));
     cpu->esp += 4u;
-    { uint64_t l=*(uint8_t*)(cpu->esi + 0x15u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
     cpu->ebx = cpu->esi;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_00029A43;
+    if (*(uint8_t*)(cpu->esi + 0x15u) == 0u) goto label_00029A43;
     label_00029A61:
     cpu->eax = *(uint32_t*)(cpu->edi + 4u);
     *(uint32_t*)(cpu->eax + 4u) = cpu->eax;
@@ -3619,14 +3511,14 @@ __declspec(noinline) void sfera_sub_00429A30(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 8u) = 0u;
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_00429A80(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_00429A80(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     lift_push32(cpu, cpu->ecx);
     cpu->edx = *(uint32_t*)(cpu->ecx + 4u);
     cpu->eax = *(uint32_t*)(cpu->edx + 4u);
-    { uint64_t l=*(uint8_t*)(cpu->eax + 0x15u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
+    sub_pred[0] = *(uint8_t*)(cpu->eax + 0x15u) == 0u;
     lift_push32(cpu, cpu->edi);
     cpu->edi = *(uint32_t*)(cpu->esp + 0x10u);
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_00029AAA;
+    if (!sub_pred[0]) goto label_00029AAA;
     lift_push32(cpu, cpu->esi);
     cpu->esi = *(uint32_t*)(cpu->edi);
     label_00029A95:
@@ -3783,31 +3675,19 @@ __declspec(noinline) void sfera_sub_00429C10(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = *(uint32_t*)(cpu->esi + 4u);
     cpu->edx = cpu->esp + 0x40u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x429CF1u)); sfera_sub_00455E40(cpu, LIFT_CODE_TOKEN_VA(0x429CF1u));
-    lift_x87_push(cpu, (double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.x));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x40u)));
-    *(float*)(cpu->esp + 0x34u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x34u) = ((((double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.x))) - (((double)*(float*)(cpu->esp + 0x40u))));
     cpu->edx = *(uint32_t*)(cpu->esp + 0x34u);
-    lift_x87_push(cpu, (double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.y));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x44u)));
-    *(float*)(cpu->esp + 0x38u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x38u) = ((((double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.y))) - (((double)*(float*)(cpu->esp + 0x44u))));
     cpu->eax = *(uint32_t*)(cpu->esp + 0x38u);
-    lift_x87_push(cpu, (double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.z));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x48u)));
-    *(float*)(cpu->esp + 0x3Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x3Cu) = ((((double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.z))) - (((double)*(float*)(cpu->esp + 0x48u))));
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x3Cu);
     goto label_00029D5C;
     label_00029D29:
-    lift_x87_push(cpu, (double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.x));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esi + 0xCu)));
-    *(float*)(cpu->esp + 0x24u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x24u) = ((((double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.x))) - (((double)*(float*)(cpu->esi + 0xCu))));
     cpu->edx = *(uint32_t*)(cpu->esp + 0x24u);
-    lift_x87_push(cpu, (double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.y));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esi + 0x10u)));
-    *(float*)(cpu->esp + 0x28u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x28u) = ((((double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.y))) - (((double)*(float*)(cpu->esi + 0x10u))));
     cpu->eax = *(uint32_t*)(cpu->esp + 0x28u);
-    lift_x87_push(cpu, (double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.z));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esi + 0x14u)));
-    *(float*)(cpu->esp + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x2Cu) = ((((double)*(float*)((uintptr_t)&g_sfera_effect_manager.viewer_position.z))) - (((double)*(float*)(cpu->esi + 0x14u))));
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x2Cu);
     label_00029D5C:
     *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->eax;
@@ -3828,9 +3708,7 @@ __declspec(noinline) void sfera_sub_00429C10(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u));
     *(float*)(cpu->esi + 0x2Cu) = cpu->fpu[0u];
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x30u));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]); lift_x87_pop(cpu); lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_00029DA8;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; lift_x87_pop(cpu); lift_x87_pop(cpu); if (!(lift_left<lift_right)) goto label_00029DA8; }
     *(uint16_t*)(cpu->esi + 2u) = (uint64_t)(*(uint16_t*)(cpu->esi + 2u)) | (uint64_t)(1u);
     label_00029DA8:
     cpu->eax = *(uint32_t*)(cpu->esi + 0x1Cu);
@@ -3941,7 +3819,8 @@ __declspec(noinline) void sfera_sub_00429C10(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x70u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[3];
+    bool lift_cmp[2];
     cpu->esp -= 0x1A0u;
     lift_push32(cpu, cpu->ebx);
     cpu->ebx = cpu->ecx;
@@ -3980,9 +3859,9 @@ __declspec(noinline) void sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->eax);
     reinterpret_cast<BloodEffListener*>(cpu->ecx)->onEffectChanged(cpu);
     label_00029FCA:
-    { uint64_t l=*(uint16_t*)(cpu->ebx), r=1u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,16u); }
+    sub_pred[0] = *(uint16_t*)(cpu->ebx) == 1u;
     lift_push32(cpu, cpu->esi);
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002A014;
+    if (!sub_pred[0]) goto label_0002A014;
     cpu->eax = *(uint32_t*)(cpu->ebx + 0xCu);
     cpu->ecx = *(uint32_t*)(cpu->ebx + 0x10u);
     cpu->edx = *(uint32_t*)(cpu->ebx + 0x14u);
@@ -4082,18 +3961,16 @@ __declspec(noinline) void sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->ebp;
     reinterpret_cast<IEffectManager*>(cpu->ecx)->updateEffect(cpu);
     label_0002A143:
-    { uint64_t l=*(uint32_t*)(cpu->esp + 0x1Cu), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_ZF) != 0u)) ? 1u : 0u) & 0xFFu);
-    { uint64_t l=*(uint8_t*)(cpu->ebp + 0xFu), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (*(uint32_t*)(cpu->esp + 0x1Cu) == 0u);
+    sub_pred[1] = *(uint8_t*)(cpu->ebp + 0xFu) == 0u;
     *(uint8_t*)(cpu->esp + 0xFu) = cpu->eax & 0xFFu;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002A18B;
+    if (!sub_pred[1]) goto label_0002A18B;
     cpu->eax = cpu->eax & 0xFFu;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = cpu->ebp;
     reinterpret_cast<IEffectManager*>(cpu->ecx)->activateEffect(cpu);
     if (cpu->eax != 0u) goto label_0002A18B;
-    { uint64_t l=*(uint8_t*)(cpu->ebp + 0xDu), r=(cpu->eax & 0xFFu), v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002A182;
+    if (*(uint8_t*)(cpu->ebp + 0xDu) != (uint8_t)(cpu->eax)) goto label_0002A182;
     cpu->eax = *(uint32_t*)(cpu->esp + 0x1Cu);
     cpu->eax >>= 1u;
     cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)(((uint64_t)((cpu->eax & 0xFFu)) & (uint64_t)(1u))) & 0xFFu);
@@ -4105,30 +3982,22 @@ __declspec(noinline) void sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_address
     *(uint8_t*)(cpu->ebp + 0xFu) = 1u;
     goto label_0002A269;
     label_0002A18B:
-    lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 0x18u));
-    lift_x87_push(cpu, (double)-1.0f);
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]); lift_x87_pop(cpu); lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x44u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002A1D3;
+    { const double lift_right=(double)*(float*)(cpu->ebp + 0x18u); const double lift_left=(double)-1.0f; if (lift_left==lift_right) goto label_0002A1D3; }
     lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 0x18u));
     lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 0x1Cu));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]); lift_x87_pop(cpu); lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
+    lift_cmp[0]=cpu->fpu[0u]<cpu->fpu[1u]; lift_x87_pop(cpu); lift_x87_pop(cpu);
     lift_x87_push(cpu, (double)g_sfera_graphics_runtime.environment_factor);
     lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 0x18u));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002A1CC;
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002A212;
+    lift_cmp[1]=cpu->fpu[0u]<cpu->fpu[1u];
+    lift_x87_pop(cpu);
+    if (!lift_cmp[0]) goto label_0002A1CC;
+    if (lift_cmp[1]) goto label_0002A212;
     label_0002A1BE:
     lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 0x1Cu));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]); lift_x87_pop(cpu); lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    if (((((cpu->eax >> 8u) & 0xFFu)) & (0x41u)) != 0u) goto label_0002A1D3;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; lift_x87_pop(cpu); lift_x87_pop(cpu); if (!(lift_left>lift_right)) goto label_0002A1D3; }
     goto label_0002A214;
     label_0002A1CC:
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002A1BE;
+    if (lift_cmp[1]) goto label_0002A1BE;
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     label_0002A1D3:
     cpu->ecx = *(uint32_t*)(cpu->ebp + 0x10u);
@@ -4169,10 +4038,10 @@ __declspec(noinline) void sfera_sub_00429F30(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esp + 0x68u;
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->edx); lift_push32(cpu, cpu->ecx);
     cpu->ecx = 0u;
-    { uint64_t l=*(uint16_t*)(cpu->ebx), r=1u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,16u); }
+    sub_pred[2] = *(uint16_t*)(cpu->ebx) == 1u;
     *(float*)(cpu->esp) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->edx = cpu->esp + 0x38u;
-    cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_ZF) == 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (!sub_pred[2]);
     cpu->ecx = (cpu->ecx * 4u) + 1u;
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->edx);
     cpu->ecx = cpu->ebp;
@@ -4202,7 +4071,7 @@ __declspec(noinline) void sfera_sub_0042A290(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->edi;
     label_0002A2B8:
     cpu->ebx = *(uint32_t*)(cpu->esi + 4u);
-    { uint64_t l=cpu->ebx, r=*(uint32_t*)(cpu->esi), c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ebx = v; }
+    cpu->ebx -= *(uint32_t*)(cpu->esi);
     *(uint32_t*)(cpu->esi + 0x14u) = cpu->edi;
     cpu->ebx = (int32_t)(cpu->ebx) >> 2u;
     if ((int32_t)cpu->ebx <= (int32_t)cpu->edi) goto label_0002A2F2;
@@ -4222,7 +4091,7 @@ __declspec(noinline) void sfera_sub_0042A290(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = *(uint32_t*)(cpu->esi);
     if (cpu->edi == cpu->ecx) goto label_0002A31A;
     cpu->eax = cpu->ecx;
-    { uint64_t l=cpu->eax, r=cpu->ecx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
+    cpu->eax -= cpu->ecx;
     cpu->eax = (int32_t)(cpu->eax) >> 2u;
     cpu->ebx = cpu->eax * 4u;
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->edi);
@@ -4338,7 +4207,7 @@ __declspec(noinline) void sfera_sub_0042A480(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\ItemArray.h";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42A496u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42A496u));
     cpu->eax = *(uint32_t*)(cpu->esi + 0x18u);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->edx = 0x3Cu;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_OF) != 0u)) ? 1u : 0u) & 0xFFu);
@@ -4354,7 +4223,7 @@ __declspec(noinline) void sfera_sub_0042A480(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42A4C7u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42A4C7u));
     cpu->eax = *(uint32_t*)(cpu->esi + 4u);
     cpu->eax -= *(uint32_t*)(cpu->esi);
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->eax = lift_shift_arithmetic(cpu, cpu->eax, 2u, 32u);
     ++cpu->eax;
     { int64_t v=(int64_t)(int32_t)(cpu->eax) * (int64_t)(int32_t)(*(uint32_t*)(cpu->esi + 0x18u)); cpu->eax= v; uint32_t ov= (int64_t)(int32_t)v != v; cpu->eflags=(cpu->eflags & ~(LIFT_FLAG_CF | LIFT_FLAG_OF)) | (ov ? LIFT_FLAG_CF | LIFT_FLAG_OF : 0u); }
@@ -4404,20 +4273,19 @@ __declspec(noinline) void sfera_sub_0042A480(LiftCpu* cpu, uint32_t stop_address
     if (cpu->edx > cpu->ecx) goto label_0002A5C4;
     cpu->edi = cpu->ecx;
     cpu->ecx = *(uint32_t*)(cpu->esi + 8u);
-    { uint64_t l=cpu->edi, r=cpu->edx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edi = v; }
+    cpu->edi -= cpu->edx;
     cpu->edi = (int32_t)(cpu->edi) >> 2u;
     if (cpu->eax != cpu->ecx) goto label_0002A5AC;
-    { uint64_t l=cpu->eax, r=cpu->edx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
+    cpu->eax -= cpu->edx;
     cpu->eax = (int32_t)(cpu->eax) >> 2u;
     if (cpu->eax <= 0x3FFFFFFEu) goto label_0002A57E;
     lift_push32(cpu, (uintptr_t)"vector<T> too long");
     lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x42A548u), "std::length_error");
     label_0002A57E:
     cpu->ecx -= cpu->edx;
-    { uint64_t l=cpu->eax, r=cpu->ebx, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->eax = v; }
+    cpu->eax += cpu->ebx;
     cpu->ecx = (int32_t)(cpu->ecx) >> 2u;
-    { uint64_t l=cpu->eax, r=cpu->ecx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) != 0u) goto label_0002A5AC;
+    if (cpu->eax <= cpu->ecx) goto label_0002A5AC;
     cpu->edx = cpu->ecx;
     cpu->edx >>= 1u;
     cpu->ebx = 0x3FFFFFFFu;
@@ -4447,17 +4315,16 @@ __declspec(noinline) void sfera_sub_0042A480(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = *(uint32_t*)(cpu->esi + 8u);
     if (cpu->eax != cpu->ecx) goto label_0002A612;
     cpu->edx = *(uint32_t*)(cpu->esi);
-    { uint64_t l=cpu->eax, r=cpu->edx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
+    cpu->eax -= cpu->edx;
     cpu->eax = (int32_t)(cpu->eax) >> 2u;
     if (cpu->eax <= 0x3FFFFFFEu) goto label_0002A5E4;
     lift_push32(cpu, (uintptr_t)"vector<T> too long");
     lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x42A5C4u), "std::length_error");
     label_0002A5E4:
     cpu->ecx -= cpu->edx;
-    { uint64_t l=cpu->eax, r=cpu->ebx, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->eax = v; }
+    cpu->eax += cpu->ebx;
     cpu->ecx = (int32_t)(cpu->ecx) >> 2u;
-    { uint64_t l=cpu->eax, r=cpu->ecx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) != 0u) goto label_0002A612;
+    if (cpu->eax <= cpu->ecx) goto label_0002A612;
     cpu->edx = cpu->ecx;
     cpu->edx >>= 1u;
     cpu->edi = 0x3FFFFFFFu;
@@ -4989,15 +4856,15 @@ __declspec(noinline) void sfera_sub_0042AB10(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x18u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042AD40(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042AD40(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->esi);
     cpu->esi = g_sfera_effect_manager.effect_definition_head;
-    { uint64_t l=*(uint32_t*)(cpu->esi + 0x20u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->esi + 0x20u) == 0u;
     lift_push32(cpu, cpu->edi);
     cpu->edi = cpu->esi + 0x20u;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->edx;
     cpu->ebx = cpu->ecx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002AD79;
+    if (sub_pred[0]) goto label_0002AD79;
     cpu->ebp = native_function_address32(&::_stricmp);
     label_0002AD60:
     cpu->eax = *(uint32_t*)(cpu->esi + 4u);
@@ -5006,9 +4873,8 @@ __declspec(noinline) void sfera_sub_0042AD40(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 8u;
     if (cpu->eax == 0u) goto label_0002AD82;
     cpu->esi = *(uint32_t*)(cpu->edi);
-    { uint64_t l=*(uint32_t*)(cpu->esi + 0x20u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     cpu->edi = cpu->esi + 0x20u;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002AD60;
+    if (*(uint32_t*)(cpu->esi + 0x20u) != 0u) goto label_0002AD60;
     label_0002AD79:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu);
     cpu->eax |= 0xFFFFFFFFu;
@@ -5022,6 +4888,7 @@ __declspec(noinline) void sfera_sub_0042AD40(LiftCpu* cpu, uint32_t stop_address
     sfera_sub_0042AB10(cpu, stop_address); return;
 }
 __declspec(noinline) void sfera_sub_0042ADA0(LiftCpu* cpu, uint32_t stop_address) {
+    bool lift_cmp[1];
     cpu->esp -= 0x3Cu;
     cpu->eax = *(uint32_t*)(cpu->esp + 0x44u);
     lift_push32(cpu, cpu->ebp);
@@ -5029,8 +4896,7 @@ __declspec(noinline) void sfera_sub_0042ADA0(LiftCpu* cpu, uint32_t stop_address
     cpu->ebp = cpu->ecx;
     if (g_sfera_effect_manager.flare_enabled == cpu->eax) goto label_0002ADD4;
     cpu->ecx = 0u;
-    { uint64_t v=cpu->eax; lift_flags_logic(cpu,v,32u); }
-    cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)((((cpu->eflags & LIFT_FLAG_ZF) == 0u)) ? 1u : 0u) & 0xFFu);
+    cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | ((uint32_t)((cpu->eax!=0u) ? 1u : 0u) & 0xFFu);
     g_sfera_effect_manager.flare_enabled = cpu->eax;
     ++cpu->ecx;
     g_sfera_effect_manager.flare_transition = cpu->ecx;
@@ -5063,7 +4929,7 @@ __declspec(noinline) void sfera_sub_0042ADA0(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, 1.0);
     cpu->eax = (int32_t)(cpu->eax) >> 1u;
     *(float*)(cpu->esp + 0x30u) = cpu->fpu[0u];
-    { uint64_t l=cpu->ebp, r=cpu->eax, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ebp = v; }
+    cpu->ebp -= cpu->eax;
     *(float*)(cpu->esp + 0x38u) = cpu->fpu[0u];
     cpu->ecx = cpu->ebx;
     *(float*)(cpu->esp + 0x3Cu) = cpu->fpu[0u];
@@ -5076,12 +4942,10 @@ __declspec(noinline) void sfera_sub_0042ADA0(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->esp + 0x40u) = cpu->fpu[0u]; lift_x87_pop(cpu);
     lift_x87_push(cpu, (double)0.3499999940395355f);
     lift_x87_push(cpu, (double)g_sfera_graphics_runtime.environment_factor);
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    cpu->eax = (cpu->eax & 0xFFFF0000u) | (((uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u))));
+    lift_cmp[0]=cpu->fpu[0u]<cpu->fpu[1u];
     cpu->fpu[1u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     lift_x87_push(cpu, 2550.0);
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002AEBD;
+    if (!lift_cmp[0]) goto label_0002AEBD;
     *(uint16_t*)(cpu->esp + 0x10u) = cpu->fpu_control;
     cpu->eax = *(uint16_t*)(cpu->esp + 0x10u);
     lift_x87_push(cpu, cpu->fpu[1u]);
@@ -5097,11 +4961,7 @@ __declspec(noinline) void sfera_sub_0042ADA0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->ecx <= 0xFFu) goto label_0002AEBD;
     cpu->ecx = 0xFFu;
     label_0002AEBD:
-    lift_x87_push(cpu, (double)*(float*)((uintptr_t)"333\077..\\ShareClientSeverCode\\CheckFiles.cpp"));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[2u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002AF07;
+    { const double lift_left=(double)*(float*)((uintptr_t)"333\077..\\ShareClientSeverCode\\CheckFiles.cpp"); const double lift_right=cpu->fpu[1u]; if (!(lift_left<lift_right)) goto label_0002AF07; }
     *(uint16_t*)(cpu->esp + 0x10u) = cpu->fpu_control;
     cpu->eax = *(uint16_t*)(cpu->esp + 0x10u);
     lift_x87_push(cpu, cpu->fpu[1u]);
@@ -5120,19 +4980,13 @@ __declspec(noinline) void sfera_sub_0042ADA0(LiftCpu* cpu, uint32_t stop_address
     label_0002AF07:
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     label_0002AF09:
-    lift_x87_push(cpu, (double)0.1899999976158142f);
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    if (((((cpu->eax >> 8u) & 0xFFu)) & (0x41u)) == 0u) goto label_0002AF27;
-    lift_x87_compare(cpu, cpu->fpu[0u], 0.8299999833106995);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x41u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002AF2B;
+    { const double lift_left=(double)0.1899999976158142f; const double lift_right=cpu->fpu[0u]; if (lift_left>lift_right) goto label_0002AF27; }
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=0.8299999833106995; lift_x87_pop(cpu); if (!(lift_left>lift_right)) goto label_0002AF2B; }
     goto label_0002AF29;
     label_0002AF27:
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     label_0002AF29:
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     label_0002AF2B:
     cpu->esi = g_sfera_effect_manager.flare_alpha;
     { int64_t v=(int64_t)(int32_t)(cpu->esi) * (int64_t)(int32_t)(cpu->ecx); cpu->esi= v; uint32_t ov= (int64_t)(int32_t)v != v; cpu->eflags=(cpu->eflags & ~(LIFT_FLAG_CF | LIFT_FLAG_OF)) | (ov ? LIFT_FLAG_CF | LIFT_FLAG_OF : 0u); }
@@ -5149,17 +5003,15 @@ __declspec(noinline) void sfera_sub_0042ADA0(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->esp + 0x2Cu);
     cpu->esp -= 0x10u;
     *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    { uint64_t l=cpu->edi, r=cpu->ebp, c=0u, v=l + r + c; lift_flags_add(cpu,l,r,c,v,32u); cpu->edi = v; }
+    cpu->edi += cpu->ebp;
     *(uint32_t*)(cpu->esp + 0x2Cu) = cpu->edi;
     lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x2Cu)))));
     cpu->ecx = cpu->esi;
     cpu->ecx <<= 24u;
     cpu->ecx |= 0xFF640Fu;
     *(float*)(cpu->esp + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x34u)))));
-    *(float*)(cpu->esp + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x38u)))));
-    *(float*)(cpu->esp) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 4u) = (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x34u))));
+    *(float*)(cpu->esp) = (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x38u))));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42AF90u)); sfera_sub_004CEDA0(cpu, LIFT_CODE_TOKEN_VA(0x42AF90u));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x2AF97u)); sfera_sub_004CE0E0(cpu, LIFT_CODE_TOKEN_RVA(0x2AF97u));
@@ -5318,15 +5170,10 @@ __declspec(noinline) void sfera_sub_0042B150(LiftCpu* cpu, uint32_t stop_address
 __declspec(noinline) void sfera_sub_0042B200(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
-    { uint64_t l=*(uint32_t*)(cpu->esi + 0x78u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x74u);
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002B242;
+    if (*(uint32_t*)(cpu->esi + 0x78u) != 0u) goto label_0002B242;
     if (cpu->ecx == 0u) goto label_0002B237;
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu));
-    lift_x87_push(cpu, (double)*(float*)(cpu->ecx + 0xACu));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]); lift_x87_pop(cpu); lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002B22A;
+    { const double lift_right=(double)*(float*)(cpu->esp + 0xCu); const double lift_left=(double)*(float*)(cpu->ecx + 0xACu); if (!(lift_left<lift_right)) goto label_0002B22A; }
     cpu->eax = 1u;
     goto label_0002B22C;
     label_0002B22A:
@@ -5515,8 +5362,7 @@ __declspec(noinline) void sfera_sub_0042B4A0(LiftCpu* cpu, uint32_t stop_address
     reinterpret_cast<IEffectManager*>(cpu->ecx)->destroyEffect(cpu);
     label_0002B503:
     cpu->esi += 0x14u;
-    { uint64_t l=cpu->edi, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->edi = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002B4E0;
+    if ((--cpu->edi) != 0u) goto label_0002B4E0;
     cpu->ecx = cpu->ebx;
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42B518u)); sfera_sub_00425E70(cpu, LIFT_CODE_TOKEN_VA(0x42B518u));
@@ -5541,11 +5387,7 @@ __declspec(noinline) void sfera_sub_0042B530(LiftCpu* cpu, uint32_t stop_address
     cpu->edi = 0u;
     cpu->ecx = cpu->esi + 0x6Cu;
     label_0002B562:
-    lift_x87_push(cpu, (double)*(float*)(cpu->ecx));
-    lift_x87_push(cpu, cpu->fpu[1u]);
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]); lift_x87_pop(cpu); lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x44u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002B57D;
+    { const double lift_right=(double)*(float*)(cpu->ecx); const double lift_left=cpu->fpu[0u]; if (lift_left==lift_right) goto label_0002B57D; }
     ++cpu->edi;
     cpu->ecx += 0x14u;
     if ((int32_t)cpu->edi < (int32_t)0x10u) goto label_0002B562;
@@ -5555,21 +5397,12 @@ __declspec(noinline) void sfera_sub_0042B530(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x2B587u), LIFT_CODE_TOKEN_RVA(0x2B585u))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (6.283185958862305);
-    *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esp + 0x18u) = ((((double)*(float*)(cpu->esp + 0x10u))) * (6.283185958862305));
     if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x2B5A9u), LIFT_CODE_TOKEN_RVA(0x2B5A7u))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (0.5);
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.1415929794311523);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esp + 0x10u) = (((((((double)*(float*)(cpu->esp + 0x10u))) - (0.5)))) * (3.1415929794311523));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42B5D8u)); sfera_sub_004EE9F2(cpu, LIFT_CODE_TOKEN_VA(0x42B5D8u));
     *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -5580,10 +5413,7 @@ __declspec(noinline) void sfera_sub_0042B530(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x18u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42B5F3u)); sfera_sub_004EE9F8(cpu, LIFT_CODE_TOKEN_VA(0x42B5F3u));
     *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esi + 0x64u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x10u)));
-    *(float*)(cpu->ebp + 0x70u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->ebp + 0x70u) = (((((((double)*(float*)(cpu->esp + 0x14u))) * (((double)*(float*)(cpu->esi + 0x64u)))))) * (((double)*(float*)(cpu->esp + 0x10u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x18u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42B60Eu)); sfera_sub_004EE9F2(cpu, LIFT_CODE_TOKEN_VA(0x42B60Eu));
     *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -5592,8 +5422,7 @@ __declspec(noinline) void sfera_sub_0042B530(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esi + 0x64u)));
     cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x10u)));
     *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u));
-    *(float*)(cpu->esi + (cpu->ecx * 4u)) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + (cpu->ecx * 4u)) = (double)*(float*)(cpu->esp + 0x14u);
     lift_x87_push(cpu, 0.0);
     *(float*)(cpu->ebp + 0x74u) = cpu->fpu[0u];
     *(float*)(cpu->ebp + 0x6Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -5604,25 +5433,16 @@ __declspec(noinline) void sfera_sub_0042B530(LiftCpu* cpu, uint32_t stop_address
     cpu->esi += 0x6Cu;
     cpu->ebp = 0x10u;
     label_0002B64A:
-    lift_x87_push(cpu, (double)*(float*)(cpu->esi));
-    lift_x87_push(cpu, cpu->fpu[1u]);
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]); lift_x87_pop(cpu); lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x44u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002B6E8;
+    { const double lift_right=(double)*(float*)(cpu->esi); const double lift_left=cpu->fpu[0u]; if (lift_left==lift_right) goto label_0002B6E8; }
     cpu->ecx = *(uint32_t*)(cpu->esi + 0xFFFFFFFCu);
     if (cpu->ecx == 0u) goto label_0002B6E8;
-    lift_x87_push(cpu, (double)*(float*)(cpu->esi));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (2.0);
-    *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x14u) = ((((double)*(float*)(cpu->esi))) + (2.0));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u));
     *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u];
     *(float*)(cpu->esi) = cpu->fpu[0u]; lift_x87_pop(cpu);
     lift_x87_push(cpu, (double)192.0f);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    cpu->eax = (cpu->eax & 0xFFFF0000u) | (((uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u))));
-    cpu->fpu[1u] = cpu->fpu[0u]; lift_x87_pop(cpu);
-    if (((((cpu->eax >> 8u) & 0xFFu)) & (0x41u)) != 0u) goto label_0002B697;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; cpu->fpu[1u]=cpu->fpu[0u]; lift_x87_pop(cpu); if (!(lift_left>lift_right)) goto label_0002B697; }
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     *(float*)(cpu->esi) = cpu->fpu[0u];
     goto label_0002B6E8;
@@ -5654,8 +5474,7 @@ __declspec(noinline) void sfera_sub_0042B530(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)-1.0f);
     label_0002B6E8:
     cpu->esi += 0x14u;
-    { uint64_t l=cpu->ebp, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->ebp = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002B64A;
+    if ((--cpu->ebp) != 0u) goto label_0002B64A;
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x28u;
@@ -5675,8 +5494,7 @@ __declspec(noinline) void sfera_sub_0042B720(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 8u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42B74Du)); sfera_sub_00425E30(cpu, LIFT_CODE_TOKEN_VA(0x42B74Du));
-    lift_x87_push(cpu, (double)4.0f);
-    *(float*)(cpu->esi + 0x64u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x64u) = (double)4.0f;
     cpu->eax = 0u;
     lift_x87_push(cpu, (double)0.4000000059604645f);
     lift_push32(cpu, (uintptr_t)"rain");
@@ -5718,16 +5536,17 @@ __declspec(noinline) void sfera_sub_0042B7E0(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = cpu->esi;
     cpu->esi = lift_pop32(cpu); cpu->esp += 8u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042B800(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042B800(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[2];
+    bool lift_cmp[1];
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->esp &= 0xFFFFFFF8u;
     cpu->esp -= 0x54u;
-    { uint64_t l=*(uint32_t*)(cpu->ebp + 0x14u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->ebp + 0x14u) == 0u;
     cpu->eax = *(uint32_t*)(cpu->ebp + 8u);
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     *(uint32_t*)(cpu->esp + 0x24u) = cpu->ecx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002BA3C;
+    if (sub_pred[0]) goto label_0002BA3C;
     cpu->ecx = *(uint32_t*)(cpu->ecx + 0x58u);
     cpu->ecx += g_sfera_effect_manager.render_slot_count;
     if (cpu->ecx >= 0x2710u) goto label_0002BA3C;
@@ -5739,18 +5558,15 @@ __declspec(noinline) void sfera_sub_0042B800(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x34u) = cpu->edx;
     lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 0x10u));
     cpu->edx = *(uint32_t*)(cpu->eax + 8u);
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
+    lift_cmp[0]=cpu->fpu[0u]>cpu->fpu[1u];
     *(uint32_t*)(cpu->esp + 0x38u) = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x3Cu) = cpu->edx;
-    cpu->eax = (cpu->eax & 0xFFFF0000u) | (((uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u))));
     cpu->fpu[1u] = cpu->fpu[0u]; lift_x87_pop(cpu);
-    if (((((cpu->eax >> 8u) & 0xFFu)) & (0x41u)) != 0u) goto label_0002B885;
+    if (!lift_cmp[0]) goto label_0002B885;
     lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[0u] = (400.0) - (cpu->fpu[0u]);
     *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) / (80.0);
-    *(float*)(cpu->esp + 0x20u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x20u) = ((((double)*(float*)(cpu->esp + 0x10u))) / (80.0));
     label_0002B885:
     cpu->fpu[0u] = (cpu->fpu[0u]) * (0.05000000074505806);
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0u;
@@ -5819,8 +5635,7 @@ __declspec(noinline) void sfera_sub_0042B800(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->ecx) = cpu->ebx;
     *(uint32_t*)(cpu->ecx + 0x20u) = cpu->eax;
     cpu->ecx += 4u;
-    { uint64_t l=cpu->edx, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->edx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002B974;
+    if ((--cpu->edx) != 0u) goto label_0002B974;
     lift_x87_push(cpu, 3.1415929794311523);
     cpu->fpu[0u] = (cpu->fpu[0u]) * (cpu->fpu[1u]);
     cpu->fpu[0u] = (cpu->fpu[0u]) * (1.2000000476837158);
@@ -5834,10 +5649,7 @@ __declspec(noinline) void sfera_sub_0042B800(LiftCpu* cpu, uint32_t stop_address
     lift_x87_pop(cpu); lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42B9C0u)); sfera_sub_004EE9F8(cpu, LIFT_CODE_TOKEN_VA(0x42B9C0u));
     *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (0.30000001192092896);
-    cpu->fpu[0u] = (*(double*)(cpu->esp + 0x28u)) - (cpu->fpu[0u]);
-    *(float*)(cpu->esp + 0x50u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x50u) = ((*(double*)(cpu->esp + 0x28u)) - ((((((double)*(float*)(cpu->esp + 0xCu))) * (0.30000001192092896)))));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x3Cu));
     *(double*)(cpu->esp + 0x28u) = cpu->fpu[0u];
     lift_x87_pop(cpu); lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u));
@@ -5850,14 +5662,11 @@ __declspec(noinline) void sfera_sub_0042B800(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esp + 0x54u;
     cpu->fpu[0u] = (*(double*)(cpu->esp + 0x2Cu)) - (cpu->fpu[0u]);
     *(float*)(cpu->esp + 0x5Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)0.15000000596046448f);
-    *(float*)(cpu->esp) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp) = (double)0.15000000596046448f;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42BA12u)); sfera_sub_00483060(cpu, LIFT_CODE_TOKEN_VA(0x42BA12u));
-    { uint64_t l=*(uint32_t*)(cpu->esp + 0x10u), v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; *(uint32_t*)(cpu->esp + 0x10u) = v; }
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x18u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (0.02500000037252903);
-    *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002B8B3;
+    --*(uint32_t*)(cpu->esp + 0x10u); sub_pred[1] = *(uint32_t*)(cpu->esp + 0x10u) == 0u;
+    *(float*)(cpu->esp + 0x18u) = ((((double)*(float*)(cpu->esp + 0x18u))) + (0.02500000037252903));
+    if (!sub_pred[1]) goto label_0002B8B3;
     cpu->eax = *(uint32_t*)(cpu->esp + 0x1Cu);
     ++cpu->eax;
     *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->eax;
@@ -5897,24 +5706,24 @@ __declspec(noinline) void sfera_sub_0042BA50(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x10u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042BAD0(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042BAD0(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[2];
     cpu->esp -= 0x5Cu;
-    { uint64_t l=*(uint32_t*)(cpu->esp + 0x6Cu), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->esp + 0x6Cu) == 0u;
     cpu->eax = *(uint32_t*)(cpu->esp + 0x60u);
     lift_push32(cpu, cpu->edi);
     cpu->edi = cpu->ecx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002C006;
+    if (sub_pred[0]) goto label_0002C006;
     cpu->ecx = *(uint32_t*)(cpu->edi + 0x58u);
     cpu->ecx += g_sfera_effect_manager.render_slot_count;
     if (cpu->ecx >= 0x2710u) goto label_0002C006;
-    { uint64_t l=*(uint32_t*)(cpu->edi + 0x6Cu), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[1] = *(uint32_t*)(cpu->edi + 0x6Cu) == 0u;
     cpu->edx = *(uint32_t*)(cpu->eax);
     cpu->ecx = *(uint32_t*)(cpu->eax + 4u);
     *(uint32_t*)(cpu->esp + 0x28u) = cpu->edx;
     cpu->edx = *(uint32_t*)(cpu->eax + 8u);
     *(uint32_t*)(cpu->esp + 0x2Cu) = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x30u) = cpu->edx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002BB37;
+    if (!sub_pred[1]) goto label_0002BB37;
     cpu->ecx = *(uint32_t*)(cpu->eax);
     *(uint32_t*)(cpu->edi + 0x5Cu) = cpu->ecx;
     cpu->edx = *(uint32_t*)(cpu->eax + 4u);
@@ -5968,85 +5777,47 @@ __declspec(noinline) void sfera_sub_0042BAD0(LiftCpu* cpu, uint32_t stop_address
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BBD8u), LIFT_CODE_TOKEN_RVA(0x2BBD6u))) { return; }
     cpu->ebp -= cpu->eax;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->ebp;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (0.20000000298023224);
-    *(float*)(cpu->esp + 0x28u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x28u) = (((((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05)))) * (0.20000000298023224));
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BBF4u), LIFT_CODE_TOKEN_RVA(0x2BBF2u))) { return; }
     cpu->ebp = cpu->eax;
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BBF8u), LIFT_CODE_TOKEN_RVA(0x2BBF6u))) { return; }
     cpu->ebp -= cpu->eax;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->ebp;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (0.20000000298023224);
-    *(float*)(cpu->esp + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x2Cu) = (((((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05)))) * (0.20000000298023224));
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BC14u), LIFT_CODE_TOKEN_RVA(0x2BC12u))) { return; }
     cpu->ebp = cpu->eax;
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BC18u), LIFT_CODE_TOKEN_RVA(0x2BC16u))) { return; }
     cpu->ebp -= cpu->eax;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->ebp;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (0.20000000298023224);
-    *(float*)(cpu->esp + 0x30u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x30u) = (((((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05)))) * (0.20000000298023224));
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BC34u), LIFT_CODE_TOKEN_RVA(0x2BC32u))) { return; }
     cpu->ebp = cpu->eax;
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BC38u), LIFT_CODE_TOKEN_RVA(0x2BC36u))) { return; }
     cpu->ebp -= cpu->eax;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->ebp;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (0.20000000298023224);
-    *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x18u) = (((((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05)))) * (0.20000000298023224));
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BC54u), LIFT_CODE_TOKEN_RVA(0x2BC52u))) { return; }
     cpu->ebp = cpu->eax;
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BC58u), LIFT_CODE_TOKEN_RVA(0x2BC56u))) { return; }
     cpu->ebp -= cpu->eax;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->ebp;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (0.20000000298023224);
-    *(float*)(cpu->esp + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x1Cu) = (((((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05)))) * (0.20000000298023224));
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BC74u), LIFT_CODE_TOKEN_RVA(0x2BC72u))) { return; }
     cpu->ebp = cpu->eax;
     if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x2BC78u), LIFT_CODE_TOKEN_RVA(0x2BC76u))) { return; }
     cpu->ebp -= cpu->eax;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->ebp;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (0.20000000298023224);
-    *(float*)(cpu->esp + 0x20u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x5Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x28u)));
-    *(float*)(cpu->esp + 0x40u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x60u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x2Cu)));
-    *(float*)(cpu->esp + 0x44u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x64u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x30u)));
-    *(float*)(cpu->esp + 0x48u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x18u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x34u)));
-    *(float*)(cpu->esp + 0x50u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x1Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x38u)));
-    *(float*)(cpu->esp + 0x54u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x20u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x3Cu)));
-    *(float*)(cpu->esp + 0x58u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x50u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x40u)));
-    *(float*)(cpu->esp + 0x28u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x54u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x44u)));
-    *(float*)(cpu->esp + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x58u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x48u)));
-    *(float*)(cpu->esp + 0x30u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x68u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (0.05000000074505806);
-    *(float*)(cpu->edi + 0x68u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x20u) = (((((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05)))) * (0.20000000298023224));
+    *(float*)(cpu->esp + 0x40u) = ((((double)*(float*)(cpu->edi + 0x5Cu))) + (((double)*(float*)(cpu->esp + 0x28u))));
+    *(float*)(cpu->esp + 0x44u) = ((((double)*(float*)(cpu->edi + 0x60u))) + (((double)*(float*)(cpu->esp + 0x2Cu))));
+    *(float*)(cpu->esp + 0x48u) = ((((double)*(float*)(cpu->edi + 0x64u))) + (((double)*(float*)(cpu->esp + 0x30u))));
+    *(float*)(cpu->esp + 0x50u) = ((((double)*(float*)(cpu->esp + 0x18u))) + (((double)*(float*)(cpu->esp + 0x34u))));
+    *(float*)(cpu->esp + 0x54u) = ((((double)*(float*)(cpu->esp + 0x1Cu))) + (((double)*(float*)(cpu->esp + 0x38u))));
+    *(float*)(cpu->esp + 0x58u) = ((((double)*(float*)(cpu->esp + 0x20u))) + (((double)*(float*)(cpu->esp + 0x3Cu))));
+    *(float*)(cpu->esp + 0x28u) = ((((double)*(float*)(cpu->esp + 0x50u))) - (((double)*(float*)(cpu->esp + 0x40u))));
+    *(float*)(cpu->esp + 0x2Cu) = ((((double)*(float*)(cpu->esp + 0x54u))) - (((double)*(float*)(cpu->esp + 0x44u))));
+    *(float*)(cpu->esp + 0x30u) = ((((double)*(float*)(cpu->esp + 0x58u))) - (((double)*(float*)(cpu->esp + 0x48u))));
+    *(float*)(cpu->edi + 0x68u) = ((((double)*(float*)(cpu->edi + 0x68u))) + (0.05000000074505806));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x2Cu));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x28u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x30u));
@@ -6062,18 +5833,10 @@ __declspec(noinline) void sfera_sub_0042BAD0(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42BD30u)); sfera_sub_004EE9EC(cpu, LIFT_CODE_TOKEN_VA(0x42BD30u));
     *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (0.30000001192092896);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x50u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x5Cu)));
-    *(float*)(cpu->esp + 0x34u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x54u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x60u)));
-    *(float*)(cpu->esp + 0x38u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x58u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x64u)));
-    *(float*)(cpu->esp + 0x3Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)*(float*)(cpu->esp + 0x10u))) * (0.30000001192092896));
+    *(float*)(cpu->esp + 0x34u) = ((((double)*(float*)(cpu->esp + 0x50u))) - (((double)*(float*)(cpu->esp + 0x5Cu))));
+    *(float*)(cpu->esp + 0x38u) = ((((double)*(float*)(cpu->esp + 0x54u))) - (((double)*(float*)(cpu->esp + 0x60u))));
+    *(float*)(cpu->esp + 0x3Cu) = ((((double)*(float*)(cpu->esp + 0x58u))) - (((double)*(float*)(cpu->esp + 0x64u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x3Cu)); lift_x87_push(cpu, cpu->fpu[0u]);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x2Cu)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -6148,8 +5911,7 @@ __declspec(noinline) void sfera_sub_0042BAD0(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[2u] = cpu->fpu[2u] + cpu->fpu[0u]; lift_x87_pop(cpu);
     { double temporary = cpu->fpu[0u]; cpu->fpu[0u] = cpu->fpu[1u]; cpu->fpu[1u] = temporary; }
     *(float*)(cpu->esi + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, 0.0);
-    *(float*)(cpu->esi + 0x70u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x70u) = (double)(0.0);
     lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x68u));
     lift_x87_push(cpu, 0.0);
     cpu->fpu[1u] = (cpu->fpu[1u]) + (cpu->fpu[0u]);
@@ -6166,19 +5928,12 @@ __declspec(noinline) void sfera_sub_0042BAD0(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[2u] = cpu->fpu[2u] - cpu->fpu[0u]; lift_x87_pop(cpu);
     { double temporary = cpu->fpu[0u]; cpu->fpu[0u] = cpu->fpu[1u]; cpu->fpu[1u] = temporary; }
     *(float*)(cpu->esi + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, 1.0);
-    *(float*)(cpu->esi + 0x78u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x78u) = (double)(1.0);
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi + 0x68u)));
     *(float*)(cpu->esi + 0x7Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x40u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x5Cu)));
-    *(float*)(cpu->esp + 0x34u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x44u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x60u)));
-    *(float*)(cpu->esp + 0x38u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x48u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x64u)));
-    *(float*)(cpu->esp + 0x3Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x34u) = ((((double)*(float*)(cpu->esp + 0x40u))) - (((double)*(float*)(cpu->esp + 0x5Cu))));
+    *(float*)(cpu->esp + 0x38u) = ((((double)*(float*)(cpu->esp + 0x44u))) - (((double)*(float*)(cpu->esp + 0x60u))));
+    *(float*)(cpu->esp + 0x3Cu) = ((((double)*(float*)(cpu->esp + 0x48u))) - (((double)*(float*)(cpu->esp + 0x64u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x3Cu)); lift_x87_push(cpu, cpu->fpu[0u]);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x2Cu)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -6253,11 +6008,8 @@ __declspec(noinline) void sfera_sub_0042BAD0(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[2u] = cpu->fpu[2u] - cpu->fpu[0u]; lift_x87_pop(cpu);
     { double temporary = cpu->fpu[0u]; cpu->fpu[0u] = cpu->fpu[1u]; cpu->fpu[1u] = temporary; }
     *(float*)(cpu->esi + 0x20u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, 1.0);
-    *(float*)(cpu->esi + 0x80u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x68u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x10u)));
-    *(float*)(cpu->esi + 0x84u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x80u) = (double)(1.0);
+    *(float*)(cpu->esi + 0x84u) = ((((double)*(float*)(cpu->edi + 0x68u))) + (((double)*(float*)(cpu->esp + 0x10u))));
     { double temporary = cpu->fpu[0u]; cpu->fpu[0u] = cpu->fpu[4u]; cpu->fpu[4u] = temporary; }
     cpu->fpu[5u] = cpu->fpu[5u] + cpu->fpu[0u]; lift_x87_pop(cpu);
     { double temporary = cpu->fpu[0u]; cpu->fpu[0u] = cpu->fpu[4u]; cpu->fpu[4u] = temporary; }
@@ -6266,11 +6018,8 @@ __declspec(noinline) void sfera_sub_0042BAD0(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->esi + 0x28u) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[1u] = cpu->fpu[1u] + cpu->fpu[0u]; lift_x87_pop(cpu);
     *(float*)(cpu->esi + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, 0.0);
-    *(float*)(cpu->esi + 0x88u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x68u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x10u)));
-    *(float*)(cpu->esi + 0x8Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x88u) = (double)(0.0);
+    *(float*)(cpu->esi + 0x8Cu) = ((((double)*(float*)(cpu->edi + 0x68u))) + (((double)*(float*)(cpu->esp + 0x10u))));
     cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     label_0002C006:
     cpu->edi = lift_pop32(cpu);
@@ -6290,24 +6039,24 @@ __declspec(noinline) void sfera_sub_0042C020(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = cpu->esi;
     cpu->esi = lift_pop32(cpu); cpu->esp += 8u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042C050(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042C050(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[2];
     cpu->esp -= 0x58u;
-    { uint64_t l=*(uint32_t*)(cpu->esp + 0x68u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->esp + 0x68u) == 0u;
     cpu->eax = *(uint32_t*)(cpu->esp + 0x5Cu);
     lift_push32(cpu, cpu->edi);
     cpu->edi = cpu->ecx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002C555;
+    if (sub_pred[0]) goto label_0002C555;
     cpu->ecx = *(uint32_t*)(cpu->edi + 0x58u);
     cpu->ecx += g_sfera_effect_manager.render_slot_count;
     if (cpu->ecx >= 0x2710u) goto label_0002C555;
-    { uint64_t l=*(uint32_t*)(cpu->edi + 0x6Cu), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[1] = *(uint32_t*)(cpu->edi + 0x6Cu) == 0u;
     cpu->edx = *(uint32_t*)(cpu->eax);
     cpu->ecx = *(uint32_t*)(cpu->eax + 4u);
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edx;
     cpu->edx = *(uint32_t*)(cpu->eax + 8u);
     *(uint32_t*)(cpu->esp + 0x18u) = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->edx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002C0B7;
+    if (!sub_pred[1]) goto label_0002C0B7;
     cpu->ecx = *(uint32_t*)(cpu->eax);
     *(uint32_t*)(cpu->edi + 0x5Cu) = cpu->ecx;
     cpu->edx = *(uint32_t*)(cpu->eax + 4u);
@@ -6341,10 +6090,7 @@ __declspec(noinline) void sfera_sub_0042C050(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x98u) = 3u;
     *(uint32_t*)(cpu->esi + 0x94u) = cpu->ebx;
     cpu->ecx = cpu->ebx;
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x68u));
-    lift_x87_compare(cpu, cpu->fpu[0u], 0.800000011920929);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    if (((((cpu->eax >> 8u) & 0xFFu)) & (0x41u)) != 0u) goto label_0002C147;
+    { const double lift_left=(double)*(float*)(cpu->edi + 0x68u); const double lift_right=0.800000011920929; if (!(lift_left>lift_right)) goto label_0002C147; }
     lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x68u));
     lift_x87_push(cpu, 1.0);
     cpu->fpu[1u] = cpu->fpu[0u] - cpu->fpu[1u]; lift_x87_pop(cpu);
@@ -6376,11 +6122,7 @@ __declspec(noinline) void sfera_sub_0042C050(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 8u));
     *(float*)(cpu->edi + 0x68u) = cpu->fpu[0u];
     lift_x87_push(cpu, 1.0);
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    cpu->eax = (cpu->eax & 0xFFFF0000u) | (((uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u))));
-    cpu->fpu[1u] = cpu->fpu[0u]; lift_x87_pop(cpu);
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002C19E;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; cpu->fpu[1u]=cpu->fpu[0u]; lift_x87_pop(cpu); if (!(lift_left<lift_right)) goto label_0002C19E; }
     *(float*)(cpu->edi + 0x68u) = cpu->fpu[0u]; lift_x87_pop(cpu);
     goto label_0002C1A0;
     label_0002C19E:
@@ -6390,14 +6132,9 @@ __declspec(noinline) void sfera_sub_0042C050(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esp + 0x18u;
     cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->edi + 0x5Cu)));
     *(float*)(cpu->esp + 0x34u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x1Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->edi + 0x60u)));
-    *(float*)(cpu->esp + 0x38u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x20u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->edi + 0x64u)));
-    *(float*)(cpu->esp + 0x3Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x68u));
-    *(float*)(cpu->esp + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x38u) = ((((double)*(float*)(cpu->esp + 0x1Cu))) - (((double)*(float*)(cpu->edi + 0x60u))));
+    *(float*)(cpu->esp + 0x3Cu) = ((((double)*(float*)(cpu->esp + 0x20u))) - (((double)*(float*)(cpu->edi + 0x64u))));
+    *(float*)(cpu->esp + 8u) = (double)*(float*)(cpu->edi + 0x68u);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x34u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 8u)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -6408,24 +6145,12 @@ __declspec(noinline) void sfera_sub_0042C050(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->esp + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x3Cu)));
     *(float*)(cpu->esp + 0x20u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x5Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x18u)));
-    *(float*)(cpu->esp + 0x28u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x1Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi + 0x60u)));
-    *(float*)(cpu->esp + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x20u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi + 0x64u)));
-    *(float*)(cpu->esp + 0x30u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x5Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x28u)));
-    *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x60u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x2Cu)));
-    *(float*)(cpu->esp + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x64u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x30u)));
-    *(float*)(cpu->esp + 0x20u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x28u) = ((((double)*(float*)(cpu->edi + 0x5Cu))) + (((double)*(float*)(cpu->esp + 0x18u))));
+    *(float*)(cpu->esp + 0x2Cu) = ((((double)*(float*)(cpu->esp + 0x1Cu))) + (((double)*(float*)(cpu->edi + 0x60u))));
+    *(float*)(cpu->esp + 0x30u) = ((((double)*(float*)(cpu->esp + 0x20u))) + (((double)*(float*)(cpu->edi + 0x64u))));
+    *(float*)(cpu->esp + 0x18u) = ((((double)*(float*)(cpu->edi + 0x5Cu))) - (((double)*(float*)(cpu->esp + 0x28u))));
+    *(float*)(cpu->esp + 0x1Cu) = ((((double)*(float*)(cpu->edi + 0x60u))) - (((double)*(float*)(cpu->esp + 0x2Cu))));
+    *(float*)(cpu->esp + 0x20u) = ((((double)*(float*)(cpu->edi + 0x64u))) - (((double)*(float*)(cpu->esp + 0x30u))));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42C237u)); sfera_sub_0042F3E0(cpu, LIFT_CODE_TOKEN_VA(0x42C237u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x18u));
     lift_x87_push(cpu, 0.5);
@@ -6554,18 +6279,11 @@ __declspec(noinline) void sfera_sub_0042C050(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[2u] = cpu->fpu[2u] - cpu->fpu[0u]; lift_x87_pop(cpu);
     { double temporary = cpu->fpu[0u]; cpu->fpu[0u] = cpu->fpu[1u]; cpu->fpu[1u] = temporary; }
     *(float*)(cpu->esi + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, 1.0);
-    *(float*)(cpu->esi + 0x78u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x78u) = (double)(1.0);
     *(float*)(cpu->esi + 0x7Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x28u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x50u)));
-    *(float*)(cpu->esp + 0x44u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x2Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x54u)));
-    *(float*)(cpu->esp + 0x48u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x30u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esp + 0x58u)));
-    *(float*)(cpu->esp + 0x4Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x44u) = ((((double)*(float*)(cpu->esp + 0x28u))) - (((double)*(float*)(cpu->esp + 0x50u))));
+    *(float*)(cpu->esp + 0x48u) = ((((double)*(float*)(cpu->esp + 0x2Cu))) - (((double)*(float*)(cpu->esp + 0x54u))));
+    *(float*)(cpu->esp + 0x4Cu) = ((((double)*(float*)(cpu->esp + 0x30u))) - (((double)*(float*)(cpu->esp + 0x58u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x4Cu)); lift_x87_push(cpu, cpu->fpu[0u]);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x1Cu)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -6654,8 +6372,7 @@ __declspec(noinline) void sfera_sub_0042C050(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[2u] = cpu->fpu[2u] + cpu->fpu[0u]; lift_x87_pop(cpu);
     { double temporary = cpu->fpu[0u]; cpu->fpu[0u] = cpu->fpu[1u]; cpu->fpu[1u] = temporary; }
     *(float*)(cpu->esi + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, 0.0);
-    *(float*)(cpu->esi + 0x88u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi + 0x88u) = (double)(0.0);
     *(float*)(cpu->esi + 0x8Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->esi = lift_pop32(cpu);
     label_0002C555:
@@ -6723,8 +6440,7 @@ __declspec(noinline) void sfera_sub_0042C570(LiftCpu* cpu, uint32_t stop_address
     label_0002C660:
     *(uint32_t*)(cpu->eax) = 0u;
     cpu->eax += 0x14u;
-    { uint64_t l=cpu->ecx, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002C660;
+    if ((--cpu->ecx) != 0u) goto label_0002C660;
     cpu->eax = cpu->esi;
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
     (void)0; /* source SEH registration eliminated */
@@ -6785,12 +6501,10 @@ __declspec(noinline) void sfera_sub_0042C6B0(LiftCpu* cpu, uint32_t stop_address
     label_0002C740:
     cpu->ecx = cpu->edi;
     reinterpret_cast<IEffectManager*>(static_cast<uintptr_t>(cpu->edi))->createEffectResources(cpu);
-    lift_x87_push(cpu, (double)-1.0f);
-    *(float*)(cpu->esi) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esi) = (double)-1.0f;
     *(uint32_t*)(cpu->esi + 0xFFFFFFFCu) = cpu->eax;
     cpu->esi += 0x14u;
-    { uint64_t l=cpu->ebx, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->ebx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002C740;
+    if ((--cpu->ebx) != 0u) goto label_0002C740;
     label_0002C75A:
     cpu->eax = cpu->ebp;
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
@@ -6799,7 +6513,7 @@ __declspec(noinline) void sfera_sub_0042C6B0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042C770(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042C770(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
@@ -6809,9 +6523,9 @@ __declspec(noinline) void sfera_sub_0042C770(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 8u) = cpu->esi;
     std::construct_at(reinterpret_cast<CRainEffect*>(cpu->esi));
-    { uint64_t l=*(uint32_t*)(cpu->esi + 0x60u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->esi + 0x60u) == 0u;
     *(uint32_t*)(cpu->esp + 0x14u) = 0u;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002C7C7;
+    if (sub_pred[0]) goto label_0002C7C7;
     cpu->edx = 0x359u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\Effects.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42C7BBu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42C7BBu));
@@ -6835,12 +6549,12 @@ __declspec(noinline) void sfera_sub_0042C770(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x10u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address) { bool lift_test[1]; bool sub_pred[1];
     cpu->esp -= 0xC0u;
-    { uint64_t l=*(uint32_t*)(cpu->esp + 0xD0u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->esp + 0xD0u) == 0u;
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->ecx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002CFA7;
+    if (sub_pred[0]) goto label_0002CFA7;
     if (*(uint32_t*)(cpu->ebp + 0x5Cu) == 0xFFFFFFFFu) goto label_0002CFA7;
     cpu->eax = *(uint32_t*)(cpu->ebp + 0x58u);
     cpu->eax += g_sfera_effect_manager.render_slot_count;
@@ -6882,21 +6596,14 @@ __declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = native_function_address32(&::rand);
     if (!lift_call_indirect(cpu, cpu->esi, LIFT_CODE_TOKEN_RVA(0x2C8B7u), LIFT_CODE_TOKEN_RVA(0x2C8B5u))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (20.0);
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (30.0);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esp + 0x10u) = (((((((double)*(float*)(cpu->esp + 0x10u))) * (20.0)))) + (30.0));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
     *(float*)(cpu->ebx + 0x18u) = cpu->fpu[0u];
     *(float*)(cpu->ebx + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
     if (!lift_call_indirect(cpu, cpu->esi, LIFT_CODE_TOKEN_RVA(0x2C8E9u), LIFT_CODE_TOKEN_RVA(0x2C8E7u))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
     lift_x87_push(cpu, 0.02500000037252903);
     cpu->fpu[1u] = (cpu->fpu[1u]) * (cpu->fpu[0u]);
@@ -6904,9 +6611,7 @@ __declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->ebx + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
     if (!lift_call_indirect(cpu, cpu->esi, LIFT_CODE_TOKEN_RVA(0x2C90Eu), LIFT_CODE_TOKEN_RVA(0x2C90Cu))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
     lift_x87_push(cpu, 0.05999999865889549);
     cpu->fpu[1u] = (cpu->fpu[1u]) * (cpu->fpu[0u]);
@@ -6914,21 +6619,12 @@ __declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->ebx + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
     if (!lift_call_indirect(cpu, cpu->esi, LIFT_CODE_TOKEN_RVA(0x2C933u), LIFT_CODE_TOKEN_RVA(0x2C931u))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (6.283185958862305);
-    *(float*)(cpu->esp + 0xC0u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esp + 0xC0u) = ((((double)*(float*)(cpu->esp + 0x10u))) * (6.283185958862305));
     if (!lift_call_indirect(cpu, cpu->esi, LIFT_CODE_TOKEN_RVA(0x2C958u), LIFT_CODE_TOKEN_RVA(0x2C956u))) { return; }
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->eax;
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.0518509447574615e-05);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (0.5);
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.1415929794311523);
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x10u)))))) * (3.0518509447574615e-05));
+    *(float*)(cpu->esp + 0x10u) = (((((((double)*(float*)(cpu->esp + 0x10u))) - (0.5)))) * (3.1415929794311523));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42C987u)); sfera_sub_004EE9F2(cpu, LIFT_CODE_TOKEN_VA(0x42C987u));
     *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -6940,10 +6636,7 @@ __declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x44u) = cpu->ecx;
     cpu->edi = *(uint32_t*)(cpu->esp + 0x44u);
     cpu->esi = *(uint32_t*)(cpu->esp + 0x10u);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xC0u));
-    lift_x87_sincos(cpu);
-    *(float*)(cpu->esi) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    *(float*)(cpu->edi) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    { const double angle=(double)*(float*)(cpu->esp + 0xC0u), sine=std::sin(angle); *(float*)(cpu->esi)=std::cos(angle); *(float*)(cpu->edi)=sine; }
     lift_x87_push(cpu, (double)*(float*)(cpu->ebp + 0x64u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x20u)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -6978,25 +6671,19 @@ __declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = 0x9Bu;
     label_0002CA22:
     cpu->edx = *(uint32_t*)(cpu->ebp + 0x60u);
-    { uint64_t l=*(uint32_t*)(cpu->eax + cpu->edx + 0x14u), r=0x80000000u, v=l & r; lift_flags_logic(cpu,v,32u); }
+    lift_test[0]=(*(uint32_t*)(cpu->eax + cpu->edx + 0x14u)&0x80000000u)==0u;
     cpu->edi = cpu->eax + cpu->edx;
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002CF90;
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x14u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (2.0);
-    *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    if (!lift_test[0]) goto label_0002CF90;
+    *(float*)(cpu->esp + 0x18u) = ((((double)*(float*)(cpu->edi + 0x14u))) - (2.0));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x18u));
     *(float*)(cpu->edi + 0x14u) = cpu->fpu[0u];
     cpu->fpu[0u] = (cpu->fpu[0u]) / (((double)*(float*)(cpu->edi + 0x18u)));
     lift_x87_push(cpu, 1.0);
     cpu->fpu[1u] = cpu->fpu[0u] - cpu->fpu[1u]; lift_x87_pop(cpu);
     *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0xCu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi + 4u)));
-    *(float*)(cpu->edi + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->edi + 4u) = ((((double)*(float*)(cpu->edi + 0xCu))) + (((double)*(float*)(cpu->edi + 4u))));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x18u));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    cpu->eax = (cpu->eax & 0xFFFF0000u) | (((uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u))));
-    if (((((cpu->eax >> 8u) & 0xFFu)) & (0x41u)) != 0u) goto label_0002CA78;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; if (!(lift_left>lift_right)) goto label_0002CA78; }
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     *(uint32_t*)(cpu->edi + 0x10u) = 0xC8u;
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -7043,15 +6730,10 @@ __declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->edi + 0x10u);
     *(uint32_t*)(cpu->eax + 0x20u) = cpu->edx;
     cpu->eax += 4u;
-    { uint64_t l=cpu->ecx, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002CB05;
+    if ((--cpu->ecx) != 0u) goto label_0002CB05;
     cpu->eax = *(uint32_t*)(cpu->esp + 0xD4u);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi)));
-    *(float*)(cpu->esp + 0x54u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 4u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi + 4u)));
-    *(float*)(cpu->esp + 0x58u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x54u) = ((((double)*(float*)(cpu->eax))) + (((double)*(float*)(cpu->edi))));
+    *(float*)(cpu->esp + 0x58u) = ((((double)*(float*)(cpu->eax + 4u))) + (((double)*(float*)(cpu->edi + 4u))));
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x58u);
     lift_x87_push(cpu, (double)*(float*)(cpu->edi + 8u));
     *(uint32_t*)(cpu->esp + 0x4Cu) = cpu->ecx;
@@ -7064,17 +6746,10 @@ __declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x50u) = cpu->edx;
     cpu->fpu[0u] = (cpu->fpu[0u]) - (4.0);
     *(float*)(cpu->esp + 0x4Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi + 0x1Cu));
-    *(float*)(cpu->esp + 0x44u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x48u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)g_sfera_effect_manager.viewer_position.x));
-    *(float*)(cpu->esp + 0x78u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x4Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)g_sfera_effect_manager.viewer_position.y));
-    *(float*)(cpu->esp + 0x7Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x50u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)g_sfera_effect_manager.viewer_position.z));
-    *(float*)(cpu->esp + 0x80u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x44u) = (double)*(float*)(cpu->edi + 0x1Cu);
+    *(float*)(cpu->esp + 0x78u) = ((((double)*(float*)(cpu->esp + 0x48u))) - (((double)g_sfera_effect_manager.viewer_position.x)));
+    *(float*)(cpu->esp + 0x7Cu) = ((((double)*(float*)(cpu->esp + 0x4Cu))) - (((double)g_sfera_effect_manager.viewer_position.y)));
+    *(float*)(cpu->esp + 0x80u) = ((((double)*(float*)(cpu->esp + 0x50u))) - (((double)g_sfera_effect_manager.viewer_position.z)));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x7Cu)); lift_x87_push(cpu, cpu->fpu[0u]);
     lift_x87_push(cpu, 0.0);
     cpu->fpu[1u] = (cpu->fpu[1u]) * (cpu->fpu[0u]);
@@ -7135,14 +6810,10 @@ __declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
     lift_x87_push(cpu, (double)9.999999747378752e-06f);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x18u));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    cpu->eax = (cpu->eax & 0xFFFF0000u) | (((uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u))));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002CC92;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; if (!(lift_left<lift_right)) goto label_0002CC92; }
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[1u] = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, 1.0);
-    *(float*)(cpu->esp + 0xA8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0xA8u) = (double)(1.0);
     lift_x87_push(cpu, 0.0);
     cpu->eax = *(uint32_t*)(cpu->esp + 0xA8u);
     *(float*)(cpu->esp + 0xACu) = cpu->fpu[0u];
@@ -7196,11 +6867,7 @@ __declspec(noinline) void sfera_sub_0042C800(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[1u] = cpu->fpu[1u] + cpu->fpu[0u]; lift_x87_pop(cpu);
     *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x18u));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    cpu->eax = (cpu->eax & 0xFFFF0000u) | (((uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u))));
-    cpu->fpu[1u] = cpu->fpu[0u]; lift_x87_pop(cpu);
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002CD60;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; cpu->fpu[1u]=cpu->fpu[0u]; lift_x87_pop(cpu); if (!(lift_left<lift_right)) goto label_0002CD60; }
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[2u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[1u] = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -7497,10 +7164,10 @@ __declspec(noinline) void sfera_sub_0042D160(LiftCpu* cpu, uint32_t stop_address
     lift_movs32(cpu, 1u);
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->esp += 0xCu; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042D180(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042D180(LiftCpu* cpu, uint32_t stop_address) { bool lift_test[1]; bool sub_pred[1];
     cpu->edx = *(uint32_t*)(cpu->ecx + 4u);
-    { uint64_t l=cpu->edx, r=1u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) != 0u) goto label_0002D262;
+    sub_pred[0] = cpu->edx == 1u;
+    if (cpu->edx <= 1u) goto label_0002D262;
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 4u));
     lift_push32(cpu, cpu->esi);
     cpu->esi = *(uint32_t*)(cpu->ecx);
@@ -7509,10 +7176,7 @@ __declspec(noinline) void sfera_sub_0042D180(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)*(float*)(cpu->esi + (cpu->eax * 8u) + 0xFFFFFFD0u));
     lift_push32(cpu, cpu->edi);
     cpu->edi = cpu->esi + (cpu->eax * 8u) + 0xFFFFFFD0u;
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x41u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002D1C6;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; lift_x87_pop(cpu); if (!(lift_left<=lift_right)) goto label_0002D1C6; }
     cpu->ecx = *(uint32_t*)(cpu->edi + 0x18u);
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->eax = *(uint32_t*)(cpu->esp + 0x10u);
@@ -7524,34 +7188,26 @@ __declspec(noinline) void sfera_sub_0042D180(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->eax + 8u) = cpu->ecx;
     cpu->esi = lift_pop32(cpu); cpu->esp += 0xCu; cpu->eip = stop_address; return;
     label_0002D1C6:
-    { uint64_t l=cpu->edx, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->edx = v; }
-    if ((cpu->eflags & LIFT_FLAG_SF) != 0u) goto label_0002D1E6;
+    if ((int32_t)(--cpu->edx) < 0) goto label_0002D1E6;
     cpu->edi = cpu->edx + (cpu->edx * 2u);
     cpu->edi <<= 4u;
     cpu->edi += cpu->esi;
     label_0002D1D1:
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x41u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002D1E4;
+    { const double lift_left=(double)*(float*)(cpu->edi); const double lift_right=cpu->fpu[0u]; if (lift_left<=lift_right) goto label_0002D1E4; }
     cpu->edi -= 0x30u;
-    { uint64_t l=cpu->edx, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->edx = v; }
-    if ((cpu->eflags & LIFT_FLAG_SF) == 0u) goto label_0002D1D1;
+    if ((int32_t)(--cpu->edx) >= 0) goto label_0002D1D1;
     goto label_0002D1E6;
     label_0002D1E4:
     cpu->esi = cpu->edi;
     label_0002D1E6:
-    { uint64_t l=*(uint8_t*)(cpu->ecx + 8u), r=1u, v=l & r; lift_flags_logic(cpu,v,8u); }
+    lift_test[0]=(*(uint8_t*)(cpu->ecx + 8u)&1u)==0u;
     cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esi)));
     lift_x87_push(cpu, (double)*(float*)(cpu->esi + 0x30u));
     cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esi)));
     cpu->fpu[1u] = cpu->fpu[1u] / cpu->fpu[0u]; lift_x87_pop(cpu);
     *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002D226;
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.1415929794311523);
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    if (lift_test[0]) goto label_0002D226;
+    *(float*)(cpu->esp + 0xCu) = ((((double)*(float*)(cpu->esp + 0xCu))) * (3.1415929794311523));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42D210u)); sfera_sub_004EE9F2(cpu, LIFT_CODE_TOKEN_VA(0x42D210u));
     *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -7584,7 +7240,7 @@ __declspec(noinline) void sfera_sub_0042D180(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->eax + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->esp += 0xCu; cpu->eip = stop_address; return;
     label_0002D262:
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002D27E;
+    if (!sub_pred[0]) goto label_0002D27E;
     cpu->eax = *(uint32_t*)(cpu->ecx);
     cpu->edx = *(uint32_t*)(cpu->eax + 0x18u);
     cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
@@ -7602,23 +7258,20 @@ __declspec(noinline) void sfera_sub_0042D180(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->eax) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->esp += 0xCu; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042D290(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042D290(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     cpu->esp -= 8u;
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi);
     cpu->esi = *(uint32_t*)(cpu->ecx + 4u);
     cpu->ebx = 1u;
-    { uint64_t l=cpu->esi, r=cpu->ebx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) != 0u) goto label_0002D3D5;
+    sub_pred[0] = cpu->esi == cpu->ebx;
+    if (cpu->esi <= cpu->ebx) goto label_0002D3D5;
     cpu->edx = *(uint32_t*)(cpu->ecx);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x14u));
     cpu->eax = cpu->esi + (cpu->esi * 2u);
     cpu->eax += cpu->eax;
     lift_x87_push(cpu, (double)*(float*)(cpu->edx + (cpu->eax * 8u) + 0xFFFFFFD0u));
     cpu->ecx = cpu->edx + (cpu->eax * 8u) + 0xFFFFFFD0u;
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x41u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002D310;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; lift_x87_pop(cpu); if (!(lift_left<=lift_right)) goto label_0002D310; }
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     if ((uint8_t)((*(uint8_t*)(cpu->ecx + 4u)) & ((cpu->ebx & 0xFFu))) == 0u) goto label_0002D2FF;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x24u);
@@ -7627,9 +7280,7 @@ __declspec(noinline) void sfera_sub_0042D290(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = lift_pop32(cpu);
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->eax;
     cpu->ebx = lift_pop32(cpu);
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x1Cu)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (1.5259021893143654e-05);
-    *(float*)(cpu->esp + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x1Cu) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x1Cu)))))) * (1.5259021893143654e-05));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x1Cu));
     cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->ecx + 0xCu)));
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->ecx + 8u)));
@@ -7647,20 +7298,14 @@ __declspec(noinline) void sfera_sub_0042D290(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
     label_0002D310:
     cpu->ecx = cpu->esi + 0xFFFFFFFFu;
-    { uint64_t v=cpu->ecx; lift_flags_logic(cpu,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_SF) != 0u) goto label_0002D335;
+    if (((cpu->ecx)&0x80000000u)!=0u) goto label_0002D335;
     cpu->esi = cpu->ecx + (cpu->ecx * 2u);
     cpu->esi <<= 4u;
     cpu->esi += cpu->edx;
     label_0002D31F:
-    lift_x87_push(cpu, (double)*(float*)(cpu->esi));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x41u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002D333;
+    { const double lift_left=(double)*(float*)(cpu->esi); const double lift_right=cpu->fpu[0u]; if (lift_left<=lift_right) goto label_0002D333; }
     cpu->esi -= 0x30u;
-    { uint64_t l=cpu->ecx, r=cpu->ebx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ecx = v; }
-    if ((cpu->eflags & LIFT_FLAG_SF) == 0u) goto label_0002D31F;
+    if ((int32_t)(cpu->ecx -= cpu->ebx) >= 0) goto label_0002D31F;
     goto label_0002D335;
     label_0002D333:
     cpu->edx = cpu->esi;
@@ -7672,10 +7317,8 @@ __declspec(noinline) void sfera_sub_0042D290(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->edx)));
     cpu->fpu[1u] = cpu->fpu[1u] / cpu->fpu[0u]; lift_x87_pop(cpu);
     *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edx + 8u));
-    *(float*)(cpu->esp + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edx + 0x38u));
-    *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 8u) = (double)*(float*)(cpu->edx + 8u);
+    *(float*)(cpu->esp + 0x14u) = (double)*(float*)(cpu->edx + 0x38u);
     lift_x87_push(cpu, 1.5259021893143654e-05);
     if ((uint8_t)((*(uint8_t*)(cpu->edx + 4u)) & ((cpu->ebx & 0xFFu))) == 0u) goto label_0002D388;
     lift_push32(cpu, cpu->edi);
@@ -7686,10 +7329,7 @@ __declspec(noinline) void sfera_sub_0042D290(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x24u)))));
     cpu->fpu[0u] = (cpu->fpu[0u]) * (cpu->fpu[1u]);
     *(float*)(cpu->esp + 0x24u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x24u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->edx + 0xCu)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 8u)));
-    *(float*)(cpu->esp + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 8u) = (((((((double)*(float*)(cpu->esp + 0x24u))) * (((double)*(float*)(cpu->edx + 0xCu)))))) + (((double)*(float*)(cpu->esp + 8u))));
     label_0002D388:
     if ((uint8_t)((*(uint8_t*)(cpu->edx + 0x34u)) & ((cpu->ebx & 0xFFu))) == 0u) goto label_0002D3B1;
     cpu->eax = *(uint16_t*)(cpu->eax + (cpu->ecx * 2u) + 2u);
@@ -7697,10 +7337,7 @@ __declspec(noinline) void sfera_sub_0042D290(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x24u) = cpu->eax;
     cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x24u)))));
     *(float*)(cpu->esp + 0x24u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x24u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->edx + 0x3Cu)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x14u)));
-    *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x14u) = (((((((double)*(float*)(cpu->esp + 0x24u))) * (((double)*(float*)(cpu->edx + 0x3Cu)))))) + (((double)*(float*)(cpu->esp + 0x14u))));
     goto label_0002D3B3;
     label_0002D3B1:
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -7719,7 +7356,7 @@ __declspec(noinline) void sfera_sub_0042D290(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 8u;
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
     label_0002D3D5:
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002D417;
+    if (!sub_pred[0]) goto label_0002D417;
     cpu->ecx = *(uint32_t*)(cpu->ecx);
     if ((uint8_t)((*(uint8_t*)(cpu->ecx + 4u)) & ((cpu->ebx & 0xFFu))) == 0u) goto label_0002D2FF;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x24u);
@@ -7728,9 +7365,7 @@ __declspec(noinline) void sfera_sub_0042D290(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = lift_pop32(cpu);
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->eax;
     cpu->ebx = lift_pop32(cpu);
-    lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x1Cu)))));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (1.5259021893143654e-05);
-    *(float*)(cpu->esp + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x1Cu) = ((((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x1Cu)))))) * (1.5259021893143654e-05));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x1Cu));
     cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->ecx + 0xCu)));
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->ecx + 8u)));
@@ -7747,25 +7382,22 @@ __declspec(noinline) void sfera_sub_0042D290(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 8u;
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042D430(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042D430(LiftCpu* cpu, uint32_t stop_address) { bool lift_test[2]; bool sub_pred[1];
     cpu->edx = *(uint32_t*)(cpu->ecx + 4u);
     cpu->esp -= 0x20u;
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
-    { uint64_t l=cpu->edx, r=1u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) != 0u) goto label_0002D8A0;
+    sub_pred[0] = cpu->edx == 1u;
+    if (cpu->edx <= 1u) goto label_0002D8A0;
     cpu->esi = *(uint32_t*)(cpu->ecx);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x34u));
     cpu->eax = cpu->edx + (cpu->edx * 2u);
     cpu->eax += cpu->eax;
     lift_x87_push(cpu, (double)*(float*)(cpu->esi + (cpu->eax * 8u) + 0xFFFFFFD0u));
     cpu->edi = cpu->esi + (cpu->eax * 8u) + 0xFFFFFFD0u;
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x41u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002D5BC;
-    { uint64_t l=*(uint8_t*)(cpu->edi + 4u), r=1u, v=l & r; lift_flags_logic(cpu,v,8u); }
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; lift_x87_pop(cpu); if (!(lift_left<=lift_right)) goto label_0002D5BC; }
+    lift_test[0]=(*(uint8_t*)(cpu->edi + 4u)&1u)==0u;
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002D593;
+    if (lift_test[0]) goto label_0002D593;
     cpu->ebp = *(uint32_t*)(cpu->esp + 0x44u);
     cpu->esi = cpu->edx;
     cpu->ecx = *(uint16_t*)(cpu->ebp + (cpu->esi * 2u) + 0xFFFFFFFEu);
@@ -7870,17 +7502,12 @@ __declspec(noinline) void sfera_sub_0042D430(LiftCpu* cpu, uint32_t stop_address
     label_0002D5BC:
     cpu->edi = cpu->edx + 0xFFFFFFFFu;
     cpu->edx = 0u;
-    { uint64_t l=cpu->edi, r=cpu->edx, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((((cpu->eflags >> 7u) ^ (cpu->eflags >> 11u)) & 1u) != 0u) goto label_0002D5E4;
+    if ((int32_t)(cpu->edi) < (int32_t)(cpu->edx)) goto label_0002D5E4;
     cpu->ecx = cpu->edi + (cpu->edi * 2u);
     cpu->ecx <<= 4u;
     cpu->ecx += cpu->esi;
     label_0002D5CD:
-    lift_x87_push(cpu, (double)*(float*)(cpu->ecx));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x41u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002D5E2;
+    { const double lift_left=(double)*(float*)(cpu->ecx); const double lift_right=cpu->fpu[0u]; if (lift_left<=lift_right) goto label_0002D5E2; }
     --cpu->edi;
     cpu->ecx -= 0x30u;
     if ((int32_t)cpu->edi >= (int32_t)cpu->edx) goto label_0002D5CD;
@@ -7888,7 +7515,7 @@ __declspec(noinline) void sfera_sub_0042D430(LiftCpu* cpu, uint32_t stop_address
     label_0002D5E2:
     cpu->esi = cpu->ecx;
     label_0002D5E4:
-    { uint64_t l=*(uint8_t*)(cpu->esi + 4u), r=1u, v=l & r; lift_flags_logic(cpu,v,8u); }
+    lift_test[1]=(*(uint8_t*)(cpu->esi + 4u)&1u)==0u;
     cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->esi)));
     lift_x87_push(cpu, (double)*(float*)(cpu->esi + 0x30u));
     cpu->edx = *(uint8_t*)(cpu->esi + 0x10u);
@@ -7912,7 +7539,7 @@ __declspec(noinline) void sfera_sub_0042D430(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x24u) = cpu->eax;
     *(float*)(cpu->esp + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
     lift_x87_push(cpu, 1.5259021893143654e-05);
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002D709;
+    if (lift_test[1]) goto label_0002D709;
     cpu->ebx = *(uint32_t*)(cpu->esp + 0x3Cu);
     cpu->ecx = *(uint16_t*)(cpu->ebp + (cpu->edi * 2u));
     cpu->edx = *(uint8_t*)(cpu->esi + 0x14u);
@@ -8055,7 +7682,7 @@ __declspec(noinline) void sfera_sub_0042D430(LiftCpu* cpu, uint32_t stop_address
     label_0002D83F:
     cpu->eax = *(uint32_t*)(cpu->esp + 0x10u);
     cpu->edx = *(uint32_t*)(cpu->esp + 0x34u);
-    { uint64_t l=cpu->edx, r=cpu->eax, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
+    cpu->edx -= cpu->eax;
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x38u);
     { int64_t v=(int64_t)(int32_t)(cpu->edx) * (int64_t)(int32_t)(cpu->esi); cpu->edx= v; uint32_t ov= (int64_t)(int32_t)v != v; cpu->eflags=(cpu->eflags & ~(LIFT_FLAG_CF | LIFT_FLAG_OF)) | (ov ? LIFT_FLAG_CF | LIFT_FLAG_OF : 0u); }
     cpu->edx = (int32_t)(cpu->edx) >> 8u;
@@ -8063,21 +7690,21 @@ __declspec(noinline) void sfera_sub_0042D430(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = *(uint32_t*)(cpu->esp + 0x18u);
     *(uint8_t*)(cpu->ecx) = cpu->edx & 0xFFu;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x14u);
-    { uint64_t l=cpu->edx, r=cpu->eax, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
+    cpu->edx -= cpu->eax;
     { int64_t v=(int64_t)(int32_t)(cpu->edx) * (int64_t)(int32_t)(cpu->esi); cpu->edx= v; uint32_t ov= (int64_t)(int32_t)v != v; cpu->eflags=(cpu->eflags & ~(LIFT_FLAG_CF | LIFT_FLAG_OF)) | (ov ? LIFT_FLAG_CF | LIFT_FLAG_OF : 0u); }
     cpu->edx = (int32_t)(cpu->edx) >> 8u;
     cpu->edx = (cpu->edx & 0xFFFFFF00u) | ((uint32_t)(((uint64_t)((cpu->edx & 0xFFu)) + (uint64_t)((cpu->eax & 0xFFu)) + (uint64_t)(0u))) & 0xFFu);
     cpu->eax = *(uint32_t*)(cpu->esp + 0x20u);
     *(uint8_t*)(cpu->ecx + 1u) = cpu->edx & 0xFFu;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x1Cu);
-    { uint64_t l=cpu->edx, r=cpu->eax, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
+    cpu->edx -= cpu->eax;
     { int64_t v=(int64_t)(int32_t)(cpu->edx) * (int64_t)(int32_t)(cpu->esi); cpu->edx= v; uint32_t ov= (int64_t)(int32_t)v != v; cpu->eflags=(cpu->eflags & ~(LIFT_FLAG_CF | LIFT_FLAG_OF)) | (ov ? LIFT_FLAG_CF | LIFT_FLAG_OF : 0u); }
     cpu->edx = (int32_t)(cpu->edx) >> 8u;
     cpu->edx = (cpu->edx & 0xFFFFFF00u) | ((uint32_t)(((uint64_t)((cpu->edx & 0xFFu)) + (uint64_t)((cpu->eax & 0xFFu)) + (uint64_t)(0u))) & 0xFFu);
     cpu->eax = *(uint32_t*)(cpu->esp + 0x28u);
     *(uint8_t*)(cpu->ecx + 2u) = cpu->edx & 0xFFu;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x24u);
-    { uint64_t l=cpu->edx, r=cpu->eax, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->edx = v; }
+    cpu->edx -= cpu->eax;
     { int64_t v=(int64_t)(int32_t)(cpu->edx) * (int64_t)(int32_t)(cpu->esi); cpu->edx= v; uint32_t ov= (int64_t)(int32_t)v != v; cpu->eflags=(cpu->eflags & ~(LIFT_FLAG_CF | LIFT_FLAG_OF)) | (ov ? LIFT_FLAG_CF | LIFT_FLAG_OF : 0u); }
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->edx = (int32_t)(cpu->edx) >> 8u;
@@ -8088,7 +7715,7 @@ __declspec(noinline) void sfera_sub_0042D430(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x20u;
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
     label_0002D8A0:
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002D9DD;
+    if (!sub_pred[0]) goto label_0002D9DD;
     cpu->esi = *(uint32_t*)(cpu->ecx);
     if (((*(uint8_t*)(cpu->esi + 4u)) & (1u)) == 0u) goto label_0002D9B4;
     cpu->ebx = *(uint32_t*)(cpu->esp + 0x44u);
@@ -8191,25 +7818,24 @@ __declspec(noinline) void sfera_sub_0042D430(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x20u;
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address) { bool lift_test[1]; bool sub_pred[1];
+    bool lift_cmp[1];
     cpu->esp -= 0x1Cu;
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->edi = *(uint32_t*)(cpu->ecx + 4u);
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->ecx;
-    { uint64_t l=cpu->edi, r=1u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
-    if ((cpu->eflags & (LIFT_FLAG_CF | LIFT_FLAG_ZF)) != 0u) goto label_0002DE96;
+    sub_pred[0] = cpu->edi == 1u;
+    if (cpu->edi <= 1u) goto label_0002DE96;
     cpu->esi = *(uint32_t*)(cpu->ecx);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x2Cu));
     cpu->eax = cpu->edi + (cpu->edi * 2u);
     cpu->eax += cpu->eax;
     lift_x87_push(cpu, (double)*(float*)(cpu->esi + (cpu->eax * 8u) + 0xFFFFFFD0u));
     cpu->edx = cpu->esi + (cpu->eax * 8u) + 0xFFFFFFD0u;
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
+    lift_cmp[0]=cpu->fpu[0u]<=cpu->fpu[1u];
     lift_x87_pop(cpu);
     lift_push32(cpu, cpu->ebp);
-    cpu->eax = (cpu->eax & 0xFFFF0000u) | (((uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u))));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x41u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) != 0u) goto label_0002DB7F;
+    if (!lift_cmp[0]) goto label_0002DB7F;
     cpu->eax = *(uint32_t*)(cpu->edx + 4u);
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     if ((((cpu->eax & 0xFFu)) & (1u)) == 0u) goto label_0002DAB7;
@@ -8240,18 +7866,9 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->esp + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x30u)))));
     *(float*)(cpu->esp + 0x30u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x30u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->edx + 0x24u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edx + 0x18u)));
-    *(float*)(cpu->eax) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edx + 0x28u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x28u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edx + 0x1Cu)));
-    *(float*)(cpu->eax + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edx + 0x2Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x2Cu)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edx + 0x20u)));
-    *(float*)(cpu->eax + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->eax) = (((((((double)*(float*)(cpu->esp + 0x30u))) * (((double)*(float*)(cpu->edx + 0x24u)))))) + (((double)*(float*)(cpu->edx + 0x18u))));
+    *(float*)(cpu->eax + 4u) = (((((((double)*(float*)(cpu->edx + 0x28u))) * (((double)*(float*)(cpu->esp + 0x28u)))))) + (((double)*(float*)(cpu->edx + 0x1Cu))));
+    *(float*)(cpu->eax + 8u) = (((((((double)*(float*)(cpu->edx + 0x2Cu))) * (((double)*(float*)(cpu->esp + 0x2Cu)))))) + (((double)*(float*)(cpu->edx + 0x20u))));
     cpu->esp += 0x1Cu;
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
     label_0002DAB7:
@@ -8291,18 +7908,9 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->esp + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x30u)))));
     *(float*)(cpu->esp + 0x30u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x30u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->edx + 0x24u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edx + 0x18u)));
-    *(float*)(cpu->eax) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edx + 0x28u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x28u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edx + 0x1Cu)));
-    *(float*)(cpu->eax + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->edx + 0x2Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x2Cu)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edx + 0x20u)));
-    *(float*)(cpu->eax + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->eax) = (((((((double)*(float*)(cpu->esp + 0x30u))) * (((double)*(float*)(cpu->edx + 0x24u)))))) + (((double)*(float*)(cpu->edx + 0x18u))));
+    *(float*)(cpu->eax + 4u) = (((((((double)*(float*)(cpu->edx + 0x28u))) * (((double)*(float*)(cpu->esp + 0x28u)))))) + (((double)*(float*)(cpu->edx + 0x1Cu))));
+    *(float*)(cpu->eax + 8u) = (((((((double)*(float*)(cpu->edx + 0x2Cu))) * (((double)*(float*)(cpu->esp + 0x2Cu)))))) + (((double)*(float*)(cpu->edx + 0x20u))));
     cpu->esp += 0x1Cu;
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
     label_0002DB60:
@@ -8320,20 +7928,14 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
     label_0002DB7F:
     cpu->edx = cpu->edi + 0xFFFFFFFFu;
-    { uint64_t v=cpu->edx; lift_flags_logic(cpu,v,32u); }
-    if ((cpu->eflags & LIFT_FLAG_SF) != 0u) goto label_0002DBA3;
+    if (((cpu->edx)&0x80000000u)!=0u) goto label_0002DBA3;
     cpu->edi = cpu->edx + (cpu->edx * 2u);
     cpu->edi <<= 4u;
     cpu->edi += cpu->esi;
     label_0002DB8E:
-    lift_x87_push(cpu, (double)*(float*)(cpu->edi));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x41u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002DBA1;
+    { const double lift_left=(double)*(float*)(cpu->edi); const double lift_right=cpu->fpu[0u]; if (lift_left<=lift_right) goto label_0002DBA1; }
     cpu->edi -= 0x30u;
-    { uint64_t l=cpu->edx, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->edx = v; }
-    if ((cpu->eflags & LIFT_FLAG_SF) == 0u) goto label_0002DB8E;
+    if ((int32_t)(--cpu->edx) >= 0) goto label_0002DB8E;
     goto label_0002DBA3;
     label_0002DBA1:
     cpu->esi = cpu->edi;
@@ -8386,14 +7988,11 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x40u)))));
     cpu->fpu[0u] = (cpu->fpu[0u]) * (cpu->fpu[1u]);
     *(float*)(cpu->esp + 0x40u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x40u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esi + 0x2Cu)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x28u)));
-    *(float*)(cpu->esp + 0x28u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x28u) = (((((((double)*(float*)(cpu->esp + 0x40u))) * (((double)*(float*)(cpu->esi + 0x2Cu)))))) + (((double)*(float*)(cpu->esp + 0x28u))));
     label_0002DC5B:
-    { uint64_t l=*(uint8_t*)(cpu->esi + 0x34u), r=1u, v=l & r; lift_flags_logic(cpu,v,8u); }
+    lift_test[0]=(*(uint8_t*)(cpu->esi + 0x34u)&1u)==0u;
     cpu->edi = *(uint32_t*)(cpu->esp + 0x3Cu);
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002DCD5;
+    if (lift_test[0]) goto label_0002DCD5;
     cpu->ecx = *(uint16_t*)(cpu->eax + (cpu->edx * 2u) + 2u);
     cpu->ecx += cpu->edi;
     *(uint32_t*)(cpu->esp + 0x40u) = cpu->ecx;
@@ -8421,10 +8020,7 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x40u)))));
     cpu->fpu[0u] = (cpu->fpu[0u]) * (cpu->fpu[1u]);
     *(float*)(cpu->esp + 0x40u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x40u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esi + 0x5Cu)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x1Cu)));
-    *(float*)(cpu->esp + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x1Cu) = (((((((double)*(float*)(cpu->esp + 0x40u))) * (((double)*(float*)(cpu->esi + 0x5Cu)))))) + (((double)*(float*)(cpu->esp + 0x1Cu))));
     label_0002DCD5:
     if ((((cpu->ebx & 0xFFu)) & (2u)) == 0u) goto label_0002DD68;
     cpu->ecx = *(uint16_t*)(cpu->eax + (cpu->edx * 2u) + 2u);
@@ -8463,10 +8059,7 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x40u)))));
     cpu->fpu[0u] = (cpu->fpu[0u]) * (cpu->fpu[1u]);
     *(float*)(cpu->esp + 0x40u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x40u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esi + 0x2Cu)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x28u)));
-    *(float*)(cpu->esp + 0x28u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x28u) = (((((((double)*(float*)(cpu->esp + 0x40u))) * (((double)*(float*)(cpu->esi + 0x2Cu)))))) + (((double)*(float*)(cpu->esp + 0x28u))));
     label_0002DD68:
     if (((*(uint8_t*)(cpu->esi + 0x34u)) & (2u)) == 0u) goto label_0002DDFD;
     cpu->ebx = *(uint16_t*)(cpu->eax + (cpu->edx * 2u) + 4u);
@@ -8504,18 +8097,13 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x40u)))));
     *(float*)(cpu->esp + 0x40u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x40u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esi + 0x5Cu)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->esp + 0x1Cu)));
-    *(float*)(cpu->esp + 0x1Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x1Cu) = (((((((double)*(float*)(cpu->esp + 0x40u))) * (((double)*(float*)(cpu->esi + 0x5Cu)))))) + (((double)*(float*)(cpu->esp + 0x1Cu))));
     goto label_0002DDFF;
     label_0002DDFD:
     cpu->fpu[0u] = cpu->fpu[0u]; lift_x87_pop(cpu);
     label_0002DDFF:
     if (((*(uint8_t*)(cpu->ecx + 8u)) & (1u)) == 0u) goto label_0002DE44;
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x30u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (3.1415929794311523);
-    *(float*)(cpu->esp + 0x40u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x40u) = ((((double)*(float*)(cpu->esp + 0x30u))) * (3.1415929794311523));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x40u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42DE1Cu)); sfera_sub_004EE9F2(cpu, LIFT_CODE_TOKEN_VA(0x42DE1Cu));
     *(float*)(cpu->esp + 0x40u) = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -8561,7 +8149,7 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x1Cu;
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
     label_0002DE96:
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002DFE1;
+    if (!sub_pred[0]) goto label_0002DFE1;
     cpu->eax = *(uint32_t*)(cpu->ecx);
     cpu->ecx = *(uint32_t*)(cpu->eax + 4u);
     if ((((cpu->ecx & 0xFFu)) & (1u)) == 0u) goto label_0002DF22;
@@ -8590,18 +8178,9 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->esp + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x30u)))));
     *(float*)(cpu->esp + 0x30u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x30u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->eax + 0x24u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax + 0x18u)));
-    *(float*)(cpu->ecx) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x28u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x28u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax + 0x1Cu)));
-    *(float*)(cpu->ecx + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x2Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x2Cu)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax + 0x20u)));
-    *(float*)(cpu->ecx + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->ecx) = (((((((double)*(float*)(cpu->esp + 0x30u))) * (((double)*(float*)(cpu->eax + 0x24u)))))) + (((double)*(float*)(cpu->eax + 0x18u))));
+    *(float*)(cpu->ecx + 4u) = (((((((double)*(float*)(cpu->eax + 0x28u))) * (((double)*(float*)(cpu->esp + 0x28u)))))) + (((double)*(float*)(cpu->eax + 0x1Cu))));
+    *(float*)(cpu->ecx + 8u) = (((((((double)*(float*)(cpu->eax + 0x2Cu))) * (((double)*(float*)(cpu->esp + 0x2Cu)))))) + (((double)*(float*)(cpu->eax + 0x20u))));
     cpu->esp += 0x1Cu;
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
     label_0002DF22:
@@ -8639,18 +8218,9 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->esp + 0x2Cu) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[0u] = (cpu->fpu[0u]) * ((double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x30u)))));
     *(float*)(cpu->esp + 0x30u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x30u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->eax + 0x24u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax + 0x18u)));
-    *(float*)(cpu->ecx) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x28u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x28u)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax + 0x1Cu)));
-    *(float*)(cpu->ecx + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x2Cu));
-    cpu->fpu[0u] = (cpu->fpu[0u]) * (((double)*(float*)(cpu->esp + 0x2Cu)));
-    cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->eax + 0x20u)));
-    *(float*)(cpu->ecx + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->ecx) = (((((((double)*(float*)(cpu->esp + 0x30u))) * (((double)*(float*)(cpu->eax + 0x24u)))))) + (((double)*(float*)(cpu->eax + 0x18u))));
+    *(float*)(cpu->ecx + 4u) = (((((((double)*(float*)(cpu->eax + 0x28u))) * (((double)*(float*)(cpu->esp + 0x28u)))))) + (((double)*(float*)(cpu->eax + 0x1Cu))));
+    *(float*)(cpu->ecx + 8u) = (((((((double)*(float*)(cpu->eax + 0x2Cu))) * (((double)*(float*)(cpu->esp + 0x2Cu)))))) + (((double)*(float*)(cpu->eax + 0x20u))));
     cpu->esp += 0x1Cu;
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
     label_0002DFC3:
@@ -8678,12 +8248,12 @@ __declspec(noinline) void sfera_sub_0042D9F0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x1Cu;
     cpu->esp += 0x18u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042E000(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042E000(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
-    { uint64_t l=*(uint32_t*)(cpu->esi), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->esi) == 0u;
     lift_push32(cpu, cpu->edi);
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002E030;
+    if (sub_pred[0]) goto label_0002E030;
     cpu->edx = 0x55u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectTrack.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E018u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42E018u));
@@ -8699,7 +8269,7 @@ __declspec(noinline) void sfera_sub_0042E000(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = 0x5Cu;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\EffectTrack.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E047u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42E047u));
-    lift_flags_logic(cpu,0u,32u); cpu->ecx = 0u;
+    cpu->ecx=0u;
     cpu->eax = cpu->edi;
     cpu->edx = 0x30u;
     lift_multiply_accumulator(cpu, cpu->edx, 32u, 0u);
@@ -8787,7 +8357,7 @@ __declspec(noinline) void sfera_sub_0042E210(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = cpu->esi;
     cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042E250(LiftCpu* cpu, uint32_t stop_address) {
+__declspec(noinline) void sfera_sub_0042E250(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[2];
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
@@ -8797,9 +8367,9 @@ __declspec(noinline) void sfera_sub_0042E250(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 8u) = cpu->esi;
     std::construct_at(reinterpret_cast<COutputLogDevice*>(cpu->esi));
-    { uint64_t l=*(uint32_t*)(cpu->esi + 8u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[0] = *(uint32_t*)(cpu->esi + 8u) == 0u;
     *(uint32_t*)(cpu->esp + 0x14u) = 0u;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002E2A7;
+    if (sub_pred[0]) goto label_0002E2A7;
     cpu->edx = 0xA0u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\ErrorLog.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E29Bu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42E29Bu));
@@ -8808,10 +8378,10 @@ __declspec(noinline) void sfera_sub_0042E250(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E2A4u)); sfera_sub_004EBE20(cpu, LIFT_CODE_TOKEN_VA(0x42E2A4u));
     cpu->esp += 4u;
     label_0002E2A7:
-    { uint64_t l=*(uint32_t*)(cpu->esi + 4u), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,32u); }
+    sub_pred[1] = *(uint32_t*)(cpu->esi + 4u) == 0u;
     *(uint32_t*)(cpu->esp + 0x14u) = 0xFFFFFFFFu;
     std::construct_at(reinterpret_cast<IOutputDevice*>(cpu->esi));
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002E2D6;
+    if (sub_pred[1]) goto label_0002E2D6;
     cpu->edx = 0x65u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\ErrorLog.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E2CAu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42E2CAu));
@@ -8839,10 +8409,10 @@ __declspec(noinline) void sfera_sub_0042E2F0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->eax));
     ++cpu->eax;
     if ((cpu->ecx & 0xFFu) != 0u) goto label_0002E308;
-    { uint64_t l=cpu->eax, r=cpu->edx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->eax = v; }
+    cpu->eax -= cpu->edx;
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->eax;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002E3DE;
+    if (cpu->eax == 0u) goto label_0002E3DE;
     cpu->edx = 0xAEu;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\ErrorLog.cpp";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E329u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42E329u));
@@ -9085,9 +8655,8 @@ __declspec(noinline) void sfera_sub_0042E6B0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->esi == 0u) goto label_0002E73C;
     cpu->eax = *(uint32_t*)(cpu->ebp + 8u);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E6E7u)); sfera_sub_004EEA10(cpu, LIFT_CODE_TOKEN_VA(0x42E6E7u));
-    { uint64_t l=*(uint8_t*)(cpu->ebp + 0xCu), r=0u, v=l-r; lift_flags_sub(cpu,l,r,0u,v,8u); }
     cpu->ebx = cpu->esp;
-    if ((cpu->eflags & LIFT_FLAG_ZF) != 0u) goto label_0002E701;
+    if (*(uint8_t*)(cpu->ebp + 0xCu) == 0u) goto label_0002E701;
     cpu->eax = *(uint32_t*)(cpu->ebp + 8u);
     lift_push32(cpu, 2u);
     cpu->eax = 0u - (uint64_t)(cpu->eax);
@@ -9934,13 +9503,10 @@ __declspec(noinline) void sfera_sub_0042F3E0(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 4u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42F409u)); sfera_sub_004EE9EC(cpu, LIFT_CODE_TOKEN_VA(0x42F409u));
     *(float*)(cpu->esp + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->esp + 4u));
-    *(float*)(cpu->esp + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 4u) = (double)*(float*)(cpu->esp + 4u);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 4u)); lift_x87_push(cpu, cpu->fpu[0u]);
     lift_x87_push(cpu, 0.0);
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]); lift_x87_pop(cpu); lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=0x44u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002F43D;
+    { const double lift_left=cpu->fpu[0u]; const double lift_right=cpu->fpu[1u]; lift_x87_pop(cpu); lift_x87_pop(cpu); if (lift_left==lift_right) goto label_0002F43D; }
     lift_x87_push(cpu, (double)*(float*)(cpu->esi));
     cpu->fpu[0u] = (cpu->fpu[0u]) / (cpu->fpu[1u]);
     *(float*)(cpu->esi) = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -9967,7 +9533,7 @@ __declspec(noinline) void sfera_sub_0042F450(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebp);
     cpu->ebx += 0xFFFFFFFCu;
     cpu->ebp = cpu->edi;
-    { uint64_t l=cpu->ebp, r=cpu->ecx, c=0u, v=l - r - c; lift_flags_sub(cpu,l,r,c,v,32u); cpu->ebp = v; }
+    cpu->ebp -= cpu->ecx;
     cpu->ebx >>= 2u;
     ++cpu->ebx;
     cpu->eax = cpu->ecx + 8u;
@@ -9977,10 +9543,8 @@ __declspec(noinline) void sfera_sub_0042F450(LiftCpu* cpu, uint32_t stop_address
     lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0xFFFFFFF8u));
     cpu->edi = *(uint32_t*)(cpu->edx);
     *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0xFFFFFFFCu));
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax));
-    *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x10u) = (double)*(float*)(cpu->eax + 0xFFFFFFFCu);
+    *(float*)(cpu->esp + 0x18u) = (double)*(float*)(cpu->eax);
     lift_x87_push(cpu, (double)*(float*)(cpu->edi + 4u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -10016,12 +9580,9 @@ __declspec(noinline) void sfera_sub_0042F450(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi + 0x2Cu)));
     *(float*)(cpu->eax + cpu->ebp) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->edi = *(uint32_t*)(cpu->edx);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 4u));
-    *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 8u));
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0xCu));
-    *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x14u) = (double)*(float*)(cpu->eax + 4u);
+    *(float*)(cpu->esp + 0x10u) = (double)*(float*)(cpu->eax + 8u);
+    *(float*)(cpu->esp + 0x18u) = (double)*(float*)(cpu->eax + 0xCu);
     lift_x87_push(cpu, (double)*(float*)(cpu->edi + 4u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -10057,12 +9618,9 @@ __declspec(noinline) void sfera_sub_0042F450(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi + 0x2Cu)));
     *(float*)(cpu->esi + 8u) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->edi = *(uint32_t*)(cpu->edx);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x10u));
-    *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x14u));
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x18u));
-    *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x14u) = (double)*(float*)(cpu->eax + 0x10u);
+    *(float*)(cpu->esp + 0x10u) = (double)*(float*)(cpu->eax + 0x14u);
+    *(float*)(cpu->esp + 0x18u) = (double)*(float*)(cpu->eax + 0x18u);
     lift_x87_push(cpu, (double)*(float*)(cpu->edi + 4u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -10098,12 +9656,9 @@ __declspec(noinline) void sfera_sub_0042F450(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi + 0x2Cu)));
     *(float*)(cpu->esi + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->edi = *(uint32_t*)(cpu->edx);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x1Cu));
-    *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x20u));
-    *(float*)(cpu->esp + 0x10u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x24u));
-    *(float*)(cpu->esp + 0x18u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x14u) = (double)*(float*)(cpu->eax + 0x1Cu);
+    *(float*)(cpu->esp + 0x10u) = (double)*(float*)(cpu->eax + 0x20u);
+    *(float*)(cpu->esp + 0x18u) = (double)*(float*)(cpu->eax + 0x24u);
     lift_x87_push(cpu, (double)*(float*)(cpu->edi + 4u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0x10u)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -10127,7 +9682,7 @@ __declspec(noinline) void sfera_sub_0042F450(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[0u] = (cpu->fpu[0u]) * (cpu->fpu[4u]);
     cpu->eax += 0x30u;
     cpu->esi += 0x30u;
-    { uint64_t l=cpu->ebx, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->ebx = v; }
+    --cpu->ebx;
     cpu->fpu[1u] = cpu->fpu[1u] + cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi + 0x1Cu)));
     *(float*)(cpu->esi + 0xFFFFFFECu) = cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -10141,7 +9696,7 @@ __declspec(noinline) void sfera_sub_0042F450(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[1u] = cpu->fpu[1u] + cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->edi + 0x2Cu)));
     *(float*)(cpu->esi + 0xFFFFFFF0u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002F490;
+    if (cpu->ebx != 0u) goto label_0002F490;
     cpu->ebx = *(uint32_t*)(cpu->esp + 0x28u);
     cpu->edi = *(uint32_t*)(cpu->esp + 0x1Cu);
     cpu->ebp = lift_pop32(cpu);
@@ -10163,10 +9718,9 @@ __declspec(noinline) void sfera_sub_0042F450(LiftCpu* cpu, uint32_t stop_address
     cpu->eax += 0xCu;
     lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0xFFFFFFF0u));
     cpu->esi += 0xCu;
-    { uint64_t l=cpu->ebx, v=l - 1u; uint32_t cf=cpu->eflags & LIFT_FLAG_CF; lift_flags_sub(cpu,l,1u,0u,v,32u); cpu->eflags=(cpu->eflags & ~LIFT_FLAG_CF) | cf; cpu->ebx = v; }
+    --cpu->ebx;
     *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0xFFFFFFF4u));
-    *(float*)(cpu->esp + 0x14u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0x14u) = (double)*(float*)(cpu->eax + 0xFFFFFFF4u);
     lift_x87_push(cpu, (double)*(float*)(cpu->ecx + 4u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -10201,7 +9755,7 @@ __declspec(noinline) void sfera_sub_0042F450(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[1u] = cpu->fpu[1u] + cpu->fpu[0u]; lift_x87_pop(cpu);
     cpu->fpu[0u] = (cpu->fpu[0u]) + (((double)*(float*)(cpu->ecx + 0x2Cu)));
     *(float*)(cpu->eax + cpu->edi + 0xFFFFFFF4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    if ((cpu->eflags & LIFT_FLAG_ZF) == 0u) goto label_0002F6A0;
+    if (cpu->ebx != 0u) goto label_0002F6A0;
     label_0002F71F:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x10u;
@@ -10222,12 +9776,8 @@ __declspec(noinline) void sfera_sub_0042F730(LiftCpu* cpu, uint32_t stop_address
     cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->eax + 0xCu)));
     cpu->esi = lift_pop32(cpu);
     *(float*)(cpu->esp) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->ecx + 4u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->eax + 0x1Cu)));
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; lift_x87_pop(cpu);
-    lift_x87_push(cpu, (double)*(float*)(cpu->ecx + 8u));
-    cpu->fpu[0u] = (cpu->fpu[0u]) - (((double)*(float*)(cpu->eax + 0x2Cu)));
-    *(float*)(cpu->esp + 4u) = cpu->fpu[0u]; lift_x87_pop(cpu);
+    *(float*)(cpu->esp + 0xCu) = ((((double)*(float*)(cpu->ecx + 4u))) - (((double)*(float*)(cpu->eax + 0x1Cu))));
+    *(float*)(cpu->esp + 4u) = ((((double)*(float*)(cpu->ecx + 8u))) - (((double)*(float*)(cpu->eax + 0x2Cu))));
     lift_x87_push(cpu, (double)*(float*)(cpu->eax + 0x10u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 0xCu)); lift_x87_push(cpu, cpu->fpu[0u]);
     cpu->fpu[2u] = cpu->fpu[2u] * cpu->fpu[0u]; lift_x87_pop(cpu);
@@ -10275,15 +9825,8 @@ __declspec(noinline) void sfera_sub_0042F7D0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esp + 8u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42F7E6u)); sfera_sub_0042F730(cpu, LIFT_CODE_TOKEN_VA(0x42F7E6u));
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 4u));
-    lift_x87_push(cpu, (double)*(float*)(cpu->esi + 0x50u));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    if (((((cpu->eax >> 8u) & 0xFFu)) & (0x41u)) == 0u) goto label_0002F863;
-    lift_x87_push(cpu, (double)*(float*)(cpu->esi + 0x54u));
-    lift_x87_compare(cpu, cpu->fpu[0u], cpu->fpu[1u]);
-    lift_x87_pop(cpu); (cpu->eax = (cpu->eax & 0xFFFF0000u) | ((uint32_t)(uint16_t)(cpu->fpu_status | ((cpu->fpu_top & 7u) << 11u)) & 0xFFFFu));
-    { uint64_t l=((cpu->eax >> 8u) & 0xFFu), r=5u, v=l & r; lift_flags_logic(cpu,v,8u); }
-    if ((cpu->eflags & LIFT_FLAG_PF) == 0u) goto label_0002F863;
+    { const double lift_left=(double)*(float*)(cpu->esi + 0x50u); const double lift_right=cpu->fpu[0u]; if (lift_left>lift_right) goto label_0002F863; }
+    { const double lift_left=(double)*(float*)(cpu->esi + 0x54u); const double lift_right=cpu->fpu[0u]; if (lift_left<lift_right) goto label_0002F863; }
     lift_x87_push(cpu, (double)*(float*)(cpu->esi + 0x64u));
     cpu->eax = *(uint32_t*)(cpu->esp + 0x18u);
     lift_x87_push(cpu, (double)*(float*)(cpu->esp + 8u));

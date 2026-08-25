@@ -418,7 +418,6 @@ void require_x87(const LiftCpu* cpu, std::uint32_t count) {
     if (!cpu || cpu->fpu_depth < count) { throw std::runtime_error("x87 stack underflow"); }
 }
 
-static double lift_x87_get(const LiftCpu* cpu, std::uint32_t index) { require_x87(cpu, index + 1u); return cpu->fpu[index]; }
 void lift_x87_push(LiftCpu* cpu, double value) {
     if (!cpu || cpu->fpu_depth == 8u) { throw std::runtime_error("x87 stack overflow"); }
     for (std::size_t index = cpu->fpu_depth; index > 0; --index) { cpu->fpu[index] = cpu->fpu[index - 1]; }
@@ -429,8 +428,6 @@ std::int64_t lift_x87_round(const LiftCpu* cpu, double value, std::uint32_t trun
     if (truncate) { return static_cast<std::int64_t>(std::trunc(value)); }
     switch ((cpu->fpu_control >> 10u) & 3u) { case 1: return static_cast<std::int64_t>(std::floor(value)); case 2: return static_cast<std::int64_t>(std::ceil(value)); case 3: return static_cast<std::int64_t>(std::trunc(value)); default: return static_cast<std::int64_t>(std::nearbyint(value)); }
 }
-void lift_x87_compare(LiftCpu* cpu, double left, double right) { cpu->fpu_status &= static_cast<std::uint16_t>(~0x4500u); if (std::isnan(left) || std::isnan(right)) { cpu->fpu_status |= 0x4500u; } else if (left < right) { cpu->fpu_status |= 0x0100u; } else if (left == right) { cpu->fpu_status |= 0x4000u; } }
-void lift_x87_sincos(LiftCpu* cpu) { const double value = lift_x87_get(cpu, 0); cpu->fpu[0] = std::sin(value); lift_x87_push(cpu, std::cos(value)); }
 
 template <class T>
 void move_string(LiftCpu* cpu, bool repeated) {
