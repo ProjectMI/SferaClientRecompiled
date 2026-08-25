@@ -17,7 +17,6 @@
 #pragma intrinsic(__readfsdword)
 #endif
 
-
 namespace lifted {
 
 static NativeRuntime* g_runtime = nullptr;
@@ -195,15 +194,6 @@ void memory_write(std::uint32_t address, T value) {
     g_process_memory->write(address, &value, sizeof(T));
 }
 
-
-std::uint32_t process_module_handle() {
-    const HMODULE module = GetModuleHandleW(nullptr);
-    if (!module) { throw std::runtime_error(win32_error("GetModuleHandleW(host)")); }
-    const std::uintptr_t value = reinterpret_cast<std::uintptr_t>(module);
-    if (value > std::numeric_limits<std::uint32_t>::max()) { throw std::runtime_error("Host process module handle exceeds Win32 range"); }
-    return static_cast<std::uint32_t>(value);
-}
-
 std::string local_c_string(std::uint32_t address, std::size_t limit = 2048u) noexcept {
     if (address == 0) { return "<null>"; }
     std::string result;
@@ -225,63 +215,12 @@ std::uint32_t align_up(std::uint32_t value, std::uint32_t alignment) noexcept {
     return (value + alignment - 1u) & ~(alignment - 1u);
 }
 
-std::uint64_t width_mask(std::uint16_t width) noexcept {
-    return width >= 64 ? std::numeric_limits<std::uint64_t>::max() : ((std::uint64_t{1} << width) - 1u);
-}
-
-std::uint64_t sign_bit(std::uint16_t width) noexcept {
-    return std::uint64_t{1} << (width - 1u);
-}
-
-std::int64_t signed_value(std::uint64_t value, std::uint16_t width) noexcept {
-    const std::uint64_t mask = width_mask(width);
-    value &= mask;
-    if (width < 64 && (value & sign_bit(width)) != 0) { value |= ~mask; }
-    return static_cast<std::int64_t>(value);
-}
-
-bool even_parity(std::uint8_t value) noexcept {
-    value ^= static_cast<std::uint8_t>(value >> 4u);
-    value &= 0x0Fu;
-    return ((0x6996u >> value) & 1u) == 0u;
-}
-
-void assign_flag(LiftCpu& state, std::uint32_t flag, bool value) noexcept {
-    state.eflags = value ? state.eflags | flag : state.eflags & ~flag;
-}
-
-bool flag(const LiftCpu& state, std::uint32_t value) noexcept {
-    return (state.eflags & value) != 0;
-}
-
-void set_szp(LiftCpu& state, std::uint64_t result, std::uint16_t width) noexcept {
-    result &= width_mask(width);
-    assign_flag(state, LIFT_FLAG_SF, (result & sign_bit(width)) != 0);
-    assign_flag(state, LIFT_FLAG_ZF, result == 0);
-    assign_flag(state, LIFT_FLAG_PF, even_parity(static_cast<std::uint8_t>(result)));
-}
-
-void set_sub_flags(LiftCpu& state, std::uint64_t left, std::uint64_t right, std::uint64_t borrow, std::uint64_t result, std::uint16_t width) noexcept {
-    const std::uint64_t mask = width_mask(width);
-    const std::uint64_t left_value = left & mask;
-    const std::uint64_t right_value = right & mask;
-    const std::uint64_t truncated = result & mask;
-    assign_flag(state, LIFT_FLAG_CF, left_value < right_value || (borrow != 0 && left_value == right_value));
-    assign_flag(state, LIFT_FLAG_OF, (((left_value ^ right_value) & (left_value ^ truncated)) & sign_bit(width)) != 0);
-    assign_flag(state, LIFT_FLAG_AF, ((left_value ^ right_value ^ truncated) & 0x10u) != 0);
-    set_szp(state, truncated, width);
-}
-
 
 } // namespace
 
-std::uint32_t lift_source_rva(std::uint32_t address) { std::uint32_t rva = 0; return g_process_memory && g_process_memory->source_rva(address, rva) ? rva : UINT32_MAX; }
 static std::uint32_t lift_code_rva(std::uint32_t address) { std::uint32_t rva = 0; return g_process_memory && g_process_memory->code_rva(address, rva) ? rva : UINT32_MAX; }
-std::uint32_t lift_is_native_code_address(std::uint32_t address) { return native_executable_image_address(address) ? 1u : 0u; }
 std::uint32_t lift_callback_address(LiftFunction function) { return g_process_memory ? g_process_memory->callback_for_function(function) : 0u; }
 static LiftFunction lift_callback_function(std::uint32_t address) { return g_process_memory ? g_process_memory->callback_function(address) : (LiftFunction)0; }
-std::uint32_t lift_process_module_handle() { return process_module_handle(); }
-
 
 void lift_push32(LiftCpu* cpu, std::uint32_t value) {
     cpu->esp -= 4u;
@@ -295,171 +234,18 @@ std::uint32_t lift_pop32(LiftCpu* cpu) {
 }
 
 
-std::uint64_t lift_shift_left(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) {
-    const std::uint64_t mask = width_mask(static_cast<std::uint16_t>(width));
-    count &= 0x1Fu;
-    value &= mask;
-    if (count == 0) { return value; }
-    const std::uint64_t result = (value << count) & mask;
-    assign_flag(*cpu, LIFT_FLAG_CF, count <= width && ((value >> (width - count)) & 1u) != 0);
-    if (count == 1) { assign_flag(*cpu, LIFT_FLAG_OF, ((result & sign_bit(static_cast<std::uint16_t>(width))) != 0) != flag(*cpu, LIFT_FLAG_CF)); }
-    set_szp(*cpu, result, static_cast<std::uint16_t>(width));
-    return result;
-}
-
-std::uint64_t lift_shift_right(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) {
-    value &= width_mask(static_cast<std::uint16_t>(width));
-    count &= 0x1Fu;
-    if (count == 0) { return value; }
-    const std::uint64_t result = value >> count;
-    assign_flag(*cpu, LIFT_FLAG_CF, count <= width && ((value >> (count - 1u)) & 1u) != 0);
-    if (count == 1) { assign_flag(*cpu, LIFT_FLAG_OF, (value & sign_bit(static_cast<std::uint16_t>(width))) != 0); }
-    set_szp(*cpu, result, static_cast<std::uint16_t>(width));
-    return result;
-}
-
-std::uint64_t lift_shift_arithmetic(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) {
-    value &= width_mask(static_cast<std::uint16_t>(width));
-    count &= 0x1Fu;
-    if (count == 0) { return value; }
-    const std::uint64_t result = static_cast<std::uint64_t>(signed_value(value, static_cast<std::uint16_t>(width)) >> count) & width_mask(static_cast<std::uint16_t>(width));
-    assign_flag(*cpu, LIFT_FLAG_CF, count <= width && ((value >> (count - 1u)) & 1u) != 0);
-    if (count == 1) { assign_flag(*cpu, LIFT_FLAG_OF, false); }
-    set_szp(*cpu, result, static_cast<std::uint16_t>(width));
-    return result;
-}
-
-
-std::uint64_t rotate_carry(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width, bool right) {
-    const std::uint64_t mask = width_mask(static_cast<std::uint16_t>(width));
-    const std::uint64_t sign = sign_bit(static_cast<std::uint16_t>(width));
-    const std::uint32_t effective = (count & 0x1Fu) % (width + 1u);
-    value &= mask;
-    for (std::uint32_t index = 0; index < effective; ++index) {
-        const bool old_carry = flag(*cpu, LIFT_FLAG_CF);
-        const bool new_carry = right ? (value & 1u) != 0 : (value & sign) != 0;
-        value = right ? (value >> 1u) | (old_carry ? sign : 0u) : ((value << 1u) & mask) | (old_carry ? 1u : 0u);
-        assign_flag(*cpu, LIFT_FLAG_CF, new_carry);
-    }
-    if (effective == 1) {
-        const bool overflow = right
-            ? ((value & sign) != 0) != ((value & (sign >> 1u)) != 0)
-            : ((value & sign) != 0) != flag(*cpu, LIFT_FLAG_CF);
-        assign_flag(*cpu, LIFT_FLAG_OF, overflow);
-    }
-    return value;
-}
-
-std::uint64_t lift_rotate_carry_right(LiftCpu* cpu, std::uint64_t value, std::uint32_t count, std::uint32_t width) { return rotate_carry(cpu, value, count, width, true); }
-
-std::uint64_t double_shift(LiftCpu* cpu, std::uint64_t left, std::uint64_t right, std::uint32_t count, std::uint32_t width, bool toward_left) {
-    const std::uint64_t mask = width_mask(static_cast<std::uint16_t>(width));
-    count &= 0x1Fu;
-    left &= mask;
-    right &= mask;
-    if (count == 0) { return left; }
-    const std::uint64_t result = toward_left ? ((left << count) | (right >> (width - count))) & mask : ((left >> count) | (right << (width - count))) & mask;
-    assign_flag(*cpu, LIFT_FLAG_CF, toward_left ? ((left >> (width - count)) & 1u) != 0 : ((left >> (count - 1u)) & 1u) != 0);
-    if (count == 1) { assign_flag(*cpu, LIFT_FLAG_OF, toward_left ? ((result & sign_bit(static_cast<std::uint16_t>(width))) != 0) != flag(*cpu, LIFT_FLAG_CF) : ((left ^ result) & sign_bit(static_cast<std::uint16_t>(width))) != 0); }
-    set_szp(*cpu, result, static_cast<std::uint16_t>(width));
-    return result;
-}
-
-std::uint64_t lift_double_shift_left(LiftCpu* cpu, std::uint64_t left, std::uint64_t right, std::uint32_t count, std::uint32_t width) { return double_shift(cpu, left, right, count, width, true); }
-std::uint64_t lift_double_shift_right(LiftCpu* cpu, std::uint64_t left, std::uint64_t right, std::uint32_t count, std::uint32_t width) { return double_shift(cpu, left, right, count, width, false); }
-
-void lift_multiply_accumulator(LiftCpu* cpu, std::uint64_t source, std::uint32_t width, std::uint32_t is_signed) {
-    if (width == 8) {
-        const std::uint16_t product = is_signed ? static_cast<std::uint16_t>(static_cast<std::int16_t>(static_cast<std::int8_t>(cpu->eax)) * static_cast<std::int8_t>(source)) : static_cast<std::uint16_t>(static_cast<std::uint8_t>(cpu->eax) * static_cast<std::uint8_t>(source));
-        cpu->eax = (cpu->eax & 0xFFFF0000u) | product;
-        const bool overflow = is_signed ? static_cast<std::int16_t>(product) != static_cast<std::int8_t>(product) : (product & 0xFF00u) != 0;
-        assign_flag(*cpu, LIFT_FLAG_CF, overflow); assign_flag(*cpu, LIFT_FLAG_OF, overflow); return;
-    }
-    if (width != 32) { throw std::runtime_error("Unsupported accumulator multiply width"); }
-    const std::uint64_t product = is_signed ? static_cast<std::uint64_t>(static_cast<std::int64_t>(static_cast<std::int32_t>(cpu->eax)) * static_cast<std::int32_t>(source)) : static_cast<std::uint64_t>(cpu->eax) * static_cast<std::uint32_t>(source);
-    cpu->eax = static_cast<std::uint32_t>(product); cpu->edx = static_cast<std::uint32_t>(product >> 32u);
-    const bool overflow = is_signed ? static_cast<std::int64_t>(product) != static_cast<std::int32_t>(product) : cpu->edx != 0;
-    assign_flag(*cpu, LIFT_FLAG_CF, overflow); assign_flag(*cpu, LIFT_FLAG_OF, overflow);
-}
-
-void lift_divide_accumulator(LiftCpu* cpu, std::uint64_t divisor, std::uint32_t width, std::uint32_t is_signed) {
-    if (divisor == 0) { throw std::runtime_error("Division by zero in lifted code"); }
-    if (width == 8) {
-        const std::uint16_t dividend = static_cast<std::uint16_t>(cpu->eax);
-        if (is_signed) {
-            const std::int16_t quotient = static_cast<std::int16_t>(dividend) / static_cast<std::int8_t>(divisor);
-            const std::int16_t remainder = static_cast<std::int16_t>(dividend) % static_cast<std::int8_t>(divisor);
-            if (quotient < -128 || quotient > 127) { throw std::runtime_error("Signed division overflow in lifted code"); }
-            cpu->eax = (cpu->eax & 0xFFFF0000u) | (static_cast<std::uint8_t>(quotient)) | (static_cast<std::uint32_t>(static_cast<std::uint8_t>(remainder)) << 8u);
-        } else {
-            const std::uint16_t quotient = dividend / static_cast<std::uint8_t>(divisor);
-            if (quotient > 0xFFu) { throw std::runtime_error("Division overflow in lifted code"); }
-            cpu->eax = (cpu->eax & 0xFFFF0000u) | static_cast<std::uint8_t>(quotient) | (static_cast<std::uint32_t>(dividend % static_cast<std::uint8_t>(divisor)) << 8u);
-        }
-        return;
-    }
-    if (width != 32) { throw std::runtime_error("Unsupported accumulator divide width"); }
-    if (is_signed) {
-        const std::int64_t dividend = static_cast<std::int64_t>((static_cast<std::uint64_t>(cpu->edx) << 32u) | cpu->eax);
-        const std::int32_t signed_divisor = static_cast<std::int32_t>(divisor);
-        if (dividend == std::numeric_limits<std::int64_t>::min() && signed_divisor == -1) { throw std::runtime_error("Signed division overflow in lifted code"); }
-        const std::int64_t quotient = dividend / signed_divisor;
-        if (quotient < std::numeric_limits<std::int32_t>::min() || quotient > std::numeric_limits<std::int32_t>::max()) { throw std::runtime_error("Signed division overflow in lifted code"); }
-        cpu->eax = static_cast<std::uint32_t>(quotient); cpu->edx = static_cast<std::uint32_t>(dividend % signed_divisor);
-    } else {
-        const std::uint64_t dividend = (static_cast<std::uint64_t>(cpu->edx) << 32u) | cpu->eax;
-        const std::uint64_t quotient = dividend / static_cast<std::uint32_t>(divisor);
-        if (quotient > std::numeric_limits<std::uint32_t>::max()) { throw std::runtime_error("Division overflow in lifted code"); }
-        cpu->eax = static_cast<std::uint32_t>(quotient); cpu->edx = static_cast<std::uint32_t>(dividend % static_cast<std::uint32_t>(divisor));
-    }
-}
-
-void require_x87(const LiftCpu* cpu, std::uint32_t count) {
-    if (!cpu || cpu->fpu_depth < count) { throw std::runtime_error("x87 stack underflow"); }
-}
-
-void lift_x87_push(LiftCpu* cpu, double value) {
-    if (!cpu || cpu->fpu_depth == 8u) { throw std::runtime_error("x87 stack overflow"); }
-    for (std::size_t index = cpu->fpu_depth; index > 0; --index) { cpu->fpu[index] = cpu->fpu[index - 1]; }
-    cpu->fpu[0] = value; cpu->fpu_top = static_cast<std::uint8_t>((cpu->fpu_top + 7u) & 7u); ++cpu->fpu_depth;
-}
-void lift_x87_pop(LiftCpu* cpu) { require_x87(cpu, 1); for (std::size_t index = 1; index < cpu->fpu_depth; ++index) { cpu->fpu[index - 1] = cpu->fpu[index]; } --cpu->fpu_depth; cpu->fpu_top = static_cast<std::uint8_t>((cpu->fpu_top + 1u) & 7u); }
-std::int64_t lift_x87_round(const LiftCpu* cpu, double value, std::uint32_t truncate) {
-    if (truncate) { return static_cast<std::int64_t>(std::trunc(value)); }
-    switch ((cpu->fpu_control >> 10u) & 3u) { case 1: return static_cast<std::int64_t>(std::floor(value)); case 2: return static_cast<std::int64_t>(std::ceil(value)); case 3: return static_cast<std::int64_t>(std::trunc(value)); default: return static_cast<std::int64_t>(std::nearbyint(value)); }
-}
-
-template <class T>
-void move_string(LiftCpu* cpu, bool repeated) {
-    std::uint32_t count = repeated ? cpu->ecx : 1u;
-    if ((cpu->eflags & LIFT_FLAG_DF) == 0u && repeated) { const std::uint32_t bytes = count * static_cast<std::uint32_t>(sizeof(T)); const std::uint32_t source_end = cpu->esi + bytes; const std::uint32_t destination_end = cpu->edi + bytes; if (cpu->edi >= source_end || cpu->esi >= destination_end || bytes == 0u) { std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(cpu->edi)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(cpu->esi)), bytes); cpu->esi = source_end; cpu->edi = destination_end; cpu->ecx = 0u; return; } }
-    const std::int32_t delta = (cpu->eflags & LIFT_FLAG_DF) != 0u ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
-    while (count-- != 0u) { const T value = memory_read<T>(cpu->esi); memory_write<T>(cpu->edi, value); cpu->esi += delta; cpu->edi += delta; if (repeated) { --cpu->ecx; } }
-}
-template <class T>
-void store_string(LiftCpu* cpu, bool repeated) {
-    std::uint32_t count = repeated ? cpu->ecx : 1u;
-    if (repeated && (cpu->eflags & LIFT_FLAG_DF) == 0u) { const std::uint32_t bytes = count * static_cast<std::uint32_t>(sizeof(T)); std::fill_n(reinterpret_cast<T*>(static_cast<std::uintptr_t>(cpu->edi)), count, static_cast<T>(cpu->eax)); cpu->edi += bytes; cpu->ecx = 0u; return; }
-    const std::int32_t delta = (cpu->eflags & LIFT_FLAG_DF) != 0u ? -static_cast<std::int32_t>(sizeof(T)) : static_cast<std::int32_t>(sizeof(T));
-    while (count-- != 0u) { memory_write<T>(cpu->edi, static_cast<T>(cpu->eax)); cpu->edi += delta; if (repeated) { --cpu->ecx; } }
-}
-void lift_movs8(LiftCpu* cpu, std::uint32_t repeated) { move_string<std::uint8_t>(cpu, repeated != 0); }
-void lift_movs16(LiftCpu* cpu, std::uint32_t repeated) { move_string<std::uint16_t>(cpu, repeated != 0); }
-void lift_movs32(LiftCpu* cpu, std::uint32_t repeated) { move_string<std::uint32_t>(cpu, repeated != 0); }
-void lift_stos16(LiftCpu* cpu, std::uint32_t repeated) { store_string<std::uint16_t>(cpu, repeated != 0); }
-void lift_stos32(LiftCpu* cpu, std::uint32_t repeated) { store_string<std::uint32_t>(cpu, repeated != 0); }
 
 [[noreturn]] void lift_trap(LiftCpu* cpu, std::uint32_t source_va, const char* reason) { if (cpu) { cpu->eip = source_va; } throw std::runtime_error(std::string("Lifted trap at ") + hex_u32(source_va) + ": " + (reason ? reason : "unknown")); }
 
 [[noreturn]] static void lift_trap_transfer(LiftCpu* cpu, std::uint32_t origin, std::uint32_t target, std::uint32_t esp_before, std::uint32_t stack_cleanup, std::uint32_t stop_address, const char* kind) {
-    auto classify = [](std::uint32_t value) -> std::string { if (LiftFunction function = lift_callback_function(value)) { const std::uint32_t index = lift_function_index(function); return "lifted-function#" + std::to_string(index); } if (lift_is_native_code_address(value)) { return "native-image"; } const std::uint32_t rva = lift_source_rva(value); if (rva == UINT32_MAX) { return "non-code"; } if (lift_has_function_rva(rva)) { return "function@" + hex_u32(0x00400000u + rva); } return "local-middle@" + hex_u32(0x00400000u + rva); };
+    auto classify = [](std::uint32_t value) -> std::string { if (LiftFunction function = lift_callback_function(value)) { const std::uint32_t index = lift_function_index(function); return "lifted-function#" + std::to_string(index); } if (native_executable_image_address(value)) { return "native-image"; } const std::uint32_t rva = lift_code_rva(value); if (rva == UINT32_MAX) { return "non-code"; } if (lift_has_function_rva(rva)) { return "function@" + hex_u32(0x00400000u + rva); } return "local-middle@" + hex_u32(0x00400000u + rva); };
     auto peek = [cpu](std::uint32_t address, std::uint32_t& value) -> bool { if (!cpu || address < cpu->stack_limit || address > cpu->stack_base - 4u) { return false; } value = *reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(address)); return true; };
     std::string message = std::string("Invalid lifted control transfer kind=") + (kind ? kind : "unknown") + " origin=" + hex_u32(origin) + " target=" + hex_u32(target) + " target-class=" + classify(target) + " esp=" + hex_u32(esp_before) + " cleanup=" + std::to_string(stack_cleanup) + " stop=" + hex_u32(stop_address);
     if (g_last_native_callsite != 0u) { message += " last-native-callsite=" + hex_u32(g_last_native_callsite) + " last-native-target=" + hex_u32(g_last_native_target) + " native-esp-before=" + hex_u32(g_last_native_esp_before) + " native-esp-after=" + hex_u32(g_last_native_esp_after) + " native-esp-delta=" + std::to_string(static_cast<std::int32_t>(g_last_native_esp_after - g_last_native_esp_before)); }
     static constexpr int offsets[] = {-8, -4, 0, 4, 8, 12, 16};
     for (int offset : offsets) { std::uint32_t value = 0u; const std::uint32_t address = static_cast<std::uint32_t>(esp_before + offset); if (peek(address, value)) { message += " [esp"; if (offset >= 0) { message += "+"; } message += std::to_string(offset); message += "]=" + hex_u32(value) + "{" + classify(value) + "}"; } }
-    std::uint32_t next = 0u; if (peek(esp_before + 4u, next) && target < 0x10000u && lift_source_rva(next) != UINT32_MAX && lift_has_function_rva(lift_source_rva(next))) { message += " probable-stack-skew=+4"; }
-    std::uint32_t prev = 0u; if (esp_before >= 4u && peek(esp_before - 4u, prev) && target < 0x10000u && lift_source_rva(prev) != UINT32_MAX && lift_has_function_rva(lift_source_rva(prev))) { message += " probable-stack-skew=-4"; }
+    std::uint32_t next = 0u; if (peek(esp_before + 4u, next) && target < 0x10000u && lift_code_rva(next) != UINT32_MAX && lift_has_function_rva(lift_code_rva(next))) { message += " probable-stack-skew=+4"; }
+    std::uint32_t prev = 0u; if (esp_before >= 4u && peek(esp_before - 4u, prev) && target < 0x10000u && lift_code_rva(prev) != UINT32_MAX && lift_has_function_rva(lift_code_rva(prev))) { message += " probable-stack-skew=-4"; }
     if (cpu) { cpu->eip = origin; }
     throw std::runtime_error(message);
 }
@@ -526,13 +312,11 @@ ProcessMemory::ProcessMemory() {
     DiagnosticPhaseScope phase(RuntimePhase::static_storage);
     try { allocate_runtime_regions(); } catch (...) { release(); throw; }
     g_process_memory = this;
-    const std::string note = "semantic native storage ready; module=" + hex_u32(load_base()) + ", callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata=eliminated, semantic-data=native";
+    const std::string note = "semantic native storage ready; callback-thunks=" + hex_u32(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(callback_thunks_))) + ", semantic-rdata=eliminated, semantic-data=native";
     diagnostic_note(note.c_str());
 }
 
 ProcessMemory::~ProcessMemory() { release(); }
-
-std::uint32_t ProcessMemory::load_base() const noexcept { return process_module_handle(); }
 
 std::uint32_t ProcessMemory::entry_va() noexcept { return kCodeTokenBase + 0x000EF142u; }
 
@@ -542,9 +326,6 @@ bool ProcessMemory::code_rva(std::uint32_t address, std::uint32_t& rva) const no
     if (token_rva >= 0x00001000u && token_rva < 0x000FC200u) { rva = token_rva; return true; }
     return false;
 }
-
-bool ProcessMemory::source_rva(std::uint32_t address, std::uint32_t& rva) const noexcept { return code_rva(address, rva); }
-
 
 void ProcessMemory::initialize_callback_registry() {
     const std::uint32_t count = lift_function_count();
@@ -730,7 +511,6 @@ void verify_native_bridge() {
     LiftCpu state{};
     auto prepare = [&]() {
         state = LiftCpu{};
-        state.eflags = 0x202u;
         state.fpu_control = 0x027Fu;
         state.esp = stack.top();
         state.stack_base = stack.base();
@@ -818,13 +598,10 @@ void lift_native_call(LiftCpu* cpu, std::uint32_t target, std::uint32_t callsite
     g_runtime->call_native(*cpu, target, callsite);
 }
 
-
-
 int NativeRuntime::execute() {
     DiagnosticPhaseScope phase(RuntimePhase::execution_setup);
     LocalStack stack(kStackReserve);
     LiftCpu state{};
-    state.eflags = 0x202u;
     state.fpu_control = 0x027Fu;
     state.esp = stack.top();
     state.stack_base = stack.base();
@@ -874,7 +651,7 @@ void NativeRuntime::dispatch_callback(CallbackRegisters& registers) {
     std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(clone_esp)), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(original_esp)), copy_size);
     *reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(clone_esp)) = LIFT_CALLBACK_SENTINEL;
     LiftCpu state{};
-    state.eax = registers.eax; state.ecx = registers.ecx; state.edx = registers.edx; state.ebx = registers.ebx; state.esp = clone_esp; state.ebp = registers.ebp; state.esi = registers.esi; state.edi = registers.edi; state.eip = LIFT_CALLBACK_SENTINEL; state.eflags = registers.eflags;
+    state.eax = registers.eax; state.ecx = registers.ecx; state.edx = registers.edx; state.ebx = registers.ebx; state.esp = clone_esp; state.ebp = registers.ebp; state.esi = registers.esi; state.edi = registers.edi; state.eip = LIFT_CALLBACK_SENTINEL;
     state.fpu_control = 0x027Fu;
     state.stack_base = clone.base(); state.stack_limit = clone.limit();
     initialize_fs(state, true);
@@ -885,7 +662,7 @@ void NativeRuntime::dispatch_callback(CallbackRegisters& registers) {
     const std::uint32_t destination = original_esp + stack_delta;
     *reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(destination - 8u)) = state.eax;
     *reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(destination - 4u)) = api_return;
-    registers.eax = destination - 8u; registers.ecx = state.ecx; registers.edx = state.edx; registers.ebx = state.ebx; registers.ebp = state.ebp; registers.esi = state.esi; registers.edi = state.edi; registers.eflags = state.eflags;
+    registers.eax = destination - 8u; registers.ecx = state.ecx; registers.edx = state.edx; registers.ebx = state.ebx; registers.ebp = state.ebp; registers.esi = state.esi; registers.edi = state.edi;
 }
 
 static void __cdecl dispatch_native_callback(CallbackRegisters* registers) {
@@ -905,10 +682,10 @@ static void callback_bridge() {}
 
 #elif defined(_M_IX86)
 
-static_assert(offsetof(LiftCpu, eax) == 0 && offsetof(LiftCpu, eflags) == 36 && offsetof(LiftCpu, fpu_control) == 114);
+static_assert(offsetof(LiftCpu, eax) == 0 && offsetof(LiftCpu, stack_base) == 36 && offsetof(LiftCpu, fpu_control) == 114);
 static_assert(offsetof(LiftCpu, fs_data) == 120);
 static_assert(offsetof(NativeCallFrame, state) == 0 && offsetof(NativeCallFrame, previous_stack_limit) == 36);
-static_assert(offsetof(CallbackRegisters, edi) == 0 && offsetof(CallbackRegisters, eax) == 28 && offsetof(CallbackRegisters, eflags) == 32 && offsetof(CallbackRegisters, callback_function) == 36);
+static_assert(offsetof(CallbackRegisters, edi) == 0 && offsetof(CallbackRegisters, eax) == 28 && offsetof(CallbackRegisters, saved_flags) == 32 && offsetof(CallbackRegisters, callback_function) == 36);
 static_assert(sizeof(CallbackRegisters) == 40);
 
 __declspec(naked) static void __cdecl native_call_bridge(NativeCallFrame*) {
@@ -928,9 +705,9 @@ __declspec(naked) static void __cdecl native_call_bridge(NativeCallFrame*) {
         mov eax, [edx]
         mov ecx, [eax + 120]
         mov fs:[0], ecx
-        mov ecx, [eax + 40]
+        mov ecx, [eax + 36]
         mov fs:[4], ecx
-        mov ecx, [eax + 44]
+        mov ecx, [eax + 40]
         mov fs:[8], ecx
         mov ecx, [eax + 16]
         sub ecx, 8
@@ -968,8 +745,6 @@ __declspec(naked) static void __cdecl native_call_bridge(NativeCallFrame*) {
         mov [ecx + 24], eax
         mov eax, [esp]
         mov [ecx + 28], eax
-        mov eax, [esp + 32]
-        mov [ecx + 36], eax
         mov eax, [edx + 28]
         mov fs:[0], eax
         mov eax, [edx + 32]
@@ -1004,7 +779,6 @@ __declspec(naked) static void callback_bridge() {
 #else
 #error The generated runtime must be compiled for Win32/x86.
 #endif
-
 
 // Lifted ABI registry and control-transfer implementation. All lift_* ABI entry points live in this translation unit.
 struct LiftFunctionEntry { uint32_t rva; LiftFunction function; };
@@ -5515,8 +5289,6 @@ void lift_tail_indirect(LiftCpu* cpu, uint32_t target, uint32_t stop_address, ui
     lift_native_call(cpu, target, callsite);
     cpu->eip = stop_address;
 }
-
-
 
 int run_native_program() {
     configure_process_environment();

@@ -116,7 +116,7 @@ void append_text(char* buffer, std::size_t capacity, std::size_t& used, const ch
 
 void append_execution_context(char* report, std::size_t capacity, std::size_t& used, const LiftCpu* state) noexcept {
     if (state) {
-        append_text(report, capacity, used, "lifted eip=%08X esp=%08X ebp=%08X eax=%08X ebx=%08X ecx=%08X edx=%08X esi=%08X edi=%08X eflags=%08X\r\n", state->eip, state->esp, state->ebp, state->eax, state->ebx, state->ecx, state->edx, state->esi, state->edi, state->eflags);
+        append_text(report, capacity, used, "lifted eip=%08X esp=%08X ebp=%08X eax=%08X ebx=%08X ecx=%08X edx=%08X esi=%08X edi=%08X\r\n", state->eip, state->esp, state->ebp, state->eax, state->ebx, state->ecx, state->edx, state->esi, state->edi);
     }
     if (g_instruction != 0) { append_text(report, capacity, used, "instruction=%08X operation=%s\r\n", g_instruction, g_operation ? g_operation : "unknown"); }
     if (g_call_count != 0) {

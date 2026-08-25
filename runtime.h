@@ -33,7 +33,7 @@ struct CallbackRegisters {
     std::uint32_t edx;
     std::uint32_t ecx;
     std::uint32_t eax;
-    std::uint32_t eflags;
+    std::uint32_t saved_flags;
     std::uint32_t callback_function;
 };
 
@@ -57,9 +57,7 @@ public:
     ProcessMemory(const ProcessMemory&) = delete;
     ProcessMemory& operator=(const ProcessMemory&) = delete;
     ~ProcessMemory();
-    std::uint32_t load_base() const noexcept;
     std::uint32_t entry_va() noexcept;
-    bool source_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
     bool code_rva(std::uint32_t address, std::uint32_t& rva) const noexcept;
     bool try_read(std::uint32_t address, void* value, std::size_t size) const noexcept;
     bool try_write(std::uint32_t address, const void* value, std::size_t size) noexcept;

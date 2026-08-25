@@ -5,6 +5,8 @@
 #include "import_bridge.h"
 
 #include <memory>
+#include <algorithm>
+#include <cstring>
 #include <oleidl.h>
 #include <exdisp.h>
 #include <mshtmhst.h>

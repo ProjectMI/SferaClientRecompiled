@@ -508,7 +508,7 @@ __declspec(noinline) void sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_address
     label_000E0EBB:
     cpu->ecx = *(uint32_t*)(cpu->ebp + 0xFFFFFFF4u);
     cpu->ecx = ~((uint64_t)(cpu->ecx));
-    cpu->ecx = lift_shift_right(cpu, cpu->ecx, 0x10u, 32u);
+    cpu->ecx >>= 16u;
     cpu->ecx &= 0xFFFFu;
     cpu->edx = *(uint32_t*)(cpu->ebp + 0xFFFFFFF4u);
     cpu->edx &= 0xFFFFu;
