@@ -17,7 +17,6 @@ namespace lifted {
 inline constexpr uint32_t LIFT_SOURCE_TEXT_SIZE = 0x000FB200u;
 constexpr uint32_t LIFT_CODE_TOKEN_RVA(uint32_t rva) noexcept { return 0xE0000000u + rva; }
 constexpr uint32_t LIFT_CODE_TOKEN_VA(uint32_t source_va) noexcept { return LIFT_CODE_TOKEN_RVA(source_va - 0x00400000u); }
-inline uint32_t LIFT_FUNCTION(LiftFunction function) noexcept { return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(function)); }
 inline uint32_t LIFT_CALLBACK(LiftFunction function) { return lift_callback_address(function); }
 
 void sfera_sub_00401000(LiftCpu* cpu, uint32_t stop_address);

@@ -35,7 +35,7 @@ __declspec(noinline) void sfera_sub_00401030(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax);
     cpu->ecx = cpu->esi + 0x14u;
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)"AutoBoundsArray error: non-uniform growth of an index\nFile: %s  Line: %d\n"); lift_push32(cpu, (uintptr_t)g_sfera_array_error_buffer);
-    if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x1057u), LIFT_CODE_TOKEN_RVA(0x1055u))) { return; }
+    lift_native_call(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x1055u));
     cpu->esp += 0x10u;
     cpu->ecx = (uintptr_t)g_sfera_array_error_buffer;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1064u)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_RVA(0x1064u));
@@ -45,7 +45,7 @@ __declspec(noinline) void sfera_sub_00401030(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->edx);
     cpu->eax = cpu->esi + 0x14u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)"AutoBoundsArray error: the index has exceeded a maximum\nFile: %s  Line: %d\n"); lift_push32(cpu, (uintptr_t)g_sfera_array_error_buffer);
-    if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x107Du), LIFT_CODE_TOKEN_RVA(0x107Bu))) { return; }
+    lift_native_call(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0x107Bu));
     cpu->esp += 0x10u;
     cpu->ecx = (uintptr_t)g_sfera_array_error_buffer;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x108Au)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_RVA(0x108Au));

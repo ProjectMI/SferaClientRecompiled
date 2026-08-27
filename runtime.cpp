@@ -5214,7 +5214,6 @@ static LiftFunction resolve_lifted_function(uint32_t target) {
     return kFastLiftedFunctions[rva - 0x00001000u];
 }
 
-static int target_is_local(uint32_t target) { return lift_callback_function(target) != (LiftFunction)0 || lift_code_rva(target) != UINT32_MAX; }
 
 static void lift_dispatch(LiftCpu* cpu, uint32_t target, uint32_t stop_address) {
     LiftFunction function = resolve_lifted_function(target);
@@ -5227,29 +5226,7 @@ static void lift_dispatch(LiftCpu* cpu, uint32_t target, uint32_t stop_address) 
     function(cpu, stop_address);
 }
 
-int lift_call_indirect(LiftCpu* cpu, uint32_t target, uint32_t return_address, uint32_t callsite) {
-    LiftFunction function = resolve_lifted_function(target);
-    if (function) {
-        lift_push32(cpu, return_address);
-        function(cpu, return_address);
-        return cpu->eip == return_address;
-    }
-    if (target_is_local(target)) {
-        lift_trap_transfer(cpu, callsite, target, cpu ? cpu->esp : 0u, 0u, return_address, "indirect-call-middle");
-    }
-    lift_native_call(cpu, target, callsite);
-    cpu->eip = return_address;
-    return 1;
-}
 
-void lift_tail_indirect(LiftCpu* cpu, uint32_t target, uint32_t stop_address, uint32_t callsite) {
-    LiftFunction function = resolve_lifted_function(target);
-    if (function) { function(cpu, stop_address); return; }
-    if (target_is_local(target)) { lift_trap_transfer(cpu, callsite, target, cpu ? cpu->esp : 0u, 0u, stop_address, "indirect-jump-middle"); }
-    cpu->esp += 4u;
-    lift_native_call(cpu, target, callsite);
-    cpu->eip = stop_address;
-}
 
 int run_native_program() {
     configure_process_environment();

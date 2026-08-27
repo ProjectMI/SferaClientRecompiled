@@ -5075,13 +5075,13 @@ __declspec(noinline) void sfera_sub_004FA0D0(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = g_sfera_execution_monitor_runtime.thread_handle;
     lift_push32(cpu, cpu->esi);
     cpu->esi = native_function_address32(&::WaitForSingleObject);
-    lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->esi, LIFT_CODE_TOKEN_RVA(0xFA0E1u), LIFT_CODE_TOKEN_RVA(0xFA0DFu))) { return; }
+
+    cpu->eax = reinterpret_cast<uint32_t (__stdcall*)(uint32_t, uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::WaitForSingleObject)))(cpu->eax, 0u);
     if (cpu->eax == 0u) goto label_000FA117;
     cpu->ecx = g_sfera_execution_monitor_runtime.thread_handle;
     lift_push32(cpu, 0x64u); lift_push32(cpu, cpu->ecx);
     g_sfera_execution_monitor_runtime.stop_requested = UINT16_C(1);
-    if (!lift_call_indirect(cpu, cpu->esi, LIFT_CODE_TOKEN_RVA(0xFA0F9u), LIFT_CODE_TOKEN_RVA(0xFA0F7u))) { return; }
+    cpu->eax = reinterpret_cast<uint32_t (__stdcall*)(uint32_t, uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::WaitForSingleObject)))(*(uint32_t*)(cpu->esp), *(uint32_t*)(cpu->esp + 0x4u)); cpu->esp += 0x8u;
     if (cpu->eax == 0u) goto label_000FA10C;
     cpu->edx = g_sfera_execution_monitor_runtime.thread_handle;
     lift_push32(cpu, 0u); lift_push32(cpu, cpu->edx);
@@ -6408,8 +6408,8 @@ __declspec(noinline) void sfera_sub_004FC0D0(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = native_function_address32(&::DestroyCursor);
     label_000D78F0:
     cpu->eax = *(uint32_t*)(cpu->esi + 0x28u);
-    lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->ebx, LIFT_CODE_TOKEN_RVA(0xD78F6u), LIFT_CODE_TOKEN_RVA(0xD78F4u))) { return; }
+
+    cpu->eax = reinterpret_cast<uint32_t (__stdcall*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::DestroyCursor)))(cpu->eax);
     if (*(uint8_t*)(cpu->esi + 0x35u) != 0u) goto label_000D7937;
     cpu->eax = *(uint32_t*)(cpu->esi + 8u);
     if (*(uint8_t*)(cpu->eax + 0x35u) != 0u) goto label_000D791C;
@@ -6585,28 +6585,28 @@ __declspec(noinline) void sfera_sub_004FC130(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->esi + 8u);
     cpu->edi = native_function_address32(&::free);
     lift_push32(cpu, cpu->edx);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED320u), LIFT_CODE_TOKEN_RVA(0xED31Eu))) { return; }
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(*(uint32_t*)(cpu->esp));
     cpu->eax = *(uint32_t*)(cpu->esi + 0x24u);
     lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED326u), LIFT_CODE_TOKEN_RVA(0xED324u))) { return; }
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(*(uint32_t*)(cpu->esp));
     cpu->eax = *(uint32_t*)(cpu->esi + 0x2Cu);
     cpu->esp += 8u;
     if (cpu->eax == 0u) goto label_000ED336;
-    lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED333u), LIFT_CODE_TOKEN_RVA(0xED331u))) { return; }
-    cpu->esp += 4u;
+
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(cpu->eax);
+
     label_000ED336:
     cpu->eax = *(uint32_t*)(cpu->esi + 0xCu);
     if (cpu->eax == 0u) goto label_000ED343;
-    lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED340u), LIFT_CODE_TOKEN_RVA(0xED33Eu))) { return; }
-    cpu->esp += 4u;
+
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(cpu->eax);
+
     label_000ED343:
     cpu->eax = *(uint32_t*)(cpu->esi + 0x18u);
     if (cpu->eax == 0u) goto label_000ED350;
-    lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED34Du), LIFT_CODE_TOKEN_RVA(0xED34Bu))) { return; }
-    cpu->esp += 4u;
+
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(cpu->eax);
+
     label_000ED350:
     cpu->ecx = cpu->esi + 0x38u;
     *(uint32_t*)(cpu->ebp + 0xFFFFFFFCu) = 0xFFFFFFFFu;
@@ -6734,28 +6734,28 @@ __declspec(noinline) void sfera_sub_004FC140(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->esi + 8u);
     cpu->edi = native_function_address32(&::free);
     lift_push32(cpu, cpu->edx);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED320u), LIFT_CODE_TOKEN_RVA(0xED31Eu))) { return; }
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(*(uint32_t*)(cpu->esp));
     cpu->eax = *(uint32_t*)(cpu->esi + 0x24u);
     lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED326u), LIFT_CODE_TOKEN_RVA(0xED324u))) { return; }
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(*(uint32_t*)(cpu->esp));
     cpu->eax = *(uint32_t*)(cpu->esi + 0x2Cu);
     cpu->esp += 8u;
     if (cpu->eax == 0u) goto label_000ED336;
-    lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED333u), LIFT_CODE_TOKEN_RVA(0xED331u))) { return; }
-    cpu->esp += 4u;
+
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(cpu->eax);
+
     label_000ED336:
     cpu->eax = *(uint32_t*)(cpu->esi + 0xCu);
     if (cpu->eax == 0u) goto label_000ED343;
-    lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED340u), LIFT_CODE_TOKEN_RVA(0xED33Eu))) { return; }
-    cpu->esp += 4u;
+
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(cpu->eax);
+
     label_000ED343:
     cpu->eax = *(uint32_t*)(cpu->esi + 0x18u);
     if (cpu->eax == 0u) goto label_000ED350;
-    lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED34Du), LIFT_CODE_TOKEN_RVA(0xED34Bu))) { return; }
-    cpu->esp += 4u;
+
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(cpu->eax);
+
     label_000ED350:
     cpu->ecx = cpu->esi + 0x38u;
     *(uint32_t*)(cpu->ebp + 0xFFFFFFFCu) = 0xFFFFFFFFu;
@@ -6883,28 +6883,28 @@ __declspec(noinline) void sfera_sub_004FC150(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->esi + 8u);
     cpu->edi = native_function_address32(&::free);
     lift_push32(cpu, cpu->edx);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED320u), LIFT_CODE_TOKEN_RVA(0xED31Eu))) { return; }
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(*(uint32_t*)(cpu->esp));
     cpu->eax = *(uint32_t*)(cpu->esi + 0x24u);
     lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED326u), LIFT_CODE_TOKEN_RVA(0xED324u))) { return; }
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(*(uint32_t*)(cpu->esp));
     cpu->eax = *(uint32_t*)(cpu->esi + 0x2Cu);
     cpu->esp += 8u;
     if (cpu->eax == 0u) goto label_000ED336;
-    lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED333u), LIFT_CODE_TOKEN_RVA(0xED331u))) { return; }
-    cpu->esp += 4u;
+
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(cpu->eax);
+
     label_000ED336:
     cpu->eax = *(uint32_t*)(cpu->esi + 0xCu);
     if (cpu->eax == 0u) goto label_000ED343;
-    lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED340u), LIFT_CODE_TOKEN_RVA(0xED33Eu))) { return; }
-    cpu->esp += 4u;
+
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(cpu->eax);
+
     label_000ED343:
     cpu->eax = *(uint32_t*)(cpu->esi + 0x18u);
     if (cpu->eax == 0u) goto label_000ED350;
-    lift_push32(cpu, cpu->eax);
-    if (!lift_call_indirect(cpu, cpu->edi, LIFT_CODE_TOKEN_RVA(0xED34Du), LIFT_CODE_TOKEN_RVA(0xED34Bu))) { return; }
-    cpu->esp += 4u;
+
+    reinterpret_cast<void (__cdecl*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::free)))(cpu->eax);
+
     label_000ED350:
     cpu->ecx = cpu->esi + 0x38u;
     *(uint32_t*)(cpu->ebp + 0xFFFFFFFCu) = 0xFFFFFFFFu;

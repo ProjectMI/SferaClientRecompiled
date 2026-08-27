@@ -31,7 +31,7 @@ __declspec(noinline) void sfera_sub_0040A270(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->edx);
     cpu->eax = cpu->esi + 0xFFFFFFECu;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->edi);
-    if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0xA2C5u), LIFT_CODE_TOKEN_RVA(0xA2C3u))) { return; }
+    cpu->eax = reinterpret_cast<uint32_t (__cdecl*)(uint32_t, uint32_t, uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::memmove)))(*(uint32_t*)(cpu->esp), *(uint32_t*)(cpu->esp + 0x4u), *(uint32_t*)(cpu->esp + 0x8u));
     cpu->esp += 0xCu;
     goto label_0000A2D2;
     label_0000A2CA:

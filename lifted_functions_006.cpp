@@ -6055,7 +6055,7 @@ __declspec(noinline) void sfera_sub_0043E9B0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, 1u);
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->edx);
-    if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x3EA1Eu), LIFT_CODE_TOKEN_RVA(0x3EA1Cu))) { return; }
+    cpu->eax = reinterpret_cast<uint32_t (__cdecl*)(uint32_t, uint32_t, uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::_read)))(*(uint32_t*)(cpu->esp), *(uint32_t*)(cpu->esp + 0x4u), *(uint32_t*)(cpu->esp + 0x8u));
     cpu->esp += 0xCu;
     if (cpu->eax != 1u) goto label_0003EA4D;
     cpu->eax = (cpu->eax & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esp + 0x10u));
@@ -9346,9 +9346,9 @@ __declspec(noinline) void sfera_sub_00441DD0(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = (uintptr_t)&g_sfera_mbc_interpreter_storage.module_records[0];
     label_00041E00:
     if (*(uint8_t*)(cpu->esi) == 0u) goto label_00041E10;
-    lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi);
-    if (!lift_call_indirect(cpu, cpu->ebp, LIFT_CODE_TOKEN_RVA(0x41E09u), LIFT_CODE_TOKEN_RVA(0x41E07u))) { return; }
-    cpu->esp += 8u;
+
+    cpu->eax = reinterpret_cast<uint32_t (__cdecl*)(uint32_t, uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::_stricmp)))(cpu->esi, cpu->ebx);
+
     if (cpu->eax == 0u) goto label_00041E3B;
     label_00041E10:
     ++cpu->edi;

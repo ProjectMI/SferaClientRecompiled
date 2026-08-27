@@ -1,6 +1,7 @@
 #pragma once
 
 #include "semantic_classes.h"
+#include "lifted_abi.h"
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -1715,7 +1716,7 @@ struct SferaMbcRuntime {
     uint32_t resolved_position_pointer;
     uint32_t file_index_scan_prev;
     uint32_t execution_context_depth;
-    uint32_t opcode_handlers[256];
+    lifted::LiftFunction opcode_handlers[256];
     uint32_t bytecode_base;
     uint32_t registered_object_count;
     SferaMbcExecutionContext execution_context_stack[100];
