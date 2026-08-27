@@ -2,9 +2,10 @@
 #include <cmath>
 namespace lifted {
 
-__declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[9]; double x87_p0;
+__declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address) { double value_0, value_1, value_2, value_3, value_4, value_5, value_6, value_7, value_8, value_9;
+ bool sub_pred[9]; double x87_p0;
     goto label_00014920;
-    label_00005690:
+label_00005690:
     cpu->ecx -= 3u;
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->edx;
@@ -14,13 +15,13 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000056A7:
+label_000056A7:
     cpu->ecx = 0u;
     sub_pred[1] = *(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx);
     cpu->esi = lift_pop32(cpu);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (sub_pred[1]);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000056B5:
+label_000056B5:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4056BAu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4056BAu));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000056F1;
     lift_push32(cpu, cpu->eax);
@@ -29,7 +30,7 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000056D3:
+label_000056D3:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4056D8u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4056D8u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000056F1;
     lift_push32(cpu, cpu->eax);
@@ -38,9 +39,9 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000056F1:
+label_000056F1:
     cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00005700:
+label_00005700:
     cpu->ecx -= 3u;
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->edx;
@@ -50,13 +51,13 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00005717:
+label_00005717:
     cpu->ecx = 0u;
     sub_pred[3] = *(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx);
     cpu->esi = lift_pop32(cpu);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (sub_pred[3]);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00005725:
+label_00005725:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40572Au)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40572Au));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00005761;
     lift_push32(cpu, cpu->eax);
@@ -65,7 +66,7 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00005743:
+label_00005743:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x405748u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x405748u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00005761;
     lift_push32(cpu, cpu->eax);
@@ -74,9 +75,9 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00005761:
+label_00005761:
     cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00005890:
+label_00005890:
     cpu->ecx -= 3u;
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->edx;
@@ -86,13 +87,13 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000058A7:
+label_000058A7:
     cpu->ecx = 0u;
     sub_pred[4] = *(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx);
     cpu->esi = lift_pop32(cpu);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (sub_pred[4]);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000058B5:
+label_000058B5:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4058BAu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4058BAu));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000058F1;
     lift_push32(cpu, cpu->eax);
@@ -101,7 +102,7 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000058D3:
+label_000058D3:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4058D8u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4058D8u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000058F1;
     lift_push32(cpu, cpu->eax);
@@ -110,9 +111,9 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000058F1:
+label_000058F1:
     cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00005900:
+label_00005900:
     cpu->ecx -= 3u;
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->edx;
@@ -122,13 +123,13 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00005917:
+label_00005917:
     cpu->ecx = 0u;
     sub_pred[5] = *(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx);
     cpu->esi = lift_pop32(cpu);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (sub_pred[5]);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00005925:
+label_00005925:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40592Au)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40592Au));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00005982;
     lift_push32(cpu, cpu->eax);
@@ -137,7 +138,7 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00005943:
+label_00005943:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x405948u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x405948u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00005982;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x10u);
@@ -151,14 +152,14 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0u;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00005975:
+label_00005975:
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00005982:
+label_00005982:
     cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00005990:
+label_00005990:
     cpu->ecx -= 3u;
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->edx;
@@ -168,13 +169,13 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000059A7:
+label_000059A7:
     cpu->ecx = 0u;
     sub_pred[7] = *(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx);
     cpu->esi = lift_pop32(cpu);
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (sub_pred[7]);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000059B5:
+label_000059B5:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4059BAu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4059BAu));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000059F1;
     lift_push32(cpu, cpu->eax);
@@ -183,7 +184,7 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000059D3:
+label_000059D3:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4059D8u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4059D8u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000059F1;
     lift_push32(cpu, cpu->eax);
@@ -192,9 +193,9 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000059F1:
+label_000059F1:
     cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00007ED0:
+label_00007ED0:
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x407ED9u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x407ED9u));
@@ -207,7 +208,8 @@ __declspec(noinline) void sfera_sub_00414920(LiftCpu* cpu, uint32_t stop_address
         case 11u: goto label_00007F1D;
         default: goto label_00007FCD;
     }
-label_00007EF0: ;
+label_00007EF0:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x407EF5u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x407EF5u));
     *(uint32_t*)(cpu->esp + 4u) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_00007FDB;
@@ -219,7 +221,7 @@ label_00007EF0: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00007F1D:
+label_00007F1D:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x407F22u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x407F22u));
     *(uint32_t*)(cpu->esp + 4u) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_00007FDB;
@@ -231,7 +233,7 @@ label_00007EF0: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00007F4A:
+label_00007F4A:
     lift_push32(cpu, cpu->edi);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x407F50u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x407F50u));
     cpu->edi = cpu->eax;
@@ -247,7 +249,7 @@ label_00007EF0: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00007F7D:
+label_00007F7D:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x407F82u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x407F82u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00007FDB;
     lift_push32(cpu, cpu->eax);
@@ -257,7 +259,7 @@ label_00007EF0: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00007F9E:
+label_00007F9E:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x407FA3u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x407FA3u));
     *(uint32_t*)(cpu->esp + 4u) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x407FACu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x407FACu));
@@ -271,17 +273,17 @@ label_00007EF0: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00007FCD:
+label_00007FCD:
     cpu->edx = cpu->esi;
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     goto label_00005690;
-    label_00007FDA:
+label_00007FDA:
     cpu->edi = lift_pop32(cpu);
-    label_00007FDB:
+label_00007FDB:
     cpu->esi = lift_pop32(cpu); cpu->ecx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00008010:
+label_00008010:
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x408019u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x408019u));
@@ -294,10 +296,11 @@ label_00007EF0: ;
         case 11u: goto label_0000805D;
         default: goto label_0000810D;
     }
-label_00008030: ;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x408035u)); sfera_sub_0043B0C0(cpu, LIFT_CODE_TOKEN_VA(0x408035u));
-    *(float*)(cpu->esp + 4u) = cpu->fpu[0u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 1, 7u * sizeof(double)); if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000811B;
+label_00008030:
+ ;
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x408035u)); value_4 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x408035u));
+    *(float*)(cpu->esp + 4u) = value_4; 
+     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000811B;
     cpu->edx = cpu->esp + 4u;
     lift_push32(cpu, cpu->edx);
     cpu->ecx = cpu->esi;
@@ -306,10 +309,10 @@ label_00008030: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000805D:
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x408062u)); sfera_sub_0043B0C0(cpu, LIFT_CODE_TOKEN_VA(0x408062u));
-    *(float*)(cpu->esp + 4u) = cpu->fpu[0u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 1, 7u * sizeof(double)); if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000811B;
+label_0000805D:
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x408062u)); value_5 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x408062u));
+    *(float*)(cpu->esp + 4u) = value_5; 
+     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000811B;
     cpu->eax = cpu->esp + 4u;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = cpu->esi;
@@ -318,13 +321,13 @@ label_00008030: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000808A:
+label_0000808A:
     lift_push32(cpu, cpu->edi);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x408090u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x408090u));
     cpu->edi = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x408097u)); sfera_sub_0043B0C0(cpu, LIFT_CODE_TOKEN_VA(0x408097u));
-    *(float*)(cpu->esp + 8u) = cpu->fpu[0u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 1, 7u * sizeof(double)); if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000811A;
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x408097u)); value_6 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x408097u));
+    *(float*)(cpu->esp + 8u) = value_6; 
+     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000811A;
     cpu->ecx = cpu->esp + 8u;
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->edi);
     cpu->ecx = cpu->esi;
@@ -334,7 +337,7 @@ label_00008030: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000080BD:
+label_000080BD:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4080C2u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4080C2u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000811B;
     lift_push32(cpu, cpu->eax);
@@ -344,7 +347,7 @@ label_00008030: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000080DE:
+label_000080DE:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4080E3u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4080E3u));
     *(uint32_t*)(cpu->esp + 4u) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4080ECu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4080ECu));
@@ -358,17 +361,17 @@ label_00008030: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000810D:
+label_0000810D:
     cpu->edx = cpu->esi;
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     goto label_00005700;
-    label_0000811A:
+label_0000811A:
     cpu->edi = lift_pop32(cpu);
-    label_0000811B:
+label_0000811B:
     cpu->esi = lift_pop32(cpu); cpu->ecx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000091B0:
+label_000091B0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -376,7 +379,6 @@ label_00008030: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x14u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4091DCu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4091DCu));
     if (cpu->eax > 0xBu) goto label_0000930C;
@@ -388,7 +390,8 @@ label_00008030: ;
         case 11u: goto label_00009243;
         default: goto label_0000930C;
     }
-label_000091F3: ;
+label_000091F3:
+ ;
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4091FCu)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x4091FCu));
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0u;
@@ -397,21 +400,19 @@ label_000091F3: ;
     lift_push32(cpu, cpu->edx);
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x9219u)); sfera_sub_00406AD0(cpu, LIFT_CODE_TOKEN_RVA(0x9219u));
-    label_00009219:
+label_00009219:
     cpu->ecx = 0u;
-    label_0000921B:
+label_0000921B:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x9220u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x9220u));
-    label_00009220:
+label_00009220:
     cpu->ecx = cpu->esp + 0xCu;
-    label_00009224:
+label_00009224:
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x409231u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_VA(0x409231u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00009243:
+label_00009243:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40924Cu)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x40924Cu));
     *(uint32_t*)(cpu->esp + 0x1Cu) = 1u;
@@ -421,7 +422,7 @@ label_000091F3: ;
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x409269u)); sfera_sub_00406B20(cpu, LIFT_CODE_TOKEN_VA(0x409269u));
     goto label_00009219;
-    label_0000926B:
+label_0000926B:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x409270u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x409270u));
     cpu->ecx = cpu->esp + 0xCu;
     cpu->edi = cpu->eax;
@@ -434,7 +435,7 @@ label_000091F3: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x409299u)); sfera_sub_00405440(cpu, LIFT_CODE_TOKEN_VA(0x409299u));
     cpu->ecx = cpu->eax;
     goto label_0000921B;
-    label_000092A0:
+label_000092A0:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4092A5u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4092A5u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00009315;
     lift_push32(cpu, cpu->eax);
@@ -442,12 +443,10 @@ label_000091F3: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4092B6u)); sfera_sub_00408150(cpu, LIFT_CODE_TOKEN_VA(0x4092B6u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4092BDu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x4092BDu));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000092CF:
+label_000092CF:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4092D4u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4092D4u));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4092DDu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4092DDu));
@@ -459,22 +458,18 @@ label_000091F3: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4092F3u)); sfera_sub_004054B0(cpu, LIFT_CODE_TOKEN_VA(0x4092F3u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4092FAu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x4092FAu));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0000930C:
+label_0000930C:
     cpu->edx = cpu->esi;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x9315u)); sfera_sub_00405800(cpu, LIFT_CODE_TOKEN_RVA(0x9315u));
-    label_00009315:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
+label_00009315:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00009350:
+label_00009350:
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40935Au)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40935Au));
@@ -486,7 +481,8 @@ label_000091F3: ;
         case 10u: goto label_00009371;
         default: goto label_0000941D;
     }
-label_00009371: ;
+label_00009371:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x409376u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x409376u));
     *(uint32_t*)(cpu->esp + 8u) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_0000942B;
@@ -499,7 +495,7 @@ label_00009371: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000939F:
+label_0000939F:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4093A4u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4093A4u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4093ABu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4093ABu));
@@ -514,7 +510,7 @@ label_00009371: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000093D1:
+label_000093D1:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4093D6u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4093D6u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000942B;
     lift_push32(cpu, cpu->eax);
@@ -525,7 +521,7 @@ label_00009371: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000093F3:
+label_000093F3:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4093F8u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4093F8u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4093FFu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4093FFu));
@@ -538,16 +534,16 @@ label_00009371: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000941D:
+label_0000941D:
     cpu->edi = lift_pop32(cpu);
     cpu->edx = cpu->esi;
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     goto label_00005890;
-    label_0000942B:
+label_0000942B:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ecx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00009450:
+label_00009450:
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40945Au)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40945Au));
@@ -559,10 +555,11 @@ label_00009371: ;
         case 10u: goto label_00009471;
         default: goto label_0000951D;
     }
-label_00009471: ;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x409476u)); sfera_sub_0043B0C0(cpu, LIFT_CODE_TOKEN_VA(0x409476u));
-    *(float*)(cpu->esp + 8u) = cpu->fpu[0u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 1, 7u * sizeof(double)); if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000952B;
+label_00009471:
+ ;
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x409476u)); value_7 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x409476u));
+    *(float*)(cpu->esp + 8u) = value_7; 
+     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000952B;
     cpu->edx = cpu->esp + 8u;
     lift_push32(cpu, cpu->edx);
     cpu->ecx = cpu->esi;
@@ -572,12 +569,12 @@ label_00009471: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000949F:
+label_0000949F:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4094A4u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4094A4u));
     cpu->edi = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4094ABu)); sfera_sub_0043B0C0(cpu, LIFT_CODE_TOKEN_VA(0x4094ABu));
-    *(float*)(cpu->esp + 8u) = cpu->fpu[0u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 1, 7u * sizeof(double)); if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000952B;
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4094ABu)); value_8 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x4094ABu));
+    *(float*)(cpu->esp + 8u) = value_8; 
+     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000952B;
     cpu->eax = cpu->esp + 8u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->edi);
     cpu->ecx = cpu->esi;
@@ -587,7 +584,7 @@ label_00009471: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000094D1:
+label_000094D1:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4094D6u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4094D6u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000952B;
     lift_push32(cpu, cpu->eax);
@@ -598,7 +595,7 @@ label_00009471: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000094F3:
+label_000094F3:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4094F8u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4094F8u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4094FFu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4094FFu));
@@ -611,16 +608,16 @@ label_00009471: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000951D:
+label_0000951D:
     cpu->edi = lift_pop32(cpu);
     cpu->edx = cpu->esi;
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     goto label_00005900;
-    label_0000952B:
+label_0000952B:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ecx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00009550:
+label_00009550:
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40955Au)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40955Au));
@@ -632,7 +629,8 @@ label_00009471: ;
         case 10u: goto label_00009571;
         default: goto label_0000961D;
     }
-label_00009571: ;
+label_00009571:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x409576u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x409576u));
     *(uint8_t*)(cpu->esp + 0xBu) = cpu->eax & 0xFFu;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_0000962B;
@@ -645,7 +643,7 @@ label_00009571: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000959F:
+label_0000959F:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4095A4u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4095A4u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4095ABu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4095ABu));
@@ -660,7 +658,7 @@ label_00009571: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000095D1:
+label_000095D1:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4095D6u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4095D6u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000962B;
     lift_push32(cpu, cpu->eax);
@@ -671,7 +669,7 @@ label_00009571: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000095F3:
+label_000095F3:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4095F8u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4095F8u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4095FFu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4095FFu));
@@ -684,16 +682,16 @@ label_00009571: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000961D:
+label_0000961D:
     cpu->edi = lift_pop32(cpu);
     cpu->edx = cpu->esi;
     cpu->ecx = cpu->eax;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     goto label_00005990;
-    label_0000962B:
+label_0000962B:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ecx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00009650:
+label_00009650:
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x409659u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x409659u));
@@ -709,7 +707,8 @@ label_00009571: ;
         case 9u: goto label_0000973F;
         default: lift_trap(cpu, 0x409662u, "resolved jump-table index out of range"); return;
     }
-label_00009669: ;
+label_00009669:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40966Eu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40966Eu));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00009762;
     lift_push32(cpu, cpu->eax);
@@ -719,7 +718,7 @@ label_00009669: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000968E:
+label_0000968E:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x409693u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x409693u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00009762;
     lift_push32(cpu, cpu->eax);
@@ -729,12 +728,12 @@ label_00009669: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000096B3:
+label_000096B3:
     cpu->ecx = *(uint8_t*)(cpu->esi + 8u);
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000096C0:
+label_000096C0:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4096C5u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4096C5u));
     *(uint32_t*)(cpu->esp + 4u) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_00009762;
@@ -746,7 +745,7 @@ label_00009669: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000096ED:
+label_000096ED:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4096F2u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4096F2u));
     *(uint32_t*)(cpu->esp + 4u) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_00009762;
@@ -758,7 +757,7 @@ label_00009669: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00009716:
+label_00009716:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40971Bu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40971Bu));
     *(uint32_t*)(cpu->esp + 4u) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_00009762;
@@ -770,7 +769,7 @@ label_00009669: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000973F:
+label_0000973F:
     cpu->ecx = cpu->esi + 0x10u;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40974Bu)); sfera_sub_004B24B0(cpu, LIFT_CODE_TOKEN_VA(0x40974Bu));
@@ -778,14 +777,14 @@ label_00009669: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00009756:
+label_00009756:
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00009762:
+label_00009762:
     cpu->esi = lift_pop32(cpu); cpu->ecx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0000A870:
+label_0000A870:
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A87Au)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40A87Au));
@@ -801,7 +800,8 @@ label_00009669: ;
         case 9u: goto label_0000A98A;
         default: lift_trap(cpu, 0x40A883u, "resolved jump-table index out of range"); return;
     }
-label_0000A88A: ;
+label_0000A88A:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A88Fu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40A88Fu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A896u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40A896u));
@@ -814,7 +814,7 @@ label_0000A88A: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000A8B8:
+label_0000A8B8:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A8BDu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40A8BDu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A8C4u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40A8C4u));
@@ -827,7 +827,7 @@ label_0000A88A: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000A8E6:
+label_0000A8E6:
     cpu->ecx = 0u;
     sub_pred[0] = *(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx);
     cpu->edi = lift_pop32(cpu);
@@ -835,7 +835,7 @@ label_0000A88A: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000A8F8:
+label_0000A8F8:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A8FDu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40A8FDu));
     *(uint32_t*)(cpu->esp + 8u) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A906u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40A906u));
@@ -851,7 +851,7 @@ label_0000A88A: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000A930:
+label_0000A930:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A935u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40A935u));
     *(uint32_t*)(cpu->esp + 8u) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_0000A9AF;
@@ -864,7 +864,7 @@ label_0000A88A: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000A95A:
+label_0000A95A:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A95Fu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40A95Fu));
     *(uint32_t*)(cpu->esp + 8u) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A968u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40A968u));
@@ -879,7 +879,7 @@ label_0000A88A: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000A98A:
+label_0000A98A:
     cpu->ecx = cpu->esi + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40A992u)); sfera_sub_00429A30(cpu, LIFT_CODE_TOKEN_VA(0x40A992u));
     cpu->edi = lift_pop32(cpu);
@@ -888,15 +888,15 @@ label_0000A88A: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000A9A2:
+label_0000A9A2:
     cpu->edi = lift_pop32(cpu);
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000A9AF:
+label_0000A9AF:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ecx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0000A9E0:
+label_0000A9E0:
     cpu->esp -= 8u;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esi = cpu->ecx;
@@ -913,7 +913,8 @@ label_0000A88A: ;
         case 9u: goto label_0000AB02;
         default: lift_trap(cpu, 0x40A9F5u, "resolved jump-table index out of range"); return;
     }
-label_0000A9FC: ;
+label_0000A9FC:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AA01u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40AA01u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AA08u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40AA08u));
@@ -926,7 +927,7 @@ label_0000A9FC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000AA2A:
+label_0000AA2A:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AA2Fu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40AA2Fu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AA36u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40AA36u));
@@ -939,7 +940,7 @@ label_0000A9FC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000AA58:
+label_0000AA58:
     cpu->ecx = 0u;
     sub_pred[2] = *(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx);
     cpu->edi = lift_pop32(cpu);
@@ -947,12 +948,12 @@ label_0000A9FC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000AA6A:
+label_0000AA6A:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AA6Fu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40AA6Fu));
     *(uint32_t*)(cpu->esp + 8u) = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AA78u)); sfera_sub_0043B0C0(cpu, LIFT_CODE_TOKEN_VA(0x40AA78u));
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 1, 7u * sizeof(double)); if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000AB27;
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AA78u)); value_9 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x40AA78u));
+    *(float*)(cpu->esp + 0xCu) = value_9; 
+     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000AB27;
     cpu->eax = cpu->esp + 8u;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = cpu->esi + 0x14u;
@@ -964,7 +965,7 @@ label_0000A9FC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000AAA8:
+label_0000AAA8:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AAADu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40AAADu));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_0000AB27;
@@ -977,7 +978,7 @@ label_0000A9FC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000AAD2:
+label_0000AAD2:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AAD7u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40AAD7u));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AAE0u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40AAE0u));
@@ -992,7 +993,7 @@ label_0000A9FC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000AB02:
+label_0000AB02:
     cpu->ecx = cpu->esi + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40AB0Au)); sfera_sub_00429A30(cpu, LIFT_CODE_TOKEN_VA(0x40AB0Au));
     cpu->edi = lift_pop32(cpu);
@@ -1001,17 +1002,17 @@ label_0000A9FC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000AB1A:
+label_0000AB1A:
     cpu->edi = lift_pop32(cpu);
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0000AB27:
+label_0000AB27:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0000D0E0:
+label_0000D0E0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -1019,7 +1020,6 @@ label_0000A9FC: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x14u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D10Cu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40D10Cu));
     if (cpu->eax > 0xAu) goto label_0000D20B;
@@ -1030,7 +1030,8 @@ label_0000A9FC: ;
         case 10u: goto label_0000D123;
         default: goto label_0000D20B;
     }
-label_0000D123: ;
+label_0000D123:
+ ;
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D12Cu)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x40D12Cu));
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0u;
@@ -1040,18 +1041,16 @@ label_0000D123: ;
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D149u)); sfera_sub_0040B760(cpu, LIFT_CODE_TOKEN_VA(0x40D149u));
     cpu->ecx = 0u;
-    label_0000D14B:
+label_0000D14B:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0xD150u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0xD150u));
-    label_0000D150:
+label_0000D150:
     cpu->ecx = cpu->esp + 0xCu;
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D161u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_VA(0x40D161u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0000D173:
+label_0000D173:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D178u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40D178u));
     cpu->ecx = cpu->esp + 0xCu;
     cpu->edi = cpu->eax;
@@ -1064,7 +1063,7 @@ label_0000D123: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D1A1u)); sfera_sub_00402A50(cpu, LIFT_CODE_TOKEN_VA(0x40D1A1u));
     cpu->ecx = cpu->eax;
     goto label_0000D14B;
-    label_0000D1A5:
+label_0000D1A5:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D1AAu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40D1AAu));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0000D214;
     lift_push32(cpu, cpu->eax);
@@ -1072,12 +1071,10 @@ label_0000D123: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D1BBu)); sfera_sub_0040A5E0(cpu, LIFT_CODE_TOKEN_VA(0x40D1BBu));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D1C2u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x40D1C2u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0000D1D4:
+label_0000D1D4:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D1D9u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40D1D9u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D1E0u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40D1E0u));
@@ -1087,22 +1084,18 @@ label_0000D123: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D1F2u)); sfera_sub_00402AC0(cpu, LIFT_CODE_TOKEN_VA(0x40D1F2u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40D1F9u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x40D1F9u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0000D20B:
+label_0000D20B:
     cpu->edx = cpu->esi;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0xD214u)); sfera_sub_00405A80(cpu, LIFT_CODE_TOKEN_RVA(0xD214u));
-    label_0000D214:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
+label_0000D214:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0000E6D0:
+label_0000E6D0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -1110,7 +1103,6 @@ label_0000D123: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E6FCu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40E6FCu));
     if (cpu->eax > 9u) goto label_0000E81E;
@@ -1125,7 +1117,8 @@ label_0000D123: ;
         case 9u: goto label_0000E813;
         default: lift_trap(cpu, 0x40E705u, "resolved jump-table index out of range"); return;
     }
-label_0000E70C: ;
+label_0000E70C:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E711u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40E711u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E718u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40E718u));
@@ -1135,7 +1128,7 @@ label_0000E70C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E72Eu)); sfera_sub_00405F10(cpu, LIFT_CODE_TOKEN_VA(0x40E72Eu));
     cpu->ecx = cpu->eax;
     goto label_0000E821;
-    label_0000E735:
+label_0000E735:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E73Au)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40E73Au));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E741u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40E741u));
@@ -1145,11 +1138,11 @@ label_0000E70C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E757u)); sfera_sub_00405F60(cpu, LIFT_CODE_TOKEN_VA(0x40E757u));
     cpu->ecx = cpu->eax;
     goto label_0000E821;
-    label_0000E75E:
+label_0000E75E:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_0000E821;
-    label_0000E76B:
+label_0000E76B:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E770u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40E770u));
     cpu->ecx = cpu->esp + 0x10u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
@@ -1164,16 +1157,14 @@ label_0000E70C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E79Fu)); sfera_sub_0040D3B0(cpu, LIFT_CODE_TOKEN_VA(0x40E79Fu));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0xE7A6u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0xE7A6u));
-    label_0000E7A6:
+label_0000E7A6:
     cpu->ecx = cpu->esp + 0x10u;
     *(uint32_t*)(cpu->esp + 0x20u) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E7B7u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_VA(0x40E7B7u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0000E7C9:
+label_0000E7C9:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E7CEu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40E7CEu));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_0000E826;
@@ -1183,7 +1174,7 @@ label_0000E70C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E7E7u)); sfera_sub_0040B810(cpu, LIFT_CODE_TOKEN_VA(0x40E7E7u));
     cpu->ecx = 0u;
     goto label_0000E821;
-    label_0000E7EB:
+label_0000E7EB:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E7F0u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x40E7F0u));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E7F9u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x40E7F9u));
@@ -1195,22 +1186,20 @@ label_0000E70C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E80Fu)); sfera_sub_00406DA0(cpu, LIFT_CODE_TOKEN_VA(0x40E80Fu));
     cpu->ecx = cpu->eax;
     goto label_0000E821;
-    label_0000E813:
+label_0000E813:
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x40E81Au)); sfera_sub_0040AB60(cpu, LIFT_CODE_TOKEN_VA(0x40E81Au));
     cpu->ecx = 0u;
     goto label_0000E821;
-    label_0000E81E:
+label_0000E81E:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_0000E821:
+label_0000E821:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0xE826u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0xE826u));
-    label_0000E826:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
+label_0000E826:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000101D0:
+label_000101D0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -1218,7 +1207,6 @@ label_0000E70C: ;
     lift_push32(cpu, cpu->esi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x60u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410206u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x410206u));
     if (cpu->eax > 9u) goto label_00010344;
@@ -1233,7 +1221,8 @@ label_0000E70C: ;
         case 9u: goto label_00010339;
         default: lift_trap(cpu, 0x41020Fu, "resolved jump-table index out of range"); return;
     }
-label_00010216: ;
+label_00010216:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41021Bu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41021Bu));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0001034C;
     lift_push32(cpu, cpu->eax);
@@ -1241,7 +1230,7 @@ label_00010216: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410230u)); sfera_sub_00403DE0(cpu, LIFT_CODE_TOKEN_VA(0x410230u));
     cpu->ecx = cpu->eax;
     goto label_00010347;
-    label_00010237:
+label_00010237:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41023Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41023Cu));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_0001034C;
     lift_push32(cpu, cpu->eax);
@@ -1249,10 +1238,10 @@ label_00010216: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410251u)); sfera_sub_00403E10(cpu, LIFT_CODE_TOKEN_VA(0x410251u));
     cpu->ecx = cpu->eax;
     goto label_00010347;
-    label_00010258:
+label_00010258:
     cpu->ecx = *(uint8_t*)(cpu->esi + 8u);
     goto label_00010347;
-    label_00010261:
+label_00010261:
     cpu->ecx = cpu->esp + 8u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41026Au)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x41026Au));
     *(uint32_t*)(cpu->esp + 0x68u) = 0u;
@@ -1263,12 +1252,12 @@ label_00010216: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410287u)); sfera_sub_0040E6A0(cpu, LIFT_CODE_TOKEN_VA(0x410287u));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1028Eu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1028Eu));
-    label_0001028E:
+label_0001028E:
     cpu->ecx = cpu->esp + 8u;
-    label_00010292:
+label_00010292:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410297u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x410297u));
     goto label_0001034C;
-    label_0001029C:
+label_0001029C:
     cpu->ecx = cpu->esp + 8u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4102A5u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x4102A5u));
     *(uint32_t*)(cpu->esp + 0x68u) = 1u;
@@ -1282,7 +1271,7 @@ label_00010216: ;
     cpu->ecx = cpu->esp + 8u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4102D2u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x4102D2u));
     goto label_0001034C;
-    label_000102D4:
+label_000102D4:
     cpu->ecx = cpu->esp + 0x40u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4102DDu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x4102DDu));
     lift_push32(cpu, cpu->eax);
@@ -1302,26 +1291,24 @@ label_00010216: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410327u)); sfera_sub_004082E0(cpu, LIFT_CODE_TOKEN_VA(0x410327u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1032Eu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1032Eu));
-    label_0001032E:
+label_0001032E:
     cpu->ecx = cpu->esp + 0x24u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410337u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x410337u));
     goto label_0001034C;
-    label_00010339:
+label_00010339:
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410340u)); sfera_sub_0040B7A0(cpu, LIFT_CODE_TOKEN_VA(0x410340u));
     cpu->ecx = 0u;
     goto label_00010347;
-    label_00010344:
+label_00010344:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_00010347:
+label_00010347:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1034Cu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1034Cu));
-    label_0001034C:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x60u);
-    (void)0; /* source SEH registration eliminated */
+label_0001034C:
     cpu->ecx = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x64u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00010EC0:
+label_00010EC0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -1329,7 +1316,6 @@ label_00010216: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x30u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410EF7u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x410EF7u));
     if (cpu->eax > 0xBu) goto label_00011010;
@@ -1341,7 +1327,8 @@ label_00010216: ;
         case 11u: goto label_00010F49;
         default: goto label_00011010;
     }
-label_00010F0E: ;
+label_00010F0E:
+ ;
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410F17u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x410F17u));
     *(uint32_t*)(cpu->esp + 0x38u) = 0u;
@@ -1352,12 +1339,12 @@ label_00010F0E: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410F34u)); sfera_sub_00410390(cpu, LIFT_CODE_TOKEN_VA(0x410F34u));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x10F3Bu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x10F3Bu));
-    label_00010F3B:
+label_00010F3B:
     cpu->ecx = cpu->esp + 0x10u;
-    label_00010F3F:
+label_00010F3F:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410F44u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x410F44u));
     goto label_00011019;
-    label_00010F49:
+label_00010F49:
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410F52u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x410F52u));
     *(uint32_t*)(cpu->esp + 0x38u) = 1u;
@@ -1371,7 +1358,7 @@ label_00010F0E: ;
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410F7Fu)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x410F7Fu));
     goto label_00011019;
-    label_00010F84:
+label_00010F84:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410F89u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x410F89u));
     cpu->ecx = cpu->esp + 0x10u;
     cpu->edi = cpu->eax;
@@ -1387,7 +1374,7 @@ label_00010F0E: ;
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410FC2u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x410FC2u));
     goto label_00011019;
-    label_00010FC4:
+label_00010FC4:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410FC9u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x410FC9u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00011019;
     lift_push32(cpu, cpu->eax);
@@ -1396,7 +1383,7 @@ label_00010F0E: ;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410FE1u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x410FE1u));
     goto label_00011019;
-    label_00010FE3:
+label_00010FE3:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410FE8u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x410FE8u));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x410FF1u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x410FF1u));
@@ -1409,17 +1396,15 @@ label_00010F0E: ;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41100Eu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x41100Eu));
     goto label_00011019;
-    label_00011010:
+label_00011010:
     cpu->edx = cpu->esi;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x11019u)); sfera_sub_00405770(cpu, LIFT_CODE_TOKEN_RVA(0x11019u));
-    label_00011019:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x30u);
-    (void)0; /* source SEH registration eliminated */
+label_00011019:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x30u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000116B0:
+label_000116B0:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     --cpu->eax;
     if (cpu->eax > 4u) goto label_000116D4;
@@ -1431,17 +1416,18 @@ label_00010F0E: ;
         case 4u: goto label_000116CF;
         default: lift_trap(cpu, 0x4116B9u, "resolved jump-table index out of range"); return;
     }
-label_000116C0: ;
+label_000116C0:
+ ;
     goto label_00007ED0;
-    label_000116C5:
+label_000116C5:
     goto label_00008010;
-    label_000116CA:
+label_000116CA:
     goto label_00010EC0;
-    label_000116CF:
+label_000116CF:
     goto label_000091B0;
-    label_000116D4:
+label_000116D4:
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00012160:
+label_00012160:
     cpu->esp -= 8u;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esi = cpu->ecx;
@@ -1458,7 +1444,8 @@ label_000116C0: ;
         case 9u: goto label_00012280;
         default: lift_trap(cpu, 0x412175u, "resolved jump-table index out of range"); return;
     }
-label_0001217C: ;
+label_0001217C:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412181u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412181u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412188u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412188u));
@@ -1471,7 +1458,7 @@ label_0001217C: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000121AA:
+label_000121AA:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4121AFu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4121AFu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4121B6u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4121B6u));
@@ -1484,7 +1471,7 @@ label_0001217C: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000121D8:
+label_000121D8:
     cpu->ecx = 0u;
     sub_pred[6] = *(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx);
     cpu->edi = lift_pop32(cpu);
@@ -1492,7 +1479,7 @@ label_0001217C: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000121EA:
+label_000121EA:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4121EFu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4121EFu));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4121F8u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4121F8u));
@@ -1509,7 +1496,7 @@ label_0001217C: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00012226:
+label_00012226:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41222Bu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x41222Bu));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_000122A0;
@@ -1522,7 +1509,7 @@ label_0001217C: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00012250:
+label_00012250:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412255u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x412255u));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41225Eu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41225Eu));
@@ -1537,7 +1524,7 @@ label_0001217C: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00012280:
+label_00012280:
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412287u)); sfera_sub_00410650(cpu, LIFT_CODE_TOKEN_VA(0x412287u));
     cpu->edi = lift_pop32(cpu);
@@ -1545,17 +1532,17 @@ label_0001217C: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00012293:
+label_00012293:
     cpu->edi = lift_pop32(cpu);
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000122A0:
+label_000122A0:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000122D0:
+label_000122D0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -1563,7 +1550,6 @@ label_0001217C: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x14u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4122FCu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4122FCu));
     if (cpu->eax > 9u) goto label_0001245D;
@@ -1578,7 +1564,8 @@ label_0001217C: ;
         case 9u: goto label_00012443;
         default: lift_trap(cpu, 0x412305u, "resolved jump-table index out of range"); return;
     }
-label_0001230C: ;
+label_0001230C:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412311u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412311u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412318u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412318u));
@@ -1588,7 +1575,7 @@ label_0001230C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41232Eu)); sfera_sub_00406F30(cpu, LIFT_CODE_TOKEN_VA(0x41232Eu));
     cpu->ecx = cpu->eax;
     goto label_00012460;
-    label_00012335:
+label_00012335:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41233Au)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41233Au));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412341u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412341u));
@@ -1598,11 +1585,11 @@ label_0001230C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412357u)); sfera_sub_00406F80(cpu, LIFT_CODE_TOKEN_VA(0x412357u));
     cpu->ecx = cpu->eax;
     goto label_00012460;
-    label_0001235E:
+label_0001235E:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_00012460;
-    label_0001236B:
+label_0001236B:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412374u)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x412374u));
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0u;
@@ -1614,20 +1601,18 @@ label_0001230C: ;
     cpu->ecx = cpu->esi + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412399u)); sfera_sub_00411370(cpu, LIFT_CODE_TOKEN_VA(0x412399u));
     *(uint32_t*)(cpu->eax) = cpu->edi;
-    label_0001239B:
+label_0001239B:
     cpu->ecx = 0u;
-    label_0001239D:
+label_0001239D:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x123A2u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x123A2u));
-    label_000123A2:
+label_000123A2:
     cpu->ecx = cpu->esp + 0xCu;
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4123B3u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_VA(0x4123B3u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000123C5:
+label_000123C5:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4123CEu)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x4123CEu));
     *(uint32_t*)(cpu->esp + 0x1Cu) = 1u;
@@ -1635,17 +1620,15 @@ label_0001230C: ;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) == 0u) goto label_00012402;
     *(uint32_t*)(cpu->esp + 0x1Cu) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4123F0u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_VA(0x4123F0u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00012402:
+label_00012402:
     lift_push32(cpu, cpu->ecx);
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41240Au)); sfera_sub_00411140(cpu, LIFT_CODE_TOKEN_VA(0x41240Au));
     goto label_0001239B;
-    label_0001240C:
+label_0001240C:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412415u)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x412415u));
     *(uint32_t*)(cpu->esp + 0x1Cu) = 2u;
@@ -1658,7 +1641,7 @@ label_0001230C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41243Cu)); sfera_sub_00409D10(cpu, LIFT_CODE_TOKEN_VA(0x41243Cu));
     cpu->ecx = cpu->eax;
     goto label_0001239D;
-    label_00012443:
+label_00012443:
     cpu->ecx = cpu->esi + 0x18u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41244Bu)); sfera_sub_0040A060(cpu, LIFT_CODE_TOKEN_VA(0x41244Bu));
     lift_push32(cpu, 8u);
@@ -1667,17 +1650,15 @@ label_0001230C: ;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx = 0u;
     goto label_00012460;
-    label_0001245D:
+label_0001245D:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_00012460:
+label_00012460:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x12465u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x12465u));
-    label_00012465:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
+label_00012465:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000124A0:
+label_000124A0:
     cpu->esp -= 8u;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esi = cpu->ecx;
@@ -1694,7 +1675,8 @@ label_0001230C: ;
         case 9u: goto label_000125C0;
         default: lift_trap(cpu, 0x4124B5u, "resolved jump-table index out of range"); return;
     }
-label_000124BC: ;
+label_000124BC:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4124C1u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4124C1u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4124C8u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4124C8u));
@@ -1707,7 +1689,7 @@ label_000124BC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000124EA:
+label_000124EA:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4124EFu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4124EFu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4124F6u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4124F6u));
@@ -1720,7 +1702,7 @@ label_000124BC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00012518:
+label_00012518:
     cpu->ecx = 0u;
     sub_pred[8] = *(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx);
     cpu->edi = lift_pop32(cpu);
@@ -1728,12 +1710,12 @@ label_000124BC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_0001252A:
+label_0001252A:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41252Fu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x41252Fu));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412538u)); sfera_sub_0043B0C0(cpu, LIFT_CODE_TOKEN_VA(0x412538u));
-    *(float*)(cpu->esp + 8u) = cpu->fpu[0u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 1, 7u * sizeof(double)); if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000125E0;
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412538u)); value_0 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x412538u));
+    *(float*)(cpu->esp + 8u) = value_0; 
+     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000125E0;
     cpu->eax = cpu->esp + 8u;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = cpu->esp + 0x10u;
@@ -1745,7 +1727,7 @@ label_000124BC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00012566:
+label_00012566:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41256Bu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x41256Bu));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_000125E0;
@@ -1758,7 +1740,7 @@ label_000124BC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00012590:
+label_00012590:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412595u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x412595u));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41259Eu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41259Eu));
@@ -1773,7 +1755,7 @@ label_000124BC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000125C0:
+label_000125C0:
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4125C7u)); sfera_sub_00410650(cpu, LIFT_CODE_TOKEN_VA(0x4125C7u));
     cpu->edi = lift_pop32(cpu);
@@ -1781,17 +1763,17 @@ label_000124BC: ;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000125D3:
+label_000125D3:
     cpu->edi = lift_pop32(cpu);
     cpu->ecx |= 0xFFFFFFFFu;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_000125E0:
+label_000125E0:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00012610:
+label_00012610:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -1799,7 +1781,6 @@ label_000124BC: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41263Cu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x41263Cu));
     if (cpu->eax > 9u) goto label_000127A3;
@@ -1814,7 +1795,8 @@ label_000124BC: ;
         case 9u: goto label_00012789;
         default: lift_trap(cpu, 0x412645u, "resolved jump-table index out of range"); return;
     }
-label_0001264C: ;
+label_0001264C:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412651u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412651u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412658u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412658u));
@@ -1824,7 +1806,7 @@ label_0001264C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41266Eu)); sfera_sub_00407130(cpu, LIFT_CODE_TOKEN_VA(0x41266Eu));
     cpu->ecx = cpu->eax;
     goto label_000127A6;
-    label_00012675:
+label_00012675:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41267Au)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41267Au));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412681u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412681u));
@@ -1834,36 +1816,34 @@ label_0001264C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412697u)); sfera_sub_00407180(cpu, LIFT_CODE_TOKEN_VA(0x412697u));
     cpu->ecx = cpu->eax;
     goto label_000127A6;
-    label_0001269E:
+label_0001269E:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_000127A6;
-    label_000126AB:
+label_000126AB:
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4126B4u)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x4126B4u));
     *(uint32_t*)(cpu->esp + 0x20u) = 0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4126C1u)); sfera_sub_0043B0C0(cpu, LIFT_CODE_TOKEN_VA(0x4126C1u));
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 1, 7u * sizeof(double)); if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000126E8;
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4126C1u)); value_1 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x4126C1u));
+    *(float*)(cpu->esp + 0xCu) = value_1; 
+     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000126E8;
     cpu->eax = cpu->esp + 0x10u;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = cpu->esi + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4126DBu)); sfera_sub_00411450(cpu, LIFT_CODE_TOKEN_VA(0x4126DBu));
     *(float*)(cpu->eax) = (double)*(float*)(cpu->esp + 0xCu);
-    label_000126E1:
+label_000126E1:
     cpu->ecx = 0u;
-    label_000126E3:
+label_000126E3:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x126E8u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x126E8u));
-    label_000126E8:
+label_000126E8:
     cpu->ecx = cpu->esp + 0x10u;
     *(uint32_t*)(cpu->esp + 0x20u) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4126F9u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_VA(0x4126F9u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0001270B:
+label_0001270B:
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412714u)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x412714u));
     *(uint32_t*)(cpu->esp + 0x20u) = 1u;
@@ -1871,17 +1851,15 @@ label_0001264C: ;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) == 0u) goto label_00012748;
     *(uint32_t*)(cpu->esp + 0x20u) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412736u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_VA(0x412736u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00012748:
+label_00012748:
     lift_push32(cpu, cpu->ecx);
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412750u)); sfera_sub_00411140(cpu, LIFT_CODE_TOKEN_VA(0x412750u));
     goto label_000126E1;
-    label_00012752:
+label_00012752:
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41275Bu)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x41275Bu));
     *(uint32_t*)(cpu->esp + 0x20u) = 2u;
@@ -1894,7 +1872,7 @@ label_0001264C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412782u)); sfera_sub_00409DD0(cpu, LIFT_CODE_TOKEN_VA(0x412782u));
     cpu->ecx = cpu->eax;
     goto label_000126E3;
-    label_00012789:
+label_00012789:
     cpu->ecx = cpu->esi + 0x18u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412791u)); sfera_sub_0040A060(cpu, LIFT_CODE_TOKEN_VA(0x412791u));
     lift_push32(cpu, 8u);
@@ -1903,17 +1881,15 @@ label_0001264C: ;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx = 0u;
     goto label_000127A6;
-    label_000127A3:
+label_000127A3:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_000127A6:
+label_000127A6:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x127ABu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x127ABu));
-    label_000127AB:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
+label_000127AB:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000127F0:
+label_000127F0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -1921,7 +1897,6 @@ label_0001264C: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41281Cu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x41281Cu));
     if (cpu->eax > 9u) goto label_0001294D;
@@ -1936,7 +1911,8 @@ label_0001264C: ;
         case 9u: goto label_00012933;
         default: lift_trap(cpu, 0x412825u, "resolved jump-table index out of range"); return;
     }
-label_0001282C: ;
+label_0001282C:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412831u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412831u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412838u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412838u));
@@ -1946,7 +1922,7 @@ label_0001282C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41284Eu)); sfera_sub_00407390(cpu, LIFT_CODE_TOKEN_VA(0x41284Eu));
     cpu->ecx = cpu->eax;
     goto label_00012950;
-    label_00012855:
+label_00012855:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41285Au)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41285Au));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412861u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412861u));
@@ -1956,11 +1932,11 @@ label_0001282C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412877u)); sfera_sub_004073E0(cpu, LIFT_CODE_TOKEN_VA(0x412877u));
     cpu->ecx = cpu->eax;
     goto label_00012950;
-    label_0001287E:
+label_0001287E:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_00012950;
-    label_0001288B:
+label_0001288B:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412890u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x412890u));
     cpu->ecx = cpu->esp + 0x10u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
@@ -1975,16 +1951,14 @@ label_0001282C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4128BFu)); sfera_sub_004118E0(cpu, LIFT_CODE_TOKEN_VA(0x4128BFu));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x128C6u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x128C6u));
-    label_000128C6:
+label_000128C6:
     cpu->ecx = cpu->esp + 0x10u;
     *(uint32_t*)(cpu->esp + 0x20u) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4128D7u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_VA(0x4128D7u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000128E9:
+label_000128E9:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4128EEu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4128EEu));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_00012955;
@@ -1994,7 +1968,7 @@ label_0001282C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412907u)); sfera_sub_00411280(cpu, LIFT_CODE_TOKEN_VA(0x412907u));
     cpu->ecx = 0u;
     goto label_00012950;
-    label_0001290B:
+label_0001290B:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412910u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x412910u));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412919u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412919u));
@@ -2006,7 +1980,7 @@ label_0001282C: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41292Fu)); sfera_sub_00409ED0(cpu, LIFT_CODE_TOKEN_VA(0x41292Fu));
     cpu->ecx = cpu->eax;
     goto label_00012950;
-    label_00012933:
+label_00012933:
     cpu->ecx = cpu->esi + 0x18u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41293Bu)); sfera_sub_00408A50(cpu, LIFT_CODE_TOKEN_VA(0x41293Bu));
     lift_push32(cpu, 8u);
@@ -2015,17 +1989,15 @@ label_0001282C: ;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx = 0u;
     goto label_00012950;
-    label_0001294D:
+label_0001294D:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_00012950:
+label_00012950:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x12955u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x12955u));
-    label_00012955:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
+label_00012955:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00012990:
+label_00012990:
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
     cpu->esp &= 0xFFFFFFF8u;
@@ -2036,7 +2008,6 @@ label_0001282C: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4129C2u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4129C2u));
     if (cpu->eax > 9u) goto label_00012B23;
@@ -2051,7 +2022,8 @@ label_0001282C: ;
         case 9u: goto label_00012B09;
         default: lift_trap(cpu, 0x4129CBu, "resolved jump-table index out of range"); return;
     }
-label_000129D2: ;
+label_000129D2:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4129D7u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4129D7u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4129DEu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4129DEu));
@@ -2061,7 +2033,7 @@ label_000129D2: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4129F4u)); sfera_sub_004074C0(cpu, LIFT_CODE_TOKEN_VA(0x4129F4u));
     cpu->ecx = cpu->eax;
     goto label_00012B26;
-    label_000129FB:
+label_000129FB:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412A00u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412A00u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412A07u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x412A07u));
@@ -2071,11 +2043,11 @@ label_000129D2: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412A1Du)); sfera_sub_00407500(cpu, LIFT_CODE_TOKEN_VA(0x412A1Du));
     cpu->ecx = cpu->eax;
     goto label_00012B26;
-    label_00012A24:
+label_00012A24:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_00012B26;
-    label_00012A31:
+label_00012A31:
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412A3Au)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x412A3Au));
     cpu->ecx = cpu->esp + 0xCu;
@@ -2091,20 +2063,18 @@ label_000129D2: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412A6Au)); sfera_sub_00411930(cpu, LIFT_CODE_TOKEN_VA(0x412A6Au));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x12A71u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x12A71u));
-    label_00012A71:
+label_00012A71:
     cpu->ecx = cpu->esp + 0xCu;
     *(uint8_t*)(cpu->esp + 0x28u) = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x12A7Fu)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_RVA(0x12A7Fu));
-    label_00012A7F:
+label_00012A7F:
     cpu->ecx = cpu->esp + 0x14u;
     *(uint32_t*)(cpu->esp + 0x28u) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412A90u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_VA(0x412A90u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp = cpu->ebp;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00012AA2:
+label_00012AA2:
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412AABu)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x412AABu));
     *(uint32_t*)(cpu->esp + 0x28u) = 2u;
@@ -2116,7 +2086,7 @@ label_000129D2: ;
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412ACFu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x412ACFu));
     goto label_00012A7F;
-    label_00012AD1:
+label_00012AD1:
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412ADAu)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x412ADAu));
     *(uint32_t*)(cpu->esp + 0x28u) = 3u;
@@ -2130,7 +2100,7 @@ label_000129D2: ;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412B04u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x412B04u));
     goto label_00012A7F;
-    label_00012B09:
+label_00012B09:
     cpu->ecx = cpu->esi + 0x18u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x412B11u)); sfera_sub_0040A0C0(cpu, LIFT_CODE_TOKEN_VA(0x412B11u));
     lift_push32(cpu, 8u);
@@ -2139,17 +2109,15 @@ label_000129D2: ;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx = 0u;
     goto label_00012B26;
-    label_00012B23:
+label_00012B23:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_00012B26:
+label_00012B26:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x12B2Bu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x12B2Bu));
-    label_00012B2B:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
+label_00012B2B:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp = cpu->ebp;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00013100:
+label_00013100:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -2157,7 +2125,6 @@ label_000129D2: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x48u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413137u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x413137u));
     if (cpu->eax > 0xAu) goto label_0001320F;
@@ -2168,7 +2135,8 @@ label_000129D2: ;
         case 10u: goto label_0001314E;
         default: goto label_0001320F;
     }
-label_0001314E: ;
+label_0001314E:
+ ;
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413157u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413157u));
     *(uint32_t*)(cpu->esp + 0x50u) = 0u;
@@ -2179,11 +2147,11 @@ label_0001314E: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413174u)); sfera_sub_00412100(cpu, LIFT_CODE_TOKEN_VA(0x413174u));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1317Bu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1317Bu));
-    label_0001317B:
+label_0001317B:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413184u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413184u));
     goto label_00013218;
-    label_00013189:
+label_00013189:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41318Eu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x41318Eu));
     cpu->ecx = cpu->esp + 0x28u;
     cpu->edi = cpu->eax;
@@ -2196,11 +2164,11 @@ label_0001314E: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4131B7u)); sfera_sub_0040A590(cpu, LIFT_CODE_TOKEN_VA(0x4131B7u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x131BEu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x131BEu));
-    label_000131BE:
+label_000131BE:
     cpu->ecx = cpu->esp + 0x28u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4131C7u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x4131C7u));
     goto label_00013218;
-    label_000131C9:
+label_000131C9:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4131CEu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4131CEu));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00013218;
     lift_push32(cpu, cpu->eax);
@@ -2209,7 +2177,7 @@ label_0001314E: ;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4131E6u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x4131E6u));
     goto label_00013218;
-    label_000131E8:
+label_000131E8:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4131EDu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4131EDu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4131F4u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4131F4u));
@@ -2220,17 +2188,15 @@ label_0001314E: ;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41320Du)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x41320Du));
     goto label_00013218;
-    label_0001320F:
+label_0001320F:
     cpu->edx = cpu->esi;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13218u)); sfera_sub_00405A00(cpu, LIFT_CODE_TOKEN_RVA(0x13218u));
-    label_00013218:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x48u);
-    (void)0; /* source SEH registration eliminated */
+label_00013218:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x48u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00013260:
+label_00013260:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -2238,7 +2204,6 @@ label_0001314E: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x48u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413297u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x413297u));
     if (cpu->eax > 9u) goto label_000133CC;
@@ -2253,7 +2218,8 @@ label_0001314E: ;
         case 9u: goto label_000133C1;
         default: lift_trap(cpu, 0x4132A0u, "resolved jump-table index out of range"); return;
     }
-label_000132A7: ;
+label_000132A7:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4132ACu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4132ACu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4132B3u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4132B3u));
@@ -2263,7 +2229,7 @@ label_000132A7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4132C9u)); sfera_sub_00405BB0(cpu, LIFT_CODE_TOKEN_VA(0x4132C9u));
     cpu->ecx = cpu->eax;
     goto label_000133CF;
-    label_000132D0:
+label_000132D0:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4132D5u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4132D5u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4132DCu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4132DCu));
@@ -2273,11 +2239,11 @@ label_000132A7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4132F2u)); sfera_sub_00405C00(cpu, LIFT_CODE_TOKEN_VA(0x4132F2u));
     cpu->ecx = cpu->eax;
     goto label_000133CF;
-    label_000132F9:
+label_000132F9:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_000133CF;
-    label_00013306:
+label_00013306:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41330Fu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x41330Fu));
     *(uint32_t*)(cpu->esp + 0x50u) = 0u;
@@ -2291,12 +2257,12 @@ label_000132A7: ;
     cpu->ecx = 0u;
     *(uint32_t*)(cpu->eax) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1333Du)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1333Du));
-    label_0001333D:
+label_0001333D:
     cpu->ecx = cpu->esp + 0xCu;
-    label_00013341:
+label_00013341:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413346u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413346u));
     goto label_000133D4;
-    label_0001334B:
+label_0001334B:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413354u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413354u));
     *(uint32_t*)(cpu->esp + 0x50u) = 1u;
@@ -2310,7 +2276,7 @@ label_000132A7: ;
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413381u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413381u));
     goto label_000133D4;
-    label_00013383:
+label_00013383:
     cpu->ecx = cpu->esp + 0x28u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41338Cu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x41338Cu));
     *(uint32_t*)(cpu->esp + 0x50u) = 2u;
@@ -2323,26 +2289,24 @@ label_000132A7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4133AFu)); sfera_sub_00408450(cpu, LIFT_CODE_TOKEN_VA(0x4133AFu));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x133B6u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x133B6u));
-    label_000133B6:
+label_000133B6:
     cpu->ecx = cpu->esp + 0x28u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4133BFu)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x4133BFu));
     goto label_000133D4;
-    label_000133C1:
+label_000133C1:
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4133C8u)); sfera_sub_0040E860(cpu, LIFT_CODE_TOKEN_VA(0x4133C8u));
     cpu->ecx = 0u;
     goto label_000133CF;
-    label_000133CC:
+label_000133CC:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_000133CF:
+label_000133CF:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x133D4u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x133D4u));
-    label_000133D4:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x48u);
-    (void)0; /* source SEH registration eliminated */
+label_000133D4:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x48u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00013420:
+label_00013420:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -2350,7 +2314,6 @@ label_000132A7: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x4Cu;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413457u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x413457u));
     if (cpu->eax > 9u) goto label_00013592;
@@ -2365,7 +2328,8 @@ label_000132A7: ;
         case 9u: goto label_00013587;
         default: lift_trap(cpu, 0x413460u, "resolved jump-table index out of range"); return;
     }
-label_00013467: ;
+label_00013467:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41346Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41346Cu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413473u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413473u));
@@ -2375,7 +2339,7 @@ label_00013467: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413489u)); sfera_sub_00405D10(cpu, LIFT_CODE_TOKEN_VA(0x413489u));
     cpu->ecx = cpu->eax;
     goto label_00013595;
-    label_00013490:
+label_00013490:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413495u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413495u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41349Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41349Cu));
@@ -2385,17 +2349,17 @@ label_00013467: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4134B2u)); sfera_sub_00405D60(cpu, LIFT_CODE_TOKEN_VA(0x4134B2u));
     cpu->ecx = cpu->eax;
     goto label_00013595;
-    label_000134B9:
+label_000134B9:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_00013595;
-    label_000134C6:
+label_000134C6:
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4134CFu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x4134CFu));
     *(uint32_t*)(cpu->esp + 0x54u) = 0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4134DCu)); sfera_sub_0043B0C0(cpu, LIFT_CODE_TOKEN_VA(0x4134DCu));
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 1, 7u * sizeof(double)); if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00013503;
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4134DCu)); value_2 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x4134DCu));
+    *(float*)(cpu->esp + 0xCu) = value_2; 
+     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00013503;
     cpu->eax = cpu->esp + 0x10u;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = cpu->esi + 0x14u;
@@ -2404,12 +2368,12 @@ label_00013467: ;
     cpu->ecx = 0u;
     *(float*)(cpu->eax) = x87_p0; 
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13503u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x13503u));
-    label_00013503:
+label_00013503:
     cpu->ecx = cpu->esp + 0x10u;
-    label_00013507:
+label_00013507:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41350Cu)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x41350Cu));
     goto label_0001359A;
-    label_00013511:
+label_00013511:
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41351Au)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x41351Au));
     *(uint32_t*)(cpu->esp + 0x54u) = 1u;
@@ -2423,7 +2387,7 @@ label_00013467: ;
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413547u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413547u));
     goto label_0001359A;
-    label_00013549:
+label_00013549:
     cpu->ecx = cpu->esp + 0x2Cu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413552u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413552u));
     *(uint32_t*)(cpu->esp + 0x54u) = 2u;
@@ -2436,26 +2400,24 @@ label_00013467: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413575u)); sfera_sub_00408510(cpu, LIFT_CODE_TOKEN_VA(0x413575u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1357Cu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1357Cu));
-    label_0001357C:
+label_0001357C:
     cpu->ecx = cpu->esp + 0x2Cu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413585u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413585u));
     goto label_0001359A;
-    label_00013587:
+label_00013587:
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41358Eu)); sfera_sub_0040E860(cpu, LIFT_CODE_TOKEN_VA(0x41358Eu));
     cpu->ecx = 0u;
     goto label_00013595;
-    label_00013592:
+label_00013592:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_00013595:
+label_00013595:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1359Au)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1359Au));
-    label_0001359A:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x4Cu);
-    (void)0; /* source SEH registration eliminated */
+label_0001359A:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x4Cu;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000135E0:
+label_000135E0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -2463,7 +2425,6 @@ label_00013467: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x30u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413617u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x413617u));
     if (cpu->eax > 9u) goto label_00013729;
@@ -2478,7 +2439,8 @@ label_00013467: ;
         case 9u: goto label_0001371E;
         default: lift_trap(cpu, 0x413620u, "resolved jump-table index out of range"); return;
     }
-label_00013627: ;
+label_00013627:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41362Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41362Cu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413633u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413633u));
@@ -2488,7 +2450,7 @@ label_00013627: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413649u)); sfera_sub_00405DC0(cpu, LIFT_CODE_TOKEN_VA(0x413649u));
     cpu->ecx = cpu->eax;
     goto label_0001372C;
-    label_00013650:
+label_00013650:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413655u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413655u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41365Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41365Cu));
@@ -2498,11 +2460,11 @@ label_00013627: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413672u)); sfera_sub_00405E10(cpu, LIFT_CODE_TOKEN_VA(0x413672u));
     cpu->ecx = cpu->eax;
     goto label_0001372C;
-    label_00013679:
+label_00013679:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_0001372C;
-    label_00013686:
+label_00013686:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41368Bu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x41368Bu));
     cpu->ecx = cpu->esp + 0x10u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
@@ -2519,11 +2481,11 @@ label_00013627: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4136C2u)); sfera_sub_00409130(cpu, LIFT_CODE_TOKEN_VA(0x4136C2u));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x136C9u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x136C9u));
-    label_000136C9:
+label_000136C9:
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4136D2u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x4136D2u));
     goto label_00013731;
-    label_000136D4:
+label_000136D4:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4136D9u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4136D9u));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_00013731;
@@ -2533,7 +2495,7 @@ label_00013627: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4136F2u)); sfera_sub_00410590(cpu, LIFT_CODE_TOKEN_VA(0x4136F2u));
     cpu->ecx = 0u;
     goto label_0001372C;
-    label_000136F6:
+label_000136F6:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4136FBu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4136FBu));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413704u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413704u));
@@ -2545,22 +2507,20 @@ label_00013627: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41371Au)); sfera_sub_00406D60(cpu, LIFT_CODE_TOKEN_VA(0x41371Au));
     cpu->ecx = cpu->eax;
     goto label_0001372C;
-    label_0001371E:
+label_0001371E:
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413725u)); sfera_sub_0040E890(cpu, LIFT_CODE_TOKEN_VA(0x413725u));
     cpu->ecx = 0u;
     goto label_0001372C;
-    label_00013729:
+label_00013729:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_0001372C:
+label_0001372C:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13731u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x13731u));
-    label_00013731:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x30u);
-    (void)0; /* source SEH registration eliminated */
+label_00013731:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x30u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00013780:
+label_00013780:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -2568,7 +2528,6 @@ label_00013627: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x64u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4137B7u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4137B7u));
     if (cpu->eax > 9u) goto label_00013906;
@@ -2583,7 +2542,8 @@ label_00013627: ;
         case 9u: goto label_000138FB;
         default: lift_trap(cpu, 0x4137C0u, "resolved jump-table index out of range"); return;
     }
-label_000137C7: ;
+label_000137C7:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4137CCu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4137CCu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4137D3u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4137D3u));
@@ -2593,7 +2553,7 @@ label_000137C7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4137E9u)); sfera_sub_00405E70(cpu, LIFT_CODE_TOKEN_VA(0x4137E9u));
     cpu->ecx = cpu->eax;
     goto label_00013909;
-    label_000137F0:
+label_000137F0:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4137F5u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4137F5u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4137FCu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4137FCu));
@@ -2603,11 +2563,11 @@ label_000137C7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413812u)); sfera_sub_00405EB0(cpu, LIFT_CODE_TOKEN_VA(0x413812u));
     cpu->ecx = cpu->eax;
     goto label_00013909;
-    label_00013819:
+label_00013819:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_00013909;
-    label_00013826:
+label_00013826:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41382Fu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x41382Fu));
     cpu->ecx = cpu->esp + 0x28u;
@@ -2625,14 +2585,14 @@ label_000137C7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413867u)); sfera_sub_00409130(cpu, LIFT_CODE_TOKEN_VA(0x413867u));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1386Eu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1386Eu));
-    label_0001386E:
+label_0001386E:
     cpu->ecx = cpu->esp + 0x28u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13877u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_RVA(0x13877u));
-    label_00013877:
+label_00013877:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413880u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413880u));
     goto label_0001390E;
-    label_00013885:
+label_00013885:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41388Eu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x41388Eu));
     *(uint32_t*)(cpu->esp + 0x6Cu) = 2u;
@@ -2646,7 +2606,7 @@ label_000137C7: ;
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4138BBu)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x4138BBu));
     goto label_0001390E;
-    label_000138BD:
+label_000138BD:
     cpu->ecx = cpu->esp + 0x44u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4138C6u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x4138C6u));
     *(uint32_t*)(cpu->esp + 0x6Cu) = 3u;
@@ -2659,26 +2619,24 @@ label_000137C7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4138E9u)); sfera_sub_00408590(cpu, LIFT_CODE_TOKEN_VA(0x4138E9u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x138F0u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x138F0u));
-    label_000138F0:
+label_000138F0:
     cpu->ecx = cpu->esp + 0x44u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4138F9u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x4138F9u));
     goto label_0001390E;
-    label_000138FB:
+label_000138FB:
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413902u)); sfera_sub_0040E8C0(cpu, LIFT_CODE_TOKEN_VA(0x413902u));
     cpu->ecx = 0u;
     goto label_00013909;
-    label_00013906:
+label_00013906:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_00013909:
+label_00013909:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1390Eu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1390Eu));
-    label_0001390E:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x64u);
-    (void)0; /* source SEH registration eliminated */
+label_0001390E:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x64u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00013960:
+label_00013960:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -2686,7 +2644,6 @@ label_000137C7: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x50u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413997u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x413997u));
     if (cpu->eax > 9u) goto label_00013AE3;
@@ -2701,7 +2658,8 @@ label_000137C7: ;
         case 9u: goto label_00013AD8;
         default: lift_trap(cpu, 0x4139A0u, "resolved jump-table index out of range"); return;
     }
-label_000139A7: ;
+label_000139A7:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4139ACu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4139ACu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4139B3u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4139B3u));
@@ -2711,7 +2669,7 @@ label_000139A7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4139C9u)); sfera_sub_00405FC0(cpu, LIFT_CODE_TOKEN_VA(0x4139C9u));
     cpu->ecx = cpu->eax;
     goto label_00013AE6;
-    label_000139D0:
+label_000139D0:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4139D5u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4139D5u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4139DCu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4139DCu));
@@ -2721,11 +2679,11 @@ label_000139A7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4139F2u)); sfera_sub_00406000(cpu, LIFT_CODE_TOKEN_VA(0x4139F2u));
     cpu->ecx = cpu->eax;
     goto label_00013AE6;
-    label_000139F9:
+label_000139F9:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_00013AE6;
-    label_00013A06:
+label_00013A06:
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413A0Fu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413A0Fu));
     cpu->ecx = cpu->esp + 0xCu;
@@ -2741,15 +2699,15 @@ label_000139A7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413A3Fu)); sfera_sub_00412B70(cpu, LIFT_CODE_TOKEN_VA(0x413A3Fu));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13A46u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x13A46u));
-    label_00013A46:
+label_00013A46:
     cpu->ecx = cpu->esp + 0xCu;
     *(uint8_t*)(cpu->esp + 0x58u) = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13A54u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_RVA(0x13A54u));
-    label_00013A54:
+label_00013A54:
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413A5Du)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413A5Du));
     goto label_00013AEB;
-    label_00013A62:
+label_00013A62:
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413A6Bu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413A6Bu));
     *(uint32_t*)(cpu->esp + 0x58u) = 2u;
@@ -2763,7 +2721,7 @@ label_000139A7: ;
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413A98u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413A98u));
     goto label_00013AEB;
-    label_00013A9A:
+label_00013A9A:
     cpu->ecx = cpu->esp + 0x30u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413AA3u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413AA3u));
     *(uint32_t*)(cpu->esp + 0x58u) = 3u;
@@ -2776,26 +2734,24 @@ label_000139A7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413AC6u)); sfera_sub_00408610(cpu, LIFT_CODE_TOKEN_VA(0x413AC6u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13ACDu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x13ACDu));
-    label_00013ACD:
+label_00013ACD:
     cpu->ecx = cpu->esp + 0x30u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413AD6u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413AD6u));
     goto label_00013AEB;
-    label_00013AD8:
+label_00013AD8:
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413ADFu)); sfera_sub_0040E8F0(cpu, LIFT_CODE_TOKEN_VA(0x413ADFu));
     cpu->ecx = 0u;
     goto label_00013AE6;
-    label_00013AE3:
+label_00013AE3:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_00013AE6:
+label_00013AE6:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13AEBu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x13AEBu));
-    label_00013AEB:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x50u);
-    (void)0; /* source SEH registration eliminated */
+label_00013AEB:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x50u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00013CC0:
+label_00013CC0:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     --cpu->eax;
     if (cpu->eax > 4u) goto label_00013CE9;
@@ -2807,19 +2763,20 @@ label_000139A7: ;
         case 4u: goto label_00013CE4;
         default: lift_trap(cpu, 0x413CC9u, "resolved jump-table index out of range"); return;
     }
-label_00013CD0: ;
+label_00013CD0:
+ ;
     goto label_00009350;
-    label_00013CD5:
+label_00013CD5:
     goto label_00009450;
-    label_00013CDA:
+label_00013CDA:
     goto label_00009550;
-    label_00013CDF:
+label_00013CDF:
     goto label_00013100;
-    label_00013CE4:
+label_00013CE4:
     goto label_0000D0E0;
-    label_00013CE9:
+label_00013CE9:
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00013D00:
+label_00013D00:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -2827,7 +2784,6 @@ label_00013CD0: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x48u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413D37u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x413D37u));
     if (cpu->eax > 9u) goto label_00013E7B;
@@ -2842,7 +2798,8 @@ label_00013CD0: ;
         case 9u: goto label_00013E61;
         default: lift_trap(cpu, 0x413D40u, "resolved jump-table index out of range"); return;
     }
-label_00013D47: ;
+label_00013D47:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413D4Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413D4Cu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413D53u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413D53u));
@@ -2852,7 +2809,7 @@ label_00013D47: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413D69u)); sfera_sub_00406E90(cpu, LIFT_CODE_TOKEN_VA(0x413D69u));
     cpu->ecx = cpu->eax;
     goto label_00013E7E;
-    label_00013D70:
+label_00013D70:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413D75u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413D75u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413D7Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413D7Cu));
@@ -2862,11 +2819,11 @@ label_00013D47: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413D92u)); sfera_sub_00406EE0(cpu, LIFT_CODE_TOKEN_VA(0x413D92u));
     cpu->ecx = cpu->eax;
     goto label_00013E7E;
-    label_00013D99:
+label_00013D99:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_00013E7E;
-    label_00013DA6:
+label_00013DA6:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413DAFu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413DAFu));
     *(uint32_t*)(cpu->esp + 0x50u) = 0u;
@@ -2880,12 +2837,12 @@ label_00013D47: ;
     cpu->ecx = 0u;
     *(uint32_t*)(cpu->eax) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13DDDu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x13DDDu));
-    label_00013DDD:
+label_00013DDD:
     cpu->ecx = cpu->esp + 0xCu;
-    label_00013DE1:
+label_00013DE1:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413DE6u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413DE6u));
     goto label_00013E83;
-    label_00013DEB:
+label_00013DEB:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413DF4u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413DF4u));
     *(uint32_t*)(cpu->esp + 0x50u) = 1u;
@@ -2899,7 +2856,7 @@ label_00013D47: ;
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413E21u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413E21u));
     goto label_00013E83;
-    label_00013E23:
+label_00013E23:
     cpu->ecx = cpu->esp + 0x28u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413E2Cu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413E2Cu));
     *(uint32_t*)(cpu->esp + 0x50u) = 2u;
@@ -2912,11 +2869,11 @@ label_00013D47: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413E4Fu)); sfera_sub_00409CD0(cpu, LIFT_CODE_TOKEN_VA(0x413E4Fu));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13E56u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x13E56u));
-    label_00013E56:
+label_00013E56:
     cpu->ecx = cpu->esp + 0x28u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413E5Fu)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413E5Fu));
     goto label_00013E83;
-    label_00013E61:
+label_00013E61:
     cpu->ecx = cpu->esi + 0x18u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413E69u)); sfera_sub_004BC130(cpu, LIFT_CODE_TOKEN_VA(0x413E69u));
     lift_push32(cpu, 8u);
@@ -2925,17 +2882,15 @@ label_00013D47: ;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx = 0u;
     goto label_00013E7E;
-    label_00013E7B:
+label_00013E7B:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_00013E7E:
+label_00013E7E:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13E83u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x13E83u));
-    label_00013E83:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x48u);
-    (void)0; /* source SEH registration eliminated */
+label_00013E83:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x48u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00013ED0:
+label_00013ED0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -2943,7 +2898,6 @@ label_00013D47: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x4Cu;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413F07u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x413F07u));
     if (cpu->eax > 9u) goto label_00014051;
@@ -2958,7 +2912,8 @@ label_00013D47: ;
         case 9u: goto label_00014037;
         default: lift_trap(cpu, 0x413F10u, "resolved jump-table index out of range"); return;
     }
-label_00013F17: ;
+label_00013F17:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413F1Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413F1Cu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413F23u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413F23u));
@@ -2968,7 +2923,7 @@ label_00013F17: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413F39u)); sfera_sub_00407090(cpu, LIFT_CODE_TOKEN_VA(0x413F39u));
     cpu->ecx = cpu->eax;
     goto label_00014054;
-    label_00013F40:
+label_00013F40:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413F45u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413F45u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413F4Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x413F4Cu));
@@ -2978,17 +2933,17 @@ label_00013F17: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413F62u)); sfera_sub_004070E0(cpu, LIFT_CODE_TOKEN_VA(0x413F62u));
     cpu->ecx = cpu->eax;
     goto label_00014054;
-    label_00013F69:
+label_00013F69:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_00014054;
-    label_00013F76:
+label_00013F76:
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413F7Fu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413F7Fu));
     *(uint32_t*)(cpu->esp + 0x54u) = 0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413F8Cu)); sfera_sub_0043B0C0(cpu, LIFT_CODE_TOKEN_VA(0x413F8Cu));
-    *(float*)(cpu->esp + 0xCu) = cpu->fpu[0u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 1, 7u * sizeof(double)); if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00013FB3;
+    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413F8Cu)); value_3 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x413F8Cu));
+    *(float*)(cpu->esp + 0xCu) = value_3; 
+     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_00013FB3;
     cpu->eax = cpu->esp + 0x10u;
     lift_push32(cpu, cpu->eax);
     cpu->ecx = cpu->esi + 0x14u;
@@ -2997,12 +2952,12 @@ label_00013F17: ;
     cpu->ecx = 0u;
     *(float*)(cpu->eax) = x87_p0; 
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x13FB3u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x13FB3u));
-    label_00013FB3:
+label_00013FB3:
     cpu->ecx = cpu->esp + 0x10u;
-    label_00013FB7:
+label_00013FB7:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413FBCu)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413FBCu));
     goto label_00014059;
-    label_00013FC1:
+label_00013FC1:
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413FCAu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x413FCAu));
     *(uint32_t*)(cpu->esp + 0x54u) = 1u;
@@ -3016,7 +2971,7 @@ label_00013F17: ;
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x413FF7u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x413FF7u));
     goto label_00014059;
-    label_00013FF9:
+label_00013FF9:
     cpu->ecx = cpu->esp + 0x2Cu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414002u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x414002u));
     *(uint32_t*)(cpu->esp + 0x54u) = 2u;
@@ -3029,11 +2984,11 @@ label_00013F17: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414025u)); sfera_sub_00409D90(cpu, LIFT_CODE_TOKEN_VA(0x414025u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1402Cu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1402Cu));
-    label_0001402C:
+label_0001402C:
     cpu->ecx = cpu->esp + 0x2Cu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414035u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x414035u));
     goto label_00014059;
-    label_00014037:
+label_00014037:
     cpu->ecx = cpu->esi + 0x18u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41403Fu)); sfera_sub_004BC130(cpu, LIFT_CODE_TOKEN_VA(0x41403Fu));
     lift_push32(cpu, 8u);
@@ -3042,17 +2997,15 @@ label_00013F17: ;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx = 0u;
     goto label_00014054;
-    label_00014051:
+label_00014051:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_00014054:
+label_00014054:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x14059u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x14059u));
-    label_00014059:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x4Cu);
-    (void)0; /* source SEH registration eliminated */
+label_00014059:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x4Cu;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000140A0:
+label_000140A0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -3060,7 +3013,6 @@ label_00013F17: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x30u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4140D7u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4140D7u));
     if (cpu->eax > 9u) goto label_000141F8;
@@ -3075,7 +3027,8 @@ label_00013F17: ;
         case 9u: goto label_000141DE;
         default: lift_trap(cpu, 0x4140E0u, "resolved jump-table index out of range"); return;
     }
-label_000140E7: ;
+label_000140E7:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4140ECu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4140ECu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4140F3u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4140F3u));
@@ -3085,7 +3038,7 @@ label_000140E7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414109u)); sfera_sub_004071D0(cpu, LIFT_CODE_TOKEN_VA(0x414109u));
     cpu->ecx = cpu->eax;
     goto label_000141FB;
-    label_00014110:
+label_00014110:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414115u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x414115u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41411Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41411Cu));
@@ -3095,11 +3048,11 @@ label_000140E7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414132u)); sfera_sub_00407220(cpu, LIFT_CODE_TOKEN_VA(0x414132u));
     cpu->ecx = cpu->eax;
     goto label_000141FB;
-    label_00014139:
+label_00014139:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_000141FB;
-    label_00014146:
+label_00014146:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41414Bu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x41414Bu));
     cpu->ecx = cpu->esp + 0x10u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
@@ -3116,11 +3069,11 @@ label_000140E7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414182u)); sfera_sub_00409130(cpu, LIFT_CODE_TOKEN_VA(0x414182u));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x14189u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x14189u));
-    label_00014189:
+label_00014189:
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414192u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x414192u));
     goto label_00014200;
-    label_00014194:
+label_00014194:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414199u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x414199u));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_00014200;
@@ -3130,7 +3083,7 @@ label_000140E7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4141B2u)); sfera_sub_004111E0(cpu, LIFT_CODE_TOKEN_VA(0x4141B2u));
     cpu->ecx = 0u;
     goto label_000141FB;
-    label_000141B6:
+label_000141B6:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4141BBu)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4141BBu));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4141C4u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4141C4u));
@@ -3142,7 +3095,7 @@ label_000140E7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4141DAu)); sfera_sub_00409E10(cpu, LIFT_CODE_TOKEN_VA(0x4141DAu));
     cpu->ecx = cpu->eax;
     goto label_000141FB;
-    label_000141DE:
+label_000141DE:
     cpu->ecx = cpu->esi + 0x18u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4141E6u)); sfera_sub_0040BB40(cpu, LIFT_CODE_TOKEN_VA(0x4141E6u));
     lift_push32(cpu, 8u);
@@ -3151,17 +3104,15 @@ label_000140E7: ;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx = 0u;
     goto label_000141FB;
-    label_000141F8:
+label_000141F8:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_000141FB:
+label_000141FB:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x14200u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x14200u));
-    label_00014200:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x30u);
-    (void)0; /* source SEH registration eliminated */
+label_00014200:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x30u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00014250:
+label_00014250:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -3169,7 +3120,6 @@ label_000140E7: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x64u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414287u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x414287u));
     if (cpu->eax > 9u) goto label_000143E5;
@@ -3184,7 +3134,8 @@ label_000140E7: ;
         case 9u: goto label_000143CB;
         default: lift_trap(cpu, 0x414290u, "resolved jump-table index out of range"); return;
     }
-label_00014297: ;
+label_00014297:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41429Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41429Cu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4142A3u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4142A3u));
@@ -3194,7 +3145,7 @@ label_00014297: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4142B9u)); sfera_sub_00407270(cpu, LIFT_CODE_TOKEN_VA(0x4142B9u));
     cpu->ecx = cpu->eax;
     goto label_000143E8;
-    label_000142C0:
+label_000142C0:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4142C5u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4142C5u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4142CCu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4142CCu));
@@ -3204,11 +3155,11 @@ label_00014297: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4142E2u)); sfera_sub_004072B0(cpu, LIFT_CODE_TOKEN_VA(0x4142E2u));
     cpu->ecx = cpu->eax;
     goto label_000143E8;
-    label_000142E9:
+label_000142E9:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_000143E8;
-    label_000142F6:
+label_000142F6:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4142FFu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x4142FFu));
     cpu->ecx = cpu->esp + 0x28u;
@@ -3226,14 +3177,14 @@ label_00014297: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414337u)); sfera_sub_00409130(cpu, LIFT_CODE_TOKEN_VA(0x414337u));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1433Eu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1433Eu));
-    label_0001433E:
+label_0001433E:
     cpu->ecx = cpu->esp + 0x28u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x14347u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_RVA(0x14347u));
-    label_00014347:
+label_00014347:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414350u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x414350u));
     goto label_000143ED;
-    label_00014355:
+label_00014355:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41435Eu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x41435Eu));
     *(uint32_t*)(cpu->esp + 0x6Cu) = 2u;
@@ -3247,7 +3198,7 @@ label_00014297: ;
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41438Bu)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x41438Bu));
     goto label_000143ED;
-    label_0001438D:
+label_0001438D:
     cpu->ecx = cpu->esp + 0x44u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414396u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x414396u));
     *(uint32_t*)(cpu->esp + 0x6Cu) = 3u;
@@ -3260,11 +3211,11 @@ label_00014297: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4143B9u)); sfera_sub_00409E50(cpu, LIFT_CODE_TOKEN_VA(0x4143B9u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x143C0u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x143C0u));
-    label_000143C0:
+label_000143C0:
     cpu->ecx = cpu->esp + 0x44u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4143C9u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x4143C9u));
     goto label_000143ED;
-    label_000143CB:
+label_000143CB:
     cpu->ecx = cpu->esi + 0x18u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4143D3u)); sfera_sub_0040BBA0(cpu, LIFT_CODE_TOKEN_VA(0x4143D3u));
     lift_push32(cpu, 8u);
@@ -3273,17 +3224,15 @@ label_00014297: ;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx = 0u;
     goto label_000143E8;
-    label_000143E5:
+label_000143E5:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_000143E8:
+label_000143E8:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x143EDu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x143EDu));
-    label_000143ED:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x64u);
-    (void)0; /* source SEH registration eliminated */
+label_000143ED:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x64u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00014440:
+label_00014440:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -3291,7 +3240,6 @@ label_00014297: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x50u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414477u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x414477u));
     if (cpu->eax > 9u) goto label_000145D2;
@@ -3306,7 +3254,8 @@ label_00014297: ;
         case 9u: goto label_000145B8;
         default: lift_trap(cpu, 0x414480u, "resolved jump-table index out of range"); return;
     }
-label_00014487: ;
+label_00014487:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41448Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41448Cu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414493u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x414493u));
@@ -3316,7 +3265,7 @@ label_00014487: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4144A9u)); sfera_sub_00407430(cpu, LIFT_CODE_TOKEN_VA(0x4144A9u));
     cpu->ecx = cpu->eax;
     goto label_000145D5;
-    label_000144B0:
+label_000144B0:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4144B5u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4144B5u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4144BCu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4144BCu));
@@ -3326,11 +3275,11 @@ label_00014487: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4144D2u)); sfera_sub_00407470(cpu, LIFT_CODE_TOKEN_VA(0x4144D2u));
     cpu->ecx = cpu->eax;
     goto label_000145D5;
-    label_000144D9:
+label_000144D9:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_000145D5;
-    label_000144E6:
+label_000144E6:
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4144EFu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x4144EFu));
     cpu->ecx = cpu->esp + 0xCu;
@@ -3346,15 +3295,15 @@ label_00014487: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41451Fu)); sfera_sub_00413B30(cpu, LIFT_CODE_TOKEN_VA(0x41451Fu));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x14526u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x14526u));
-    label_00014526:
+label_00014526:
     cpu->ecx = cpu->esp + 0xCu;
     *(uint8_t*)(cpu->esp + 0x58u) = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x14534u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_RVA(0x14534u));
-    label_00014534:
+label_00014534:
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41453Du)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x41453Du));
     goto label_000145DA;
-    label_00014542:
+label_00014542:
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41454Bu)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x41454Bu));
     *(uint32_t*)(cpu->esp + 0x58u) = 2u;
@@ -3368,7 +3317,7 @@ label_00014487: ;
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414578u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x414578u));
     goto label_000145DA;
-    label_0001457A:
+label_0001457A:
     cpu->ecx = cpu->esp + 0x30u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414583u)); sfera_sub_0040A500(cpu, LIFT_CODE_TOKEN_VA(0x414583u));
     *(uint32_t*)(cpu->esp + 0x58u) = 3u;
@@ -3381,11 +3330,11 @@ label_00014487: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4145A6u)); sfera_sub_00409F10(cpu, LIFT_CODE_TOKEN_VA(0x4145A6u));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x145ADu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x145ADu));
-    label_000145AD:
+label_000145AD:
     cpu->ecx = cpu->esp + 0x30u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4145B6u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_VA(0x4145B6u));
     goto label_000145DA;
-    label_000145B8:
+label_000145B8:
     cpu->ecx = cpu->esi + 0x18u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4145C0u)); sfera_sub_0040BC20(cpu, LIFT_CODE_TOKEN_VA(0x4145C0u));
     lift_push32(cpu, 8u);
@@ -3394,17 +3343,15 @@ label_00014487: ;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx = 0u;
     goto label_000145D5;
-    label_000145D2:
+label_000145D2:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_000145D5:
+label_000145D5:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x145DAu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x145DAu));
-    label_000145DA:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x50u);
-    (void)0; /* source SEH registration eliminated */
+label_000145DA:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x50u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00014620:
+label_00014620:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0x10u);
     --cpu->eax;
     if (cpu->eax > 4u) goto label_00014684;
@@ -3416,37 +3363,38 @@ label_00014487: ;
         case 4u: goto label_0001466F;
         default: lift_trap(cpu, 0x414629u, "resolved jump-table index out of range"); return;
     }
-label_00014630: ;
+label_00014630:
+ ;
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     if ((--cpu->eax) == 0u) goto label_00014640;
     if ((cpu->eax -= 3u) != 0u) goto label_00014684;
     goto label_00013260;
-    label_00014640:
+label_00014640:
     goto label_0000A870;
-    label_00014645:
+label_00014645:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     if ((--cpu->eax) == 0u) goto label_00014655;
     if ((cpu->eax -= 3u) != 0u) goto label_00014684;
     goto label_00013420;
-    label_00014655:
+label_00014655:
     goto label_0000A9E0;
-    label_0001465A:
+label_0001465A:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     if ((--cpu->eax) == 0u) goto label_0001466A;
     if ((cpu->eax -= 3u) != 0u) goto label_00014684;
     goto label_00013780;
-    label_0001466A:
+label_0001466A:
     goto label_000135E0;
-    label_0001466F:
+label_0001466F:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     if ((--cpu->eax) == 0u) goto label_0001467F;
     if ((cpu->eax -= 3u) != 0u) goto label_00014684;
     goto label_00013960;
-    label_0001467F:
+label_0001467F:
     goto label_0000E6D0;
-    label_00014684:
+label_00014684:
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_000146A0:
+label_000146A0:
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax);
@@ -3454,7 +3402,6 @@ label_00014630: ;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x34u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4146D7u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x4146D7u));
     if (cpu->eax > 9u) goto label_0001482B;
@@ -3469,7 +3416,8 @@ label_00014630: ;
         case 9u: goto label_00014811;
         default: lift_trap(cpu, 0x4146E0u, "resolved jump-table index out of range"); return;
     }
-label_000146E7: ;
+label_000146E7:
+ ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4146ECu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4146ECu));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4146F3u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x4146F3u));
@@ -3479,7 +3427,7 @@ label_000146E7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414709u)); sfera_sub_00407300(cpu, LIFT_CODE_TOKEN_VA(0x414709u));
     cpu->ecx = cpu->eax;
     goto label_0001482E;
-    label_00014710:
+label_00014710:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414715u)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x414715u));
     cpu->edi = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41471Cu)); sfera_sub_0043AE70(cpu, LIFT_CODE_TOKEN_VA(0x41471Cu));
@@ -3489,11 +3437,11 @@ label_000146E7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414732u)); sfera_sub_00407340(cpu, LIFT_CODE_TOKEN_VA(0x414732u));
     cpu->ecx = cpu->eax;
     goto label_0001482E;
-    label_00014739:
+label_00014739:
     cpu->ecx = 0u;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esi + 8u) == (uint8_t)(cpu->ecx));
     goto label_0001482E;
-    label_00014746:
+label_00014746:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41474Fu)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x41474Fu));
     cpu->ecx = cpu->esp + 0x14u;
@@ -3511,15 +3459,15 @@ label_000146E7: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414787u)); sfera_sub_00409130(cpu, LIFT_CODE_TOKEN_VA(0x414787u));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1478Eu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x1478Eu));
-    label_0001478E:
+label_0001478E:
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x14797u)); sfera_sub_004061B0(cpu, LIFT_CODE_TOKEN_RVA(0x14797u));
-    label_00014797:
+label_00014797:
     cpu->ecx = cpu->esp + 0xCu;
     *(uint32_t*)(cpu->esp + 0x3Cu) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4147A8u)); sfera_sub_00402CF0(cpu, LIFT_CODE_TOKEN_VA(0x4147A8u));
     goto label_00014833;
-    label_000147AD:
+label_000147AD:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4147B6u)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x4147B6u));
     *(uint32_t*)(cpu->esp + 0x3Cu) = 2u;
@@ -3531,7 +3479,7 @@ label_000146E7: ;
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4147DAu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x4147DAu));
     goto label_00014797;
-    label_000147DC:
+label_000147DC:
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4147E5u)); sfera_sub_00402720(cpu, LIFT_CODE_TOKEN_VA(0x4147E5u));
     *(uint32_t*)(cpu->esp + 0x3Cu) = 3u;
@@ -3545,7 +3493,7 @@ label_000146E7: ;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41480Fu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x41480Fu));
     goto label_00014797;
-    label_00014811:
+label_00014811:
     cpu->ecx = cpu->esi + 0x18u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414819u)); sfera_sub_0040D740(cpu, LIFT_CODE_TOKEN_VA(0x414819u));
     lift_push32(cpu, 8u);
@@ -3554,17 +3502,15 @@ label_000146E7: ;
     *(uint8_t*)(cpu->esi + 8u) = 0u;
     cpu->ecx = 0u;
     goto label_0001482E;
-    label_0001482B:
+label_0001482B:
     cpu->ecx |= 0xFFFFFFFFu;
-    label_0001482E:
+label_0001482E:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x14833u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_RVA(0x14833u));
-    label_00014833:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x34u);
-    (void)0; /* source SEH registration eliminated */
+label_00014833:
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x34u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00014880:
+label_00014880:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0x10u);
     --cpu->eax;
     if (cpu->eax > 4u) goto label_00014904;
@@ -3576,58 +3522,59 @@ label_000146E7: ;
         case 4u: goto label_000148E7;
         default: lift_trap(cpu, 0x414889u, "resolved jump-table index out of range"); return;
     }
-label_00014890: ;
+label_00014890:
+ ;
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     if ((--cpu->eax) == 0u) goto label_000148A8;
     if ((cpu->eax -= 3u) == 0u) goto label_000148A3;
     if ((--cpu->eax) != 0u) goto label_00014904;
     goto label_000122D0;
-    label_000148A3:
+label_000148A3:
     goto label_00013D00;
-    label_000148A8:
+label_000148A8:
     goto label_00012160;
-    label_000148AD:
+label_000148AD:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     if ((--cpu->eax) == 0u) goto label_000148C5;
     if ((cpu->eax -= 3u) == 0u) goto label_000148C0;
     if ((--cpu->eax) != 0u) goto label_00014904;
     goto label_00012610;
-    label_000148C0:
+label_000148C0:
     goto label_00013ED0;
-    label_000148C5:
+label_000148C5:
     goto label_000124A0;
-    label_000148CA:
+label_000148CA:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     if ((--cpu->eax) == 0u) goto label_000148E2;
     if ((cpu->eax -= 3u) == 0u) goto label_000148DD;
     if ((--cpu->eax) != 0u) goto label_00014904;
     goto label_000146A0;
-    label_000148DD:
+label_000148DD:
     goto label_00014250;
-    label_000148E2:
+label_000148E2:
     goto label_000140A0;
-    label_000148E7:
+label_000148E7:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     if ((--cpu->eax) == 0u) goto label_000148FF;
     if ((cpu->eax -= 3u) == 0u) goto label_000148FA;
     if ((--cpu->eax) != 0u) goto label_00014904;
     goto label_00012990;
-    label_000148FA:
+label_000148FA:
     goto label_00014440;
-    label_000148FF:
+label_000148FF:
     goto label_000127F0;
-    label_00014904:
+label_00014904:
     cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_00014920:
+label_00014920:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414925u)); sfera_sub_0043B0B0(cpu, LIFT_CODE_TOKEN_VA(0x414925u));
     cpu->ecx = cpu->eax;
     if (cpu->ecx == 0u) goto label_00014938;
     cpu->eax = (cpu->eax & 0xFFFFFF00u) | (*(uint32_t*)(cpu->ecx) == 0x19285u);
     if ((cpu->eax & 0xFFu) != 0u) goto label_00014940;
-    label_00014938:
+label_00014938:
     cpu->ecx |= 0xFFFFFFFFu;
     sfera_sub_0043B0D0(cpu, stop_address); return;
-    label_00014940:
+label_00014940:
     cpu->eax = *(uint32_t*)(cpu->ecx + 4u);
     --cpu->eax;
     if (cpu->eax > 4u) goto label_00014979;
@@ -3639,22 +3586,23 @@ label_00014890: ;
         case 4u: goto label_00014974;
         default: lift_trap(cpu, 0x414949u, "resolved jump-table index out of range"); return;
     }
-label_00014950: ;
+label_00014950:
+ ;
     goto label_000116B0;
-    label_00014955:
+label_00014955:
     goto label_00013CC0;
-    label_0001495A:
+label_0001495A:
     cpu->eax = *(uint32_t*)(cpu->ecx + 0xCu);
     if ((--cpu->eax) == 0u) goto label_0001496A;
     if ((cpu->eax -= 3u) != 0u) goto label_00014979;
     goto label_000101D0;
-    label_0001496A:
+label_0001496A:
     goto label_00009650;
-    label_0001496F:
+label_0001496F:
     goto label_00014620;
-    label_00014974:
+label_00014974:
     goto label_00014880;
-    label_00014979:
+label_00014979:
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 __declspec(noinline) void sfera_sub_004149A0(LiftCpu* cpu, uint32_t stop_address) {
@@ -3717,7 +3665,6 @@ __declspec(noinline) void sfera_sub_00414A30(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414A60u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x414A60u));
@@ -3738,8 +3685,6 @@ __declspec(noinline) void sfera_sub_00414A30(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 1u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -3763,7 +3708,6 @@ __declspec(noinline) void sfera_sub_00414AE0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414B10u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x414B10u));
@@ -3784,8 +3728,6 @@ __declspec(noinline) void sfera_sub_00414AE0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 1u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -3809,7 +3751,6 @@ __declspec(noinline) void sfera_sub_00414BF0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414C20u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x414C20u));
@@ -3830,8 +3771,6 @@ __declspec(noinline) void sfera_sub_00414BF0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 1u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -3855,7 +3794,6 @@ __declspec(noinline) void sfera_sub_00414CA0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x14u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->esi;
     cpu->edi = cpu->esi + 0x10u;
@@ -3877,8 +3815,6 @@ __declspec(noinline) void sfera_sub_00414CA0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_00014D10:
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -3891,7 +3827,6 @@ __declspec(noinline) void sfera_sub_00414D50(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414D80u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x414D80u));
@@ -3912,8 +3847,6 @@ __declspec(noinline) void sfera_sub_00414D50(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 1u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -3934,8 +3867,6 @@ __declspec(noinline) void sfera_sub_00414E00(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
-    cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     cpu->eax = cpu->ecx + 0xFFFFFFFFu;
     if (cpu->eax > 4u) goto label_00014F3C;
     switch (cpu->eax) {
@@ -3958,8 +3889,6 @@ label_00014E34: ;
     if (cpu->eax == 0u) goto label_00014F3C;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414E68u)); sfera_sub_00414A30(cpu, LIFT_CODE_TOKEN_VA(0x414E68u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -3975,8 +3904,6 @@ label_00014E34: ;
     if (cpu->eax == 0u) goto label_00014F3C;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414EACu)); sfera_sub_00414AE0(cpu, LIFT_CODE_TOKEN_VA(0x414EACu));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -3992,8 +3919,6 @@ label_00014E34: ;
     if (cpu->eax == 0u) goto label_00014F3C;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414EECu)); sfera_sub_00414D50(cpu, LIFT_CODE_TOKEN_VA(0x414EECu));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4009,15 +3934,11 @@ label_00014E34: ;
     if (cpu->eax == 0u) goto label_00014F3C;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x414F2Cu)); sfera_sub_00414BF0(cpu, LIFT_CODE_TOKEN_VA(0x414F2Cu));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00014F3C:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4030,7 +3951,6 @@ __declspec(noinline) void sfera_sub_004150C0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4150F0u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4150F0u));
@@ -4060,8 +3980,6 @@ __declspec(noinline) void sfera_sub_004150C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 4u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4085,7 +4003,6 @@ __declspec(noinline) void sfera_sub_00415190(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4151C0u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4151C0u));
@@ -4115,8 +4032,6 @@ __declspec(noinline) void sfera_sub_00415190(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 4u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4140,7 +4055,6 @@ __declspec(noinline) void sfera_sub_00415260(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->edi;
     cpu->esi = cpu->edi + 0x14u;
@@ -4167,8 +4081,6 @@ __declspec(noinline) void sfera_sub_00415260(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_000152DD:
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -4181,7 +4093,6 @@ __declspec(noinline) void sfera_sub_00415370(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4153A0u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4153A0u));
@@ -4211,8 +4122,6 @@ __declspec(noinline) void sfera_sub_00415370(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 4u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4236,7 +4145,6 @@ __declspec(noinline) void sfera_sub_00415440(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->edi;
     cpu->esi = cpu->edi + 0x14u;
@@ -4263,8 +4171,6 @@ __declspec(noinline) void sfera_sub_00415440(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_000154BD:
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -4277,7 +4183,6 @@ __declspec(noinline) void sfera_sub_004156A0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4156D0u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4156D0u));
@@ -4307,8 +4212,6 @@ __declspec(noinline) void sfera_sub_004156A0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 4u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4332,7 +4235,6 @@ __declspec(noinline) void sfera_sub_00415770(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4157A0u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4157A0u));
@@ -4362,8 +4264,6 @@ __declspec(noinline) void sfera_sub_00415770(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 4u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4387,7 +4287,6 @@ __declspec(noinline) void sfera_sub_00415840(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415870u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x415870u));
@@ -4417,8 +4316,6 @@ __declspec(noinline) void sfera_sub_00415840(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 4u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4442,7 +4339,6 @@ __declspec(noinline) void sfera_sub_00415910(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415940u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x415940u));
@@ -4472,8 +4368,6 @@ __declspec(noinline) void sfera_sub_00415910(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 4u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4497,7 +4391,6 @@ __declspec(noinline) void sfera_sub_004159E0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415A10u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x415A10u));
@@ -4527,8 +4420,6 @@ __declspec(noinline) void sfera_sub_004159E0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 4u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4552,7 +4443,6 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     if ((--cpu->ecx) == 0u) goto label_00015B17;
     if ((cpu->ecx -= 3u) != 0u) goto label_00015B57;
     cpu->edx = cpu->ecx + 0x7Au;
@@ -4566,8 +4456,6 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00015B57;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415B07u)); sfera_sub_004156A0(cpu, LIFT_CODE_TOKEN_VA(0x415B07u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4583,15 +4471,11 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00015B57;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415B47u)); sfera_sub_004150C0(cpu, LIFT_CODE_TOKEN_VA(0x415B47u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00015B57:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4601,7 +4485,6 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     if ((--cpu->ecx) == 0u) goto label_00015BD7;
     if ((cpu->ecx -= 3u) != 0u) goto label_00015C17;
     cpu->edx = cpu->ecx + 0x7Au;
@@ -4615,8 +4498,6 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00015C17;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415BC7u)); sfera_sub_00415770(cpu, LIFT_CODE_TOKEN_VA(0x415BC7u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4632,15 +4513,11 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00015C17;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415C07u)); sfera_sub_00415190(cpu, LIFT_CODE_TOKEN_VA(0x415C07u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00015C17:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4650,7 +4527,6 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     if ((--cpu->ecx) == 0u) goto label_00015C97;
     if ((cpu->ecx -= 3u) != 0u) goto label_00015CD7;
     cpu->edx = cpu->ecx + 0x7Au;
@@ -4664,8 +4540,6 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00015CD7;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415C87u)); sfera_sub_00415910(cpu, LIFT_CODE_TOKEN_VA(0x415C87u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4681,15 +4555,11 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00015CD7;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415CC7u)); sfera_sub_00415840(cpu, LIFT_CODE_TOKEN_VA(0x415CC7u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00015CD7:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4699,7 +4569,6 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     if ((--cpu->ecx) == 0u) goto label_00015D57;
     if ((cpu->ecx -= 3u) != 0u) goto label_00015D97;
     cpu->edx = cpu->ecx + 0x7Au;
@@ -4713,8 +4582,6 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00015D97;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415D47u)); sfera_sub_004159E0(cpu, LIFT_CODE_TOKEN_VA(0x415D47u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4730,15 +4597,11 @@ __declspec(noinline) void sfera_sub_00415DB0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00015D97;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x415D87u)); sfera_sub_00415370(cpu, LIFT_CODE_TOKEN_VA(0x415D87u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00015D97:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4777,7 +4640,6 @@ __declspec(noinline) void sfera_sub_00415E00(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->edi;
     cpu->esi = cpu->edi + 0x14u;
@@ -4804,8 +4666,6 @@ __declspec(noinline) void sfera_sub_00415E00(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_00015E7D:
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -4818,7 +4678,6 @@ __declspec(noinline) void sfera_sub_00415EA0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->edi;
     cpu->esi = cpu->edi + 0x14u;
@@ -4845,8 +4704,6 @@ __declspec(noinline) void sfera_sub_00415EA0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_00015F1D:
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -4859,7 +4716,6 @@ __declspec(noinline) void sfera_sub_00415F40(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->edi;
     cpu->esi = cpu->edi + 0x14u;
@@ -4886,8 +4742,6 @@ __declspec(noinline) void sfera_sub_00415F40(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_00015FBD:
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -4900,7 +4754,6 @@ __declspec(noinline) void sfera_sub_00415FE0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->edi;
     cpu->esi = cpu->edi + 0x14u;
@@ -4927,8 +4780,6 @@ __declspec(noinline) void sfera_sub_00415FE0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_0001605D:
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -5022,7 +4873,6 @@ __declspec(noinline) void sfera_sub_004161D0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x416200u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x416200u));
@@ -5050,8 +4900,6 @@ __declspec(noinline) void sfera_sub_004161D0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 3u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5075,7 +4923,6 @@ __declspec(noinline) void sfera_sub_00416290(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->edi;
     cpu->esi = cpu->edi + 0x10u;
@@ -5102,8 +4949,6 @@ __declspec(noinline) void sfera_sub_00416290(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_0001630D:
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -5116,7 +4961,6 @@ __declspec(noinline) void sfera_sub_004163A0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x20u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4163D0u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4163D0u));
@@ -5144,8 +4988,6 @@ __declspec(noinline) void sfera_sub_004163A0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 3u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x20u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5167,7 +5009,6 @@ __declspec(noinline) void sfera_sub_00416460(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     if ((--cpu->ecx) == 0u) goto label_000164C7;
     if ((cpu->ecx -= 3u) != 0u) goto label_00016507;
     cpu->edx = cpu->ecx + 0xEu;
@@ -5181,8 +5022,6 @@ __declspec(noinline) void sfera_sub_00416460(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00016507;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4164B7u)); sfera_sub_004163A0(cpu, LIFT_CODE_TOKEN_VA(0x4164B7u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5198,15 +5037,11 @@ __declspec(noinline) void sfera_sub_00416460(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00016507;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4164F7u)); sfera_sub_004161D0(cpu, LIFT_CODE_TOKEN_VA(0x4164F7u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00016507:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5219,7 +5054,6 @@ __declspec(noinline) void sfera_sub_00416520(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->edi;
     cpu->esi = cpu->edi + 0x10u;
@@ -5246,8 +5080,6 @@ __declspec(noinline) void sfera_sub_00416520(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_0001659D:
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x18u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -5321,7 +5153,6 @@ __declspec(noinline) void sfera_sub_00416A30(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x14u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->esi;
     cpu->eax = *(uint32_t*)(cpu->esi + 0x24u);
@@ -5353,8 +5184,6 @@ __declspec(noinline) void sfera_sub_00416A30(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_00016AB7:
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -5367,7 +5196,6 @@ __declspec(noinline) void sfera_sub_00416AD0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x14u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->esi;
     cpu->eax = *(uint32_t*)(cpu->esi + 0x24u);
@@ -5399,8 +5227,6 @@ __declspec(noinline) void sfera_sub_00416AD0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_00016B57:
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -5413,7 +5239,6 @@ __declspec(noinline) void sfera_sub_00416B70(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x14u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->esi;
     cpu->eax = *(uint32_t*)(cpu->esi + 0x24u);
@@ -5445,8 +5270,6 @@ __declspec(noinline) void sfera_sub_00416B70(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_00016BF7:
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -5459,7 +5282,6 @@ __declspec(noinline) void sfera_sub_00416C10(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x416C41u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x416C41u));
@@ -5495,8 +5317,6 @@ __declspec(noinline) void sfera_sub_00416C10(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5520,7 +5340,6 @@ __declspec(noinline) void sfera_sub_00416CF0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x416D21u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x416D21u));
@@ -5556,8 +5375,6 @@ __declspec(noinline) void sfera_sub_00416CF0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5581,7 +5398,6 @@ __declspec(noinline) void sfera_sub_00416DD0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x416E01u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x416E01u));
@@ -5617,8 +5433,6 @@ __declspec(noinline) void sfera_sub_00416DD0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5642,7 +5456,6 @@ __declspec(noinline) void sfera_sub_00416EB0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x416EE1u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x416EE1u));
@@ -5678,8 +5491,6 @@ __declspec(noinline) void sfera_sub_00416EB0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5703,7 +5514,6 @@ __declspec(noinline) void sfera_sub_00416F90(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x416FC1u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x416FC1u));
@@ -5739,8 +5549,6 @@ __declspec(noinline) void sfera_sub_00416F90(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5764,7 +5572,6 @@ __declspec(noinline) void sfera_sub_00417070(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4170A1u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4170A1u));
@@ -5800,8 +5607,6 @@ __declspec(noinline) void sfera_sub_00417070(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5825,7 +5630,6 @@ __declspec(noinline) void sfera_sub_004172F0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417321u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x417321u));
@@ -5861,8 +5665,6 @@ __declspec(noinline) void sfera_sub_004172F0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5886,7 +5688,6 @@ __declspec(noinline) void sfera_sub_004173D0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417401u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x417401u));
@@ -5922,8 +5723,6 @@ __declspec(noinline) void sfera_sub_004173D0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -5947,7 +5746,6 @@ __declspec(noinline) void sfera_sub_004174B0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4174E1u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4174E1u));
@@ -5983,8 +5781,6 @@ __declspec(noinline) void sfera_sub_004174B0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6008,7 +5804,6 @@ __declspec(noinline) void sfera_sub_00417590(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4175C1u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4175C1u));
@@ -6044,8 +5839,6 @@ __declspec(noinline) void sfera_sub_00417590(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6069,7 +5862,6 @@ __declspec(noinline) void sfera_sub_00417670(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4176A1u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4176A1u));
@@ -6105,8 +5897,6 @@ __declspec(noinline) void sfera_sub_00417670(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6130,7 +5920,6 @@ __declspec(noinline) void sfera_sub_00417750(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x28u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417781u)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x417781u));
@@ -6166,8 +5955,6 @@ __declspec(noinline) void sfera_sub_00417750(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x10u) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = 5u;
     cpu->eax = cpu->edi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x24u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6191,7 +5978,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     if ((--cpu->ecx) == 0u) goto label_000178E8;
     if ((cpu->ecx -= 3u) == 0u) goto label_000178A8;
     if ((--cpu->ecx) != 0u) goto label_00017928;
@@ -6206,8 +5992,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017928;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417898u)); sfera_sub_00416CF0(cpu, LIFT_CODE_TOKEN_VA(0x417898u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6223,8 +6007,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017928;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4178D8u)); sfera_sub_004172F0(cpu, LIFT_CODE_TOKEN_VA(0x4178D8u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6240,15 +6022,11 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017928;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417918u)); sfera_sub_00416C10(cpu, LIFT_CODE_TOKEN_VA(0x417918u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00017928:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6258,7 +6036,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     if ((--cpu->ecx) == 0u) goto label_000179F8;
     if ((cpu->ecx -= 3u) == 0u) goto label_000179B8;
     if ((--cpu->ecx) != 0u) goto label_00017A38;
@@ -6273,8 +6050,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017A38;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4179A8u)); sfera_sub_00416EB0(cpu, LIFT_CODE_TOKEN_VA(0x4179A8u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6290,8 +6065,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017A38;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4179E8u)); sfera_sub_004173D0(cpu, LIFT_CODE_TOKEN_VA(0x4179E8u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6307,15 +6080,11 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017A38;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417A28u)); sfera_sub_00416DD0(cpu, LIFT_CODE_TOKEN_VA(0x417A28u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00017A38:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6325,7 +6094,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     if ((--cpu->ecx) == 0u) goto label_00017B08;
     if ((cpu->ecx -= 3u) == 0u) goto label_00017AC8;
     if ((--cpu->ecx) != 0u) goto label_00017B48;
@@ -6340,8 +6108,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017B48;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417AB8u)); sfera_sub_00417670(cpu, LIFT_CODE_TOKEN_VA(0x417AB8u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6357,8 +6123,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017B48;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417AF8u)); sfera_sub_00417590(cpu, LIFT_CODE_TOKEN_VA(0x417AF8u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6374,15 +6138,11 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017B48;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417B38u)); sfera_sub_004174B0(cpu, LIFT_CODE_TOKEN_VA(0x417B38u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00017B48:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6392,7 +6152,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     if ((--cpu->ecx) == 0u) goto label_00017C18;
     if ((cpu->ecx -= 3u) == 0u) goto label_00017BD8;
     if ((--cpu->ecx) != 0u) goto label_00017C58;
@@ -6407,8 +6166,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017C58;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417BC8u)); sfera_sub_00417070(cpu, LIFT_CODE_TOKEN_VA(0x417BC8u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6424,8 +6181,6 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017C58;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417C08u)); sfera_sub_00417750(cpu, LIFT_CODE_TOKEN_VA(0x417C08u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6441,15 +6196,11 @@ __declspec(noinline) void sfera_sub_00417C70(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_00017C58;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x417C48u)); sfera_sub_00416F90(cpu, LIFT_CODE_TOKEN_VA(0x417C48u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00017C58:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6581,7 +6332,6 @@ __declspec(noinline) void sfera_sub_00417DE0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x14u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->esi;
     cpu->eax = *(uint32_t*)(cpu->esi + 0x24u);
@@ -6613,8 +6363,6 @@ __declspec(noinline) void sfera_sub_00417DE0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_00017E67:
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -6627,7 +6375,6 @@ __declspec(noinline) void sfera_sub_00417E80(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x14u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->esi;
     cpu->eax = *(uint32_t*)(cpu->esi + 0x24u);
@@ -6659,8 +6406,6 @@ __declspec(noinline) void sfera_sub_00417E80(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 4u;
     label_00017F07:
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x14u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -6786,7 +6531,6 @@ __declspec(noinline) void sfera_sub_004180D0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0xCu;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 8u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4180FDu)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4180FDu));
@@ -6801,8 +6545,6 @@ __declspec(noinline) void sfera_sub_004180D0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 2u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0xCu);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6813,7 +6555,6 @@ __declspec(noinline) void sfera_sub_00418140(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0xCu;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 8u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41816Du)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x41816Du));
@@ -6828,8 +6569,6 @@ __declspec(noinline) void sfera_sub_00418140(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 2u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0xCu);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6840,7 +6579,6 @@ __declspec(noinline) void sfera_sub_004181B0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0xCu;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 8u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4181DDu)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x4181DDu));
@@ -6855,8 +6593,6 @@ __declspec(noinline) void sfera_sub_004181B0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 2u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0xCu);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6889,7 +6625,6 @@ __declspec(noinline) void sfera_sub_004182C0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->edi;
     cpu->esi = *(uint32_t*)(cpu->edi + 0x10u);
@@ -6916,8 +6651,6 @@ __declspec(noinline) void sfera_sub_004182C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->edi + 0x18u) = cpu->ebp;
     *(uint32_t*)(cpu->esp + 0x20u) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x418332u)); sfera_sub_00401E50(cpu, LIFT_CODE_TOKEN_VA(0x418332u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6928,7 +6661,6 @@ __declspec(noinline) void sfera_sub_00418350(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0xCu;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 8u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41837Du)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x41837Du));
@@ -6943,8 +6675,6 @@ __declspec(noinline) void sfera_sub_00418350(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 2u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0xCu);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6955,7 +6685,6 @@ __declspec(noinline) void sfera_sub_00418400(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0xCu;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 8u) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41842Du)); sfera_sub_00401E40(cpu, LIFT_CODE_TOKEN_VA(0x41842Du));
@@ -6970,8 +6699,6 @@ __declspec(noinline) void sfera_sub_00418400(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esi + 4u) = 2u;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0xCu);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -6981,8 +6708,6 @@ __declspec(noinline) void sfera_sub_00418470(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = 0u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
-    cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     cpu->eax = cpu->ecx + 0xFFFFFFFFu;
     if (cpu->eax > 4u) goto label_000185F0;
     switch (cpu->eax) {
@@ -7005,8 +6730,6 @@ label_000184A4: ;
     if (cpu->eax == 0u) goto label_000185F0;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4184D8u)); sfera_sub_004180D0(cpu, LIFT_CODE_TOKEN_VA(0x4184D8u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -7022,8 +6745,6 @@ label_000184A4: ;
     if (cpu->eax == 0u) goto label_000185F0;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41851Cu)); sfera_sub_00418140(cpu, LIFT_CODE_TOKEN_VA(0x41851Cu));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -7039,8 +6760,6 @@ label_000184A4: ;
     if (cpu->eax == 0u) goto label_000185F0;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x418560u)); sfera_sub_004181B0(cpu, LIFT_CODE_TOKEN_VA(0x418560u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -7056,8 +6775,6 @@ label_000184A4: ;
     if (cpu->eax == 0u) goto label_000185F0;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4185A0u)); sfera_sub_00418400(cpu, LIFT_CODE_TOKEN_VA(0x4185A0u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -7073,15 +6790,11 @@ label_000184A4: ;
     if (cpu->eax == 0u) goto label_000185F0;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4185E0u)); sfera_sub_00418350(cpu, LIFT_CODE_TOKEN_VA(0x4185E0u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_000185F0:
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -7201,7 +6914,6 @@ __declspec(noinline) void sfera_sub_004188A0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x10u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4188CEu)); sfera_sub_00419810(cpu, LIFT_CODE_TOKEN_VA(0x4188CEu));
@@ -7242,8 +6954,6 @@ __declspec(noinline) void sfera_sub_004188A0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x418995u)); sfera_sub_00418750(cpu, LIFT_CODE_TOKEN_VA(0x418995u));
     cpu->esp += 0x1Cu;
     cpu->eax = cpu->esi;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x10u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -7382,7 +7092,6 @@ __declspec(noinline) void sfera_sub_00418BB0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x18u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     lift_push32(cpu, (uintptr_t)&g_sfera_network_send_runtime.critical_section[0]);
     *(uint32_t*)(cpu->esp + 0x18u) = (uintptr_t)&g_sfera_network_send_runtime.critical_section[0];
@@ -7463,8 +7172,6 @@ __declspec(noinline) void sfera_sub_00418BB0(LiftCpu* cpu, uint32_t stop_address
     label_00018D2B:
     lift_push32(cpu, (uintptr_t)&g_sfera_network_send_runtime.critical_section[0]);
     lift_native_call(cpu, native_function_address32(&::LeaveCriticalSection), LIFT_CODE_TOKEN_VA(0x418D30u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 0x10u; cpu->eip = stop_address; return;
@@ -7475,7 +7182,6 @@ __declspec(noinline) void sfera_sub_00418D50(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0xCu;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->esp + 8u) = cpu->esi;
     *(uint32_t*)(cpu->esp + 0x14u) = 0u;
@@ -7487,8 +7193,6 @@ __declspec(noinline) void sfera_sub_00418D50(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esi;
     *(uint32_t*)(cpu->esp + 0x14u) = 0xFFFFFFFFu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x418DA6u)); sfera_sub_0042B7D0(cpu, LIFT_CODE_TOKEN_VA(0x418DA6u));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0xCu);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -7501,7 +7205,6 @@ __declspec(noinline) void sfera_sub_00418DD0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 0x234u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = *(uint32_t*)(cpu->esp + 0x244u);
     cpu->ebx = 0u;
     *(uint32_t*)(cpu->esp + 0x24u) = cpu->ebx;
@@ -7715,8 +7418,6 @@ __declspec(noinline) void sfera_sub_00418DD0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0xEA68u) = cpu->edi;
     lift_native_call(cpu, native_function_address32(&::WSACleanup), LIFT_CODE_TOKEN_VA(0x4191E3u));
     cpu->eax = 0u;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x234u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x22Cu;
     cpu->esp += 8u; cpu->eip = stop_address; return;
@@ -8473,7 +8174,6 @@ __declspec(noinline) void sfera_sub_00419D10(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->ebp + 0xFFFFFFF4u;
-    (void)0; /* source SEH registration eliminated */
     *(uint32_t*)(cpu->ebp + 0xFFFFFFF0u) = cpu->esp;
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->ebp + 0xFFFFFFE8u) = cpu->esi;
@@ -8589,8 +8289,6 @@ __declspec(noinline) void sfera_sub_00419D10(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x419E95u)); sfera_sub_00419AD0(cpu, LIFT_CODE_TOKEN_VA(0x419E95u));
     cpu->ecx = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x419E9Cu)); sfera_sub_00419BF0(cpu, LIFT_CODE_TOKEN_VA(0x419E9Cu));
-    cpu->ecx = *(uint32_t*)(cpu->ebp + 0xFFFFFFF4u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp = cpu->ebp;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 0xCu; cpu->eip = stop_address; return;
@@ -8766,7 +8464,8 @@ __declspec(noinline) void sfera_sub_0041A0B0(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = g_sfera_blood_effect_instance;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1]; double x87_v0; double x87_p0, x87_p1, x87_p2, x87_p3, x87_p4, x87_p5, x87_p6;
+__declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address) { double value_0, value_1, value_2, value_3, value_4;
+ bool sub_pred[1]; double x87_v0; double x87_p0, x87_p1, x87_p2, x87_p3, x87_p4, x87_p5, x87_p6;
     cpu->esp -= 0x5Cu;
     lift_push32(cpu, cpu->esi);
     cpu->esi = cpu->ecx;
@@ -8778,19 +8477,17 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = 0u;
     cpu->ecx = 0u;
     cpu->edx = cpu->esi + 8u;
-    label_0001A0E1:
+label_0001A0E1:
     { const double lift_right=(double)*(float*)(cpu->edx); const double lift_left=x87_v0; if (lift_left==lift_right) goto label_0001A104; }
     ++cpu->ecx;
     cpu->edx += 0x9E0u;
     if ((int32_t)cpu->ecx < (int32_t)0x1Eu) goto label_0001A0E1;
     cpu->ebx = lift_pop32(cpu);
-    x87_v0 = x87_v0; 
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x5Cu;
     cpu->esp += 0x10u; cpu->eip = stop_address; return;
-    label_0001A104:
+label_0001A104:
     cpu->ecx = (int64_t)(int32_t)(cpu->ecx) * (int64_t)(int32_t)(0x9E0u);
-    x87_v0 = x87_v0; 
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->ecx + cpu->esi + 8u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->ebp;
@@ -8800,7 +8497,7 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->ebp) = x87_v0; 
     if (cpu->esi <= 0x1Eu) goto label_0001A130;
     cpu->esi = 0x1Eu;
-    label_0001A130:
+label_0001A130:
     lift_push32(cpu, cpu->edi); lift_push32(cpu, 0x40u);
     cpu->eax = cpu->esp + 0x30u;
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->eax);
@@ -8846,7 +8543,7 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(float*)(cpu->esp + 0x40u) = x87_p2; 
     x87_p2 = (double)*(float*)(cpu->esp + 0x18u);
     x87_p0 = x87_p0 * x87_p2; 
-    { double temporary = x87_p1; x87_p1 = x87_p0; x87_p0 = temporary; }
+    std::swap(x87_p1, x87_p0);
     *(float*)(cpu->esp + 0x34u) = x87_p1; 
     *(float*)(cpu->esp + 0x44u) = x87_p0; 
     *(float*)(cpu->esp + 0x70u) = (-((double)*(float*)(cpu->eax)));
@@ -8857,29 +8554,29 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     x87_p3 = (double)*(float*)(cpu->esp + 0x70u); x87_p4 = x87_p3;
     x87_p5 = (double)*(float*)(cpu->esp + 0x2Cu); x87_p6 = x87_p5;
     x87_p4 = x87_p4 * x87_p6; 
-    { double temporary = x87_p5; x87_p5 = x87_p1; x87_p1 = temporary; }
+    std::swap(x87_p5, x87_p1);
     x87_p4 = x87_p4 + x87_p5; 
     *(float*)(cpu->esp + 0x38u) = x87_p4; 
     x87_p4 = (double)*(float*)(cpu->esp + 0x44u); x87_p5 = x87_p4;
     x87_p0 = x87_p0 * x87_p5; 
     x87_p5 = (double)*(float*)(cpu->esp + 0x3Cu); x87_p6 = x87_p5;
     x87_p3 = x87_p3 * x87_p6; 
-    { double temporary = x87_p5; x87_p5 = x87_p0; x87_p0 = temporary; }
+    std::swap(x87_p5, x87_p0);
     x87_p3 = x87_p3 + x87_p5; 
     cpu->edi = cpu->esi + (cpu->esi * 2u);
-    { double temporary = x87_p4; x87_p4 = x87_p3; x87_p3 = temporary; }
+    std::swap(x87_p4, x87_p3);
     cpu->esi = 0u;
     cpu->eax = cpu->ebp + 8u;
     *(float*)(cpu->esp + 0x48u) = x87_p4; 
     x87_p4 = 0.5;
-    std::memmove(cpu->fpu + 5, cpu->fpu, 3u * sizeof(double)); cpu->fpu[0u] = x87_p4; cpu->fpu[1u] = x87_p3; cpu->fpu[2u] = x87_p2; cpu->fpu[3u] = x87_p1; cpu->fpu[4u] = x87_p0; if ((int32_t)(cpu->edi) < (int32_t)(4u)) goto label_0001A48A;
+     value_0 = x87_p4; value_1 = x87_p3; value_2 = x87_p2; value_3 = x87_p1; value_4 = x87_p0; if ((int32_t)(cpu->edi) < (int32_t)(4u)) goto label_0001A48A;
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x74u);
     cpu->edx = cpu->edi + 0xFFFFFFFCu;
     cpu->edx >>= 2u;
     cpu->ecx += 0xCu;
     ++cpu->edx;
     cpu->esi = cpu->edx * 4u;
-    label_0001A274:
+label_0001A274:
     cpu->ebp = *(uint32_t*)(cpu->ecx + 0xFFFFFFF4u);
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->ebp;
     x87_p0 = (double)*(float*)(cpu->esp + 0x20u);
@@ -8889,22 +8586,22 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x24u) = cpu->ebp;
     x87_p1 = (x87_p1) * (((double)*(float*)(cpu->esp + 0x24u)));
     cpu->ebp = *(uint32_t*)(cpu->ecx + 0xFFFFFFFCu);
-    x87_p2 = cpu->fpu[3u];
+    x87_p2 = value_3;
     *(uint32_t*)(cpu->esp + 0x28u) = cpu->ebp;
     x87_p0 = x87_p0 * x87_p2; 
     x87_p0 = x87_p0 + x87_p1; 
     x87_p1 = (double)*(float*)(cpu->esp + 0x28u);
-    x87_p1 = (x87_p1) * (cpu->fpu[2u]);
+    x87_p1 = (x87_p1) * (value_2);
     x87_p0 = x87_p0 + x87_p1; 
     x87_p0 = (x87_p0) + (((double)*(float*)(cpu->esp + 0x38u)));
     *(float*)(cpu->esp + 0x20u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x24u);
     x87_p0 = (x87_p0) * (((double)*(float*)(cpu->esp + 0x40u)));
-    x87_p1 = cpu->fpu[4u];
+    x87_p1 = value_4;
     x87_p1 = (x87_p1) * (((double)*(float*)(cpu->esp + 0x78u)));
     x87_p0 = x87_p0 + x87_p1; 
     x87_p1 = (double)*(float*)(cpu->esp + 0x28u);
-    x87_p1 = (x87_p1) * (cpu->fpu[1u]);
+    x87_p1 = (x87_p1) * (value_1);
     x87_p0 = x87_p0 + x87_p1; 
     x87_p0 = (x87_p0) + (((double)*(float*)(cpu->esp + 0x48u)));
     *(float*)(cpu->esp + 0x24u) = x87_p0; 
@@ -8914,10 +8611,10 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->eax + 0x10u) = cpu->ebx;
     *(float*)(cpu->eax + 8u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x20u);
-    x87_p0 = (x87_p0) + (cpu->fpu[0u]);
+    x87_p0 = (x87_p0) + (value_0);
     *(float*)(cpu->eax + 0x14u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x24u);
-    x87_p0 = (x87_p0) + (cpu->fpu[0u]);
+    x87_p0 = (x87_p0) + (value_0);
     *(float*)(cpu->eax + 0x18u) = x87_p0; 
     cpu->ebp = *(uint32_t*)(cpu->ecx);
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->ebp;
@@ -8928,22 +8625,22 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x24u) = cpu->ebp;
     x87_p1 = (x87_p1) * (((double)*(float*)(cpu->esp + 0x24u)));
     cpu->ebp = *(uint32_t*)(cpu->ecx + 8u);
-    x87_p2 = cpu->fpu[3u];
+    x87_p2 = value_3;
     *(uint32_t*)(cpu->esp + 0x28u) = cpu->ebp;
     x87_p0 = x87_p0 * x87_p2; 
     x87_p0 = x87_p0 + x87_p1; 
     x87_p1 = (double)*(float*)(cpu->esp + 0x28u);
-    x87_p1 = (x87_p1) * (cpu->fpu[2u]);
+    x87_p1 = (x87_p1) * (value_2);
     x87_p0 = x87_p0 + x87_p1; 
     x87_p0 = (x87_p0) + (((double)*(float*)(cpu->esp + 0x38u)));
     *(float*)(cpu->esp + 0x20u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x24u);
     x87_p0 = (x87_p0) * (((double)*(float*)(cpu->esp + 0x40u)));
-    x87_p1 = cpu->fpu[4u];
+    x87_p1 = value_4;
     x87_p1 = (x87_p1) * (((double)*(float*)(cpu->esp + 0x78u)));
     x87_p0 = x87_p0 + x87_p1; 
     x87_p1 = (double)*(float*)(cpu->esp + 0x28u);
-    x87_p1 = (x87_p1) * (cpu->fpu[1u]);
+    x87_p1 = (x87_p1) * (value_1);
     x87_p0 = x87_p0 + x87_p1; 
     x87_p0 = (x87_p0) + (((double)*(float*)(cpu->esp + 0x48u)));
     *(float*)(cpu->esp + 0x24u) = x87_p0; 
@@ -8953,10 +8650,10 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->eax + 0x2Cu) = cpu->ebx;
     *(float*)(cpu->eax + 0x24u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x20u);
-    x87_p0 = (x87_p0) + (cpu->fpu[0u]);
+    x87_p0 = (x87_p0) + (value_0);
     *(float*)(cpu->eax + 0x30u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x24u);
-    x87_p0 = (x87_p0) + (cpu->fpu[0u]);
+    x87_p0 = (x87_p0) + (value_0);
     *(float*)(cpu->eax + 0x34u) = x87_p0; 
     cpu->ebp = *(uint32_t*)(cpu->ecx + 0xCu);
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->ebp;
@@ -8967,22 +8664,22 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x24u) = cpu->ebp;
     x87_p1 = (x87_p1) * (((double)*(float*)(cpu->esp + 0x24u)));
     cpu->ebp = *(uint32_t*)(cpu->ecx + 0x14u);
-    x87_p2 = cpu->fpu[3u];
+    x87_p2 = value_3;
     *(uint32_t*)(cpu->esp + 0x28u) = cpu->ebp;
     x87_p0 = x87_p0 * x87_p2; 
     x87_p0 = x87_p0 + x87_p1; 
     x87_p1 = (double)*(float*)(cpu->esp + 0x28u);
-    x87_p1 = (x87_p1) * (cpu->fpu[2u]);
+    x87_p1 = (x87_p1) * (value_2);
     x87_p0 = x87_p0 + x87_p1; 
     x87_p0 = (x87_p0) + (((double)*(float*)(cpu->esp + 0x38u)));
     *(float*)(cpu->esp + 0x20u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x24u);
     x87_p0 = (x87_p0) * (((double)*(float*)(cpu->esp + 0x40u)));
-    x87_p1 = cpu->fpu[4u];
+    x87_p1 = value_4;
     x87_p1 = (x87_p1) * (((double)*(float*)(cpu->esp + 0x78u)));
     x87_p0 = x87_p0 + x87_p1; 
     x87_p1 = (double)*(float*)(cpu->esp + 0x28u);
-    x87_p1 = (x87_p1) * (cpu->fpu[1u]);
+    x87_p1 = (x87_p1) * (value_1);
     x87_p0 = x87_p0 + x87_p1; 
     x87_p0 = (x87_p0) + (((double)*(float*)(cpu->esp + 0x48u)));
     *(float*)(cpu->esp + 0x24u) = x87_p0; 
@@ -8992,10 +8689,10 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->eax + 0x48u) = cpu->ebx;
     *(float*)(cpu->eax + 0x40u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x20u);
-    x87_p0 = (x87_p0) + (cpu->fpu[0u]);
+    x87_p0 = (x87_p0) + (value_0);
     *(float*)(cpu->eax + 0x4Cu) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x24u);
-    x87_p0 = (x87_p0) + (cpu->fpu[0u]);
+    x87_p0 = (x87_p0) + (value_0);
     *(float*)(cpu->eax + 0x50u) = x87_p0; 
     cpu->ebp = *(uint32_t*)(cpu->ecx + 0x18u);
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->ebp;
@@ -9006,22 +8703,22 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x24u) = cpu->ebp;
     x87_p1 = (x87_p1) * (((double)*(float*)(cpu->esp + 0x24u)));
     cpu->ebp = *(uint32_t*)(cpu->ecx + 0x20u);
-    x87_p2 = cpu->fpu[3u];
+    x87_p2 = value_3;
     *(uint32_t*)(cpu->esp + 0x28u) = cpu->ebp;
     x87_p0 = x87_p0 * x87_p2; 
     x87_p0 = x87_p0 + x87_p1; 
     x87_p1 = (double)*(float*)(cpu->esp + 0x28u);
-    x87_p1 = (x87_p1) * (cpu->fpu[2u]);
+    x87_p1 = (x87_p1) * (value_2);
     x87_p0 = x87_p0 + x87_p1; 
     x87_p0 = (x87_p0) + (((double)*(float*)(cpu->esp + 0x38u)));
     *(float*)(cpu->esp + 0x20u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x24u);
     x87_p0 = (x87_p0) * (((double)*(float*)(cpu->esp + 0x40u)));
-    x87_p1 = cpu->fpu[4u];
+    x87_p1 = value_4;
     x87_p1 = (x87_p1) * (((double)*(float*)(cpu->esp + 0x78u)));
     x87_p0 = x87_p0 + x87_p1; 
     x87_p1 = (double)*(float*)(cpu->esp + 0x28u);
-    x87_p1 = (x87_p1) * (cpu->fpu[1u]);
+    x87_p1 = (x87_p1) * (value_1);
     x87_p0 = x87_p0 + x87_p1; 
     x87_p0 = (x87_p0) + (((double)*(float*)(cpu->esp + 0x48u)));
     *(float*)(cpu->esp + 0x24u) = x87_p0; 
@@ -9031,17 +8728,17 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->eax + 0x64u) = cpu->ebx;
     *(float*)(cpu->eax + 0x5Cu) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x20u);
-    x87_p0 = (x87_p0) + (cpu->fpu[0u]);
+    x87_p0 = (x87_p0) + (value_0);
     *(float*)(cpu->eax + 0x68u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x24u);
-    x87_p0 = (x87_p0) + (cpu->fpu[0u]);
+    x87_p0 = (x87_p0) + (value_0);
     cpu->eax += 0x70u;
     cpu->ecx += 0x30u;
     --cpu->edx;
     *(float*)(cpu->eax + 0xFFFFFFFCu) = x87_p0; 
     if (cpu->edx != 0u) goto label_0001A274;
     cpu->ebp = *(uint32_t*)(cpu->esp + 0x10u);
-    label_0001A48A:
+label_0001A48A:
     if (cpu->esi >= cpu->edi) goto label_0001A531;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x74u);
     cpu->ecx = cpu->esi + (cpu->esi * 2u);
@@ -9049,7 +8746,7 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = cpu->edi;
     cpu->eax += 8u;
     cpu->edx -= cpu->esi;
-    label_0001A4A3:
+label_0001A4A3:
     cpu->esi = *(uint32_t*)(cpu->ecx);
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->esi;
     x87_p0 = (double)*(float*)(cpu->esp + 0x20u);
@@ -9059,7 +8756,7 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x24u) = cpu->esi;
     x87_p1 = (x87_p1) * (((double)*(float*)(cpu->esp + 0x24u)));
     cpu->esi = *(uint32_t*)(cpu->ecx + 8u);
-    x87_p2 = cpu->fpu[3u];
+    x87_p2 = value_3;
     *(uint32_t*)(cpu->esp + 0x28u) = cpu->esi;
     x87_p0 = x87_p0 * x87_p2; 
     cpu->eax += 0x1Cu;
@@ -9067,17 +8764,17 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     --cpu->edx;
     x87_p0 = x87_p0 + x87_p1; 
     x87_p1 = (double)*(float*)(cpu->esp + 0x28u);
-    x87_p1 = (x87_p1) * (cpu->fpu[2u]);
+    x87_p1 = (x87_p1) * (value_2);
     x87_p0 = x87_p0 + x87_p1; 
     x87_p0 = (x87_p0) + (((double)*(float*)(cpu->esp + 0x38u)));
     *(float*)(cpu->esp + 0x20u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x24u);
     x87_p0 = (x87_p0) * (((double)*(float*)(cpu->esp + 0x40u)));
-    x87_p1 = cpu->fpu[4u];
+    x87_p1 = value_4;
     x87_p1 = (x87_p1) * (((double)*(float*)(cpu->esp + 0x78u)));
     x87_p0 = x87_p0 + x87_p1; 
     x87_p1 = (double)*(float*)(cpu->esp + 0x28u);
-    x87_p1 = (x87_p1) * (cpu->fpu[1u]);
+    x87_p1 = (x87_p1) * (value_1);
     x87_p0 = x87_p0 + x87_p1; 
     x87_p0 = (x87_p0) + (((double)*(float*)(cpu->esp + 0x48u)));
     *(float*)(cpu->esp + 0x24u) = x87_p0; 
@@ -9087,25 +8784,20 @@ __declspec(noinline) void sfera_sub_0041A0C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->eax + 0xFFFFFFECu) = cpu->ebx;
     *(float*)(cpu->eax + 0xFFFFFFE4u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x20u);
-    x87_p0 = (x87_p0) + (cpu->fpu[0u]);
+    x87_p0 = (x87_p0) + (value_0);
     *(float*)(cpu->eax + 0xFFFFFFF0u) = x87_p0; 
     x87_p0 = (double)*(float*)(cpu->esp + 0x24u);
-    x87_p0 = (x87_p0) + (cpu->fpu[0u]);
+    x87_p0 = (x87_p0) + (value_0);
     *(float*)(cpu->eax + 0xFFFFFFF4u) = x87_p0; 
     if (cpu->edx != 0u) goto label_0001A4A3;
-    label_0001A531:
+label_0001A531:
     cpu->eax = *(uint32_t*)(cpu->esp + 0x14u);
-    cpu->fpu[0u] = cpu->fpu[0u]; 
-    cpu->fpu[2u] = cpu->fpu[1u]; 
     *(uint32_t*)(cpu->ebp + 4u) = cpu->edi;
     ++*(uint32_t*)(cpu->eax + 0x12848u);
-    cpu->fpu[3u] = cpu->fpu[2u]; 
-    cpu->fpu[3u] = cpu->fpu[3u]; 
     cpu->edi = lift_pop32(cpu);
-    cpu->fpu[4u] = cpu->fpu[4u]; 
-    std::memmove(cpu->fpu, cpu->fpu + 5, 3u * sizeof(double)); label_0001A549:
+label_0001A549:
     cpu->ebp = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
-    label_0001A54B:
+label_0001A54B:
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x5Cu;
     cpu->esp += 0x10u; cpu->eip = stop_address; return;
@@ -9272,18 +8964,12 @@ __declspec(noinline) void sfera_sub_0041A560(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax > 0xBB8u) goto label_0001A959;
     x87_v2 = (double)*(float*)(cpu->esi + 0xFFFFFFFCu);
     cpu->edi = 0u;
-    *(uint16_t*)(cpu->esp + 0x16u) = cpu->fpu_control;
-    cpu->eax = *(uint16_t*)(cpu->esp + 0x16u);
     x87_v2 = (x87_v2) * (x87_v0);
-    cpu->eax|=0xC00u;
-    *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->eax;
     cpu->eax = *(uint8_t*)(cpu->esp + 0x24u);
-    cpu->fpu_control = *(uint16_t*)(cpu->esp + 0x1Cu);
     *(uint64_t*)(cpu->esp + 0x1Cu) = static_cast<int64_t>(std::trunc(x87_v2));
     cpu->edx = *(uint32_t*)(cpu->esp + 0x1Cu);
     cpu->edx <<= 8u;
     cpu->edx|=cpu->eax;
-    cpu->fpu_control = *(uint16_t*)(cpu->esp + 0x16u);
     cpu->edx <<= 8u;
     cpu->eax = cpu->ebx & 0xFFu;
     cpu->edx|=cpu->eax;
@@ -9587,7 +9273,6 @@ __declspec(noinline) void sfera_sub_0041AD50(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->esp -= 4u;
     cpu->eax = cpu->esp + 8u;
-    (void)0; /* source SEH registration eliminated */
     if ((uint32_t)(g_sfera_blood_effect_instance) == 0u) goto label_0001AD97;
     lift_push32(cpu, 0x9Du); lift_push32(cpu, (uintptr_t)"..\\ShareClientSeverCode\\BloodEffect.cpp"); lift_push32(cpu, (uintptr_t)"SphereReport::Assertion failed -> File %s, Line %d");
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41AD8Eu)); sfera_sub_0042E1D0(cpu, LIFT_CODE_TOKEN_VA(0x41AD8Eu));
@@ -9607,16 +9292,12 @@ __declspec(noinline) void sfera_sub_0041AD50(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41ADCAu)); sfera_sub_0041ACF0(cpu, LIFT_CODE_TOKEN_VA(0x41ADCAu));
     g_sfera_blood_effect_instance = cpu->eax;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_0001ADDF:
     cpu->eax = 0u;
     g_sfera_blood_effect_instance = cpu->eax;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 8u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -9696,7 +9377,6 @@ __declspec(noinline) void sfera_sub_0041AEE0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp -= 0x20u;
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi); lift_push32(cpu, cpu->eax);
     cpu->eax = cpu->ebp + 0xFFFFFFF4u;
-    (void)0; /* source SEH registration eliminated */
     cpu->esi = cpu->ecx;
     *(uint32_t*)(cpu->ebp + 0xFFFFFFE4u) = cpu->esi;
     cpu->ebx = *(uint32_t*)(cpu->ebp + 8u);
@@ -9912,8 +9592,6 @@ label_0001B044: ;
     lift_native_call(cpu, native_function_address32(&::UnmapViewOfFile), LIFT_CODE_TOKEN_RVA(0x1B191u));
     label_0001B197:
     cpu->esp = cpu->ebp + 0xFFFFFFC4u;
-    cpu->ecx = *(uint32_t*)(cpu->ebp + 0xFFFFFFF4u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp = cpu->ebp;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 0xCu; cpu->eip = stop_address; return;

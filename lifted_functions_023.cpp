@@ -8121,7 +8121,6 @@ __declspec(noinline) void sfera_sub_004EB1D0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->ebp + 0xFFFFFFF4u;
-    (void)0; /* source SEH registration eliminated */
     *(uint32_t*)(cpu->ebp + 0xFFFFFFF0u) = cpu->edx;
     *(uint32_t*)(cpu->ebp + 0xFFFFFFECu) = cpu->ecx;
     cpu->eax = 0u;
@@ -8186,8 +8185,6 @@ __declspec(noinline) void sfera_sub_004EB1D0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, (uintptr_t)g_sfera_memory_runtime.lock_words);
     lift_native_call(cpu, native_function_address32(&::LeaveCriticalSection), LIFT_CODE_TOKEN_RVA(0xEB2D9u));
     label_000EB2DF:
-    cpu->ecx = *(uint32_t*)(cpu->ebp + 0xFFFFFFF4u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp = cpu->ebp;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 0x14u; cpu->eip = stop_address; return;
@@ -8202,7 +8199,6 @@ __declspec(noinline) void sfera_sub_004EB300(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esp -= 4u;
     cpu->eax = cpu->ebp + 0xFFFFFFF4u;
-    (void)0; /* source SEH registration eliminated */
     cpu->edi = cpu->ecx;
     cpu->esi = 0u;
     cpu->ebx = 1u;
@@ -8317,8 +8313,6 @@ __declspec(noinline) void sfera_sub_004EB300(LiftCpu* cpu, uint32_t stop_address
     g_sfera_memory_runtime.lock_held = 0u;
     lift_native_call(cpu, native_function_address32(&::LeaveCriticalSection), LIFT_CODE_TOKEN_VA(0x4EB4F6u));
     cpu->eax = cpu->esi + 4u;
-    cpu->ecx = *(uint32_t*)(cpu->ebp + 0xFFFFFFF4u);
-    (void)0; /* source SEH registration eliminated */
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp = cpu->ebp;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 0xCu; cpu->eip = stop_address; return;

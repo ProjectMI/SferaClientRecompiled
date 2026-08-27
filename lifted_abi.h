@@ -13,14 +13,6 @@ struct LiftCpu {
     uint32_t esi;
     uint32_t edi;
     uint32_t eip;
-    uint32_t stack_base;
-    uint32_t stack_limit;
-    double fpu[8];
-    uint16_t x87_reserved;
-    uint16_t fpu_control;
-    uint16_t fpu_status;
-    uint16_t reserved;
-    uint8_t fs_data[64];
 };
 
 namespace lifted {

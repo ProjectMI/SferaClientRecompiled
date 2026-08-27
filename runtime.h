@@ -20,8 +20,11 @@ struct NativeCallFrame {
     std::uint32_t host_esi;
     std::uint32_t host_edi;
     void* previous_exception_list;
-    void* previous_stack_base;
-    void* previous_stack_limit;
+    void* previous_stack_high;
+    void* previous_stack_low;
+    std::uint32_t guest_exception_list;
+    std::uint32_t guest_stack_high;
+    std::uint32_t guest_stack_low;
 };
 
 struct CallbackRegisters {

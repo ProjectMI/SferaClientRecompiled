@@ -48,6 +48,7 @@ thread_local std::uint32_t g_last_native_callsite = 0u;
 thread_local std::uint32_t g_last_native_target = 0u;
 thread_local std::uint32_t g_last_native_esp_before = 0u;
 thread_local std::uint32_t g_last_native_esp_after = 0u;
+thread_local std::uint32_t g_guest_exception_list = 0xFFFFFFFFu;
 class CallbackStackLease {
 public:
     CallbackStackLease() { if (g_callback_stack_depth == g_callback_stacks.size()) { g_callback_stacks.push_back(std::make_unique<LocalStack>(kStackReserve)); } stack_ = g_callback_stacks[g_callback_stack_depth++].get(); }
@@ -239,7 +240,7 @@ std::uint32_t lift_pop32(LiftCpu* cpu) {
 
 [[noreturn]] static void lift_trap_transfer(LiftCpu* cpu, std::uint32_t origin, std::uint32_t target, std::uint32_t esp_before, std::uint32_t stack_cleanup, std::uint32_t stop_address, const char* kind) {
     auto classify = [](std::uint32_t value) -> std::string { if (LiftFunction function = lift_callback_function(value)) { const std::uint32_t index = lift_function_index(function); return "lifted-function#" + std::to_string(index); } if (native_executable_image_address(value)) { return "native-image"; } const std::uint32_t rva = lift_code_rva(value); if (rva == UINT32_MAX) { return "non-code"; } if (lift_has_function_rva(rva)) { return "function@" + hex_u32(0x00400000u + rva); } return "local-middle@" + hex_u32(0x00400000u + rva); };
-    auto peek = [cpu](std::uint32_t address, std::uint32_t& value) -> bool { if (!cpu || address < cpu->stack_limit || address > cpu->stack_base - 4u) { return false; } value = *reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(address)); return true; };
+    auto peek = [](std::uint32_t address, std::uint32_t& value) -> bool { return try_memory_read(address, value); };
     std::string message = std::string("Invalid lifted control transfer kind=") + (kind ? kind : "unknown") + " origin=" + hex_u32(origin) + " target=" + hex_u32(target) + " target-class=" + classify(target) + " esp=" + hex_u32(esp_before) + " cleanup=" + std::to_string(stack_cleanup) + " stop=" + hex_u32(stop_address);
     if (g_last_native_callsite != 0u) { message += " last-native-callsite=" + hex_u32(g_last_native_callsite) + " last-native-target=" + hex_u32(g_last_native_target) + " native-esp-before=" + hex_u32(g_last_native_esp_before) + " native-esp-after=" + hex_u32(g_last_native_esp_after) + " native-esp-delta=" + std::to_string(static_cast<std::int32_t>(g_last_native_esp_after - g_last_native_esp_before)); }
     static constexpr int offsets[] = {-8, -4, 0, 4, 8, 12, 16};
@@ -490,14 +491,6 @@ void ProcessMemory::release() noexcept {
 
 namespace {
 
-void initialize_fs(LiftCpu& state, bool inherit_exception_chain = false) {
-    const std::uint32_t exception_list = inherit_exception_chain ? __readfsdword(0) : 0xFFFFFFFFu;
-    const std::uint32_t teb = __readfsdword(0x18);
-    const std::uint32_t peb = __readfsdword(0x30);
-    std::memcpy(state.fs_data, &exception_list, sizeof(exception_list));
-    std::memcpy(state.fs_data + 0x18u, &teb, sizeof(teb));
-    std::memcpy(state.fs_data + 0x30u, &peb, sizeof(peb));
-}
 
 #if !defined(SFERA_PORTABLE_CHECK) && defined(_M_IX86)
 
@@ -511,62 +504,58 @@ void verify_native_bridge() {
     LiftCpu state{};
     auto prepare = [&]() {
         state = LiftCpu{};
-        state.fpu_control = 0x027Fu;
         state.esp = stack.top();
-        state.stack_base = stack.base();
-        state.stack_limit = stack.limit();
         state.ebx = 0xB1B2B3B4u;
         state.ebp = 0xB5B6B7B8u;
         state.esi = 0x51525354u;
         state.edi = 0xD1D2D3D4u;
-        initialize_fs(state);
     };
     auto verify_nonvolatile = [&]() {
         if (state.ebx != 0xB1B2B3B4u || state.ebp != 0xB5B6B7B8u || state.esi != 0x51525354u || state.edi != 0xD1D2D3D4u) { throw std::runtime_error("Native bridge corrupted a nonvolatile x86 register"); }
     };
-    auto verify_teb = [&](const NativeCallFrame& frame, const char* convention, std::uint32_t actual_exception_list, std::uint32_t actual_stack_base, std::uint32_t actual_stack_limit) {
+    auto verify_teb = [&](const NativeCallFrame& frame, const char* convention, std::uint32_t actual_exception_list, std::uint32_t actual_stack_high, std::uint32_t actual_stack_low) {
         const std::uint32_t expected_exception_list = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(frame.previous_exception_list));
-        const std::uint32_t expected_stack_base = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(frame.previous_stack_base));
-        const std::uint32_t expected_stack_limit = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(frame.previous_stack_limit));
-        if (actual_exception_list == expected_exception_list && actual_stack_base == expected_stack_base && actual_stack_limit == expected_stack_limit) { return; }
-        throw std::runtime_error(std::string("Native bridge failed to restore the host TEB after ") + convention + ": FS:[0] expected=" + hex_u32(expected_exception_list) + " actual=" + hex_u32(actual_exception_list) + ", FS:[4] expected=" + hex_u32(expected_stack_base) + " actual=" + hex_u32(actual_stack_base) + ", FS:[8] expected=" + hex_u32(expected_stack_limit) + " actual=" + hex_u32(actual_stack_limit));
+        const std::uint32_t expected_stack_high = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(frame.previous_stack_high));
+        const std::uint32_t expected_stack_low = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(frame.previous_stack_low));
+        if (actual_exception_list == expected_exception_list && actual_stack_high == expected_stack_high && actual_stack_low == expected_stack_low) { return; }
+        throw std::runtime_error(std::string("Native bridge failed to restore the host TEB after ") + convention + ": FS:[0] expected=" + hex_u32(expected_exception_list) + " actual=" + hex_u32(actual_exception_list) + ", FS:[4] expected=" + hex_u32(expected_stack_high) + " actual=" + hex_u32(actual_stack_high) + ", FS:[8] expected=" + hex_u32(expected_stack_low) + " actual=" + hex_u32(actual_stack_low));
     };
     prepare();
     lift_push32(&state, 7u);
     lift_push32(&state, 5u);
     const std::uint32_t cdecl_esp = state.esp;
-    NativeCallFrame cdecl_frame{&state, reinterpret_cast<void*>(&bridge_test_cdecl), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr};
+    NativeCallFrame cdecl_frame{&state, reinterpret_cast<void*>(&bridge_test_cdecl), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0xFFFFFFFFu, stack.base(), stack.limit()};
     native_call_bridge(&cdecl_frame);
     const std::uint32_t cdecl_exception_list = __readfsdword(0);
-    const std::uint32_t cdecl_stack_base = __readfsdword(4);
-    const std::uint32_t cdecl_stack_limit = __readfsdword(8);
+    const std::uint32_t cdecl_stack_high = __readfsdword(4);
+    const std::uint32_t cdecl_stack_low = __readfsdword(8);
     if (state.eax != 26u || state.esp != cdecl_esp) { throw std::runtime_error("Native bridge failed its cdecl stack test"); }
-    verify_teb(cdecl_frame, "cdecl", cdecl_exception_list, cdecl_stack_base, cdecl_stack_limit);
+    verify_teb(cdecl_frame, "cdecl", cdecl_exception_list, cdecl_stack_high, cdecl_stack_low);
     verify_nonvolatile();
     prepare();
     lift_push32(&state, 0x2468ACE0u);
     lift_push32(&state, 0x10203040u);
     const std::uint32_t stdcall_esp = state.esp;
-    NativeCallFrame stdcall_frame{&state, reinterpret_cast<void*>(&bridge_test_stdcall), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr};
+    NativeCallFrame stdcall_frame{&state, reinterpret_cast<void*>(&bridge_test_stdcall), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0xFFFFFFFFu, stack.base(), stack.limit()};
     native_call_bridge(&stdcall_frame);
     const std::uint32_t stdcall_exception_list = __readfsdword(0);
-    const std::uint32_t stdcall_stack_base = __readfsdword(4);
-    const std::uint32_t stdcall_stack_limit = __readfsdword(8);
+    const std::uint32_t stdcall_stack_high = __readfsdword(4);
+    const std::uint32_t stdcall_stack_low = __readfsdword(8);
     if (state.eax != (0x10203040u ^ (0x2468ACE0u + 0x13579BDFu)) || state.esp != stdcall_esp + 8u) { throw std::runtime_error("Native bridge failed its stdcall stack test"); }
-    verify_teb(stdcall_frame, "stdcall", stdcall_exception_list, stdcall_stack_base, stdcall_stack_limit);
+    verify_teb(stdcall_frame, "stdcall", stdcall_exception_list, stdcall_stack_high, stdcall_stack_low);
     verify_nonvolatile();
     prepare();
     state.ecx = 11u;
     state.edx = 13u;
     lift_push32(&state, 17u);
     const std::uint32_t fastcall_esp = state.esp;
-    NativeCallFrame fastcall_frame{&state, reinterpret_cast<void*>(&bridge_test_fastcall), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr};
+    NativeCallFrame fastcall_frame{&state, reinterpret_cast<void*>(&bridge_test_fastcall), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, 0xFFFFFFFFu, stack.base(), stack.limit()};
     native_call_bridge(&fastcall_frame);
     const std::uint32_t fastcall_exception_list = __readfsdword(0);
-    const std::uint32_t fastcall_stack_base = __readfsdword(4);
-    const std::uint32_t fastcall_stack_limit = __readfsdword(8);
+    const std::uint32_t fastcall_stack_high = __readfsdword(4);
+    const std::uint32_t fastcall_stack_low = __readfsdword(8);
     if (state.eax != 41u || state.esp != fastcall_esp + 4u) { throw std::runtime_error("Native bridge failed its fastcall stack test"); }
-    verify_teb(fastcall_frame, "fastcall", fastcall_exception_list, fastcall_stack_base, fastcall_stack_limit);
+    verify_teb(fastcall_frame, "fastcall", fastcall_exception_list, fastcall_stack_high, fastcall_stack_low);
     verify_nonvolatile();
     diagnostic_note("cdecl/stdcall/fastcall bridge self-test passed");
 }
@@ -589,7 +578,10 @@ NativeRuntime::NativeRuntime() {
 void NativeRuntime::call_native(LiftCpu& state, std::uint32_t target, std::uint32_t callsite) {
     struct NativeEspTrace { LiftCpu& state; NativeEspTrace(LiftCpu& value, std::uint32_t native_target, std::uint32_t native_callsite) : state(value) { g_last_native_target = native_target; g_last_native_callsite = native_callsite; g_last_native_esp_before = value.esp; g_last_native_esp_after = value.esp; } ~NativeEspTrace() { g_last_native_esp_after = state.esp; } } native_esp_trace(state, target, callsite);
     if (target < 0x10000u) { throw std::runtime_error("Invalid native call target " + hex_u32(target) + " at " + hex_u32(callsite)); }
-    NativeCallFrame frame{&state, reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr};
+    MEMORY_BASIC_INFORMATION guest_stack{}; if (VirtualQuery(reinterpret_cast<void*>(static_cast<std::uintptr_t>(state.esp)), &guest_stack, sizeof(guest_stack)) != sizeof(guest_stack) || guest_stack.State != MEM_COMMIT) { throw std::runtime_error("Unable to resolve lifted stack bounds"); }
+    const std::uint32_t guest_stack_low = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(guest_stack.BaseAddress));
+    const std::uint32_t guest_stack_high = guest_stack_low + static_cast<std::uint32_t>(guest_stack.RegionSize);
+    NativeCallFrame frame{&state, reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), 0, 0, 0, 0, 0, nullptr, nullptr, nullptr, g_guest_exception_list, guest_stack_high, guest_stack_low};
     native_call_bridge(&frame);
 }
 
@@ -602,12 +594,8 @@ int NativeRuntime::execute() {
     DiagnosticPhaseScope phase(RuntimePhase::execution_setup);
     LocalStack stack(kStackReserve);
     LiftCpu state{};
-    state.fpu_control = 0x027Fu;
     state.esp = stack.top();
-    state.stack_base = stack.base();
-    state.stack_limit = stack.limit();
     state.eip = memory_.entry_va();
-    initialize_fs(state);
     lift_push32(&state, LIFT_CALLBACK_SENTINEL);
     DiagnosticRunScope run_scope(&state);
     DiagnosticExecutionScope execution_scope(state.eip, LIFT_CALLBACK_SENTINEL, state.esp);
@@ -634,9 +622,11 @@ void NativeRuntime::dispatch_callback(CallbackRegisters& registers) {
     if (!memory_.is_callback_function(function)) { throw std::runtime_error("Unknown semantic callback function"); }
     const std::uint32_t original_esp = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&registers.callback_function) + sizeof(registers.callback_function));
     const std::uint32_t api_return = *reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(original_esp));
+    std::uint32_t callback_exception_list = 0xFFFFFFFFu;
 #if !defined(SFERA_PORTABLE_CHECK) && defined(_M_IX86)
-    const std::uintptr_t stack_base = __readfsdword(4);
-    const std::size_t available = stack_base > original_esp ? stack_base - original_esp : 0u;
+    callback_exception_list = __readfsdword(0);
+    const std::uintptr_t host_stack_high = __readfsdword(4);
+    const std::size_t available = host_stack_high > original_esp ? host_stack_high - original_esp : 0u;
 #else
     MEMORY_BASIC_INFORMATION region{};
     if (VirtualQuery(reinterpret_cast<void*>(static_cast<std::uintptr_t>(original_esp)), &region, sizeof(region)) == 0 || region.State != MEM_COMMIT) { throw std::runtime_error("Unable to inspect native callback stack"); }
@@ -652,9 +642,7 @@ void NativeRuntime::dispatch_callback(CallbackRegisters& registers) {
     *reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(clone_esp)) = LIFT_CALLBACK_SENTINEL;
     LiftCpu state{};
     state.eax = registers.eax; state.ecx = registers.ecx; state.edx = registers.edx; state.ebx = registers.ebx; state.esp = clone_esp; state.ebp = registers.ebp; state.esi = registers.esi; state.edi = registers.edi; state.eip = LIFT_CALLBACK_SENTINEL;
-    state.fpu_control = 0x027Fu;
-    state.stack_base = clone.base(); state.stack_limit = clone.limit();
-    initialize_fs(state, true);
+    struct GuestExceptionScope { std::uint32_t previous; explicit GuestExceptionScope(std::uint32_t value) : previous(g_guest_exception_list) { g_guest_exception_list = value; } ~GuestExceptionScope() { g_guest_exception_list = previous; } } guest_exception_scope(callback_exception_list);
     function(&state, LIFT_CALLBACK_SENTINEL);
     const std::uint32_t stack_delta = state.esp - clone_esp;
     if (stack_delta < 4u || stack_delta > copy_size) { throw std::runtime_error("Lifted callback returned an invalid stack delta"); }
@@ -682,9 +670,8 @@ static void callback_bridge() {}
 
 #elif defined(_M_IX86)
 
-static_assert(offsetof(LiftCpu, eax) == 0 && offsetof(LiftCpu, stack_base) == 36 && offsetof(LiftCpu, fpu_control) == 114);
-static_assert(offsetof(LiftCpu, fs_data) == 120);
-static_assert(offsetof(NativeCallFrame, state) == 0 && offsetof(NativeCallFrame, previous_stack_limit) == 36);
+static_assert(offsetof(LiftCpu, eax) == 0 && offsetof(LiftCpu, eip) == 32 && sizeof(LiftCpu) == 36);
+static_assert(offsetof(NativeCallFrame, state) == 0 && offsetof(NativeCallFrame, previous_stack_low) == 36 && offsetof(NativeCallFrame, guest_exception_list) == 40 && offsetof(NativeCallFrame, guest_stack_low) == 48 && sizeof(NativeCallFrame) == 52);
 static_assert(offsetof(CallbackRegisters, edi) == 0 && offsetof(CallbackRegisters, eax) == 28 && offsetof(CallbackRegisters, saved_flags) == 32 && offsetof(CallbackRegisters, callback_function) == 36);
 static_assert(sizeof(CallbackRegisters) == 40);
 
@@ -703,11 +690,11 @@ __declspec(naked) static void __cdecl native_call_bridge(NativeCallFrame*) {
         mov eax, fs:[8]
         mov [edx + 36], eax
         mov eax, [edx]
-        mov ecx, [eax + 120]
+        mov ecx, [edx + 40]
         mov fs:[0], ecx
-        mov ecx, [eax + 36]
+        mov ecx, [edx + 44]
         mov fs:[4], ecx
-        mov ecx, [eax + 40]
+        mov ecx, [edx + 48]
         mov fs:[8], ecx
         mov ecx, [eax + 16]
         sub ecx, 8
@@ -1382,7 +1369,6 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x0001C3E0u, &sfera_sub_0041C3E0},
     {0x0001C520u, &sfera_sub_0041C520},
     {0x0001C5B0u, &sfera_sub_0041C5B0},
-    {0x0001C6C0u, &sfera_sub_0041C6C0},
     {0x0001C7F0u, &sfera_sub_0041C7F0},
     {0x0001CC90u, &sfera_sub_0041CC90},
     {0x0001CDA0u, &sfera_sub_0041CDA0},
@@ -1500,7 +1486,6 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x000259C0u, &sfera_sub_004259C0},
     {0x00025A50u, &sfera_sub_00425A50},
     {0x00025AA0u, &sfera_sub_00425AA0},
-    {0x00025B20u, &sfera_sub_00425B20},
     {0x00025BD0u, &sfera_sub_00425BD0},
     {0x00025BF0u, &sfera_sub_00425BF0},
     {0x00025C00u, &sfera_sub_00425C00},
@@ -1828,14 +1813,12 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x0003AC30u, &sfera_sub_0043AC30},
     {0x0003AC90u, &sfera_sub_0043AC90},
     {0x0003ACF0u, &sfera_sub_0043ACF0},
-    {0x0003AD60u, &sfera_sub_0043AD60},
     {0x0003AE00u, &sfera_sub_0043AE00},
     {0x0003AE70u, &sfera_sub_0043AE70},
     {0x0003AED0u, &sfera_sub_0043AED0},
     {0x0003AF30u, &sfera_sub_0043AF30},
     {0x0003AFA0u, &sfera_sub_0043AFA0},
     {0x0003B0B0u, &sfera_sub_0043B0B0},
-    {0x0003B0C0u, &sfera_sub_0043B0C0},
     {0x0003B0D0u, &sfera_sub_0043B0D0},
     {0x0003B130u, &sfera_sub_0043B130},
     {0x0003B140u, &sfera_sub_0043B140},
@@ -2084,7 +2067,6 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x0004E1B0u, &sfera_sub_0044E1B0},
     {0x0004E230u, &sfera_sub_0044E230},
     {0x0004E2B0u, &sfera_sub_0044E2B0},
-    {0x0004E400u, &sfera_sub_0044E400},
     {0x0004E480u, &sfera_sub_0044E480},
     {0x0004E6A0u, &sfera_sub_0044E6A0},
     {0x0004E720u, &sfera_sub_0044E720},
@@ -2127,9 +2109,7 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x000517D0u, &sfera_sub_004517D0},
     {0x00051890u, &sfera_sub_00451890},
     {0x000518E0u, &sfera_sub_004518E0},
-    {0x00051990u, &sfera_sub_00451990},
     {0x000519B0u, &sfera_sub_004519B0},
-    {0x000519D0u, &sfera_sub_004519D0},
     {0x00051A30u, &sfera_sub_00451A30},
     {0x00051A40u, &sfera_sub_00451A40},
     {0x00051B40u, &sfera_sub_00451B40},
@@ -2187,7 +2167,6 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x00057490u, &sfera_sub_00457490},
     {0x00057510u, &sfera_sub_00457510},
     {0x00057840u, &sfera_sub_00457840},
-    {0x00057E80u, &sfera_sub_00457E80},
     {0x00058E80u, &sfera_sub_00458E80},
     {0x00059080u, &sfera_sub_00459080},
     {0x00059150u, &sfera_sub_00459150},
@@ -2586,7 +2565,6 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x00093F70u, &sfera_sub_00493F70},
     {0x00094030u, &sfera_sub_00494030},
     {0x00094150u, &sfera_sub_00494150},
-    {0x000942C0u, &sfera_sub_004942C0},
     {0x00094360u, &sfera_sub_00494360},
     {0x00094400u, &sfera_sub_00494400},
     {0x000944A0u, &sfera_sub_004944A0},
@@ -2664,7 +2642,6 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x000984C0u, &sfera_sub_004984C0},
     {0x00098550u, &sfera_sub_00498550},
     {0x000985E0u, &sfera_sub_004985E0},
-    {0x00098660u, &sfera_sub_00498660},
     {0x00098730u, &sfera_sub_00498730},
     {0x00098860u, &sfera_sub_00498860},
     {0x00098930u, &sfera_sub_00498930},
@@ -2721,9 +2698,7 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x0009BA10u, &sfera_sub_0049BA10},
     {0x0009BAC0u, &sfera_sub_0049BAC0},
     {0x0009C460u, &sfera_sub_0049C460},
-    {0x0009C510u, &sfera_sub_0049C510},
     {0x0009C640u, &sfera_sub_0049C640},
-    {0x0009C6E0u, &sfera_sub_0049C6E0},
     {0x0009C820u, &sfera_sub_0049C820},
     {0x0009C8C0u, &sfera_sub_0049C8C0},
     {0x0009C980u, &sfera_sub_0049C980},
@@ -2747,7 +2722,6 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x0009D710u, &sfera_sub_0049D710},
     {0x0009D780u, &sfera_sub_0049D780},
     {0x0009D820u, &sfera_sub_0049D820},
-    {0x0009D910u, &sfera_sub_0049D910},
     {0x0009DA20u, &sfera_sub_0049DA20},
     {0x0009DC00u, &sfera_sub_0049DC00},
     {0x0009DC60u, &sfera_sub_0049DC60},
@@ -3837,12 +3811,6 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x000EE8C0u, &sfera_sub_004EE8C0},
     {0x000EE8D7u, &sfera_sub_004EE8D7},
     {0x000EE92Au, &sfera_sub_004EE92A},
-    {0x000EE940u, &sfera_sub_004EE940},
-    {0x000EE976u, &sfera_sub_004EE976},
-    {0x000EE9ECu, &sfera_sub_004EE9EC},
-    {0x000EE9F2u, &sfera_sub_004EE9F2},
-    {0x000EE9F8u, &sfera_sub_004EE9F8},
-    {0x000EE9FEu, &sfera_sub_004EE9FE},
     {0x000EEA10u, &sfera_sub_004EEA10},
     {0x000EEA40u, &sfera_sub_004EEA40},
     {0x000EEAF0u, &sfera_sub_004EEAF0},
@@ -3853,15 +3821,8 @@ static const LiftFunctionEntry kLiftedFunctions[] = {
     {0x000EEBD1u, &sfera_sub_004EEBD1},
     {0x000EEBE9u, &sfera_sub_004EEBE9},
     {0x000EEC36u, &sfera_sub_004EEC36},
-    {0x000EEC4Eu, &sfera_sub_004EEC4E},
-    {0x000EEC54u, &sfera_sub_004EEC54},
     {0x000EEC60u, &sfera_sub_004EEC60},
     {0x000EED20u, &sfera_sub_004EED20},
-    {0x000EED54u, &sfera_sub_004EED54},
-    {0x000EED5Au, &sfera_sub_004EED5A},
-    {0x000EED60u, &sfera_sub_004EED60},
-    {0x000EED66u, &sfera_sub_004EED66},
-    {0x000EED6Cu, &sfera_sub_004EED6C},
     {0x000EED80u, &sfera_sub_004EED80},
     {0x000EEDF0u, &sfera_sub_004EEDF0},
     {0x000EEE10u, &sfera_sub_004EEE10},
