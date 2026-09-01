@@ -517,7 +517,7 @@ __declspec(noinline) void sfera_sub_004D6DE0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4D6E17u)); sfera_sub_004EBE20(cpu, LIFT_CODE_TOKEN_VA(0x4D6E17u));
     cpu->esp += 4u;
     lift_push32(cpu, (uintptr_t)"map/set<T> too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x4D6E02u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x4D6E02u); throw std::length_error("std::length_error");
     label_000D6E25:
     ++cpu->eax;
     *(uint32_t*)(cpu->ecx + 8u) = cpu->eax;
@@ -714,7 +714,7 @@ __declspec(noinline) void sfera_sub_004D7030(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 4u) = cpu->ebx;
     if (sub_pred[0]) goto label_000D704D;
     lift_push32(cpu, (uintptr_t)"invalid map/set<T> iterator");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x4D7030u), "std::out_of_range");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x4D7030u); throw std::out_of_range("std::out_of_range");
     label_000D704D:
     lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->ecx = cpu->esp + 0x1Cu;
@@ -1176,27 +1176,7 @@ __declspec(noinline) void sfera_sub_004D74D0(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = cpu->ebp + 0xFFFFFFD8u;
     lift_push32(cpu, cpu->eax);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4D75BBu)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x4D75BBu));
-    lift_trap(cpu, 0x4D75BBu, "INT3"); return;
-}
-__declspec(noinline) void sfera_sub_004D7581(LiftCpu* cpu, uint32_t stop_address) {
-    (void)stop_address;
-    cpu->ecx = *(uint32_t*)(cpu->ebp + 0xFFFFFFECu);
-    lift_push32(cpu, cpu->ecx);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4D758Au)); sfera_sub_004EBE20(cpu, LIFT_CODE_TOKEN_VA(0x4D758Au));
-    cpu->esp += 4u;
-    cpu->eax = 0u;
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4D7596u)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x4D7596u));
-    cpu->edx = cpu->ebp + 8u;
-    lift_push32(cpu, cpu->edx);
-    cpu->ecx = cpu->ebp + 0xFFFFFFD8u;
-    *(uint32_t*)(cpu->ebp + 8u) = cpu->eax;
-    cpu->esp += 4u;
-    lift_push32(cpu, 0u);
-    cpu->eax = cpu->ebp + 0xFFFFFFD8u;
-    lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4D75BBu)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x4D75BBu));
-    lift_trap(cpu, 0x4D75BBu, "INT3"); return;
+    cpu->eip = 0x4D75BBu; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_004D75C0(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
@@ -1441,7 +1421,7 @@ __declspec(noinline) void sfera_sub_004D7980(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esp + 0xCu;
     lift_push32(cpu, cpu->ecx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4D79EFu)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x4D79EFu));
-    lift_trap(cpu, 0x4D79EFu, "INT3"); return;
+    cpu->eip = 0x4D79EFu; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_004D79F0(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
@@ -7348,7 +7328,7 @@ __declspec(noinline) void sfera_sub_004DD550(LiftCpu* cpu, uint32_t stop_address
         case 10u: case 11u: goto label_000DD616;
         case 12u: goto label_000DD5D5;
         case 13u: goto label_000DD5E0;
-        default: lift_trap(cpu, 0x4DD560u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4DD560u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000DD567: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4DD56Cu)); sfera_sub_004DBFE0(cpu, LIFT_CODE_TOKEN_VA(0x4DD56Cu));
@@ -7883,7 +7863,7 @@ __declspec(noinline) void sfera_sub_004DDC25(LiftCpu* cpu, uint32_t stop_address
         case 11u: goto label_000DE1FC;
         case 12u: goto label_000DE2A0;
         case 13u: goto label_000DE2A7;
-        default: lift_trap(cpu, 0x4DDC88u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4DDC88u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000DDC8F: ;
     cpu->edx = *(uint32_t*)(cpu->ebp + 8u);
@@ -8624,14 +8604,6 @@ __declspec(noinline) void sfera_sub_004DEBDE(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = sfera_zlib_deflate(*(uint32_t*)(cpu->esp + 4u), (int32_t)*(uint32_t*)(cpu->esp + 8u));
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004DEF60(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_deflate_put_short_msb(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004DEFB0(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_deflate_flush_pending(*(uint32_t*)(cpu->esp + 4u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
 __declspec(noinline) void sfera_sub_004DF075(LiftCpu* cpu, uint32_t stop_address) {
     const uint32_t stream_address = *(uint32_t*)(cpu->esp + 4u);
     auto* stream = reinterpret_cast<SferaZStream32*>(static_cast<uintptr_t>(stream_address));
@@ -8644,29 +8616,4 @@ __declspec(noinline) void sfera_sub_004DF075(LiftCpu* cpu, uint32_t stop_address
     }
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004DF3D2(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_deflate_lm_init(*(uint32_t*)(cpu->esp + 4u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004DF4C0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = sfera_zlib_deflate_stored(*(uint32_t*)(cpu->esp + 4u), (int32_t)*(uint32_t*)(cpu->esp + 8u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004DF700(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_deflate_fill_window(*(uint32_t*)(cpu->esp + 4u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004DF93B(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = sfera_zlib_deflate_read_buf(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u), *(uint32_t*)(cpu->esp + 12u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004DF9D3(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = sfera_zlib_deflate_fast(*(uint32_t*)(cpu->esp + 4u), (int32_t)*(uint32_t*)(cpu->esp + 8u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004DFF2A(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = sfera_zlib_deflate_longest_match(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-
 } // namespace lifted

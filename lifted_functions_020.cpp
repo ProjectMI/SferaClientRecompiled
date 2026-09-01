@@ -1796,8 +1796,7 @@ __declspec(noinline) void sfera_sub_004C5120(LiftCpu* cpu, uint32_t stop_address
     goto label_000C5299;
     label_000C532B:
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x4C532Bu), "std::length_error");
-    lift_trap(cpu, 0x4C5336u, "INT3"); return;
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x4C532Bu); throw std::length_error("std::length_error");
 }
 __declspec(noinline) void sfera_sub_004C5340(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
@@ -5813,7 +5812,7 @@ __declspec(noinline) void sfera_sub_004C9250(LiftCpu* cpu, uint32_t stop_address
         case 9u: goto label_000C9375;
         case 10u: goto label_000C9483;
         case 11u: goto label_000C93FA;
-        default: lift_trap(cpu, 0x4C9299u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4C9299u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000C92A0: ;
     lift_push32(cpu, cpu->edi);
@@ -6679,16 +6678,6 @@ __declspec(noinline) void sfera_sub_004C9FD0(LiftCpu* cpu, uint32_t stop_address
     label_000C9FFF:
     cpu->esp += 0x14u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004CA0E5(LiftCpu* cpu, uint32_t stop_address) {
-    (void)stop_address;
-    cpu->eax = *(uint32_t*)(cpu->ebp + 0xFFFFFFECu);
-    lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4CA0EEu)); sfera_sub_004EBE20(cpu, LIFT_CODE_TOKEN_VA(0x4CA0EEu));
-    cpu->esp += 4u;
-    lift_push32(cpu, 0u); lift_push32(cpu, 0u);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4CA0FAu)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x4CA0FAu));
-    lift_trap(cpu, 0x4CA0FAu, "INT3"); return;
-}
 __declspec(noinline) void sfera_sub_004CA100(LiftCpu* cpu, uint32_t stop_address) {
     goto label_000CA100;
     label_000CA010:
@@ -6706,7 +6695,7 @@ __declspec(noinline) void sfera_sub_004CA100(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = *(uint32_t*)(cpu->ebp + 8u);
     if (cpu->ebx <= 0x15555555u) goto label_000CA053;
     lift_push32(cpu, (uintptr_t)"vector<T> too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x4CA010u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x4CA010u); throw std::length_error("std::length_error");
     label_000CA053:
     cpu->ecx = *(uint32_t*)(cpu->esi + 8u);
     cpu->ecx -= *(uint32_t*)(cpu->esi);
@@ -6768,7 +6757,7 @@ __declspec(noinline) void sfera_sub_004CA100(LiftCpu* cpu, uint32_t stop_address
     cpu->edx -= cpu->eax;
     if (cpu->edx >= cpu->esi) goto label_000CA133;
     lift_push32(cpu, (uintptr_t)"vector<T> too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x4CA100u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x4CA100u); throw std::length_error("std::length_error");
     label_000CA133:
     cpu->edx = *(uint32_t*)(cpu->ecx + 8u);
     cpu->esi += cpu->eax;
@@ -7156,7 +7145,7 @@ __declspec(noinline) void sfera_sub_004CA530(LiftCpu* cpu, uint32_t stop_address
         case 2u: case 4u: goto label_000CA800;
         case 3u: goto label_000CA63B;
         case 5u: goto label_000CA6EB;
-        default: lift_trap(cpu, 0x4CA617u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4CA617u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000CA61E: ;
     std::memmove((void*)((uintptr_t)&g_sfera_control_options.configured_bindings[0]),(void*)((uintptr_t)&g_sfera_control_options.working_bindings[0]),256u); cpu->ecx = 0u;

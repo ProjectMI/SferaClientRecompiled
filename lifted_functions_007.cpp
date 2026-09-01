@@ -1221,7 +1221,7 @@ __declspec(noinline) void sfera_sub_00443EB0(LiftCpu* cpu, uint32_t stop_address
         case 5u: goto label_00043EDA;
         case 6u: goto label_00043EDF;
         case 7u: goto label_00043EE4;
-        default: lift_trap(cpu, 0x443EBAu, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x443EBAu; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_00043EC1: ;
     goto label_00043A10;
@@ -1501,7 +1501,7 @@ label_000440B7:
         case 7u: goto label_00044147;
         case 8u: goto label_00044158;
         case 9u: goto label_0004418A;
-        default: lift_trap(cpu, 0x4440E6u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4440E6u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000440ED:
  ;
@@ -6919,7 +6919,7 @@ __declspec(noinline) void sfera_sub_00449EF0(LiftCpu* cpu, uint32_t stop_address
         case 8u: goto label_0004A6A1;
         case 9u: goto label_0004A767;
         case 10u: goto label_0004A871;
-        default: lift_trap(cpu, 0x449F17u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x449F17u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_00049F1E:
  ;
@@ -8055,7 +8055,7 @@ __declspec(noinline) void sfera_sub_0044B130(LiftCpu* cpu, uint32_t stop_address
         case 2u: goto label_0004B14B;
         case 3u: goto label_0004B150;
         case 4u: goto label_0004B155;
-        default: lift_trap(cpu, 0x44B13Au, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x44B13Au; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_0004B141: ;
     goto label_0004A8C0;
@@ -8070,53 +8070,6 @@ label_0004B141: ;
     label_0004B15A:
     cpu->ecx = (uintptr_t)"ffchat_utility(). Invalid Chat utility function type";
     sfera_sub_004385D0(cpu, stop_address); return;
-}
-__declspec(noinline) void sfera_sub_0044B180(LiftCpu* cpu, uint32_t stop_address) {
-    const uint32_t address = cpu->ecx;
-    auto* effect = reinterpret_cast<CLightEffect*>(static_cast<uintptr_t>(address));
-    std::construct_at(effect);
-    effect->initializePreset();
-    lift_push32(cpu, (uintptr_t)"light_source.eff"); cpu->ecx = address; lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44B1C7u)); sfera_sub_00425EB0(cpu, LIFT_CODE_TOKEN_VA(0x44B1C7u));
-    cpu->eax = address;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044B230(LiftCpu* cpu, uint32_t stop_address) {
-    auto* effect = reinterpret_cast<CLightEffect*>(static_cast<uintptr_t>(cpu->ecx));
-    SferaEffectInitializeContext context{reinterpret_cast<void*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))), *(uint32_t*)(cpu->esp + 8u), std::bit_cast<float>(*(uint32_t*)(cpu->esp + 0xCu)), *(uint32_t*)(cpu->esp + 0x10u) != 0u, reinterpret_cast<void*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 0x14u)))};
-    effect->initializeEffect(context);
-    cpu->esp += 0x18u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044B340(LiftCpu* cpu, uint32_t stop_address) {
-    auto* effect = reinterpret_cast<CLightEffect*>(static_cast<uintptr_t>(cpu->ecx));
-    cpu->eax = effect->activateEffect(*(uint32_t*)(cpu->esp + 4u) != 0u) ? 1u : 0u;
-    cpu->esp += 8u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044B380(LiftCpu* cpu, uint32_t stop_address) {
-    auto* effect = reinterpret_cast<CLightEffect*>(static_cast<uintptr_t>(cpu->ecx));
-    effect->deactivateEffect(*(uint32_t*)(cpu->esp + 4u) != 0u);
-    cpu->esp += 8u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044B3B0(LiftCpu* cpu, uint32_t stop_address) {
-    reinterpret_cast<CLightEffect*>(static_cast<uintptr_t>(cpu->ecx))->renderEffect();
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044B3C0(LiftCpu* cpu, uint32_t stop_address) {
-    auto* definition = reinterpret_cast<CLightEffect*>(static_cast<uintptr_t>(cpu->ecx));
-    cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(definition->createEffectResources()));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044B440(LiftCpu* cpu, uint32_t stop_address) {
-    auto* effect = reinterpret_cast<CLightEffect*>(static_cast<uintptr_t>(cpu->ecx));
-    auto* parameters = reinterpret_cast<const SferaEffectParameter*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u)));
-    effect->setParameter(parameters, *(uint32_t*)(cpu->esp + 8u));
-    cpu->esp += 0xCu; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044B510(LiftCpu* cpu, uint32_t stop_address) {
-    auto* effect = reinterpret_cast<CLightEffect*>(static_cast<uintptr_t>(cpu->ecx));
-    const uint32_t address = cpu->ecx;
-    effect->destroyEffect((*(uint8_t*)(cpu->esp + 4u) & 1u) != 0u);
-    cpu->eax = address;
-    cpu->esp += 8u; cpu->eip = stop_address; return;
 }
 __declspec(noinline) void sfera_sub_0044B5A0(LiftCpu* cpu, uint32_t stop_address) { double x87_v0, x87_v1, x87_v2, x87_v3, x87_v4, x87_v5;
     cpu->esp -= 0xCu;
@@ -8959,7 +8912,7 @@ __declspec(noinline) void sfera_sub_0044C160(LiftCpu* cpu, uint32_t stop_address
     label_0004C1BF:
     lift_push32(cpu, 0u);
     lift_native_call(cpu, native_function_address32(&::ExitProcess), LIFT_CODE_TOKEN_VA(0x44C1C1u));
-    lift_trap(cpu, 0x44C1C7u, "INT3"); return;
+    cpu->eip = 0x44C1C7u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_0044C1D0(LiftCpu* cpu, uint32_t stop_address) { double x87_v0, x87_v1;
     x87_v0 = (double)*(float*)(cpu->edx + 4u);
@@ -9110,13 +9063,6 @@ __declspec(noinline) void sfera_sub_0044C210(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 8u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044C370(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->edx);
-    cpu->edx = cpu->ecx;
-    cpu->ecx = (uintptr_t)&g_sfera_main_ui_state_runtime.clip_planes[0][0];
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44C37Du)); sfera_sub_0044C210(cpu, LIFT_CODE_TOKEN_VA(0x44C37Du));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 __declspec(noinline) void sfera_sub_0044C380(LiftCpu* cpu, uint32_t stop_address) { double x87_v0, x87_v1, x87_v2, x87_v3, x87_v4;
     bool lift_cmp[1];

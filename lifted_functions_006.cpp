@@ -5585,7 +5585,7 @@ __declspec(noinline) void sfera_sub_0043E220(LiftCpu* cpu, uint32_t stop_address
         case 14u: goto label_0003E415;
         case 15u: goto label_0003E430;
         case 16u: goto label_0003E450;
-        default: lift_trap(cpu, 0x43E302u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x43E302u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_0003E309: ;
     cpu->ecx = cpu->edi;

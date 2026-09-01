@@ -4311,7 +4311,7 @@ label_00071EC0:
         case 12u: goto label_0007310D;
         case 13u: goto label_00072828;
         case 14u: goto label_0007304A;
-        default: lift_trap(cpu, 0x471EF5u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x471EF5u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_00071EFC:
  ;
@@ -4557,7 +4557,7 @@ label_000723C5:
         case 7u: goto label_0007310D;
         case 8u: goto label_00072828;
         case 9u: goto label_0007304A;
-        default: lift_trap(cpu, 0x4723E1u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4723E1u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000723E8:
     cpu->ecx = *(uint8_t*)(cpu->esi + 0x48u);
@@ -4759,7 +4759,7 @@ label_00072681:
         case 2u: goto label_0007310D;
         case 3u: goto label_00072828;
         case 4u: goto label_0007304A;
-        default: lift_trap(cpu, 0x472821u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x472821u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_00072828:
     cpu->ecx = *(uint8_t*)(cpu->ebx + 0x48u);
@@ -7268,7 +7268,7 @@ __declspec(noinline) void sfera_sub_00475430(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x14u;
     cpu->ecx = cpu->esp + 0x28u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4755DAu)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x4755DAu));
-    lift_trap(cpu, 0x4755DAu, "INT3"); return;
+    cpu->eip = 0x4755DAu; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_004755E0(LiftCpu* cpu, uint32_t stop_address) { double x87_v0, x87_v1, x87_v2, x87_v3, x87_v4;
     cpu->esp -= 0x414u;
@@ -8678,7 +8678,7 @@ __declspec(noinline) void sfera_sub_00476DE0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x14u;
     cpu->ecx = cpu->esp + 0x24u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47701Bu)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x47701Bu));
-    lift_trap(cpu, 0x47701Bu, "INT3"); return;
+    cpu->eip = 0x47701Bu; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_00477020(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[3]; double x87_v0, x87_v1, x87_v2, x87_v3, x87_v4, x87_v5;
     bool lift_cmp[1];
@@ -9616,7 +9616,7 @@ __declspec(noinline) void sfera_sub_00477020(LiftCpu* cpu, uint32_t stop_address
     label_00077F9D:
     cpu->ecx = (uintptr_t)"MNO_INDICES_IN_PRIMITIVE exceed";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x477FA7u)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x477FA7u));
-    lift_trap(cpu, 0x477FA7u, "INT3"); return;
+    cpu->eip = 0x477FA7u; ::DebugBreak(); return;
 }
 
 } // namespace lifted

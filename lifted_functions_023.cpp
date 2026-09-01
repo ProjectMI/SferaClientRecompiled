@@ -4,10 +4,6 @@
 namespace lifted {
 
 static uint32_t sfera_zlib_low_mask(uint32_t bit_count) { if (bit_count == 0u) { return 0u; } return bit_count >= 32u ? UINT32_MAX : (UINT32_C(1) << bit_count) - 1u; }
-__declspec(noinline) void sfera_sub_004E0259(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = sfera_zlib_deflate_slow(*(uint32_t*)(cpu->esp + 4u), (int32_t)*(uint32_t*)(cpu->esp + 8u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
 __declspec(noinline) void sfera_sub_004E0950(LiftCpu* cpu, uint32_t stop_address) {
     const uint32_t blocks_address = *(uint32_t*)(cpu->esp + 4u);
     const uint32_t stream_address = *(uint32_t*)(cpu->esp + 8u);
@@ -116,7 +112,7 @@ __declspec(noinline) void sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_address
         case 11u: goto label_000E0C9E;
         case 12u: goto label_000E0D67;
         case 13u: goto label_000E0D87;
-        default: lift_trap(cpu, 0x4E0B81u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E0B81u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
     label_000E0B88:
     if (*(uint32_t*)(cpu->ebp + 0xFFFFFFECu) >= 3u) goto label_000E0C30;
@@ -193,7 +189,7 @@ __declspec(noinline) void sfera_sub_004E0AFF(LiftCpu* cpu, uint32_t stop_address
         case 1u: goto label_000E0C9E;
         case 2u: goto label_000E0D67;
         case 3u: goto label_000E0D87;
-        default: lift_trap(cpu, 0x4E0C5Au, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E0C5Au; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
     label_000E0C61:
     cpu->edx = *(uint32_t*)(cpu->ebp + 0xFFFFFFF4u);
@@ -1742,87 +1738,6 @@ __declspec(noinline) void sfera_sub_004E1E72(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = 0u;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004E2200(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_tree_init(*(uint32_t*)(cpu->esp + 4u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E2296(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->ebp);
-    cpu->ebp = cpu->esp;
-    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E229B(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_init_block(*(uint32_t*)(cpu->esp + 4u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E2364(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_write_stored_block(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u), *(uint32_t*)(cpu->esp + 12u), *(uint32_t*)(cpu->esp + 16u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E24A3(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_align_static_block(*(uint32_t*)(cpu->esp + 4u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E2992(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_flush_block(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u), *(uint32_t*)(cpu->esp + 12u), *(uint32_t*)(cpu->esp + 16u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E2D4E(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_build_tree(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E30EE(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_pq_down_heap(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u), *(uint32_t*)(cpu->esp + 12u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E328D(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_generate_bit_lengths(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E35C0(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_generate_codes(*(uint32_t*)(cpu->esp + 4u), (int32_t)*(uint32_t*)(cpu->esp + 8u), *(uint32_t*)(cpu->esp + 12u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E3685(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = sfera_zlib_build_bit_length_tree(*(uint32_t*)(cpu->esp + 4u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E373C(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_scan_tree(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u), (int32_t)*(uint32_t*)(cpu->esp + 12u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E38D9(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_send_all_trees(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u), *(uint32_t*)(cpu->esp + 12u), *(uint32_t*)(cpu->esp + 16u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E3DFC(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_send_tree(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u), (int32_t)*(uint32_t*)(cpu->esp + 12u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E4A02(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_compress_block(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u), *(uint32_t*)(cpu->esp + 12u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E524A(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_set_data_type(*(uint32_t*)(cpu->esp + 4u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E52FC(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = sfera_zlib_bit_reverse(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E533D(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_bit_flush(*(uint32_t*)(cpu->esp + 4u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E5426(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_bit_windup(*(uint32_t*)(cpu->esp + 4u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004E54E2(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_zlib_copy_stored_block(*(uint32_t*)(cpu->esp + 4u), *(uint32_t*)(cpu->esp + 8u), *(uint32_t*)(cpu->esp + 12u), *(uint32_t*)(cpu->esp + 16u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
 __declspec(noinline) void sfera_sub_004E5600(LiftCpu* cpu, uint32_t stop_address) {
     const uint32_t stream_address = *(uint32_t*)(cpu->esp + 0x14u);
     auto* stream = reinterpret_cast<SferaZStream32*>(static_cast<uintptr_t>(stream_address));
@@ -1889,7 +1804,7 @@ __declspec(noinline) void sfera_sub_004E5655(LiftCpu* cpu, uint32_t stop_address
         case 7u: goto label_000E6182;
         case 8u: goto label_000E626C;
         case 9u: goto label_000E62CE;
-        default: lift_trap(cpu, 0x4E56E0u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E56E0u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000E56E7: ;
     if (*(uint32_t*)(cpu->ebp + 0xFFFFFFD8u) < 0x102u) goto label_000E57ED;
@@ -4076,7 +3991,7 @@ __declspec(noinline) void sfera_sub_004E787C(LiftCpu* cpu, uint32_t stop_address
         case 72u: goto label_000E7CD9;
         case 73u: goto label_000E7CE3;
         case 74u: goto label_000EA18F;
-        default: lift_trap(cpu, 0x4E79D1u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E79D1u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000E79D8: ;
     cpu->eax = (uintptr_t)"The device is full. & An invalid media subtype was specified.";
@@ -4180,7 +4095,7 @@ label_000E79D8: ;
         case 62u: goto label_000E7CD9;
         case 63u: goto label_000E7CE3;
         case 64u: goto label_000EA18F;
-        default: lift_trap(cpu, 0x4E7A54u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E7A54u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
     label_000E7A5B:
     cpu->eax = (uintptr_t)"No buffer space has been set";
@@ -4901,7 +4816,7 @@ label_000E7F22: ;
         case 68u: goto label_000E8EF3;
         case 69u: goto label_000E8EFD;
         case 70u: goto label_000E8F07;
-        default: lift_trap(cpu, 0x4E82B0u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E82B0u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000E82B7: ;
     cpu->eax = (uintptr_t)"Connected";
@@ -4993,7 +4908,7 @@ label_000E82B7: ;
         case 56u: goto label_000E8EF3;
         case 57u: goto label_000E8EFD;
         case 58u: goto label_000E8F07;
-        default: lift_trap(cpu, 0x4E8329u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E8329u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
     label_000E8330:
     cpu->eax = (uintptr_t)"No 3d sound";
@@ -5990,7 +5905,7 @@ label_000E90DC: ;
         case 21u: goto label_000E955B;
         case 22u: goto label_000E9565;
         case 23u: goto label_000E956F;
-        default: lift_trap(cpu, 0x4E91B1u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E91B1u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000E91B8: ;
     cpu->eax = (uintptr_t)"Unsupported color operation";
@@ -6293,7 +6208,7 @@ label_000E91B8: ;
         case 42u: goto label_000E9775;
         case 43u: goto label_000E977F;
         case 44u: goto label_000EA18F;
-        default: lift_trap(cpu, 0x4E9591u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E9591u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000E9598: ;
     cpu->eax = (uintptr_t)"The specified property item may not be set on the target object.";
@@ -6618,7 +6533,7 @@ label_000E9598: ;
         case 86u: goto label_000E9F11;
         case 87u: goto label_000E80E3;
         case 90u: goto label_000E9F1B;
-        default: lift_trap(cpu, 0x4E98BCu, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E98BCu; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000E98C3: ;
     cpu->eax = (uintptr_t)"The default system port could not be opened.";
@@ -6748,7 +6663,7 @@ label_000E98C3: ;
         case 57u: goto label_000E9F11;
         case 58u: goto label_000E80E3;
         case 61u: goto label_000E9F1B;
-        default: lift_trap(cpu, 0x4E99ACu, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E99ACu; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
     label_000E99B3:
     cpu->eax = (uintptr_t)"A script routine written in AudioVBScript failed because an invalid operation occurred.  For example, adding the number 3 to a segment object would produce this error.  So would attempting to call a routine that doesn't exist.";
@@ -6918,7 +6833,7 @@ label_000E98C3: ;
         case 45u: goto label_000E9F11;
         case 46u: goto label_000E80E3;
         case 49u: goto label_000E9F1B;
-        default: lift_trap(cpu, 0x4E9B8Au, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E9B8Au; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
     label_000E9B91:
     cpu->eax = (uintptr_t)"Fail to play due to instance limit.";
@@ -7084,7 +6999,7 @@ label_000E98C3: ;
         case 36u: goto label_000E9F11;
         case 37u: goto label_000E80E3;
         case 40u: goto label_000E9F1B;
-        default: lift_trap(cpu, 0x4E9D82u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E9D82u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
     label_000E9D89:
     cpu->eax = (uintptr_t)"Failed to update caps database after changing display mode";
@@ -7190,7 +7105,7 @@ label_000E98C3: ;
         case 9u: goto label_000E9F11;
         case 10u: goto label_000E80E3;
         case 13u: goto label_000E9F1B;
-        default: lift_trap(cpu, 0x4E9EBAu, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4E9EBAu; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
     label_000E9EC1:
     cpu->eax = (uintptr_t)"Call successful, but returned FALSE";

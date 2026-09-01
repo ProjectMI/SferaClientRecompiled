@@ -941,7 +941,7 @@ label_00079092:
 label_000790AB:
     cpu->ecx = (uintptr_t)"MNO_INDICES_IN_PRIMITIVE exceed";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4790B5u)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x4790B5u));
-    lift_trap(cpu, 0x4790B5u, "INT3"); return;
+    cpu->eip = 0x4790B5u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_004790C0(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[2]; double x87_v0, x87_v1, x87_v2;
     lift_push32(cpu, cpu->ebp);
@@ -1205,7 +1205,7 @@ __declspec(noinline) void sfera_sub_004790C0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x14u;
     cpu->ecx = cpu->esp + 0xB8u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x479527u)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x479527u));
-    lift_trap(cpu, 0x479527u, "INT3"); return;
+    cpu->eip = 0x479527u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_00479530(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1]; double x87_v0, x87_v1, x87_v2, x87_v3;
     cpu->esp -= 0x40Cu;
@@ -1911,7 +1911,7 @@ __declspec(noinline) void sfera_sub_00479FD0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x14u;
     cpu->ecx = cpu->esp + 0x10u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47A142u)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x47A142u));
-    lift_trap(cpu, 0x47A142u, "INT3"); return;
+    cpu->eip = 0x47A142u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_0047A150(LiftCpu* cpu, uint32_t stop_address) { double value_0, value_1, value_2, value_3, value_4, value_5, value_6, value_7, value_8, value_9, value_10, value_11, value_12, value_13, value_14, value_15, value_16, value_17, value_18, value_19, value_20, value_21, value_22, value_23, value_24;
  bool lift_test[1]; bool sub_pred[2]; double x87_p0, x87_p1, x87_p2;
@@ -3266,7 +3266,7 @@ label_0007B8B6:
 label_0007B8BE:
     cpu->ecx = (uintptr_t)"internal error 743827592";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47B8C8u)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x47B8C8u));
-    lift_trap(cpu, 0x47B8C8u, "INT3"); return;
+    cpu->eip = 0x47B8C8u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_0047B8D0(LiftCpu* cpu, uint32_t stop_address) { double x87_v0;
     cpu->eax = *(uint32_t*)(void*)&g_sfera_client_config_runtime.state_28;
@@ -4147,7 +4147,7 @@ __declspec(noinline) void sfera_sub_0047BD30(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x14u;
     cpu->ecx = cpu->esp + 0xB4u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47C666u)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x47C666u));
-    lift_trap(cpu, 0x47C666u, "INT3"); return;
+    cpu->eip = 0x47C666u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_0047C670(LiftCpu* cpu, uint32_t stop_address) { double value_0, value_1, value_2, value_3, value_4, value_5, value_6, value_7, value_8, value_9, value_10, value_11, value_12, value_13, value_14, value_15, value_16, value_17, value_18, value_19, value_20, value_21, value_22, value_23, value_24, value_25, value_26, value_27, value_28, value_29, value_30, value_31, value_32, value_33, value_34, value_35, value_36;
  double x87_p0, x87_p1, x87_p2;
@@ -5369,7 +5369,7 @@ __declspec(noinline) void sfera_sub_0047D040(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47D75Cu)); sfera_sub_0042EB70(cpu, LIFT_CODE_TOKEN_VA(0x47D75Cu));
     lift_push32(cpu, cpu->ebx);
     lift_native_call(cpu, native_function_address32(&::exit), LIFT_CODE_TOKEN_VA(0x47D75Du));
-    lift_trap(cpu, 0x47D763u, "INT3"); return;
+    cpu->eip = 0x47D763u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_0047D770(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1]; double x87_p0;
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, 1u);
@@ -6087,7 +6087,7 @@ __declspec(noinline) void sfera_sub_0047E1C0(LiftCpu* cpu, uint32_t stop_address
         case 2u: goto label_0007E29B;
         case 3u: goto label_0007E2BD;
         case 4u: goto label_0007E301;
-        default: lift_trap(cpu, 0x47E235u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x47E235u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_0007E23C: ;
     cpu->eax = *(uint32_t*)(cpu->esp + 0x1Cu);
@@ -7482,14 +7482,6 @@ __declspec(noinline) void sfera_sub_0047F4D0(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = *(uint32_t*)(cpu->ecx + (cpu->edi * 8u) + 0x24u);
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->esp += 8u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0047F5A0(LiftCpu* cpu, uint32_t stop_address) {
-    auto* listener = reinterpret_cast<LightingListener*>(static_cast<std::uintptr_t>(cpu->ecx));
-    auto* effect = reinterpret_cast<IEffect*>(static_cast<std::uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); auto* item = reinterpret_cast<SferaActiveEffect*>(static_cast<std::uintptr_t>(*(uint32_t*)(cpu->esp + 8u)));
-    cpu->eax = listener != nullptr && effect != nullptr && item != nullptr && listener->onEffectDetached(*effect, *item) ? 1u : 0u; cpu->esp += 0xCu; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0047F5C0(LiftCpu* cpu, uint32_t stop_address) {
-    auto* listener = reinterpret_cast<LightingListener*>(static_cast<std::uintptr_t>(cpu->ecx)); auto* effect = reinterpret_cast<IEffect*>(static_cast<std::uintptr_t>(*(uint32_t*)(cpu->esp + 8u))); auto* item = reinterpret_cast<SferaActiveEffect*>(static_cast<std::uintptr_t>(*(uint32_t*)(cpu->esp + 0xCu))); if (listener != nullptr && effect != nullptr && item != nullptr) listener->onEffectChanged(*(uint32_t*)(cpu->esp + 4u), *effect, *item); cpu->esp += 0x10u; cpu->eip = stop_address; return;
-}
 __declspec(noinline) void sfera_sub_0047F6B0(LiftCpu* cpu, uint32_t stop_address) {
     cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sfera_nature_manager())); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
@@ -7508,29 +7500,8 @@ __declspec(noinline) void sfera_sub_0047F750(LiftCpu* cpu, uint32_t stop_address
 __declspec(noinline) void sfera_sub_0047F770(LiftCpu* cpu, uint32_t stop_address) {
     auto* manager = reinterpret_cast<SferaNatureManager*>(static_cast<std::uintptr_t>(cpu->ecx)); if (manager != nullptr) manager->setLightingLevel(std::bit_cast<float>(*(uint32_t*)(cpu->esp + 4u))); cpu->esp += 8u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0047F7B0(LiftCpu* cpu, uint32_t stop_address) {
-    auto* listener = reinterpret_cast<NatureRainListener*>(static_cast<std::uintptr_t>(cpu->ecx)); auto* effect = reinterpret_cast<IEffect*>(static_cast<std::uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); auto* item = reinterpret_cast<SferaActiveEffect*>(static_cast<std::uintptr_t>(*(uint32_t*)(cpu->esp + 8u))); cpu->eax = listener != nullptr && effect != nullptr && item != nullptr && listener->onEffectDetached(*effect, *item) ? 1u : 0u; cpu->esp += 0xCu; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0047F820(LiftCpu* cpu, uint32_t stop_address) {
-    auto* listener = reinterpret_cast<LightingListener*>(static_cast<std::uintptr_t>(cpu->ecx)); auto* effect = reinterpret_cast<IEffect*>(static_cast<std::uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); auto* item = reinterpret_cast<SferaActiveEffect*>(static_cast<std::uintptr_t>(*(uint32_t*)(cpu->esp + 8u))); const float distance = std::bit_cast<float>(*(uint32_t*)(cpu->esp + 0xCu)); cpu->eax = listener != nullptr && effect != nullptr && item != nullptr && listener->onEffectAttached(*effect, *item, distance) ? 1u : 0u; cpu->esp += 0x10u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0047F8A0(LiftCpu* cpu, uint32_t stop_address) {
-    auto* manager = reinterpret_cast<SferaNatureManager*>(static_cast<std::uintptr_t>(cpu->ecx)); if (manager != nullptr) { std::construct_at(manager); manager->initialize(); } cpu->eax = cpu->ecx; cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0047F900(LiftCpu* cpu, uint32_t stop_address) {
-    auto* manager = reinterpret_cast<SferaNatureManager*>(static_cast<std::uintptr_t>(cpu->ecx)); if (manager != nullptr) manager->updateAmbientRainEffects(); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
 __declspec(noinline) void sfera_sub_0047FA20(LiftCpu* cpu, uint32_t stop_address) {
     auto* manager = reinterpret_cast<SferaNatureManager*>(static_cast<std::uintptr_t>(cpu->ecx)); if (manager != nullptr) manager->setRainIntensity(std::bit_cast<float>(*(uint32_t*)(cpu->esp + 4u))); cpu->esp += 8u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0047FA50(LiftCpu* cpu, uint32_t stop_address) {
-    auto* listener = reinterpret_cast<NatureRainListener*>(static_cast<std::uintptr_t>(cpu->ecx)); auto* effect = reinterpret_cast<IEffect*>(static_cast<std::uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); auto* item = reinterpret_cast<SferaActiveEffect*>(static_cast<std::uintptr_t>(*(uint32_t*)(cpu->esp + 8u))); const float distance = std::bit_cast<float>(*(uint32_t*)(cpu->esp + 0xCu)); cpu->eax = listener != nullptr && effect != nullptr && item != nullptr && listener->onEffectAttached(*effect, *item, distance) ? 1u : 0u; cpu->esp += 0x10u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0047FB10(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_initialize_nature_manager(); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0047FBA0(LiftCpu* cpu, uint32_t stop_address) {
-    sfera_shutdown_nature_manager(); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 __declspec(noinline) void sfera_sub_0047FEB0(LiftCpu* cpu, uint32_t stop_address) {
     cpu->eax = *(uint32_t*)(cpu->esp + 4u);
@@ -8771,7 +8742,7 @@ __declspec(noinline) void sfera_sub_004811B0(LiftCpu* cpu, uint32_t stop_address
         case 0u: case 1u: goto label_000811D0;
         case 2u: case 4u: goto label_000811D3;
         case 3u: goto label_000811DC;
-        default: lift_trap(cpu, 0x4811C9u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x4811C9u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_000811D0: ;
     cpu->eax = *(uint32_t*)(cpu->eax);

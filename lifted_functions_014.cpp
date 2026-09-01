@@ -2599,26 +2599,6 @@ __declspec(noinline) void sfera_sub_0048E0A0(LiftCpu* cpu, uint32_t stop_address
     label_0008E0D9:
     cpu->esp += 0xCu; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0048E0E0(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
-    cpu->eax = *(uint32_t*)(cpu->ecx + 0x10u);
-    if (cpu->eax == 0u) goto label_0008E10C;
-    ++*(uint32_t*)(cpu->ecx + 0xCu);
-    lift_push32(cpu, cpu->edi);
-    cpu->edi = *(uint32_t*)(cpu->ecx + 8u);
-    cpu->edi += cpu->edi;
-    cpu->edi += cpu->edi;
-    sub_pred[0] = cpu->edi <= *(uint32_t*)(cpu->ecx + 0xCu);
-    cpu->edi = lift_pop32(cpu);
-    if (!sub_pred[0]) goto label_0008E0FF;
-    *(uint32_t*)(cpu->ecx + 0xCu) = 0u;
-    label_0008E0FF:
-    --cpu->eax;
-    *(uint32_t*)(cpu->ecx + 0x10u) = cpu->eax;
-    if (cpu->eax != 0u) goto label_0008E10C;
-    *(uint32_t*)(cpu->ecx + 0xCu) = 0u;
-    label_0008E10C:
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
 __declspec(noinline) void sfera_sub_0048E110(LiftCpu* cpu, uint32_t stop_address) {
     cpu->esp -= 0xCu;
     lift_push32(cpu, cpu->ebx);
@@ -2630,7 +2610,7 @@ __declspec(noinline) void sfera_sub_0048E110(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx -= cpu->eax;
     if (cpu->ecx >= cpu->edi) goto label_0008E134;
     lift_push32(cpu, (uintptr_t)"deque<T> too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48E110u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48E110u); throw std::length_error("std::length_error");
     label_0008E134:
     cpu->ecx = cpu->eax;
     cpu->ecx >>= 1u;
@@ -2746,7 +2726,7 @@ __declspec(noinline) void sfera_sub_0048E270(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = *(uint32_t*)(cpu->esp + 0xCu);
     if (cpu->eax >= cpu->ecx) goto label_0008E28D;
     lift_push32(cpu, (uintptr_t)"invalid string position");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48E270u), "std::out_of_range");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48E270u); throw std::out_of_range("std::out_of_range");
     label_0008E28D:
     lift_push32(cpu, cpu->ebx);
     cpu->ebx = *(uint32_t*)(cpu->esp + 0x14u);
@@ -2759,14 +2739,14 @@ __declspec(noinline) void sfera_sub_0048E270(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx -= cpu->eax;
     if (cpu->ecx > cpu->ebx) goto label_0008E2B1;
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48E29Au), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48E29Au); throw std::length_error("std::length_error");
     label_0008E2B1:
     lift_push32(cpu, cpu->edi);
     if (cpu->ebx == 0u) goto label_0008E34E;
     cpu->edi = cpu->eax + cpu->ebx;
     if (cpu->edi <= 0xFFFFFFFEu) goto label_0008E2CD;
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48E2B1u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48E2B1u); throw std::length_error("std::length_error");
     label_0008E2CD:
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x14u);
     if (cpu->ecx >= cpu->edi) goto label_0008E2F7;
@@ -2873,14 +2853,14 @@ __declspec(noinline) void sfera_sub_0048E360(LiftCpu* cpu, uint32_t stop_address
     cpu->edx -= cpu->eax;
     if (cpu->edx > cpu->ebx) goto label_0008E3E1;
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48E3C5u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48E3C5u); throw std::length_error("std::length_error");
     label_0008E3E1:
     lift_push32(cpu, cpu->edi);
     if (cpu->ebx == 0u) goto label_0008E471;
     cpu->edi = cpu->eax + cpu->ebx;
     if (cpu->edi <= 0xFFFFFFFEu) goto label_0008E3FD;
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48E3E1u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48E3E1u); throw std::length_error("std::length_error");
     label_0008E3FD:
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x14u);
     if (cpu->ecx >= cpu->edi) goto label_0008E41B;
@@ -2940,7 +2920,7 @@ __declspec(noinline) void sfera_sub_0048E480(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = *(uint32_t*)(cpu->esi + 0x10u);
     if (cpu->eax >= cpu->ebx) goto label_0008E49A;
     lift_push32(cpu, (uintptr_t)"invalid string position");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48E480u), "std::out_of_range");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48E480u); throw std::out_of_range("std::out_of_range");
     label_0008E49A:
     cpu->ecx |= 0xFFFFFFFFu;
     lift_push32(cpu, cpu->ebp);
@@ -2948,14 +2928,14 @@ __declspec(noinline) void sfera_sub_0048E480(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx -= cpu->eax;
     if (cpu->ecx > cpu->ebp) goto label_0008E4B3;
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48E49Au), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48E49Au); throw std::length_error("std::length_error");
     label_0008E4B3:
     lift_push32(cpu, cpu->edi);
     if (cpu->ebp == 0u) goto label_0008E569;
     cpu->edi = cpu->eax + cpu->ebp;
     if (cpu->edi <= 0xFFFFFFFEu) goto label_0008E4CF;
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48E4B3u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48E4B3u); throw std::length_error("std::length_error");
     label_0008E4CF:
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x14u);
     if (cpu->ecx >= cpu->edi) goto label_0008E4F3;
@@ -3184,7 +3164,7 @@ __declspec(noinline) void sfera_sub_0048E6A0(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = cpu->esp + 0x14u;
     lift_push32(cpu, cpu->eax);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48E74Cu)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x48E74Cu));
-    lift_trap(cpu, 0x48E74Cu, "INT3"); return;
+    cpu->eip = 0x48E74Cu; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_0048E750(LiftCpu* cpu, uint32_t stop_address) { bool lift_test[1];
     cpu->esp -= 0x10u;
@@ -3244,7 +3224,7 @@ __declspec(noinline) void sfera_sub_0048E750(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, cpu->ecx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48E7FBu)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x48E7FBu));
-    lift_trap(cpu, 0x48E7FBu, "INT3"); return;
+    cpu->eip = 0x48E7FBu; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_0048E800(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, cpu->ebp);
@@ -3481,7 +3461,7 @@ __declspec(noinline) void sfera_sub_0048EAC0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp -= 0x18u;
     if (*(uint32_t*)(cpu->ecx + 0x10u) > cpu->eax) goto label_0008EAD7;
     lift_push32(cpu, (uintptr_t)"invalid deque<T> subscript");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48EAC0u), "std::out_of_range");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48EAC0u); throw std::out_of_range("std::out_of_range");
     label_0008EAD7:
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->eax);
     cpu->eax = cpu->esp + 8u;
@@ -3760,14 +3740,14 @@ __declspec(noinline) void sfera_sub_0048EDB0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx -= cpu->eax;
     if (cpu->ecx > cpu->ebx) goto label_0008EDCF;
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48EDB0u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48EDB0u); throw std::length_error("std::length_error");
     label_0008EDCF:
     lift_push32(cpu, cpu->edi);
     if (cpu->ebx == 0u) goto label_0008EE4D;
     cpu->edi = cpu->eax + cpu->ebx;
     if (cpu->edi <= 0xFFFFFFFEu) goto label_0008EDE7;
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48EDCFu), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48EDCFu); throw std::length_error("std::length_error");
     label_0008EDE7:
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x14u);
     if (cpu->ecx >= cpu->edi) goto label_0008EE23;
@@ -3833,7 +3813,7 @@ __declspec(noinline) void sfera_sub_0048EE60(LiftCpu* cpu, uint32_t stop_address
     cpu->edx -= cpu->ecx;
     if (cpu->edx > cpu->edi) goto label_0008EEA7;
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48EE93u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48EE93u); throw std::length_error("std::length_error");
     label_0008EEA7:
     lift_push32(cpu, cpu->ebx);
     if (cpu->edi == 0u) goto label_0008EFC8;
@@ -3841,7 +3821,7 @@ __declspec(noinline) void sfera_sub_0048EE60(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->ebx;
     if (cpu->ebx <= 0xFFFFFFFEu) goto label_0008EEC7;
     lift_push32(cpu, (uintptr_t)"string too long");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48EEA7u), "std::length_error");
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48EEA7u); throw std::length_error("std::length_error");
     label_0008EEC7:
     cpu->eax = *(uint32_t*)(cpu->esi + 0x14u);
     if (cpu->eax >= cpu->ebx) goto label_0008EEEB;
@@ -3957,8 +3937,7 @@ __declspec(noinline) void sfera_sub_0048EE60(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->esp += 0x14u; cpu->eip = stop_address; return;
     label_0008EFD1:
     lift_push32(cpu, (uintptr_t)"invalid string position");
-    lift_trap(cpu, LIFT_CODE_TOKEN_VA(0x48EFD1u), "std::out_of_range");
-    lift_trap(cpu, 0x48EFDCu, "INT3"); return;
+    cpu->eip = LIFT_CODE_TOKEN_VA(0x48EFD1u); throw std::out_of_range("std::out_of_range");
 }
 __declspec(noinline) void sfera_sub_0048EFE0(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, cpu->ecx);
@@ -4319,145 +4298,6 @@ __declspec(noinline) void sfera_sub_0048F1B0(LiftCpu* cpu, uint32_t stop_address
     label_0008F3FB:
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x8F400u)); sfera_sub_0048F0F0(cpu, LIFT_CODE_TOKEN_RVA(0x8F400u));
     label_0008F400:
-    cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
-    cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); cpu->esp += 0x2Cu; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0048F25D(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->esi = *(uint32_t*)(cpu->ebp + 0xFFFFFFE8u);
-    cpu->edi = *(uint32_t*)(cpu->ebp + 0xFFFFFFE4u);
-    if (cpu->edi >= *(uint32_t*)(cpu->esi + 0x10u)) goto label_0008F274;
-    label_0008F268:
-    cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F26Fu)); sfera_sub_0048E0E0(cpu, LIFT_CODE_TOKEN_VA(0x48F26Fu));
-    if (cpu->edi < *(uint32_t*)(cpu->esi + 0x10u)) goto label_0008F268;
-    label_0008F274:
-    lift_push32(cpu, 0u); lift_push32(cpu, 0u);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F27Du)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x48F27Du));
-    cpu->esi = *(uint32_t*)(cpu->edi + 0x10u);
-    cpu->esi -= cpu->ebx;
-    lift_push32(cpu, cpu->esi);
-    cpu->eax = cpu->ebp + 0xFFFFFFD8u;
-    lift_push32(cpu, cpu->eax);
-    cpu->ecx = cpu->ebp + 0xFFFFFFC0u;
-    lift_push32(cpu, cpu->ecx);
-    cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F292u)); sfera_sub_004A8E20(cpu, LIFT_CODE_TOKEN_VA(0x48F292u));
-    cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F299u)); sfera_sub_004A8C50(cpu, LIFT_CODE_TOKEN_VA(0x48F299u));
-    cpu->edx = cpu->ebp + 0xFFFFFFCCu;
-    lift_push32(cpu, cpu->edx);
-    cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F2A4u)); sfera_sub_004A8E20(cpu, LIFT_CODE_TOKEN_VA(0x48F2A4u));
-    cpu->eax = *(uint32_t*)(cpu->ebp + 0x1Cu);
-    lift_push32(cpu, cpu->eax);
-    cpu->eax = *(uint32_t*)(cpu->ebp + 0xFFFFFFD8u);
-    if (cpu->eax == 0u) goto label_0008F2BB;
-    cpu->eax = *(uint32_t*)(cpu->eax);
-    if (cpu->eax == 0u) goto label_0008F2BB;
-    cpu->eax = *(uint32_t*)(cpu->eax);
-    if (cpu->eax != 0u) goto label_0008F2BF;
-    label_0008F2BB:
-    cpu->ecx = 0u;
-    goto label_0008F2C1;
-    label_0008F2BF:
-    cpu->ecx = *(uint32_t*)(cpu->eax);
-    label_0008F2C1:
-    cpu->eax = *(uint32_t*)(cpu->ebp + 0xFFFFFFE0u);
-    lift_push32(cpu, cpu->eax);
-    cpu->eax = *(uint32_t*)(cpu->ebp + 0xFFFFFFCCu);
-    lift_push32(cpu, cpu->ecx);
-    if (cpu->eax == 0u) goto label_0008F2D9;
-    cpu->eax = *(uint32_t*)(cpu->eax);
-    if (cpu->eax == 0u) goto label_0008F2D9;
-    cpu->eax = *(uint32_t*)(cpu->eax);
-    if (cpu->eax != 0u) goto label_0008F2DD;
-    label_0008F2D9:
-    cpu->ecx = 0u;
-    goto label_0008F2DF;
-    label_0008F2DD:
-    cpu->ecx = *(uint32_t*)(cpu->eax);
-    label_0008F2DF:
-    cpu->eax = *(uint32_t*)(cpu->ebp + 0xFFFFFFD4u);
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F2E9u)); sfera_sub_0048DF30(cpu, LIFT_CODE_TOKEN_VA(0x48F2E9u));
-    cpu->edx = *(uint32_t*)(cpu->ebp + 0xFFFFFFECu);
-    cpu->esp -= 0xCu;
-    cpu->ecx = cpu->esp;
-    *(uint32_t*)(cpu->ebp + 0xFFFFFFE4u) = cpu->esp;
-    lift_push32(cpu, cpu->edx); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
-    cpu->eax = cpu->ebp + 0xFFFFFFC0u;
-    lift_push32(cpu, cpu->eax);
-    cpu->ecx = cpu->ebp + 0xFFFFFFCCu;
-    lift_push32(cpu, cpu->ecx);
-    cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F306u)); sfera_sub_004A8E20(cpu, LIFT_CODE_TOKEN_VA(0x48F306u));
-    cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F30Du)); sfera_sub_004A8C50(cpu, LIFT_CODE_TOKEN_VA(0x48F30Du));
-    cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F314u)); sfera_sub_004A8C50(cpu, LIFT_CODE_TOKEN_VA(0x48F314u));
-    cpu->esp -= 0xCu;
-    cpu->edx = cpu->esp;
-    *(uint32_t*)(cpu->ebp + 0xFFFFFFE4u) = cpu->esp;
-    lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edx);
-    cpu->eax = cpu->ebp + 0xFFFFFFB4u;
-    lift_push32(cpu, cpu->eax);
-    cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F329u)); sfera_sub_004A8E20(cpu, LIFT_CODE_TOKEN_VA(0x48F329u));
-    cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F330u)); sfera_sub_004A8C50(cpu, LIFT_CODE_TOKEN_VA(0x48F330u));
-    cpu->esp -= 0xCu;
-    cpu->ecx = cpu->esp;
-    *(uint32_t*)(cpu->ebp + 0xFFFFFFE4u) = cpu->esp;
-    lift_push32(cpu, cpu->ecx);
-    cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F340u)); sfera_sub_004A8E20(cpu, LIFT_CODE_TOKEN_VA(0x48F340u));
-    cpu->ecx = cpu->ebp + 0xFFFFFFA8u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F400u)); sfera_sub_0048F0F0(cpu, LIFT_CODE_TOKEN_VA(0x48F400u));
-    cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
-    cpu->esp = cpu->ebp;
-    cpu->ebp = lift_pop32(cpu); cpu->esp += 0x2Cu; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0048F38D(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->esi = *(uint32_t*)(cpu->ebp + 0xFFFFFFE8u);
-    cpu->edi = *(uint32_t*)(cpu->ebp + 0xFFFFFFE4u);
-    if (cpu->edi >= *(uint32_t*)(cpu->esi + 0x10u)) goto label_0008F3A4;
-    label_0008F398:
-    cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F39Fu)); sfera_sub_0049FA20(cpu, LIFT_CODE_TOKEN_VA(0x48F39Fu));
-    if (cpu->edi < *(uint32_t*)(cpu->esi + 0x10u)) goto label_0008F398;
-    label_0008F3A4:
-    lift_push32(cpu, 0u); lift_push32(cpu, 0u);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F3ADu)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x48F3ADu));
-    cpu->esp -= 0xCu;
-    cpu->eax = cpu->esp;
-    *(uint32_t*)(cpu->ebp + 0xFFFFFFE4u) = cpu->esp;
-    lift_push32(cpu, cpu->eax);
-    cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F3BDu)); sfera_sub_0049F5D0(cpu, LIFT_CODE_TOKEN_VA(0x48F3BDu));
-    cpu->esp -= 0xCu;
-    cpu->ecx = cpu->esp;
-    *(uint32_t*)(cpu->ebp + 0xFFFFFFE4u) = cpu->esp;
-    lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ecx);
-    cpu->edx = cpu->ebp + 0xFFFFFFA8u;
-    lift_push32(cpu, cpu->edx);
-    cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F3D2u)); sfera_sub_004A8E20(cpu, LIFT_CODE_TOKEN_VA(0x48F3D2u));
-    cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F3D9u)); sfera_sub_004A8C50(cpu, LIFT_CODE_TOKEN_VA(0x48F3D9u));
-    cpu->ecx = *(uint32_t*)(cpu->ebp + 0xFFFFFFECu);
-    cpu->esp -= 0xCu;
-    cpu->eax = cpu->esp;
-    *(uint32_t*)(cpu->ebp + 0xFFFFFFE4u) = cpu->esp;
-    lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->eax);
-    cpu->edx = cpu->ebp + 0xFFFFFFB4u;
-    lift_push32(cpu, cpu->edx);
-    cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F3F1u)); sfera_sub_004A8E20(cpu, LIFT_CODE_TOKEN_VA(0x48F3F1u));
-    cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F3F8u)); sfera_sub_004A8C50(cpu, LIFT_CODE_TOKEN_VA(0x48F3F8u));
-    cpu->ecx = cpu->ebp + 0xFFFFFFC0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x48F400u)); sfera_sub_0048F0F0(cpu, LIFT_CODE_TOKEN_VA(0x48F400u));
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
     cpu->esp = cpu->ebp;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 0x2Cu; cpu->eip = stop_address; return;
@@ -7893,7 +7733,7 @@ __declspec(noinline) void sfera_sub_004923E0(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = cpu->esp + 0x50u;
     lift_push32(cpu, cpu->eax);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4927B7u)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x4927B7u));
-    lift_trap(cpu, 0x4927B7u, "INT3"); return;
+    cpu->eip = 0x4927B7u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_004927C0(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
@@ -8131,7 +7971,7 @@ __declspec(noinline) void sfera_sub_004927C0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esp + 0x44u;
     lift_push32(cpu, cpu->ecx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x492B34u)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x492B34u));
-    lift_trap(cpu, 0x492B34u, "INT3"); return;
+    cpu->eip = 0x492B34u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_00492B40(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
@@ -8632,7 +8472,7 @@ __declspec(noinline) void sfera_sub_004930A0(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = cpu->esp + 0x3Cu;
     lift_push32(cpu, cpu->edx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x493421u)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x493421u));
-    lift_trap(cpu, 0x493421u, "INT3"); return;
+    cpu->eip = 0x493421u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_00493430(LiftCpu* cpu, uint32_t stop_address) { bool lift_test[1];
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
@@ -8941,7 +8781,7 @@ __declspec(noinline) void sfera_sub_00493430(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esp + 0x40u;
     lift_push32(cpu, cpu->ecx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x493917u)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x493917u));
-    lift_trap(cpu, 0x493917u, "INT3"); return;
+    cpu->eip = 0x493917u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_00493920(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[3];
     lift_push32(cpu, 0xFFFFFFFFu); lift_push32(cpu, 0u);
@@ -9114,31 +8954,7 @@ __declspec(noinline) void sfera_sub_00493920(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = cpu->esp + 0x3Cu;
     lift_push32(cpu, cpu->eax);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x493BECu)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x493BECu));
-    lift_trap(cpu, 0x493BECu, "INT3"); return;
+    cpu->eip = 0x493BECu; ::DebugBreak(); return;
 }
-__declspec(noinline) void sfera_sub_00493BF0(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); parser->initialize(); cpu->eax = cpu->ecx; cpu->esp += 4u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00493C00(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); parser->release(); cpu->esp += 4u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00493C50(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); parser->rebuildLineTable(); cpu->esp += 4u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00493D20(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const char* line = reinterpret_cast<const char*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(parser->firstToken(line))); cpu->esp += 8u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00493D70(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const int32_t begin = static_cast<int32_t>(*(uint32_t*)(cpu->esp + 4u)); const int32_t end = static_cast<int32_t>(*(uint32_t*)(cpu->esp + 8u)); cpu->eax = static_cast<uint32_t>(parser->findClosingBrace(begin, end)); cpu->esp += 0xCu; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00493E10(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const char* first = reinterpret_cast<const char*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); const int32_t line = static_cast<int32_t>(*(uint32_t*)(cpu->esp + 8u)); const int32_t end = static_cast<int32_t>(*(uint32_t*)(cpu->esp + 0xCu)); SferaParserRange* range = reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 0x10u))); cpu->eax = static_cast<uint32_t>(parser->parseBlockAt(first, line, end, range)); cpu->esp += 0x14u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00493F70(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const char* name = reinterpret_cast<const char*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); SferaParserRange* output = reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 8u))); const SferaParserRange* range = reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 0xCu))); const int32_t occurrence = static_cast<int32_t>(*(uint32_t*)(cpu->esp + 0x10u)); cpu->eax = parser->findBlock(name, output, range, occurrence) ? 1u : 0u; cpu->esp += 0x14u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00494030(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const char* name = reinterpret_cast<const char*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); const SferaParserRange* range = reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 8u))); cpu->eax = static_cast<uint32_t>(parser->countBlocks(name, range)); cpu->esp += 0xCu; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00494150(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const char* name = reinterpret_cast<const char*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); const SferaParserRange* range = reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 8u))); cpu->eax = parser->findValue(name, range) ? 1u : 0u; cpu->esp += 0xCu; cpu->eip = stop_address; return; }
 __declspec(noinline) double sfera_sub_004942C0(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const uint32_t index = *(uint32_t*)(cpu->esp + 4u); const double value = parser->readFloat(index); cpu->esp += 8u; cpu->eip = stop_address; return value; }
-__declspec(noinline) void sfera_sub_00494360(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const uint32_t index = *(uint32_t*)(cpu->esp + 4u); cpu->eax = static_cast<uint32_t>(parser->readInt(index)); cpu->esp += 8u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00494400(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const uint32_t index = *(uint32_t*)(cpu->esp + 4u); char* output = reinterpret_cast<char*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 8u))); cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(parser->readString(index, output))); cpu->esp += 0xCu; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_004944A0(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const uint32_t index = *(uint32_t*)(cpu->esp + 4u); char* output = reinterpret_cast<char*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 8u))); cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(parser->readQuotedString(index, output))); cpu->esp += 0xCu; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00494550(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const SferaParserRange* range = reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); parser->setScanRange(range); cpu->esp += 8u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_004945B0(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); parser->clearScanRange(); cpu->esp += 4u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_004945C0(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const char* name = reinterpret_cast<const char*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); cpu->eax = parser->nextValue(name) ? 1u : 0u; cpu->esp += 8u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00494710(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const uint32_t index = *(uint32_t*)(cpu->esp + 4u); cpu->eax = parser->readBool(index) ? 1u : 0u; cpu->esp += 8u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_004947E0(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = parser->tokenCount(); cpu->esp += 4u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00494850(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const SferaParserRange* range = reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); parser->setBlockRange(range); cpu->esp += 8u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_004948B0(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); parser->clearBlockRange(); cpu->esp += 4u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_004948C0(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const char* name = reinterpret_cast<const char*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); SferaParserRange* output = reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 8u))); cpu->eax = parser->nextBlock(name, output) ? 1u : 0u; cpu->esp += 0xCu; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00494900(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); SferaParserRange* output = reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); parser->getBlockRange(output); cpu->esp += 8u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00494920(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); SferaParserRange* output = reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); parser->getScanRange(output); cpu->esp += 8u; cpu->eip = stop_address; return; }
-__declspec(noinline) void sfera_sub_00494940(LiftCpu* cpu, uint32_t stop_address) { SferaSimpleParser* parser = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); const char* filename = reinterpret_cast<const char*>(static_cast<uintptr_t>(*(uint32_t*)(cpu->esp + 4u))); parser->load(filename); cpu->esp += 8u; cpu->eip = stop_address; return; }
-
 } // namespace lifted

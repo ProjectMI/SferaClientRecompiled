@@ -498,7 +498,7 @@ static void sfera_mbinter_execute_opcode(LiftCpu* cpu, uint32_t stop_address, ui
             sfera_sub_00443050(cpu, stop_address);
             return;
         default:
-            lift_trap(cpu, 0x43774Eu, "unsupported MBInter bytecode opcode");
+            cpu->eip = 0x43774Eu; throw std::runtime_error("unsupported MBInter bytecode opcode");
             return;
     }
 }
@@ -7558,7 +7558,7 @@ __declspec(noinline) void sfera_sub_00435D40(LiftCpu* cpu, uint32_t stop_address
         case 7u: goto label_00035FBA;
         case 8u: goto label_00035FC8;
         case 9u: goto label_0003601C;
-        default: lift_trap(cpu, 0x435F90u, "resolved jump-table index out of range"); return;
+        default: cpu->eip = 0x435F90u; throw std::out_of_range("resolved jump-table index out of range"); return;
     }
 label_00035F97: ;
     cpu->ecx = *(uint32_t*)(cpu->ebx);

@@ -199,8 +199,6 @@ std::uint32_t lift_pop32(LiftCpu* cpu) {
 
 
 
-[[noreturn]] void lift_trap(LiftCpu* cpu, std::uint32_t source_va, const char* reason) { if (cpu) { cpu->eip = source_va; } throw std::runtime_error(std::string("Lifted trap at ") + hex_u32(source_va) + ": " + (reason ? reason : "unknown")); }
-
 const std::wstring& client_root_directory() {
     static const std::wstring root = [] {
         const std::wstring configured = environment_path(kClientRootEnvironment);

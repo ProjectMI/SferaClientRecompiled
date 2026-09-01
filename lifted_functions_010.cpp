@@ -662,7 +662,7 @@ __declspec(noinline) void sfera_sub_00463020(LiftCpu* cpu, uint32_t stop_address
     label_000634CD:
     cpu->ecx = (uintptr_t)"Empty text created";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4634D7u)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x4634D7u));
-    lift_trap(cpu, 0x4634D7u, "INT3"); return;
+    cpu->eip = 0x4634D7u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_004634E0(LiftCpu* cpu, uint32_t stop_address) { double value_0, value_1, value_2, value_3, value_4, value_5, value_6, value_7, value_8, value_9, value_10, value_11, value_12, value_13, value_14, value_15, value_16, value_17, value_18, value_19, value_20, value_21, value_22, value_23, value_24, value_25, value_26;
  double x87_p0, x87_p1, x87_p2, x87_p3, x87_p4, x87_p5, x87_p6, x87_p7;
@@ -5282,7 +5282,7 @@ __declspec(noinline) void sfera_sub_00468050(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x14u;
     cpu->ecx = cpu->esp + 8u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x46819Cu)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x46819Cu));
-    lift_trap(cpu, 0x46819Cu, "INT3"); return;
+    cpu->eip = 0x46819Cu; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_004681A0(LiftCpu* cpu, uint32_t stop_address) { double x87_v0, x87_v1;
     cpu->esp -= 0x78u;
@@ -5761,7 +5761,7 @@ __declspec(noinline) void sfera_sub_00468750(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0xCu;
     cpu->ecx = (uintptr_t)&g_sfera_error_message_scratch_runtime.formatted_message[0];
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4689D2u)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x4689D2u));
-    lift_trap(cpu, 0x4689D2u, "INT3"); return;
+    cpu->eip = 0x4689D2u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_004689E0(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->esi);
@@ -5853,7 +5853,7 @@ __declspec(noinline) void sfera_sub_004689E0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0xCu;
     cpu->ecx = (uintptr_t)&g_sfera_error_message_scratch_runtime.formatted_message[0];
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x468B3Bu)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x468B3Bu));
-    lift_trap(cpu, 0x468B3Bu, "INT3"); return;
+    cpu->eip = 0x468B3Bu; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_00468B40(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi);
@@ -6172,7 +6172,7 @@ __declspec(noinline) void sfera_sub_00468E50(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = *(uint32_t*)(cpu->esp + 0x10u);
     lift_push32(cpu, cpu->edx); lift_push32(cpu, (uintptr_t)"Smooth error in %s! Look at lndbug.tga");
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x469084u)); sfera_sub_004623C0(cpu, LIFT_CODE_TOKEN_VA(0x469084u));
-    lift_trap(cpu, 0x469084u, "INT3"); return;
+    cpu->eip = 0x469084u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_00469090(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[7]; double x87_v0, x87_v1, x87_v2, x87_v3, x87_v4, x87_v5, x87_v6, x87_v7;
     lift_push32(cpu, cpu->ebp);
@@ -7223,7 +7223,7 @@ __declspec(noinline) void sfera_sub_00469090(LiftCpu* cpu, uint32_t stop_address
     label_0006A059:
     cpu->ecx = (uintptr_t)"fatal error 58289563485";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x46A063u)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x46A063u));
-    lift_trap(cpu, 0x46A063u, "INT3"); return;
+    cpu->eip = 0x46A063u; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_0046A070(LiftCpu* cpu, uint32_t stop_address) { bool lift_test[1]; double x87_v0, x87_v1, x87_v2;
     lift_push32(cpu, cpu->ebp);
@@ -10287,7 +10287,7 @@ __declspec(noinline) void sfera_sub_0046CBA0(LiftCpu* cpu, uint32_t stop_address
     label_0006D234:
     cpu->ecx = (uintptr_t)"Number of layer masks is not the same in lnd and msk";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x46D23Eu)); sfera_sub_00459B10(cpu, LIFT_CODE_TOKEN_VA(0x46D23Eu));
-    lift_trap(cpu, 0x46D23Eu, "INT3"); return;
+    cpu->eip = 0x46D23Eu; ::DebugBreak(); return;
 }
 __declspec(noinline) void sfera_sub_0046D240(LiftCpu* cpu, uint32_t stop_address) {
     cpu->eax = *(uint32_t*)(cpu->esp + 4u);

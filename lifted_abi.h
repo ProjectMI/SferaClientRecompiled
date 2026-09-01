@@ -24,6 +24,5 @@ void lift_push32(LiftCpu* cpu, uint32_t value);
 uint32_t lift_pop32(LiftCpu* cpu);
 
 void lift_native_call(LiftCpu* cpu, uint32_t target, uint32_t callsite);
-[[noreturn]] void lift_trap(LiftCpu* cpu, uint32_t source_va, const char* reason);
 
 } // namespace lifted
