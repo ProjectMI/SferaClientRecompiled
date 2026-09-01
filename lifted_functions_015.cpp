@@ -1461,62 +1461,62 @@ __declspec(noinline) void sfera_sub_00495F40(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = *(uint32_t*)(cpu->esp + 0x130u);
     lift_push32(cpu, cpu->edi);
     cpu->edi = cpu->ecx;
-    lift_push32(cpu, cpu->ebp);
+    { const uint32_t __parser_arg_015_0_0 = static_cast<uint32_t>(cpu->ebp);
     cpu->ebx = 0u;
-    lift_push32(cpu, (uintptr_t)"eff_number");
+    const uint32_t __parser_arg_015_0_1 = static_cast<uint32_t>((uintptr_t)"eff_number");
     cpu->ecx = cpu->esi;
-    *(uint32_t*)(cpu->esp + 0x18u) = cpu->ebp;
+    *(uint32_t*)(cpu->esp + 0x10u) = cpu->ebp;
     *(uint32_t*)(cpu->edi + 4u) = cpu->ebx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x495F7Eu)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x495F7Eu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_0_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_0_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_00095F8C;
-    lift_push32(cpu, cpu->ebx);
+    { const uint32_t __parser_arg_015_1_0 = static_cast<uint32_t>(cpu->ebx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x495F8Au)); sfera_sub_00494360(cpu, LIFT_CODE_TOKEN_VA(0x495F8Au));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(__parser_direct->readInt(__parser_arg_015_1_0)); }
     *(uint32_t*)(cpu->edi) = cpu->eax;
 label_00095F8C:
-    lift_push32(cpu, 1u); lift_push32(cpu, cpu->ebp);
-    cpu->eax = cpu->esp + 0x28u;
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)"audio_files");
+    { const uint32_t __parser_arg_015_2_0 = static_cast<uint32_t>(1u); const uint32_t __parser_arg_015_2_1 = static_cast<uint32_t>(cpu->ebp);
+    cpu->eax = cpu->esp + 0x20u;
+    const uint32_t __parser_arg_015_2_2 = static_cast<uint32_t>(cpu->eax); const uint32_t __parser_arg_015_2_3 = static_cast<uint32_t>((uintptr_t)"audio_files");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x495FA0u)); sfera_sub_00493F70(cpu, LIFT_CODE_TOKEN_VA(0x495FA0u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findBlock(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_2_3)), reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_2_2)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_2_1)), static_cast<int32_t>(__parser_arg_015_2_0)) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_0009609B;
     cpu->ecx = cpu->esp + 0x20u;
-    lift_push32(cpu, cpu->ecx);
+    { const uint32_t __parser_arg_015_3_0 = static_cast<uint32_t>(cpu->ecx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x495FB4u)); sfera_sub_00494550(cpu, LIFT_CODE_TOKEN_VA(0x495FB4u));
-    lift_push32(cpu, (uintptr_t)"source");
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->setScanRange(reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_3_0))); }
+    { const uint32_t __parser_arg_015_4_0 = static_cast<uint32_t>((uintptr_t)"source");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x495FC0u)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x495FC0u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_4_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000963C9;
 label_00095FC8:
-    lift_push32(cpu, (uintptr_t)"source");
+    { const uint32_t __parser_arg_015_5_0 = static_cast<uint32_t>((uintptr_t)"source");
     cpu->ecx = cpu->esi;
     ++cpu->ebx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x495FD5u)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x495FD5u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_5_0))) ? 1u : 0u; }
     if (cpu->eax != 0u) goto label_00095FC8;
     if (cpu->ebx == 0u) goto label_000963C9;
     cpu->edx = cpu->esp + 0x20u;
-    lift_push32(cpu, cpu->edx);
+    { const uint32_t __parser_arg_015_6_0 = static_cast<uint32_t>(cpu->edx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x495FEDu)); sfera_sub_00494550(cpu, LIFT_CODE_TOKEN_VA(0x495FEDu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->setScanRange(reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_6_0))); }
     lift_push32(cpu, cpu->ebx);
     cpu->ecx = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x495FF5u)); sfera_sub_00495C80(cpu, LIFT_CODE_TOKEN_VA(0x495FF5u));
-    lift_push32(cpu, (uintptr_t)"source");
+    { const uint32_t __parser_arg_015_7_0 = static_cast<uint32_t>((uintptr_t)"source");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496001u)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x496001u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_7_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000960DB;
 label_00096010:
-    lift_push32(cpu, 0u);
+    { const uint32_t __parser_arg_015_8_0 = static_cast<uint32_t>(0u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496019u)); sfera_sub_00494360(cpu, LIFT_CODE_TOKEN_VA(0x496019u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(__parser_direct->readInt(__parser_arg_015_8_0)); }
     cpu->ebp = cpu->eax;
     if ((int32_t)cpu->ebp >= (int32_t)cpu->ebx) goto label_000963C9;
     if ((int32_t)cpu->ebp < 0) goto label_000963C9;
     cpu->eax = cpu->esp + 0x2Cu;
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, 1u);
+    { const uint32_t __parser_arg_015_9_0 = static_cast<uint32_t>(cpu->eax); const uint32_t __parser_arg_015_9_1 = static_cast<uint32_t>(1u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496039u)); sfera_sub_004944A0(cpu, LIFT_CODE_TOKEN_VA(0x496039u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(__parser_direct->readQuotedString(__parser_arg_015_9_1, reinterpret_cast<char*>(static_cast<uintptr_t>(__parser_arg_015_9_0))))); }
     if (cpu->eax == 0u) goto label_00096081;
     cpu->ecx = cpu->esp + 0x2Cu;
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->ebp);
@@ -1531,28 +1531,28 @@ label_00096010:
     cpu->ebp = cpu->ebp + (cpu->ebp * 2u);
     cpu->ebp += cpu->ebp;
     cpu->ebp += cpu->ebp;
-    lift_push32(cpu, 2u);
+    { const uint32_t __parser_arg_015_10_0 = static_cast<uint32_t>(2u);
     cpu->ecx = cpu->esi;
     *(uint8_t*)(cpu->eax + cpu->ebp + 4u) = 1u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49607Au)); value_11 = sfera_sub_004942C0(cpu, LIFT_CODE_TOKEN_VA(0x49607Au));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); value_11 = __parser_direct->readFloat(__parser_arg_015_10_0); }
     cpu->ecx = *(uint32_t*)(cpu->edi + 0x28u);
     *(float*)(cpu->ecx + cpu->ebp + 8u) = value_11; 
 label_00096081:
-    lift_push32(cpu, (uintptr_t)"source");
+    { const uint32_t __parser_arg_015_11_0 = static_cast<uint32_t>((uintptr_t)"source");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49608Du)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x49608Du));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_11_0))) ? 1u : 0u; }
     if (cpu->eax != 0u) goto label_00096010;
     cpu->ebp = *(uint32_t*)(cpu->esp + 0x10u);
     goto label_000960DB;
 label_0009609B:
-    lift_push32(cpu, cpu->ebp); lift_push32(cpu, (uintptr_t)"audio_file");
+    { const uint32_t __parser_arg_015_12_0 = static_cast<uint32_t>(cpu->ebp); const uint32_t __parser_arg_015_12_1 = static_cast<uint32_t>((uintptr_t)"audio_file");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4960A8u)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x4960A8u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_12_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_12_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000963C9;
     cpu->edx = cpu->esp + 0x2Cu;
-    lift_push32(cpu, cpu->edx); lift_push32(cpu, cpu->ebx);
+    { const uint32_t __parser_arg_015_13_0 = static_cast<uint32_t>(cpu->edx); const uint32_t __parser_arg_015_13_1 = static_cast<uint32_t>(cpu->ebx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4960BDu)); sfera_sub_004944A0(cpu, LIFT_CODE_TOKEN_VA(0x4960BDu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(__parser_direct->readQuotedString(__parser_arg_015_13_1, reinterpret_cast<char*>(static_cast<uintptr_t>(__parser_arg_015_13_0))))); }
     if (cpu->eax == 0u) goto label_000963C9;
     lift_push32(cpu, 1u);
     cpu->ecx = cpu->edi;
@@ -1562,39 +1562,39 @@ label_0009609B:
     cpu->ecx = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x960DBu)); sfera_sub_00495ED0(cpu, LIFT_CODE_TOKEN_RVA(0x960DBu));
 label_000960DB:
-    lift_push32(cpu, 1u); lift_push32(cpu, cpu->ebp);
-    cpu->ecx = cpu->esp + 0x28u;
-    lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)"time_groups");
+    { const uint32_t __parser_arg_015_14_0 = static_cast<uint32_t>(1u); const uint32_t __parser_arg_015_14_1 = static_cast<uint32_t>(cpu->ebp);
+    cpu->ecx = cpu->esp + 0x20u;
+    const uint32_t __parser_arg_015_14_2 = static_cast<uint32_t>(cpu->ecx); const uint32_t __parser_arg_015_14_3 = static_cast<uint32_t>((uintptr_t)"time_groups");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4960EFu)); sfera_sub_00493F70(cpu, LIFT_CODE_TOKEN_VA(0x4960EFu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findBlock(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_14_3)), reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_14_2)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_14_1)), static_cast<int32_t>(__parser_arg_015_14_0)) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000961E8;
     cpu->edx = cpu->esp + 0x20u;
-    lift_push32(cpu, cpu->edx);
+    { const uint32_t __parser_arg_015_15_0 = static_cast<uint32_t>(cpu->edx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496103u)); sfera_sub_00494550(cpu, LIFT_CODE_TOKEN_VA(0x496103u));
-    lift_push32(cpu, (uintptr_t)"time");
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->setScanRange(reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_15_0))); }
+    { const uint32_t __parser_arg_015_16_0 = static_cast<uint32_t>((uintptr_t)"time");
     cpu->ecx = cpu->esi;
     cpu->ebx = 0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496111u)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x496111u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_16_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000961E8;
 label_00096120:
-    lift_push32(cpu, (uintptr_t)"time");
+    { const uint32_t __parser_arg_015_17_0 = static_cast<uint32_t>((uintptr_t)"time");
     cpu->ecx = cpu->esi;
     ++cpu->ebx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49612Du)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x49612Du));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_17_0))) ? 1u : 0u; }
     if (cpu->eax != 0u) goto label_00096120;
     if (cpu->ebx == 0u) goto label_000961E8;
     cpu->eax = cpu->esp + 0x20u;
-    lift_push32(cpu, cpu->eax);
+    { const uint32_t __parser_arg_015_18_0 = static_cast<uint32_t>(cpu->eax);
     cpu->ecx = cpu->esi;
     cpu->ebp = 0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496147u)); sfera_sub_00494550(cpu, LIFT_CODE_TOKEN_VA(0x496147u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->setScanRange(reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_18_0))); }
     lift_push32(cpu, cpu->ebx);
     cpu->ecx = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49614Fu)); sfera_sub_00495DD0(cpu, LIFT_CODE_TOKEN_VA(0x49614Fu));
-    lift_push32(cpu, (uintptr_t)"time");
+    { const uint32_t __parser_arg_015_19_0 = static_cast<uint32_t>((uintptr_t)"time");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49615Bu)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x49615Bu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_19_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000961E4;
     cpu->ebx = cpu->esi + 0x10u;
 label_00096166:
@@ -1629,28 +1629,28 @@ label_000961AF:
     *(float*)(cpu->esp) = (double)*(float*)(cpu->esp + 0x28u);
     lift_push32(cpu, cpu->ebp);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4961D3u)); sfera_sub_00495E50(cpu, LIFT_CODE_TOKEN_VA(0x4961D3u));
-    lift_push32(cpu, (uintptr_t)"time");
+    { const uint32_t __parser_arg_015_20_0 = static_cast<uint32_t>((uintptr_t)"time");
     cpu->ecx = cpu->esi;
     ++cpu->ebp;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4961E0u)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x4961E0u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_20_0))) ? 1u : 0u; }
     if (cpu->eax != 0u) goto label_00096166;
 label_000961E4:
     cpu->ebp = *(uint32_t*)(cpu->esp + 0x10u);
 label_000961E8:
-    lift_push32(cpu, cpu->ebp); lift_push32(cpu, (uintptr_t)"flags");
+    { const uint32_t __parser_arg_015_21_0 = static_cast<uint32_t>(cpu->ebp); const uint32_t __parser_arg_015_21_1 = static_cast<uint32_t>((uintptr_t)"flags");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4961F5u)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x4961F5u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_21_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_21_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_00096230;
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496200u)); sfera_sub_004947E0(cpu, LIFT_CODE_TOKEN_VA(0x496200u));
+    { SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->tokenCount(); }
     cpu->ebp = cpu->eax;
     cpu->ebx = 0u;
     if ((int32_t)cpu->ebp <= 0) goto label_0009622C;
 label_00096208:
     cpu->edx = cpu->esp + 0x2Cu;
-    lift_push32(cpu, cpu->edx); lift_push32(cpu, cpu->ebx);
+    { const uint32_t __parser_arg_015_23_0 = static_cast<uint32_t>(cpu->edx); const uint32_t __parser_arg_015_23_1 = static_cast<uint32_t>(cpu->ebx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496215u)); sfera_sub_00494400(cpu, LIFT_CODE_TOKEN_VA(0x496215u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(__parser_direct->readString(__parser_arg_015_23_1, reinterpret_cast<char*>(static_cast<uintptr_t>(__parser_arg_015_23_0))))); }
     if (cpu->eax == 0u) goto label_00096225;
     cpu->ecx = cpu->esp + 0x2Cu;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496222u)); sfera_sub_00495910(cpu, LIFT_CODE_TOKEN_VA(0x496222u));
@@ -1661,9 +1661,9 @@ label_00096225:
 label_0009622C:
     cpu->ebp = *(uint32_t*)(cpu->esp + 0x10u);
 label_00096230:
-    lift_push32(cpu, cpu->ebp); lift_push32(cpu, (uintptr_t)"region_radius");
+    { const uint32_t __parser_arg_015_24_0 = static_cast<uint32_t>(cpu->ebp); const uint32_t __parser_arg_015_24_1 = static_cast<uint32_t>((uintptr_t)"region_radius");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49623Du)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x49623Du));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_24_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_24_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_0009625F;
     cpu->eax = cpu->edi + 0x50u;
     lift_push32(cpu, cpu->eax);
@@ -1677,46 +1677,46 @@ label_00096230:
     cpu->esp += 0x14u;
 label_0009625F:
     x87_p0 = (double)0.029999999329447746f;
-    lift_push32(cpu, cpu->ebp);
+    { const uint32_t __parser_arg_015_25_0 = static_cast<uint32_t>(cpu->ebp);
     cpu->ebx = 0u;
-    *(float*)(cpu->esp + 0x14u) = x87_p0; 
-    lift_push32(cpu, (uintptr_t)"min_distance");
+    *(float*)(cpu->esp + 0x10u) = x87_p0; 
+    const uint32_t __parser_arg_015_25_1 = static_cast<uint32_t>((uintptr_t)"min_distance");
     cpu->ecx = cpu->esi;
-    *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->ebx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49627Cu)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x49627Cu));
+    *(uint32_t*)(cpu->esp + 0x14u) = cpu->ebx;
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_25_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_25_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_00096296;
-    lift_push32(cpu, cpu->ebx);
+    { const uint32_t __parser_arg_015_26_0 = static_cast<uint32_t>(cpu->ebx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496288u)); value_7 = sfera_sub_004942C0(cpu, LIFT_CODE_TOKEN_VA(0x496288u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); value_7 = __parser_direct->readFloat(__parser_arg_015_26_0); }
     *(float*)(cpu->edi + 0xA8u) = value_7; 
     *(uint32_t*)(cpu->esp + 0x14u) = 1u;
 label_00096296:
-    lift_push32(cpu, cpu->ebp); lift_push32(cpu, (uintptr_t)"max_distance");
+    { const uint32_t __parser_arg_015_27_0 = static_cast<uint32_t>(cpu->ebp); const uint32_t __parser_arg_015_27_1 = static_cast<uint32_t>((uintptr_t)"max_distance");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4962A3u)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x4962A3u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_27_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_27_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000962BB;
-    lift_push32(cpu, 0u);
+    { const uint32_t __parser_arg_015_28_0 = static_cast<uint32_t>(0u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4962B0u)); value_8 = sfera_sub_004942C0(cpu, LIFT_CODE_TOKEN_VA(0x4962B0u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); value_8 = __parser_direct->readFloat(__parser_arg_015_28_0); }
     *(float*)(cpu->edi + 0xACu) = value_8; 
     cpu->ebx = 1u;
 label_000962BB:
-    lift_push32(cpu, cpu->ebp); lift_push32(cpu, (uintptr_t)"mix_duration");
+    { const uint32_t __parser_arg_015_29_0 = static_cast<uint32_t>(cpu->ebp); const uint32_t __parser_arg_015_29_1 = static_cast<uint32_t>((uintptr_t)"mix_duration");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4962C8u)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x4962C8u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_29_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_29_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000962D8;
-    lift_push32(cpu, 0u);
+    { const uint32_t __parser_arg_015_30_0 = static_cast<uint32_t>(0u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4962D5u)); value_9 = sfera_sub_004942C0(cpu, LIFT_CODE_TOKEN_VA(0x4962D5u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); value_9 = __parser_direct->readFloat(__parser_arg_015_30_0); }
     *(float*)(cpu->edi + 0x60u) = value_9; 
 label_000962D8:
-    lift_push32(cpu, cpu->ebp); lift_push32(cpu, (uintptr_t)"vol_barier");
+    { const uint32_t __parser_arg_015_31_0 = static_cast<uint32_t>(cpu->ebp); const uint32_t __parser_arg_015_31_1 = static_cast<uint32_t>((uintptr_t)"vol_barier");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4962E5u)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x4962E5u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_31_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_31_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_00096330;
-    lift_push32(cpu, 0u);
+    { const uint32_t __parser_arg_015_32_0 = static_cast<uint32_t>(0u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4962F2u)); value_10 = sfera_sub_004942C0(cpu, LIFT_CODE_TOKEN_VA(0x4962F2u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); value_10 = __parser_direct->readFloat(__parser_arg_015_32_0); }
     *(float*)(cpu->esp + 0x18u) = value_10; 
     value_1 = (double)*(float*)(cpu->esp + 0x18u); x87_p0 = value_1;
     x87_p1 = 0.0;
@@ -1733,9 +1733,9 @@ label_00096317:
      goto label_00096330;
 label_0009632E:
 label_00096330:
-    lift_push32(cpu, cpu->ebp); lift_push32(cpu, (uintptr_t)"offset_vec");
+    { const uint32_t __parser_arg_015_33_0 = static_cast<uint32_t>(cpu->ebp); const uint32_t __parser_arg_015_33_1 = static_cast<uint32_t>((uintptr_t)"offset_vec");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49633Du)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x49633Du));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_33_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_33_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_0009635F;
     cpu->ecx = cpu->edi + 0x44u;
     lift_push32(cpu, cpu->ecx);
@@ -1748,13 +1748,13 @@ label_00096330:
     lift_native_call(cpu, native_function_address32(&::sscanf), LIFT_CODE_TOKEN_VA(0x496356u));
     cpu->esp += 0x14u;
 label_0009635F:
-    lift_push32(cpu, cpu->ebp); lift_push32(cpu, ((uintptr_t)"(knNcache_lifetime") + 4u);
+    { const uint32_t __parser_arg_015_34_0 = static_cast<uint32_t>(cpu->ebp); const uint32_t __parser_arg_015_34_1 = static_cast<uint32_t>(((uintptr_t)"(knNcache_lifetime") + 4u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49636Cu)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x49636Cu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_34_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_34_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_00096388;
-    lift_push32(cpu, 0u);
+    { const uint32_t __parser_arg_015_35_0 = static_cast<uint32_t>(0u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x496379u)); sfera_sub_00494360(cpu, LIFT_CODE_TOKEN_VA(0x496379u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(__parser_direct->readInt(__parser_arg_015_35_0)); }
     *(uint32_t*)(cpu->edi + 0x6Cu) = cpu->eax;
     if ((int32_t)cpu->eax <= (int32_t)0xAu) goto label_00096388;
     *(uint32_t*)(cpu->edi + 0x6Cu) = 0xAu;
@@ -2793,33 +2793,33 @@ __declspec(noinline) void sfera_sub_00497150(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x280u) = 0u;
     if (cpu->eax == 0u) goto label_00097251;
     cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49724Du)); sfera_sub_00493BF0(cpu, LIFT_CODE_TOKEN_VA(0x49724Du));
+    { SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->initialize(); cpu->eax = cpu->ecx; }
     cpu->esi = cpu->eax;
     goto label_00097253;
     label_00097251:
     cpu->esi = 0u;
     label_00097253:
     cpu->eax = cpu->esp + 0x16Cu;
-    lift_push32(cpu, cpu->eax);
+    { const uint32_t __parser_arg_015_37_0 = static_cast<uint32_t>(cpu->eax);
     cpu->ecx = cpu->esi;
-    *(uint32_t*)(cpu->esp + 0x284u) = 0xFFFFFFFFu;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49726Du)); sfera_sub_00494940(cpu, LIFT_CODE_TOKEN_VA(0x49726Du));
-    lift_push32(cpu, 0u);
+    *(uint32_t*)(cpu->esp + 0x280u) = 0xFFFFFFFFu;
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->load(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_37_0))); }
+    { const uint32_t __parser_arg_015_38_0 = static_cast<uint32_t>(0u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x497276u)); sfera_sub_00494850(cpu, LIFT_CODE_TOKEN_VA(0x497276u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->setBlockRange(reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_38_0))); }
     cpu->ecx = cpu->esp + 0x18u;
-    lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)"soundeffect");
+    { const uint32_t __parser_arg_015_39_0 = static_cast<uint32_t>(cpu->ecx); const uint32_t __parser_arg_015_39_1 = static_cast<uint32_t>((uintptr_t)"soundeffect");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x497287u)); sfera_sub_004948C0(cpu, LIFT_CODE_TOKEN_VA(0x497287u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextBlock(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_39_1)), reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_39_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000972DF;
     label_00097290:
     cpu->ecx = cpu->ebx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x497297u)); sfera_sub_00497040(cpu, LIFT_CODE_TOKEN_VA(0x497297u));
     cpu->edx = cpu->esp + 0x20u;
-    lift_push32(cpu, cpu->edx);
+    { const uint32_t __parser_arg_015_40_0 = static_cast<uint32_t>(cpu->edx);
     cpu->ecx = cpu->esi;
     cpu->edi = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4972A5u)); sfera_sub_00494900(cpu, LIFT_CODE_TOKEN_VA(0x4972A5u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->getBlockRange(reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_40_0))); }
     cpu->eax = cpu->esp + 0x18u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->esi);
     cpu->ecx = cpu->edi;
@@ -2829,13 +2829,13 @@ __declspec(noinline) void sfera_sub_00497150(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->ebx + 8u) = cpu->eax;
     label_000972BE:
     cpu->ecx = cpu->esp + 0x20u;
-    lift_push32(cpu, cpu->ecx);
+    { const uint32_t __parser_arg_015_41_0 = static_cast<uint32_t>(cpu->ecx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4972CAu)); sfera_sub_00494850(cpu, LIFT_CODE_TOKEN_VA(0x4972CAu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->setBlockRange(reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_41_0))); }
     cpu->edx = cpu->esp + 0x18u;
-    lift_push32(cpu, cpu->edx); lift_push32(cpu, (uintptr_t)"soundeffect");
+    { const uint32_t __parser_arg_015_42_0 = static_cast<uint32_t>(cpu->edx); const uint32_t __parser_arg_015_42_1 = static_cast<uint32_t>((uintptr_t)"soundeffect");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4972DBu)); sfera_sub_004948C0(cpu, LIFT_CODE_TOKEN_VA(0x4972DBu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextBlock(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_42_1)), reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_42_0))) ? 1u : 0u; }
     if (cpu->eax != 0u) goto label_00097290;
     label_000972DF:
     cpu->edx = 0x1BBu;
@@ -2843,7 +2843,7 @@ __declspec(noinline) void sfera_sub_00497150(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4972EEu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x4972EEu));
     if (cpu->esi == 0u) goto label_00097302;
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4972F9u)); sfera_sub_00493C00(cpu, LIFT_CODE_TOKEN_VA(0x4972F9u));
+    { SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->release(); }
     lift_push32(cpu, cpu->esi);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4972FFu)); sfera_sub_004EBE20(cpu, LIFT_CODE_TOKEN_VA(0x4972FFu));
     cpu->esp += 4u;
@@ -5256,31 +5256,31 @@ __declspec(noinline) void sfera_sub_00499290(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x13Cu) = 0u;
     if (cpu->eax == 0u) goto label_0009930E;
     cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49930Au)); sfera_sub_00493BF0(cpu, LIFT_CODE_TOKEN_VA(0x49930Au));
+    { SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->initialize(); cpu->eax = cpu->ecx; }
     cpu->esi = cpu->eax;
     goto label_00099310;
 label_0009930E:
     cpu->esi = 0u;
 label_00099310:
-    lift_push32(cpu, cpu->ebx);
+    { const uint32_t __parser_arg_015_45_0 = static_cast<uint32_t>(cpu->ebx);
     cpu->ecx = cpu->esi;
-    *(uint32_t*)(cpu->esp + 0x140u) = 0xFFFFFFFFu;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499323u)); sfera_sub_00494940(cpu, LIFT_CODE_TOKEN_VA(0x499323u));
-    lift_push32(cpu, 1u); lift_push32(cpu, 0u);
-    cpu->eax = cpu->esp + 0x2Cu;
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)"soundtrack");
+    *(uint32_t*)(cpu->esp + 0x13Cu) = 0xFFFFFFFFu;
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->load(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_45_0))); }
+    { const uint32_t __parser_arg_015_46_0 = static_cast<uint32_t>(1u); const uint32_t __parser_arg_015_46_1 = static_cast<uint32_t>(0u);
+    cpu->eax = cpu->esp + 0x24u;
+    const uint32_t __parser_arg_015_46_2 = static_cast<uint32_t>(cpu->eax); const uint32_t __parser_arg_015_46_3 = static_cast<uint32_t>((uintptr_t)"soundtrack");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499338u)); sfera_sub_00493F70(cpu, LIFT_CODE_TOKEN_VA(0x499338u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findBlock(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_46_3)), reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_46_2)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_46_1)), static_cast<int32_t>(__parser_arg_015_46_0)) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000996D6;
     cpu->ecx = cpu->esp + 0x24u;
-    lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)"audio_file");
+    { const uint32_t __parser_arg_015_47_0 = static_cast<uint32_t>(cpu->ecx); const uint32_t __parser_arg_015_47_1 = static_cast<uint32_t>((uintptr_t)"audio_file");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499351u)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x499351u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_47_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_47_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000996CF;
     cpu->edx = cpu->esp + 0x30u;
-    lift_push32(cpu, cpu->edx); lift_push32(cpu, 0u);
+    { const uint32_t __parser_arg_015_48_0 = static_cast<uint32_t>(cpu->edx); const uint32_t __parser_arg_015_48_1 = static_cast<uint32_t>(0u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499367u)); sfera_sub_004944A0(cpu, LIFT_CODE_TOKEN_VA(0x499367u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(__parser_direct->readQuotedString(__parser_arg_015_48_1, reinterpret_cast<char*>(static_cast<uintptr_t>(__parser_arg_015_48_0))))); }
     if (cpu->eax == 0u) goto label_000996CF;
     cpu->edx = 0x34Eu;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\SoundTrack.cpp";
@@ -5306,31 +5306,31 @@ label_000993A1:
     ++cpu->edx;
     if ((cpu->eax & 0xFFu) != 0u) goto label_000993A1;
     cpu->eax = cpu->esp + 0x24u;
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)"volume");
+    { const uint32_t __parser_arg_015_49_0 = static_cast<uint32_t>(cpu->eax); const uint32_t __parser_arg_015_49_1 = static_cast<uint32_t>((uintptr_t)"volume");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4993BCu)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x4993BCu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_49_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_49_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000993D1;
-    lift_push32(cpu, 0u);
+    { const uint32_t __parser_arg_015_50_0 = static_cast<uint32_t>(0u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4993C9u)); value_3 = sfera_sub_004942C0(cpu, LIFT_CODE_TOKEN_VA(0x4993C9u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); value_3 = __parser_direct->readFloat(__parser_arg_015_50_0); }
     cpu->eax = (uint32_t)(int32_t)std::trunc(value_3); 
     *(uint32_t*)(cpu->edi + 0x44u) = cpu->eax;
 label_000993D1:
     cpu->ecx = cpu->esp + 0x24u;
-    lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)"flags");
+    { const uint32_t __parser_arg_015_51_0 = static_cast<uint32_t>(cpu->ecx); const uint32_t __parser_arg_015_51_1 = static_cast<uint32_t>((uintptr_t)"flags");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4993E2u)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x4993E2u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_51_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_51_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_00099428;
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4993EDu)); sfera_sub_004947E0(cpu, LIFT_CODE_TOKEN_VA(0x4993EDu));
+    { SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->tokenCount(); }
     cpu->ebp = cpu->eax;
     cpu->ebx = 0u;
     if ((int32_t)cpu->ebp <= 0) goto label_00099428;
 label_000993F5:
     cpu->edx = cpu->esp + 0x30u;
-    lift_push32(cpu, cpu->edx); lift_push32(cpu, cpu->ebx);
+    { const uint32_t __parser_arg_015_53_0 = static_cast<uint32_t>(cpu->edx); const uint32_t __parser_arg_015_53_1 = static_cast<uint32_t>(cpu->ebx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499402u)); sfera_sub_00494400(cpu, LIFT_CODE_TOKEN_VA(0x499402u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(__parser_direct->readString(__parser_arg_015_53_1, reinterpret_cast<char*>(static_cast<uintptr_t>(__parser_arg_015_53_0))))); }
     if (cpu->eax == 0u) goto label_00099421;
     cpu->eax = cpu->esp + 0x30u;
     lift_push32(cpu, (uintptr_t)"ST_AUTOFREE"); lift_push32(cpu, cpu->eax);
@@ -5342,28 +5342,28 @@ label_00099421:
     cpu->ebx += 2u;
     if ((int32_t)cpu->ebx < (int32_t)cpu->ebp) goto label_000993F5;
 label_00099428:
-    lift_push32(cpu, 1u);
-    cpu->ecx = cpu->esp + 0x28u;
-    lift_push32(cpu, cpu->ecx);
-    cpu->edx = cpu->esp + 0x24u;
-    lift_push32(cpu, cpu->edx); lift_push32(cpu, (uintptr_t)"samples");
+    { const uint32_t __parser_arg_015_54_0 = static_cast<uint32_t>(1u);
+    cpu->ecx = cpu->esp + 0x24u;
+    const uint32_t __parser_arg_015_54_1 = static_cast<uint32_t>(cpu->ecx);
+    cpu->edx = cpu->esp + 0x1Cu;
+    const uint32_t __parser_arg_015_54_2 = static_cast<uint32_t>(cpu->edx); const uint32_t __parser_arg_015_54_3 = static_cast<uint32_t>((uintptr_t)"samples");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499440u)); sfera_sub_00493F70(cpu, LIFT_CODE_TOKEN_VA(0x499440u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findBlock(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_54_3)), reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_54_2)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_54_1)), static_cast<int32_t>(__parser_arg_015_54_0)) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000996C8;
     cpu->eax = cpu->esp + 0x1Cu;
-    lift_push32(cpu, cpu->eax);
+    { const uint32_t __parser_arg_015_55_0 = static_cast<uint32_t>(cpu->eax);
     cpu->ecx = cpu->esi;
     cpu->ebx = 0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499456u)); sfera_sub_00494550(cpu, LIFT_CODE_TOKEN_VA(0x499456u));
-    lift_push32(cpu, (uintptr_t)"sample");
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->setScanRange(reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_55_0))); }
+    { const uint32_t __parser_arg_015_56_0 = static_cast<uint32_t>((uintptr_t)"sample");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499462u)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x499462u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_56_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_0009947B;
 label_00099466:
-    lift_push32(cpu, (uintptr_t)"sample");
+    { const uint32_t __parser_arg_015_57_0 = static_cast<uint32_t>((uintptr_t)"sample");
     cpu->ecx = cpu->esi;
     ++cpu->ebx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499473u)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x499473u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_57_0))) ? 1u : 0u; }
     if (cpu->eax != 0u) goto label_00099466;
     if (cpu->ebx != 0u) goto label_00099485;
 label_0009947B:
@@ -5374,12 +5374,12 @@ label_00099485:
     cpu->ecx = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49948Du)); sfera_sub_004985E0(cpu, LIFT_CODE_TOKEN_VA(0x49948Du));
     cpu->ecx = cpu->esp + 0x1Cu;
-    lift_push32(cpu, cpu->ecx);
+    { const uint32_t __parser_arg_015_58_0 = static_cast<uint32_t>(cpu->ecx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499499u)); sfera_sub_00494550(cpu, LIFT_CODE_TOKEN_VA(0x499499u));
-    lift_push32(cpu, (uintptr_t)"sample");
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->setScanRange(reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_58_0))); }
+    { const uint32_t __parser_arg_015_59_0 = static_cast<uint32_t>((uintptr_t)"sample");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4994A5u)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x4994A5u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_59_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_00099526;
     cpu->ebx = cpu->esi + 0x10u;
 label_000994B0:
@@ -5407,36 +5407,36 @@ label_000994B0:
     *(float*)(cpu->ecx + (cpu->ebp * 8u) + 0xFFFFFFF8u) = (double)*(float*)(cpu->esp + 0x14u);
     cpu->edx = *(uint32_t*)(cpu->edi + 4u);
     value_0 = (double)*(float*)(cpu->esp + 0x18u);
-    lift_push32(cpu, (uintptr_t)"sample");
+    { const uint32_t __parser_arg_015_60_0 = static_cast<uint32_t>((uintptr_t)"sample");
     cpu->ecx = cpu->esi;
     *(float*)(cpu->edx + (cpu->ebp * 8u) + 0xFFFFFFFCu) = value_0; 
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499522u)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x499522u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_60_0))) ? 1u : 0u; }
      if (cpu->eax != 0u) goto label_000994B0;
 label_00099526:
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49952Du)); sfera_sub_004945B0(cpu, LIFT_CODE_TOKEN_VA(0x49952Du));
-    lift_push32(cpu, 1u);
-    cpu->eax = cpu->esp + 0x28u;
-    lift_push32(cpu, cpu->eax);
-    cpu->ecx = cpu->esp + 0x24u;
-    lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)"patterns");
+    { SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->clearScanRange(); }
+    { const uint32_t __parser_arg_015_62_0 = static_cast<uint32_t>(1u);
+    cpu->eax = cpu->esp + 0x24u;
+    const uint32_t __parser_arg_015_62_1 = static_cast<uint32_t>(cpu->eax);
+    cpu->ecx = cpu->esp + 0x1Cu;
+    const uint32_t __parser_arg_015_62_2 = static_cast<uint32_t>(cpu->ecx); const uint32_t __parser_arg_015_62_3 = static_cast<uint32_t>((uintptr_t)"patterns");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499545u)); sfera_sub_00493F70(cpu, LIFT_CODE_TOKEN_VA(0x499545u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findBlock(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_62_3)), reinterpret_cast<SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_62_2)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_62_1)), static_cast<int32_t>(__parser_arg_015_62_0)) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_000996C1;
     cpu->edx = cpu->esp + 0x1Cu;
-    lift_push32(cpu, cpu->edx);
+    { const uint32_t __parser_arg_015_63_0 = static_cast<uint32_t>(cpu->edx);
     cpu->ecx = cpu->esi;
     cpu->ebx = 0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49955Bu)); sfera_sub_00494550(cpu, LIFT_CODE_TOKEN_VA(0x49955Bu));
-    lift_push32(cpu, (uintptr_t)"pattern");
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->setScanRange(reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_63_0))); }
+    { const uint32_t __parser_arg_015_64_0 = static_cast<uint32_t>((uintptr_t)"pattern");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499567u)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x499567u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_64_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_00099585;
 label_00099570:
-    lift_push32(cpu, (uintptr_t)"pattern");
+    { const uint32_t __parser_arg_015_65_0 = static_cast<uint32_t>((uintptr_t)"pattern");
     cpu->ecx = cpu->esi;
     ++cpu->ebx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49957Du)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x49957Du));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_65_0))) ? 1u : 0u; }
     if (cpu->eax != 0u) goto label_00099570;
     if (cpu->ebx != 0u) goto label_0009958F;
 label_00099585:
@@ -5447,21 +5447,21 @@ label_0009958F:
     cpu->ecx = cpu->edi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499597u)); sfera_sub_004991A0(cpu, LIFT_CODE_TOKEN_VA(0x499597u));
     cpu->eax = cpu->esp + 0x1Cu;
-    lift_push32(cpu, cpu->eax);
+    { const uint32_t __parser_arg_015_66_0 = static_cast<uint32_t>(cpu->eax);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4995A3u)); sfera_sub_00494550(cpu, LIFT_CODE_TOKEN_VA(0x4995A3u));
-    lift_push32(cpu, (uintptr_t)"pattern");
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->setScanRange(reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_66_0))); }
+    { const uint32_t __parser_arg_015_67_0 = static_cast<uint32_t>((uintptr_t)"pattern");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4995AFu)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x4995AFu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_67_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_00099656;
 label_000995B7:
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4995BEu)); sfera_sub_004947E0(cpu, LIFT_CODE_TOKEN_VA(0x4995BEu));
+    { SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->tokenCount(); }
     cpu->ebp = cpu->eax;
     if ((int32_t)cpu->ebp <= 0) goto label_00099642;
-    lift_push32(cpu, 0u);
+    { const uint32_t __parser_arg_015_69_0 = static_cast<uint32_t>(0u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4995D1u)); sfera_sub_00494360(cpu, LIFT_CODE_TOKEN_VA(0x4995D1u));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(__parser_direct->readInt(__parser_arg_015_69_0)); }
     cpu->edx = *(uint32_t*)(cpu->edi + 0x24u);
     cpu->ecx = cpu->eax + (cpu->eax * 4u);
     cpu->ecx = cpu->edx + (cpu->ecx * 4u) + 0xFFFFFFECu;
@@ -5481,9 +5481,9 @@ label_000995F2:
     if ((int32_t)cpu->ebp <= (int32_t)cpu->ebx) goto label_00099642;
 label_00099610:
     cpu->eax = cpu->esp + 0x30u;
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ebx);
+    { const uint32_t __parser_arg_015_70_0 = static_cast<uint32_t>(cpu->eax); const uint32_t __parser_arg_015_70_1 = static_cast<uint32_t>(cpu->ebx);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49961Du)); sfera_sub_00494400(cpu, LIFT_CODE_TOKEN_VA(0x49961Du));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(__parser_direct->readString(__parser_arg_015_70_1, reinterpret_cast<char*>(static_cast<uintptr_t>(__parser_arg_015_70_0))))); }
     if (cpu->eax == 0u) goto label_0009963B;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x14u);
     cpu->eax = *(uint32_t*)(cpu->esp + 0x18u);
@@ -5496,21 +5496,21 @@ label_0009963B:
     cpu->ebx += 2u;
     if ((int32_t)cpu->ebx < (int32_t)cpu->ebp) goto label_00099610;
 label_00099642:
-    lift_push32(cpu, (uintptr_t)"pattern");
+    { const uint32_t __parser_arg_015_71_0 = static_cast<uint32_t>((uintptr_t)"pattern");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49964Eu)); sfera_sub_004945C0(cpu, LIFT_CODE_TOKEN_VA(0x49964Eu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->nextValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_71_0))) ? 1u : 0u; }
     if (cpu->eax != 0u) goto label_000995B7;
 label_00099656:
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49965Du)); sfera_sub_004945B0(cpu, LIFT_CODE_TOKEN_VA(0x49965Du));
+    { SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->clearScanRange(); }
     cpu->ecx = cpu->esp + 0x1Cu;
-    lift_push32(cpu, cpu->ecx); lift_push32(cpu, (uintptr_t)"start_pattern");
+    { const uint32_t __parser_arg_015_73_0 = static_cast<uint32_t>(cpu->ecx); const uint32_t __parser_arg_015_73_1 = static_cast<uint32_t>((uintptr_t)"start_pattern");
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49966Eu)); sfera_sub_00494150(cpu, LIFT_CODE_TOKEN_VA(0x49966Eu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = __parser_direct->findValue(reinterpret_cast<const char*>(static_cast<uintptr_t>(__parser_arg_015_73_1)), reinterpret_cast<const SferaParserRange*>(static_cast<uintptr_t>(__parser_arg_015_73_0))) ? 1u : 0u; }
     if (cpu->eax == 0u) goto label_00099681;
-    lift_push32(cpu, 0u);
+    { const uint32_t __parser_arg_015_74_0 = static_cast<uint32_t>(0u);
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49967Bu)); sfera_sub_00494360(cpu, LIFT_CODE_TOKEN_VA(0x49967Bu));
+    SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); cpu->eax = static_cast<uint32_t>(__parser_direct->readInt(__parser_arg_015_74_0)); }
     --cpu->eax;
     *(uint32_t*)(cpu->edi + 0x30u) = cpu->eax;
     goto label_00099688;
@@ -5527,7 +5527,7 @@ label_0009969C:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4996A6u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x4996A6u));
     if (cpu->esi == 0u) goto label_000996BA;
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4996B1u)); sfera_sub_00493C00(cpu, LIFT_CODE_TOKEN_VA(0x4996B1u));
+    { SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->release(); }
     lift_push32(cpu, cpu->esi);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4996B7u)); sfera_sub_004EBE20(cpu, LIFT_CODE_TOKEN_VA(0x4996B7u));
     cpu->esp += 4u;
@@ -5551,7 +5551,7 @@ label_000996E0:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4996E5u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x4996E5u));
     if (cpu->esi == 0u) goto label_000996F9;
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4996F0u)); sfera_sub_00493C00(cpu, LIFT_CODE_TOKEN_VA(0x4996F0u));
+    { SferaSimpleParser* __parser_direct = reinterpret_cast<SferaSimpleParser*>(static_cast<uintptr_t>(cpu->ecx)); __parser_direct->release(); }
     lift_push32(cpu, cpu->esi);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4996F6u)); sfera_sub_004EBE20(cpu, LIFT_CODE_TOKEN_VA(0x4996F6u));
     cpu->esp += 4u;
@@ -6062,7 +6062,7 @@ __declspec(noinline) void sfera_sub_00499E20(LiftCpu* cpu, uint32_t stop_address
     if (((*(uint32_t*)(cpu->esi + 0x70u)) & (0x200u)) == 0u) goto label_00099EA8;
     cpu->edi += 0x24u;
     lift_push32(cpu, cpu->edi); lift_push32(cpu, cpu->ecx);
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     cpu->edx = *(uint32_t*)(cpu->ecx + 4u);
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499EA0u)); sfera_sub_004D8F10(cpu, LIFT_CODE_TOKEN_VA(0x499EA0u));
@@ -6072,7 +6072,7 @@ __declspec(noinline) void sfera_sub_00499E20(LiftCpu* cpu, uint32_t stop_address
     label_00099EA8:
     cpu->eax = cpu->edi + 0x24u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     cpu->edx = *(uint32_t*)(cpu->ecx + 4u);
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x499EBDu)); sfera_sub_004D8ED0(cpu, LIFT_CODE_TOKEN_VA(0x499EBDu));

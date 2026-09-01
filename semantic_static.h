@@ -43,15 +43,31 @@ struct SferaItemArray {
     uint32_t free_items;
     uint32_t free_count;
     uint32_t growth_count;
+
+    bool grow(std::uint32_t item_size);
+    std::uint32_t take();
+    void put(std::uint32_t address);
+    void clear();
+};
+struct SferaServerWallEffectRecord {
+    SferaEffectVec3F positions[4];
+    float duration;
+    float remaining;
+    float animation_phase;
+};
+struct SferaServerWallTextureFrame {
+    float uv[5][2];
 };
 struct SferaServerWall {
-    uint32_t wall_data;
-    uint32_t reserved_04;
+    uint32_t wall_segments;
+    uint32_t wall_normals;
     uint32_t wall_count;
-    uint32_t generated_data;
-    uint32_t generated_points;
-    uint32_t segment_count;
-    uint32_t effect_handle;
+    uint32_t effect_records;
+    uint32_t texture_frames;
+    uint32_t texture_frame_count;
+    uint32_t texture_id;
+
+    void updateEffectRendering();
 };
 struct SferaDirectPlayCaps32 {
     uint32_t words[12];
@@ -202,7 +218,7 @@ struct SferaGraphicsRuntime {
     float base_render_factor;
     uint32_t display_width;
     uint32_t display_height;
-    uint32_t d3d9_device;
+    uint32_t d3d9_device_runtime;
 };
 struct SferaBoundCheckArray {
     uint32_t data;
@@ -210,6 +226,7 @@ struct SferaBoundCheckArray {
     char debug_file[32];
     uint32_t debug_line;
 };
+struct SferaWorldObjectEffectRuntime;
 struct SferaWorldObjectRuntime {
     uint32_t max_occupied_object_handle;
     uint32_t controlled_object_handle;
@@ -217,6 +234,58 @@ struct SferaWorldObjectRuntime {
     SferaBoundCheckArray object_handles;
     SferaBoundCheckArray extended_object_handles;
     uint32_t extended_object_count;
+
+    SferaWorldObjectEffectRuntime* effectObject(std::uint32_t handle) const;
+    SferaEffectVec3F referencePosition() const;
+    SferaEffectVec3F objectPosition(std::uint32_t handle) const;
+    bool attachEffect(std::uint32_t handle, SferaActiveEffect& item);
+    void detachEffect(std::uint32_t handle, SferaActiveEffect& item);
+    SferaActiveEffect* firstEffect(std::uint32_t handle) const;
+    bool buildEffectFrames(std::uint32_t handle, SferaEffectSpatialFrames& spatial_frames, SferaEffectWorldFrames& world_frames) const;
+};
+struct SferaWorldObjectEffectRuntime {
+    uint32_t runtime_flags;
+    uint32_t model_handle;
+    SferaEffectVec3F position;
+    SferaEffectVec3F rotation;
+    uint32_t spatial_membership;
+    int32_t grid_min_x;
+    int32_t grid_max_x;
+    int32_t grid_min_y;
+    int32_t grid_max_y;
+    float render_fade;
+    uint32_t render_group;
+    float world_transform[16];
+    SferaEffectVec3F bounds_minimum;
+    SferaEffectVec3F bounds_maximum;
+    SferaEffectVec3F bounds_corners[8];
+    uint32_t visibility_mark;
+    uint32_t linked_objects[5];
+    uint32_t attached_effects[10];
+    uint32_t lighting_color;
+    uint8_t extended_pose_available;
+    uint8_t visible;
+    uint32_t extended_object_index;
+    uint8_t motion_state;
+    uint8_t render_enabled;
+    uint8_t view_projection_mode;
+    int32_t render_cache_handle;
+    float scale;
+    SferaEffectVec3F orientation_basis[3];
+    int32_t animation;
+    int32_t frame;
+    float interpolation;
+    int32_t frame_secondary;
+    int32_t animation_secondary;
+    uint32_t parent_object_handle;
+    uint32_t parent_link_slot;
+    uint32_t model_instance;
+    SferaEffectVec3F effect_frame_position_a;
+    SferaEffectVec3F effect_frame_position_b;
+    float effect_frame_transform_a[16];
+    float effect_frame_transform_b[16];
+    SferaEffectVec3F effect_frame_position_c;
+    float effect_frame_transform_c[16];
 };
 struct SferaGrassRuntime {
     SferaBoundCheckArray instance_offsets;
@@ -233,6 +302,12 @@ struct SferaLightRuntime {
     SferaBoundCheckArray active_handles;
     uint32_t render_candidate_indices[30];
     uint32_t render_candidate_active[30];
+
+    std::uint32_t* handleTable() const;
+    std::uint8_t* record(std::int32_t handle) const;
+    std::int32_t create(const SferaEffectVec3F& position, const float* color, float radius);
+    void write(std::int32_t handle, const SferaEffectVec3F& position, const float* color, float radius);
+    void release(std::int32_t handle);
 };
 struct SferaAutoBoundsArray {
     uint32_t data;
@@ -297,6 +372,14 @@ struct SferaTreeMapHeader {
     uint32_t sentinel;
     uint32_t size;
 };
+struct SferaControlReferenceNodeRuntime {
+    uint32_t left;
+    uint32_t parent;
+    uint32_t right;
+    uint32_t control;
+    uint8_t color;
+    uint8_t is_nil;
+};
 using SferaModelRegistryRuntime = SferaTreeMapHeader;
 struct SferaModelMaterialLookupRuntime {
     uint32_t refresh_tick;
@@ -306,14 +389,74 @@ struct SferaIntrusiveListHeader {
     uint32_t first;
     uint32_t last;
 };
-using SferaListStackRuntime = SferaIntrusiveListHeader;
-struct SferaNatureRuntime {
-    uint32_t manager;
+struct SferaEffectListenerNodeRuntime {
+    uint32_t left;
+    uint32_t parent;
+    uint32_t right;
+    uint32_t effect_id;
+    uint32_t listener;
+    uint8_t color;
+    uint8_t is_nil;
+    uint8_t reserved_16[2];
 };
+static_assert(offsetof(SferaEffectListenerNodeRuntime, effect_id) == 0x0C);
+static_assert(offsetof(SferaEffectListenerNodeRuntime, listener) == 0x10);
+static_assert(offsetof(SferaEffectListenerNodeRuntime, is_nil) == 0x15);
+static_assert(sizeof(SferaEffectListenerNodeRuntime) == 0x18);
+using SferaListStackRuntime = SferaIntrusiveListHeader;
+IEffect* sfera_effect_definition(uint32_t address);
+SferaActiveEffect* sfera_active_effect(uint32_t address);
+void sfera_effect_list_append(SferaIntrusiveListHeader& list, SferaActiveEffect& item);
+void sfera_effect_list_remove(SferaIntrusiveListHeader& list, SferaActiveEffect& item);
+uint32_t sfera_effect_take_free_item();
+void sfera_effect_return_free_item(uint32_t address);
+struct SferaNatureManager {
+    NatureRainListener rain_listener;
+    LightingListener lighting_listener;
+    IEffect* rain_effect;
+    float rain_intensity;
+    float rain_scale;
+    IEffect* lighting_effect;
+    float lighting_level;
+    std::uint32_t rain_effect_handle;
+    std::uint32_t lighting_effect_handle;
+    std::uint32_t ambient_rain_handles[3];
+
+    void initialize();
+    void shutdown();
+    bool attachRainEffect(IEffect& effect);
+    void detachRainEffect();
+    bool attachLightingEffect(IEffect& effect);
+    void detachLightingEffect();
+    void onLightingEffectChanged(IEffect& effect, SferaActiveEffect& item);
+    void startRain();
+    void stopRain();
+    void startLighting();
+    void stopLighting();
+    void setRainIntensity(float value);
+    void setLightingLevel(float value);
+    void updateAmbientRainEffects();
+};
+#if defined(_M_IX86)
+static_assert(offsetof(SferaNatureManager, rain_effect) == 0x10);
+static_assert(offsetof(SferaNatureManager, lighting_effect) == 0x1C);
+static_assert(offsetof(SferaNatureManager, rain_effect_handle) == 0x24);
+static_assert(offsetof(SferaNatureManager, ambient_rain_handles) == 0x2C);
+static_assert(sizeof(SferaNatureManager) == 0x38);
+#endif
+
+struct SferaNatureRuntime { std::uint32_t manager; };
+SferaNatureManager* sfera_nature_manager();
+void sfera_initialize_nature_manager();
+void sfera_shutdown_nature_manager();
 struct SferaSoundRuntime {
     uint32_t effect_manager;
     uint32_t manager;
     SferaListStackRuntime tracks;
+
+    bool interfaceAvailable() const;
+    CSoundEffect* createEffect(std::uint32_t effect_id);
+    void destroyEffect(CSoundEffect* effect);
 };
 struct SferaWarningLogRuntime {
     uint8_t object[0x5320];
@@ -554,10 +697,12 @@ struct SferaMainUiStateRuntime {
     SferaInterpolationAxisState interpolation_axes[3];
     uint32_t reserved_1a8;
     uint32_t ui_state_09;
+
+    bool effectVisible(const IEffect& effect, const SferaEffectVec3F& position) const;
 };
 
 struct SferaClientConfigRuntime {
-    uint32_t state_01;
+    uint32_t gpu_sync_query;
     uint32_t state_02;
     uint8_t reserved_008;
     uint8_t flag_01;
@@ -640,13 +785,59 @@ struct SferaSavedControlledPositionRuntime {
     uint32_t z;
 };
 
+struct SferaLoadScreenControlNodeRuntime {
+    uint32_t next;
+    uint32_t previous;
+    uint32_t control;
+};
+struct SferaUiStringRuntime {
+    char inline_text[16];
+    uint32_t length;
+    uint32_t capacity;
+    uint32_t storage_context;
+};
+struct SferaUiWindowRuntime {
+    uint32_t vtable;
+    uint32_t control_reference;
+    SferaUiStringRuntime name;
+    uint32_t behavior_flags;
+    int32_t width;
+    int32_t height;
+    int32_t x;
+    int32_t y;
+    uint32_t alignment_flags;
+    int32_t group;
+    int32_t initial_x;
+    int32_t initial_y;
+    uint8_t hidden;
+    uint8_t disabled;
+    uint8_t input_locked;
+    uint8_t owns_references;
+    uint8_t can_drag_drop;
+    uint8_t can_go_top;
+    uint8_t save_last_position;
+    uint8_t hit_transparent;
+    uint32_t control_kind;
+    SferaUiStringRuntime text;
+    SferaUiStringRuntime help;
+    uint8_t font;
+    uint8_t font_initialized;
+    uint16_t font_attributes;
+    uint32_t text_color;
+    uint32_t text_state;
+    uint32_t disabled_color;
+    uint32_t parent;
+    uint32_t child_sentinel;
+    uint32_t child_count;
+};
+using SferaLoadScreenRuntime = SferaUiWindowRuntime;
 struct SferaInterfaceCoreRuntime {
     uint32_t state_01;
     uint32_t state_02;
     uint32_t state_03;
     uint32_t state_04;
     uint32_t state_05;
-    uint32_t state_06;
+    uint32_t load_screen;
     uint32_t state_07;
     uint32_t state_08;
     uint32_t state_09;
@@ -756,6 +947,8 @@ struct SferaTextureRegistryRuntime {
     uint32_t preload_request_count;
     uint32_t default_texture_id;
     uint16_t hash_mix[256];
+
+    std::int32_t findTexture(const char* name) const;
 };
 struct SferaInterfaceRuntime {
     uint32_t cursor_kind;
@@ -1511,7 +1704,7 @@ struct SferaWorldRenderQueueRuntime {
 };
 
 using SferaEffectListenerMap = SferaTreeMapHeader;
-struct SferaEffectManagerRuntime {
+struct SferaEffectManager {
     uint32_t deferred_lifecycle;
     uint32_t render_cycle;
     uint32_t active_resource_count;
@@ -1535,6 +1728,37 @@ struct SferaEffectManagerRuntime {
     SferaVec3F viewer_position;
     SferaBoundCheckArray render_slots;
     SferaEffectListenerMap effect_listeners;
+
+    void* allocate(std::size_t size) const;
+    void free(void* pointer) const;
+    void reportError(const char* message) const;
+    SferaEffectRenderSlot* acquireRenderSlot();
+    void finalizeBillboard(SferaEffectRenderSlot& slot, const SferaEffectVec3F& position, float size) const;
+    float viewerDistance(const SferaEffectVec3F& position) const;
+    float viewerDistance(std::uint32_t source_handle) const;
+    void appendDefinition(IEffect* effect);
+    IEffect* findDefinition(uint32_t effect_id) const;
+    IEffect* findDefinition(const char* script_name) const;
+    int32_t findDefinitionId(const char* script_name) const;
+    IEffectListener* findListener(uint32_t effect_id) const;
+    bool registerListener(std::uint32_t effect_id, IEffectListener& listener);
+    void unregisterListener(IEffectListener& listener);
+    void clearListeners();
+    void registerEffectMeshFile(const char* filename);
+    void reportLoadProgress(std::uint32_t progress);
+    void initializeBloodEffect();
+    void shutdownBloodEffect();
+    void loadDefinitions();
+    void destroyDefinitions();
+    void sortRenderSlots();
+    bool initialize();
+    void shutdown();
+    std::uint32_t createActiveEffect(std::uint32_t effect_id, std::uint32_t source_handle);
+    std::uint32_t createActiveEffect(const char* script_name, std::uint32_t source_handle);
+    void removeActiveEffect(SferaActiveEffect& item);
+    bool setEffectParameters(std::uint32_t source_handle, const SferaEffectParameter* parameters, std::uint32_t count);
+    void updateActiveEffects();
+    void updateActiveEffect(SferaActiveEffect& item, std::uint16_t state_flags, float viewer_distance);
 };
 
 struct SferaMbcValue {
@@ -1753,7 +1977,7 @@ struct SferaMbcRuntime {
 
 inline SferaItemArray g_sfera_effect_items{.growth_count = 6000u};
 inline SferaItemArray g_sfera_sound_effect_items{.growth_count = 128u};
-inline SferaServerWall g_sfera_server_wall{.effect_handle = UINT32_MAX};
+inline SferaServerWall g_sfera_server_wall{.texture_id = UINT32_MAX};
 inline SferaNetworkRuntime g_sfera_network_runtime{.initialization_result = UINT32_MAX, .server_port = 25858u, .local_port_candidate = 26860u, .connection_slot = UINT32_MAX, .pending_slot = UINT32_MAX, .active_slot = UINT32_MAX, .shutdown_state = UINT32_MAX};
 inline SferaDirectPlayRuntime g_sfera_directplay_runtime;
 inline SferaNetworkConnectionCheckerRuntime g_sfera_network_connection_checker;
@@ -1917,7 +2141,7 @@ inline SferaCrashReportRuntime g_sfera_crash_report_runtime;
 inline SferaRenderBufferCapacities g_sfera_render_buffer_capacities{.vertex32 = 30000u, .vertex28 = 30000u, .index_primary = 5000u, .index_secondary = 5000u};
 inline uint32_t g_sfera_blood_effect_instance;
 inline SferaFileRuntime g_sfera_file_runtime;
-inline SferaEffectManagerRuntime g_sfera_effect_manager{.deferred_lifecycle = 1u, .render_cycle = 31u, .last_processed_generation = UINT32_MAX};
+inline SferaEffectManager g_sfera_effect_manager{.deferred_lifecycle = 1u, .render_cycle = 31u, .last_processed_generation = UINT32_MAX};
 inline SferaConfigParserRuntime g_sfera_config_parser_runtime;
 inline SferaMbcRuntime g_sfera_mbc_runtime_storage;
 inline SferaMbcRuntime* g_sfera_mbc_runtime = &g_sfera_mbc_runtime_storage;

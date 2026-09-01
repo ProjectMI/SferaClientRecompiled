@@ -14,6 +14,7 @@
 
 namespace lifted {
 
+
 inline constexpr uint32_t LIFT_SOURCE_TEXT_SIZE = 0x000FB200u;
 constexpr uint32_t LIFT_CODE_TOKEN_RVA(uint32_t rva) noexcept { return 0xE0000000u + rva; }
 constexpr uint32_t LIFT_CODE_TOKEN_VA(uint32_t source_va) noexcept { return LIFT_CODE_TOKEN_RVA(source_va - 0x00400000u); }

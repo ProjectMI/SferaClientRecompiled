@@ -837,7 +837,7 @@ label_00058D70:
     if (g_sfera_main_render_runtime.secondary_render_pass == cpu->ebx) goto label_00058DE0;
     cpu->ecx = (uintptr_t)"black";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x458DCCu)); sfera_sub_0049A4A0(cpu, LIFT_CODE_TOKEN_VA(0x458DCCu));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ebx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x458DD9u)); sfera_sub_004D8F40(cpu, LIFT_CODE_TOKEN_VA(0x458DD9u));
     cpu->ecx = (uintptr_t)"black";
@@ -845,22 +845,22 @@ label_00058D70:
 label_00058DE0:
     cpu->ecx = (uintptr_t)"stars";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x458DEAu)); sfera_sub_0049A4A0(cpu, LIFT_CODE_TOKEN_VA(0x458DEAu));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, 0u);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x458DF8u)); sfera_sub_004D8F40(cpu, LIFT_CODE_TOKEN_VA(0x458DF8u));
     cpu->ecx = (uintptr_t)"stars";
 label_00058DFD:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x458E02u)); sfera_sub_0049A4C0(cpu, LIFT_CODE_TOKEN_VA(0x458E02u));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, 1u); lift_push32(cpu, 0x1Du);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x458E11u)); sfera_sub_004D8740(cpu, LIFT_CODE_TOKEN_VA(0x458E11u));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, 0x1C4u);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x458E21u)); sfera_sub_004D8B70(cpu, LIFT_CODE_TOKEN_VA(0x458E21u));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, 0x20u); lift_push32(cpu, 0x252u); lift_push32(cpu, (uintptr_t)&g_sfera_sky_runtime.indices[0]); lift_push32(cpu, 0x78u); lift_push32(cpu, sfera_screen_vertex_address(g_sfera_sky_screen_vertices, 0u, &SferaScreenVertex::x)); lift_push32(cpu, 0xEu); lift_push32(cpu, 4u);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x458E43u)); sfera_sub_004D9580(cpu, LIFT_CODE_TOKEN_VA(0x458E43u));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, 0u); lift_push32(cpu, 0x1Du);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x458E52u)); sfera_sub_004D8740(cpu, LIFT_CODE_TOKEN_VA(0x458E52u));
     x87_p0 = (double)*(float*)((uintptr_t)&g_sfera_view_motion_runtime.motion_terms[0].f32);
@@ -2576,7 +2576,7 @@ label_0005A5D7:
     cpu->edx = g_sfera_font_atlas_staging_runtime.height;
     cpu->eax = cpu->edi;
     cpu->edi = cpu->ecx + (cpu->eax * 4u);
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     cpu->edi += cpu->eax;
     cpu->eax = g_sfera_font_atlas_staging_runtime.width;
     cpu->edi = (cpu->edi * 4u) + ((uintptr_t)&g_sfera_static_render_lookup_runtime.atlas_resources[0][0]);
@@ -2639,7 +2639,7 @@ label_0005A771:
     cpu->esi += cpu->edi;
     cpu->esi = (cpu->esi * 4u) + ((uintptr_t)&g_sfera_static_render_lookup_runtime.atlas_resources[0][0]);
     lift_push32(cpu, cpu->esi); lift_push32(cpu, 1u); lift_push32(cpu, 0x1Au); lift_push32(cpu, 0u); lift_push32(cpu, 1u); lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     cpu->edx = *(uint32_t*)(cpu->ecx + 4u);
     lift_push32(cpu, cpu->edx);
     *(uint32_t*)(cpu->esp + 0x50u) = cpu->esi;
@@ -4086,7 +4086,7 @@ __declspec(noinline) void sfera_sub_0045BE50(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->ecx;
     goto label_0005BF3C;
     label_0005BF04:
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     cpu->edx <<= 4u;
     cpu->esi = cpu->edx;
     cpu->eax = *(uint32_t*)(cpu->esi + ((uintptr_t)&g_sfera_texture_cache_runtime.entries[0].resource));
@@ -4299,7 +4299,7 @@ __declspec(noinline) void sfera_sub_0045BE50(LiftCpu* cpu, uint32_t stop_address
     lift_native_call(cpu, cpu->eax, LIFT_CODE_TOKEN_RVA(0x5C1F5u));
     cpu->ecx = *(uint32_t*)(cpu->ebp + ((uintptr_t)&g_sfera_texture_cache_runtime.entries[0].resource));
     lift_push32(cpu, cpu->ecx);
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, cpu->ebx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45C20Au)); sfera_sub_004D8F40(cpu, LIFT_CODE_TOKEN_VA(0x45C20Au));
     cpu->ebp = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
@@ -4758,13 +4758,13 @@ label_0005C79C:
     if (!((value_21)<(((double)*(float*)(cpu->esp + 0x28u))))) goto label_0005CB13;
     { const double lift_right=(double)*(float*)(cpu->esp + 0x24u); const double lift_left=(double)(((int32_t)(g_sfera_graphics_runtime.display_height))); if (!(lift_left>lift_right)) goto label_0005CB13; }
     if (!((value_21)<(((double)*(float*)(cpu->esp + 0x20u))))) goto label_0005CB15;
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     if (cpu->ebp != 0u) goto label_0005CAAF;
     lift_push32(cpu, 2u); lift_push32(cpu, 5u);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45CA82u)); sfera_sub_004D9190(cpu, LIFT_CODE_TOKEN_VA(0x45CA82u));
     cpu->ecx = (uintptr_t)"sun";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45CA8Cu)); sfera_sub_0049A4A0(cpu, LIFT_CODE_TOKEN_VA(0x45CA8Cu));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ebp);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45CA99u)); sfera_sub_004D8F40(cpu, LIFT_CODE_TOKEN_VA(0x45CA99u));
     cpu->ecx = (uintptr_t)"sun";
@@ -4776,19 +4776,19 @@ label_0005CAAF:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45CAB8u)); sfera_sub_004D9190(cpu, LIFT_CODE_TOKEN_VA(0x45CAB8u));
     cpu->ecx = (uintptr_t)"moon";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45CAC2u)); sfera_sub_0049A4A0(cpu, LIFT_CODE_TOKEN_VA(0x45CAC2u));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, 0u);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45CAD0u)); sfera_sub_004D8F40(cpu, LIFT_CODE_TOKEN_VA(0x45CAD0u));
     cpu->ecx = (uintptr_t)"moon";
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x5CADAu)); sfera_sub_0049A4C0(cpu, LIFT_CODE_TOKEN_RVA(0x5CADAu));
 label_0005CADA:
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, 0x1C4u);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45CAEAu)); sfera_sub_004D8B70(cpu, LIFT_CODE_TOKEN_VA(0x45CAEAu));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, 0x20u); lift_push32(cpu, 0u); lift_push32(cpu, 0u); lift_push32(cpu, 4u); lift_push32(cpu, (uintptr_t)&g_sfera_scene_render_runtime.textured_quad[0].x); lift_push32(cpu, 0xEu); lift_push32(cpu, 6u);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45CB06u)); sfera_sub_004D9580(cpu, LIFT_CODE_TOKEN_VA(0x45CB06u));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45CB11u)); sfera_sub_004D91E0(cpu, LIFT_CODE_TOKEN_VA(0x45CB11u));
     goto label_0005CB15;
 label_0005CB13:
@@ -6125,7 +6125,7 @@ __declspec(noinline) void sfera_sub_0045DCD0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esp + 0x54u) = cpu->ecx;
     cpu->edx = *(uint32_t*)(cpu->ebp + 0x28u);
     cpu->edx -= *(uint32_t*)(cpu->ebp + 0x24u);
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     ++cpu->edx;
     lift_push32(cpu, cpu->eax);
     *(uint32_t*)(cpu->esp + 0x5Cu) = cpu->edx;
@@ -6366,7 +6366,7 @@ __declspec(noinline) void sfera_sub_0045DCD0(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = g_sfera_graphics_runtime.display_width;
     cpu->edx = cpu->esp + 0x4Cu;
     *(uint32_t*)(cpu->esp + 0x58u) = cpu->ecx;
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, cpu->edx);
     *(uint32_t*)(cpu->esp + 0x58u) = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45E4EFu)); sfera_sub_004D8970(cpu, LIFT_CODE_TOKEN_VA(0x45E4EFu));
@@ -8309,7 +8309,7 @@ __declspec(noinline) void sfera_sub_00460110(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = g_sfera_light_runtime.active_handles.data;
     lift_push32(cpu, cpu->edi);
     *(uint32_t*)(cpu->eax + (cpu->esi * 4u)) = cpu->edi;
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, cpu->esi);
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x601E9u)); sfera_sub_004D8C60(cpu, LIFT_CODE_TOKEN_RVA(0x601E9u));
     label_000601E9:
@@ -9388,7 +9388,7 @@ __declspec(noinline) void sfera_sub_00461700(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = 0x64u;
     label_00061731:
     if (cpu->esi == g_sfera_graphics_runtime.rebuild_percent) goto label_0006179E;
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     g_sfera_graphics_runtime.rebuild_percent = cpu->esi;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x46174Au)); sfera_sub_004DA310(cpu, LIFT_CODE_TOKEN_VA(0x46174Au));
     if ((cpu->eax & 0xFFu) == 0u) goto label_0006179E;
@@ -9400,10 +9400,10 @@ __declspec(noinline) void sfera_sub_00461700(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x46176Cu)); sfera_sub_004BAFB0(cpu, LIFT_CODE_TOKEN_VA(0x46176Cu));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x461771u)); sfera_sub_0045E560(cpu, LIFT_CODE_TOKEN_VA(0x461771u));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x46177Cu)); sfera_sub_004D8840(cpu, LIFT_CODE_TOKEN_VA(0x46177Cu));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x461781u)); sfera_sub_0044E020(cpu, LIFT_CODE_TOKEN_VA(0x461781u));
-    cpu->ecx = g_sfera_graphics_runtime.d3d9_device;
+    cpu->ecx = g_sfera_graphics_runtime.d3d9_device_runtime;
     lift_push32(cpu, 0u); lift_push32(cpu, 0u); lift_push32(cpu, 0u); lift_push32(cpu, 0u);
     g_sfera_world_render_runtime.scene_active = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x6179Eu)); sfera_sub_004D8880(cpu, LIFT_CODE_TOKEN_RVA(0x6179Eu));
