@@ -6386,7 +6386,7 @@ __declspec(noinline) void sfera_sub_004C9C30(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"authors";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4C9CFDu)); sfera_sub_004BAAA0(cpu, LIFT_CODE_TOKEN_VA(0x4C9CFDu));
     if (cpu->eax == 0u) goto label_000C9D0B;
-    *(uint32_t*)(cpu->eax + 0xF8u) = LIFT_CALLBACK(sfera_sub_004C9C30);
+    SphereUI::bindEventHandler(reinterpret_cast<SphereUI::Window*>(cpu->eax), SphereUI::WindowEventHandler::authors);
     label_000C9D0B:
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_000C9D0C:
@@ -6423,7 +6423,7 @@ __declspec(noinline) void sfera_sub_004C9C40(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)"quit";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4C9C9Du)); sfera_sub_004BAAA0(cpu, LIFT_CODE_TOKEN_VA(0x4C9C9Du));
     if (cpu->eax == 0u) goto label_000C9CAB;
-    *(uint32_t*)(cpu->eax + 0xF8u) = LIFT_CALLBACK(sfera_sub_004C9C40);
+    SphereUI::bindEventHandler(reinterpret_cast<SphereUI::Window*>(cpu->eax), SphereUI::WindowEventHandler::quit);
     label_000C9CAB:
     cpu->esp += 4u; cpu->eip = stop_address; return;
     label_000C9CAC:
@@ -6940,7 +6940,7 @@ __declspec(noinline) void sfera_sub_004CA180(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = cpu->eax;
     if (cpu->ebx == 0u) goto label_000CA445;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
-    *(uint32_t*)(cpu->ebx + 0xF8u) = LIFT_CALLBACK(sfera_sub_004CA180);
+    SphereUI::bindEventHandler(reinterpret_cast<SphereUI::Window*>(cpu->ebx), SphereUI::WindowEventHandler::sound_options);
     lift_native_call(cpu, native_function_address32(&SI_GetStreamVolume), LIFT_CODE_TOKEN_VA(0x4CA34Au));
     g_sfera_sphere_options_runtime.saved_music_volume = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4CA359u)); sfera_sub_00497980(cpu, LIFT_CODE_TOKEN_VA(0x4CA359u));
@@ -7101,9 +7101,9 @@ __declspec(noinline) void sfera_sub_004CA530(LiftCpu* cpu, uint32_t stop_address
     goto label_000CA890;
     label_000CA565:
     if (g_sfera_control_options.active_slot == 0xFFFFFFFFu) goto label_000CA800;
-    cpu->edx = 0u;
-    cpu->ecx = 0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4CA57Bu)); sfera_sub_004B8230(cpu, LIFT_CODE_TOKEN_VA(0x4CA57Bu));
+    g_sfera_client_process_runtime.ui_bridge = 0u;
+    g_sfera_interface_core_runtime.capture_control_binding = 0u;
+    g_sfera_main_command_state_runtime.command_state = 0u;
     cpu->esi = *(uint32_t*)(cpu->esi + 0xCu);
     cpu->ecx = (uintptr_t)"control_options";
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4CA588u)); sfera_sub_004B9A70(cpu, LIFT_CODE_TOKEN_VA(0x4CA588u));
@@ -7360,11 +7360,12 @@ label_000CA61E: ;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4CA859u)); sfera_sub_00406820(cpu, LIFT_CODE_TOKEN_VA(0x4CA859u));
     g_sfera_control_options.active_slot = cpu->edi;
     cpu->edi = lift_pop32(cpu);
-    cpu->edx = LIFT_CALLBACK(sfera_sub_004CA530);
-    cpu->ecx = 1u;
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 4u;
-    sfera_sub_004B8230(cpu, stop_address); return;
+    g_sfera_client_process_runtime.ui_bridge = 1u;
+    g_sfera_interface_core_runtime.capture_control_binding = 1u;
+    g_sfera_main_command_state_runtime.command_state = 0u;
+    cpu->esp += 4u; cpu->eip = stop_address; return;
     label_000CA890:
     cpu->esp -= 0x2Cu;
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi);
@@ -7383,7 +7384,7 @@ label_000CA61E: ;
     cpu->ebx = cpu->eax;
     if (cpu->ebx == 0u) goto label_000CABB6;
     lift_push32(cpu, cpu->ebp); lift_push32(cpu, 0x100u); lift_push32(cpu, 0u); lift_push32(cpu, (uintptr_t)&g_sfera_control_options.configured_bindings[0]);
-    *(uint32_t*)(cpu->ebx + 0xF8u) = LIFT_CALLBACK(sfera_sub_004CA530);
+    SphereUI::bindEventHandler(reinterpret_cast<SphereUI::Window*>(cpu->ebx), SphereUI::WindowEventHandler::control_options);
     lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4CA8F5u));
     cpu->esp += 0xCu;
     cpu->edx = 0u;
@@ -8092,7 +8093,7 @@ label_000CAC06: ;
     if (cpu->esi == 0u) goto label_000CD410;
     lift_push32(cpu, 2u);
     cpu->ecx = (uintptr_t)&g_sfera_options_dialog_runtime.chat_list_fonts;
-    *(uint32_t*)(cpu->esi + 0xF8u) = LIFT_CALLBACK(sfera_sub_004CD1F0);
+    SphereUI::bindEventHandler(reinterpret_cast<SphereUI::Window*>(cpu->esi), SphereUI::WindowEventHandler::font_options);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4CD2DDu)); sfera_sub_00429830(cpu, LIFT_CODE_TOKEN_VA(0x4CD2DDu));
     lift_push32(cpu, 2u);
     cpu->ecx = (uintptr_t)&g_sfera_options_dialog_runtime.chat_edit_fonts;
@@ -8191,7 +8192,7 @@ __declspec(noinline) void sfera_sub_004CB100(LiftCpu* cpu, uint32_t stop_address
     if (cpu->ebx == 0u) goto label_000CB6E2;
     cpu->edx = 0u;
     cpu->ecx = (uintptr_t)"ISSN";
-    *(uint32_t*)(cpu->ebx + 0xF8u) = LIFT_CALLBACK(sfera_sub_004CABD0);
+    SphereUI::bindEventHandler(reinterpret_cast<SphereUI::Window*>(cpu->ebx), SphereUI::WindowEventHandler::interface_options);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4CB163u)); sfera_sub_00437F60(cpu, LIFT_CODE_TOKEN_VA(0x4CB163u));
     cpu->edx = 0u;
     cpu->ecx = (uintptr_t)"ISAD";
@@ -9540,7 +9541,7 @@ __declspec(noinline) void sfera_sub_004CC280(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4CC2B8u)); sfera_sub_004BAAA0(cpu, LIFT_CODE_TOKEN_VA(0x4CC2B8u));
     cpu->esi = cpu->eax;
     if (cpu->esi == 0u) goto label_000CCEDA;
-    *(uint32_t*)(cpu->esi + 0xF8u) = LIFT_CALLBACK(sfera_sub_004CB950);
+    SphereUI::bindEventHandler(reinterpret_cast<SphereUI::Window*>(cpu->esi), SphereUI::WindowEventHandler::graphics_options);
     x87_v0 = (double)g_sfera_graphics_runtime.fog_distance;
     cpu->eax = *(uint32_t*)(void*)&g_sfera_client_config_runtime.state_25;
     *(float*)((uintptr_t)&g_sfera_sphere_options_runtime.saved_fog_distance.f32) = x87_v0; 

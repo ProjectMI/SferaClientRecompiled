@@ -344,7 +344,7 @@ struct SferaActiveEffect {
     std::uint32_t source_handle;
     std::uint32_t age_ticks;
     SferaEffectVec3F position;
-    std::uint32_t update_callback;
+    std::uint32_t reserved_update_handler;
     IEffect* effect;
     CSoundEffect* resource;
     std::uint32_t sound_started;
@@ -878,6 +878,15 @@ public:
 
 namespace SphereUI {
 
+enum class WindowEventHandler : std::uint8_t { none, description, help, authors, quit, sound_options, control_options, interface_options, graphics_options, options, font_options };
+
+class Window;
+void bindEventHandler(Window* window, WindowEventHandler handler);
+void copyEventHandler(Window* destination, const Window* source);
+bool hasEventHandler(const Window* window);
+void dispatchEvent(Window* window, LiftCpu* cpu, std::uint32_t callsite);
+void unbindEventHandler(const void* window);
+
 class Window {
 public:
     Window() = default;
@@ -894,6 +903,8 @@ public:
     virtual void getFont(LiftCpu* cpu);
     virtual void destroy(LiftCpu* cpu);
 };
+
+
 
 class ButtonCtrl : public Window {
 public:

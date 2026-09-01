@@ -97,7 +97,31 @@ public:
     CSound* cache_next;
     CSound* cache_previous;
 };
-class CSoundStream { public: void SetDecodeSignal(float); int SeekToTime(float); void SetPlaySignal(float); void Stop(); int IsStreamPlaying() const; int PlayEx(float, int); };
+struct SferaSoundBackendNative { virtual void unknown_00() = 0; virtual void unknown_04() = 0; virtual void unknown_08() = 0; virtual const WAVEFORMATEX* format() = 0; };
+class CSoundStream;
+using SferaSoundStreamCallback = std::uint32_t (__fastcall*)(CSoundStream* stream, void* state);
+class CSoundStream {
+public:
+    void SetDecodeSignal(float); int SeekToTime(float); void SetPlaySignal(float); void Stop(); int IsStreamPlaying() const; int PlayEx(float, int);
+    const WAVEFORMATEX* Format() const noexcept { return backend ? backend->format() : nullptr; }
+    SferaSoundBackendNative* backend;
+    std::uint8_t reserved_backend_state[48];
+    std::uint32_t playback_position_adjustment;
+    std::uint8_t reserved_playback_state[28];
+    SferaSoundStreamCallback decode_callback;
+    void* decode_state;
+    std::uint32_t decode_event_position;
+    SferaSoundStreamCallback play_callback;
+    void* play_state;
+    std::uint32_t play_event_position;
+    float stream_gain;
+};
+#if defined(_M_IX86)
+static_assert(offsetof(CSoundStream, playback_position_adjustment) == 52u);
+static_assert(offsetof(CSoundStream, decode_callback) == 84u);
+static_assert(offsetof(CSoundStream, play_callback) == 96u);
+static_assert(offsetof(CSoundStream, stream_gain) == 108u);
+#endif
 
 void SI_SetHardwareMixing(bool);
 int SI_GetStreamVolume();

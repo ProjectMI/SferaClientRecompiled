@@ -94,6 +94,9 @@
     <ClCompile Include="main.cpp">
       <Filter>core</Filter>
     </ClCompile>
+    <ClCompile Include="native_callbacks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="runtime.cpp">
       <Filter>core</Filter>
     </ClCompile>
@@ -116,6 +119,9 @@
     </ClInclude>
     <ClInclude Include="diagnostics.h">
       <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="native_callbacks.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="import_bridge.h">
       <Filter>core</Filter>

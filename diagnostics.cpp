@@ -60,11 +60,9 @@ std::size_t memory_write_bucket(std::uint32_t address) noexcept {
         case RuntimePhase::static_storage: return "static-storage";
         case RuntimePhase::protect_static_storage: return "protect-static-storage";
         case RuntimePhase::abi_self_test: return "abi-self-test";
-        case RuntimePhase::function_map: return "function-map";
         case RuntimePhase::execution_setup: return "execution-setup";
         case RuntimePhase::native_c: return "native-c";
         case RuntimePhase::native_call: return "native-call";
-        case RuntimePhase::callback: return "callback";
     }
     return "unknown";
 }

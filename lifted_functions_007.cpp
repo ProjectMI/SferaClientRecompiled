@@ -10423,26 +10423,6 @@ __declspec(noinline) void sfera_sub_0044D700(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x6Cu;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0044D7E0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->esi);
-    cpu->esi = 2u;
-    if ((cpu->edx & 0xFFu) == 0u) goto label_0004D808;
-    cpu->eax = g_sfera_window_runtime.main_window;
-    lift_push32(cpu, 0x10u); lift_push32(cpu, (uintptr_t)"Critical"); lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->eax);
-    lift_native_call(cpu, native_function_address32(&::MessageBoxA), LIFT_CODE_TOKEN_VA(0x44D7F8u));
-    cpu->eax = 0u;
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (cpu->esi == 1u);
-    cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0004D808:
-    lift_push32(cpu, 0x11u); lift_push32(cpu, (uintptr_t)"Error"); lift_push32(cpu, cpu->ecx);
-    cpu->ecx = g_sfera_window_runtime.main_window;
-    lift_push32(cpu, cpu->ecx);
-    lift_native_call(cpu, native_function_address32(&::MessageBoxA), LIFT_CODE_TOKEN_VA(0x44D817u));
-    cpu->esi = cpu->eax;
-    cpu->eax = 0u;
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (cpu->esi == 1u);
-    cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
 __declspec(noinline) void sfera_sub_0044D830(LiftCpu* cpu, uint32_t stop_address) { double x87_v0, x87_v1;
     cpu->esp -= 0xCu;
     x87_v0 = 1024.0;

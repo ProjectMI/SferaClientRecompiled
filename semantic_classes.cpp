@@ -21,7 +21,11 @@
 namespace {
     template <class T> T* ptr32(std::uint32_t address) { return reinterpret_cast<T*>(static_cast<std::uintptr_t>(address)); }
     using SemanticLiftTarget = void (*)(LiftCpu*, std::uint32_t);
-    template <class T> void semantic_dispatch(T* self, LiftCpu* cpu, SemanticLiftTarget target) { cpu->ecx = address32(self); lifted::lift_push32(cpu, lifted::LIFT_CALLBACK_SENTINEL); target(cpu, lifted::LIFT_CALLBACK_SENTINEL); }
+    template <class T> void semantic_dispatch(T* self, LiftCpu* cpu, SemanticLiftTarget target) { cpu->ecx = address32(self); lifted::lift_push32(cpu, lifted::LIFT_RETURN_SENTINEL); target(cpu, lifted::LIFT_RETURN_SENTINEL); }
+    struct BoundUiEventHandler { std::uint32_t window; SphereUI::WindowEventHandler handler; };
+    std::vector<BoundUiEventHandler>& bound_ui_event_handlers() { static std::vector<BoundUiEventHandler> handlers; return handlers; }
+    SemanticLiftTarget ui_event_target(SphereUI::WindowEventHandler handler) { switch (handler) { case SphereUI::WindowEventHandler::description: return lifted::sfera_sub_004A2000; case SphereUI::WindowEventHandler::help: return lifted::sfera_sub_004B9540; case SphereUI::WindowEventHandler::authors: return lifted::sfera_sub_004C9C30; case SphereUI::WindowEventHandler::quit: return lifted::sfera_sub_004C9C40; case SphereUI::WindowEventHandler::sound_options: return lifted::sfera_sub_004CA180; case SphereUI::WindowEventHandler::control_options: return lifted::sfera_sub_004CA530; case SphereUI::WindowEventHandler::interface_options: return lifted::sfera_sub_004CABD0; case SphereUI::WindowEventHandler::graphics_options: return lifted::sfera_sub_004CB950; case SphereUI::WindowEventHandler::options: return lifted::sfera_sub_004CD0D0; case SphereUI::WindowEventHandler::font_options: return lifted::sfera_sub_004CD1F0; case SphereUI::WindowEventHandler::none: return nullptr; } return nullptr; }
+    SphereUI::WindowEventHandler bound_ui_event_handler(const SphereUI::Window* window) { const std::uint32_t address = address32(window); for (const auto& binding : bound_ui_event_handlers()) if (binding.window == address) return binding.handler; return SphereUI::WindowEventHandler::none; }
     [[noreturn]] void semantic_abi_abstract_call(void* self, LiftCpu* cpu) { if (cpu != nullptr) cpu->ecx = address32(self); lifted::lift_trap(cpu, cpu ? cpu->eip : 0u, "abstract ABI method called"); }
     char* duplicate_managed_string(const char* source) {
         if (source == nullptr || *source == '\0') return nullptr;
@@ -2038,6 +2042,11 @@ void SphereUI::Window::dispatchMessage(LiftCpu* cpu) { semantic_dispatch(this, c
 void SphereUI::Window::setFont(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D1AC0); }
 void SphereUI::Window::getFont(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D1B00); }
 void SphereUI::Window::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A13C0); }
+void SphereUI::bindEventHandler(Window* window, WindowEventHandler handler) { if (window == nullptr) return; auto& bindings = bound_ui_event_handlers(); const std::uint32_t address = address32(window); for (auto& binding : bindings) if (binding.window == address) { binding.handler = handler; return; } if (handler != WindowEventHandler::none) bindings.push_back({address, handler}); }
+void SphereUI::copyEventHandler(Window* destination, const Window* source) { if (destination == nullptr || destination == source) return; const WindowEventHandler handler = bound_ui_event_handler(source); unbindEventHandler(destination); if (handler != WindowEventHandler::none) bindEventHandler(destination, handler); }
+bool SphereUI::hasEventHandler(const Window* window) { return window != nullptr && bound_ui_event_handler(window) != WindowEventHandler::none; }
+void SphereUI::dispatchEvent(Window* window, LiftCpu* cpu, std::uint32_t callsite) { const auto target = ui_event_target(bound_ui_event_handler(window)); if (target == nullptr) return; cpu->ecx = address32(window); lifted::lift_push32(cpu, callsite); target(cpu, callsite); }
+void SphereUI::unbindEventHandler(const void* window) { if (window == nullptr) return; auto& bindings = bound_ui_event_handlers(); const std::uint32_t address = address32(window); bindings.erase(std::remove_if(bindings.begin(), bindings.end(), [address](const BoundUiEventHandler& binding) { return binding.window == address; }), bindings.end()); }
 void SphereUI::ButtonCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0049EDE0); }
 void SphereUI::ButtonCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A0DB0); }
 void SphereUI::ButtonCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0049F5A0); }

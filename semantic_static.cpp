@@ -68,9 +68,19 @@ void updateLoadingProgressControl(std::uint32_t percent) {
     if (node == nullptr || !loadingControlIsRegistered(node->control)) return;
     auto* progress = sfera_ptr32<SphereUI::ProgressBar>(node->control);
     if (progress == nullptr) return;
-    lifted::LocalStack stack(4096u); LiftCpu cpu{}; cpu.esp = stack.top();
-    lifted::lift_push32(&cpu, 0u); lifted::lift_push32(&cpu, std::min(percent, 100u)); lifted::lift_push32(&cpu, 2001u);
-    progress->SphereUI::ProgressBar::handleMessage(&cpu);
+    auto* bytes = reinterpret_cast<std::uint8_t*>(progress);
+    const std::int32_t minimum = *reinterpret_cast<std::int32_t*>(bytes + 0x198u);
+    const std::int32_t maximum = *reinterpret_cast<std::int32_t*>(bytes + 0x19Cu);
+    const std::int32_t current = std::clamp(static_cast<std::int32_t>(std::min(percent, 100u)), minimum, maximum);
+    *reinterpret_cast<std::int32_t*>(bytes + 0x1A0u) = current;
+    const std::int32_t range = maximum - minimum;
+    float ratio = std::fabs(static_cast<float>(current) / static_cast<float>(range));
+    if (ratio > 1.0f) ratio = 1.0f;
+    *reinterpret_cast<float*>(bytes + 0x1A4u) = ratio;
+    const std::uint32_t display_mode = *reinterpret_cast<std::uint32_t*>(bytes + 0x1A8u);
+    auto* text = reinterpret_cast<char*>(bytes + 0x1ACu);
+    if (display_mode == 1u) std::snprintf(text, 24u, "%d%%", static_cast<int>(std::trunc(ratio * 100.0f)));
+    else if (display_mode == 2u) std::snprintf(text, 24u, "%d / %d", current, range);
 }
 SferaD3D9DeviceRuntime* effectLoadDeviceRuntime() { return sfera_ptr32<SferaD3D9DeviceRuntime>(g_sfera_graphics_runtime.d3d9_device_runtime); }
 bool beginEffectLoadScene(SferaD3D9DeviceRuntime& runtime) {
@@ -652,7 +662,7 @@ void SferaEffectManager::removeActiveEffect(SferaActiveEffect& item) {
     if (item.position_source == 0u) g_sfera_world_objects.detachEffect(item.source_handle, item);
     if (item.effect != nullptr) { item.effect->releaseEffect(); item.effect = nullptr; }
     if (item.resource != nullptr) { g_sfera_sound_runtime.destroyEffect(item.resource); item.resource = nullptr; if (active_resource_count != 0u) --active_resource_count; }
-    item.age_ticks = 0xFFFFFFFFu; item.update_callback = 0u; item.listener_key = 0xFFFFFFFFu; if (active_effect_count != 0u) --active_effect_count; if (item.owner_list != nullptr) sfera_effect_list_remove(*item.owner_list, item); g_sfera_effect_items.put(sfera_address32(&item));
+    item.age_ticks = 0xFFFFFFFFu; item.reserved_update_handler = 0u; item.listener_key = 0xFFFFFFFFu; if (active_effect_count != 0u) --active_effect_count; if (item.owner_list != nullptr) sfera_effect_list_remove(*item.owner_list, item); g_sfera_effect_items.put(sfera_address32(&item));
 }
 
 bool SferaEffectManager::setEffectParameters(std::uint32_t source_handle, const SferaEffectParameter* parameters, std::uint32_t count) { SferaActiveEffect* item = g_sfera_world_objects.firstEffect(source_handle); if (item == nullptr || item->effect == nullptr) return false; item->effect->setParameter(parameters, count); return true; }

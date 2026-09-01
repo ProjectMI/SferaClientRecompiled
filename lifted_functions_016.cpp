@@ -3485,6 +3485,7 @@ __declspec(noinline) void sfera_sub_004A0A40(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->ebx + 0xF4u) = cpu->edx;
     cpu->eax = *(uint32_t*)(cpu->ebp + 0xF8u);
     *(uint32_t*)(cpu->ebx + 0xF8u) = cpu->eax;
+    SphereUI::copyEventHandler(reinterpret_cast<SphereUI::Window*>(cpu->ebx), reinterpret_cast<const SphereUI::Window*>(cpu->ebp));
     cpu->ecx = *(uint32_t*)(cpu->ebp + 0xFCu);
     *(uint32_t*)(cpu->ebx + 0xFCu) = cpu->ecx;
     cpu->edx = *(uint32_t*)(cpu->ebp + 0x100u);
@@ -4914,7 +4915,7 @@ __declspec(noinline) void sfera_sub_004A2040(LiftCpu* cpu, uint32_t stop_address
     label_000A21A2:
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x2Cu);
     cpu->ecx -= *(uint32_t*)(cpu->edi + 0x2Cu);
-    *(uint32_t*)(cpu->esi + 0xF8u) = LIFT_CALLBACK(sfera_sub_004A2000);
+    SphereUI::bindEventHandler(reinterpret_cast<SphereUI::Window*>(cpu->esi), SphereUI::WindowEventHandler::description);
     *(uint32_t*)(cpu->esi + 0x1BCu) = cpu->ecx;
     cpu->ecx = cpu->esi;
     *(uint32_t*)(cpu->esi + 0x19Cu) = cpu->ebx;
@@ -10081,8 +10082,7 @@ __declspec(noinline) void sfera_sub_004A6C00(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax == 0u) goto label_000A6C4F;
     cpu->edx = *(uint32_t*)(cpu->eax + 0xFFFFFFFCu);
     cpu->ebx = cpu->eax + 0xFFFFFFFCu;
-    lift_push32(cpu, LIFT_CALLBACK(sfera_sub_00416610)); lift_push32(cpu, cpu->edx); lift_push32(cpu, 0xCu); lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4A6C46u)); sfera_sub_004EEB86(cpu, LIFT_CODE_TOKEN_VA(0x4A6C46u));
+    { uint32_t current = cpu->eax + 0xCu * cpu->edx; uint32_t count = cpu->edx; while (count-- != 0u) { current -= 0xCu; cpu->ecx = current; lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4A6C46u)); sfera_sub_00416610(cpu, LIFT_CODE_TOKEN_VA(0x4A6C46u)); } }
     lift_push32(cpu, cpu->ebx);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4A6C4Cu)); sfera_sub_004EBE20(cpu, LIFT_CODE_TOKEN_VA(0x4A6C4Cu));
     cpu->esp += 4u;

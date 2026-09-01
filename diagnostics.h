@@ -20,11 +20,9 @@ enum class RuntimePhase : std::uint32_t {
     static_storage,
     protect_static_storage,
     abi_self_test,
-    function_map,
     execution_setup,
     native_c,
-    native_call,
-    callback
+    native_call
 };
 
 class DiagnosticPhaseScope {

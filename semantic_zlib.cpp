@@ -3,24 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
+
+uint32_t __cdecl sfera_zlib_adler32_callback(uint32_t adler, uint32_t buffer_address, uint32_t length) noexcept { return sfera_zlib_adler32(adler, buffer_address, length); }
+void* __cdecl sfera_zlib_alloc_callback(void*, uint32_t items, uint32_t size) noexcept { return std::calloc(items, size); }
+void __cdecl sfera_zlib_free_callback(void*, void* address) noexcept { std::free(address); }
 
 namespace {
-struct SferaZStream32 {
-    uint32_t next_in;
-    uint32_t avail_in;
-    uint32_t total_in;
-    uint32_t next_out;
-    uint32_t avail_out;
-    uint32_t total_out;
-    uint32_t msg;
-    uint32_t state;
-    uint32_t zalloc;
-    uint32_t zfree;
-    uint32_t opaque;
-    int32_t data_type;
-    uint32_t adler;
-    uint32_t reserved;
-};
 
 struct SferaDeflateStatePrefix32 {
     uint32_t strm;
@@ -637,7 +626,7 @@ static int32_t sfera_zlib_flush_current_block(uint32_t state_address, bool end_o
 uint32_t sfera_zlib_deflate_reset(uint32_t stream_address) {
     if (stream_address == 0u) { return static_cast<uint32_t>(-2); }
     SferaZStream32* stream = sfera_zlib_pointer<SferaZStream32>(stream_address);
-    if (stream->state == 0u || stream->zalloc == 0u || stream->zfree == 0u) { return static_cast<uint32_t>(-2); }
+    if (stream->state == 0u || !stream->zalloc || !stream->zfree) { return static_cast<uint32_t>(-2); }
     stream->total_in = 0u;
     stream->total_out = 0u;
     stream->msg = 0u;

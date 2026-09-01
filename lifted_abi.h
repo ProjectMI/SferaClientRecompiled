@@ -19,18 +19,11 @@ namespace lifted {
 
 using LiftFunction = void (*)(LiftCpu* cpu, uint32_t stop_address);
 
-inline constexpr uint32_t LIFT_CALLBACK_SENTINEL = 0xFFF0FFF0u;
-
-uint32_t lift_callback_address(LiftFunction function);
-
+inline constexpr uint32_t LIFT_RETURN_SENTINEL = 0xFFF0FFF0u;
 void lift_push32(LiftCpu* cpu, uint32_t value);
 uint32_t lift_pop32(LiftCpu* cpu);
 
 void lift_native_call(LiftCpu* cpu, uint32_t target, uint32_t callsite);
-[[noreturn]] void lift_trap(LiftCpu* cpu, uint32_t source_va, const char* reason);
-
-
-
-
+[[noreturn]] void lift_trap(LiftCpu* cpu, uint32_t source_va, const char* reason);
 
 } // namespace lifted

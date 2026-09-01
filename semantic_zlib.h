@@ -2,7 +2,37 @@
 
 #include <cstdint>
 
+using SferaZCheckCallback = uint32_t (__cdecl*)(uint32_t adler, uint32_t buffer_address, uint32_t length);
+using SferaZAllocCallback = void* (__cdecl*)(void* opaque, uint32_t items, uint32_t size);
+using SferaZFreeCallback = void (__cdecl*)(void* opaque, void* address);
+
+struct SferaZStream32 {
+    uint32_t next_in;
+    uint32_t avail_in;
+    uint32_t total_in;
+    uint32_t next_out;
+    uint32_t avail_out;
+    uint32_t total_out;
+    uint32_t msg;
+    uint32_t state;
+    SferaZAllocCallback zalloc;
+    SferaZFreeCallback zfree;
+    void* opaque;
+    int32_t data_type;
+    uint32_t adler;
+    uint32_t reserved;
+    uint32_t allocate(uint32_t items, uint32_t size) const noexcept { return zalloc ? static_cast<uint32_t>(reinterpret_cast<uintptr_t>(zalloc(opaque, items, size))) : 0u; }
+    void release(uint32_t address) const noexcept { if (zfree && address) zfree(opaque, reinterpret_cast<void*>(static_cast<uintptr_t>(address))); }
+};
+
+static_assert(sizeof(SferaZStream32) == 0x38u);
+
+struct SferaInflateBlocksCallbacks32 { uint8_t reserved_000[0x38]; SferaZCheckCallback check; uint32_t check_value; };
+
 uint32_t sfera_zlib_adler32(uint32_t adler, uint32_t buffer_address, uint32_t length);
+uint32_t __cdecl sfera_zlib_adler32_callback(uint32_t adler, uint32_t buffer_address, uint32_t length) noexcept;
+void* __cdecl sfera_zlib_alloc_callback(void* opaque, uint32_t items, uint32_t size) noexcept;
+void __cdecl sfera_zlib_free_callback(void* opaque, void* address) noexcept;
 void sfera_zlib_deflate_put_short_msb(uint32_t state_address, uint32_t value);
 void sfera_zlib_deflate_flush_pending(uint32_t stream_address);
 void sfera_zlib_deflate_lm_init(uint32_t state_address);

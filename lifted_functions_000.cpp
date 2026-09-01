@@ -3141,8 +3141,8 @@ __declspec(noinline) void sfera_sub_004032E4(LiftCpu* cpu, uint32_t stop_address
     *(uint8_t*)(cpu->ebp + 0xFFFFFFFCu) = 2u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4032FEu)); sfera_sub_004028A0(cpu, LIFT_CODE_TOKEN_VA(0x4032FEu));
     *(uint32_t*)(cpu->ebp + 8u) = cpu->eax;
-    cpu->eax = LIFT_CALLBACK(sfera_sub_00403307);
-    cpu->esp += 4u; cpu->eip = stop_address; return;
+    cpu->esp += 4u;
+    sfera_sub_00403307(cpu, stop_address); return;
 }
 __declspec(noinline) void sfera_sub_00403307(LiftCpu* cpu, uint32_t stop_address) {
     cpu->edi = *(uint32_t*)(cpu->ebp + 0xFFFFFFECu);

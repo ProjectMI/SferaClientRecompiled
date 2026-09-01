@@ -68,6 +68,7 @@
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <TargetMachine>MachineX86</TargetMachine>
+      <StackReserveSize>8388608</StackReserveSize>
       <AdditionalLibraryDirectories>$(IntDir)generated_imports;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;comctl32.lib;ws2_32.lib;winmm.lib;dinput8.lib;dxguid.lib;d3d9.lib;dbghelp.lib;d3dx9_26.lib;sound.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
@@ -113,6 +114,7 @@ if errorlevel 1 exit /b 1</Command>
     <ClCompile Include="semantic_classes.cpp" />
 <ClCompile Include="main.cpp" />
     <ClCompile Include="runtime.cpp" />
+    <ClCompile Include="native_callbacks.cpp" />
     <ClCompile Include="lifted_functions_000.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
@@ -279,6 +281,7 @@ if errorlevel 1 exit /b 1</Command>
     <ClInclude Include="lifted_abi.h" />
     <ClInclude Include="lifted_functions.h" />
     <ClInclude Include="import_bridge.h" />
+    <ClInclude Include="native_callbacks.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="imports\d3dx9_26.def" />
