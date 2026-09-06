@@ -29,8 +29,6 @@ public:
     ProcessMemory(const ProcessMemory&) = delete;
     ProcessMemory& operator=(const ProcessMemory&) = delete;
     ~ProcessMemory();
-    bool try_read(std::uint32_t address, void* value, std::size_t size) const noexcept;
-    bool try_write(std::uint32_t address, const void* value, std::size_t size) noexcept;
     void read(std::uint32_t address, void* value, std::size_t size) const;
     void write(std::uint32_t address, const void* value, std::size_t size);
     void initialize_native();

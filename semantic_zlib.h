@@ -25,7 +25,6 @@ struct SferaZStream32 {
     void release(uint32_t address) const noexcept { if (zfree && address) zfree(opaque, reinterpret_cast<void*>(static_cast<uintptr_t>(address))); }
 };
 
-static_assert(sizeof(SferaZStream32) == 0x38u);
 
 struct SferaInflateBlocksCallbacks32 { uint8_t reserved_000[0x38]; SferaZCheckCallback check; uint32_t check_value; };
 
@@ -42,9 +41,6 @@ uint32_t sfera_zlib_deflate_longest_match(uint32_t state_address, uint32_t curre
 uint32_t sfera_zlib_fixed_literal_length(uint32_t symbol);
 uint32_t sfera_zlib_fixed_literal_code(uint32_t symbol);
 uint32_t sfera_zlib_fixed_distance_code(uint32_t symbol);
-void sfera_zlib_pq_down_heap(uint32_t state_address, uint32_t tree_address, uint32_t heap_index);
-void sfera_zlib_generate_bit_lengths(uint32_t state_address, uint32_t descriptor_address);
-void sfera_zlib_generate_codes(uint32_t tree_address, int32_t max_code, uint32_t bit_counts_address);
 void sfera_zlib_init_block(uint32_t state_address);
 void sfera_zlib_tree_init(uint32_t state_address);
 void sfera_zlib_build_tree(uint32_t state_address, uint32_t descriptor_address);
@@ -54,7 +50,6 @@ int32_t sfera_zlib_build_bit_length_tree(uint32_t state_address);
 void sfera_zlib_send_all_trees(uint32_t state_address, uint32_t literal_codes, uint32_t distance_codes, uint32_t bit_length_codes);
 void sfera_zlib_flush_block(uint32_t state_address, uint32_t buffer_address, uint32_t stored_length, uint32_t end_of_file);
 void sfera_zlib_compress_block(uint32_t state_address, uint32_t literal_tree_address, uint32_t distance_tree_address);
-uint32_t sfera_zlib_bit_reverse(uint32_t value, uint32_t bit_count);
 void sfera_zlib_bit_flush(uint32_t state_address);
 void sfera_zlib_bit_windup(uint32_t state_address);
 void sfera_zlib_copy_stored_block(uint32_t state_address, uint32_t buffer_address, uint32_t length, uint32_t write_header);

@@ -1,11 +1,16 @@
 #pragma once
 
+struct IDirect3DTexture9;
+
 #include <cstddef>
 #include <cstdint>
+
+#include "semantic_window.h"
 
 struct LiftCpu;
 struct SferaIntrusiveListHeader;
 class CSound;
+class StdAllocator;
 
 
 struct SferaParserRange {
@@ -682,78 +687,128 @@ public:
 
 class IOutputDevice {
 public:
-    IOutputDevice() = default;
-    virtual void write(LiftCpu* cpu);
+    char* buffer = nullptr;
+    IOutputDevice();
+    ~IOutputDevice();
+    virtual void write(const char* text) = 0;
 };
 
 class COutputLogDevice : public IOutputDevice {
 public:
+    char* filename = nullptr;
     COutputLogDevice() = default;
-    void write(LiftCpu* cpu) override;
+    ~COutputLogDevice();
+    void setFilename(const char* path);
+    void write(const char* text) override;
 };
 
 class CSphereError : public IOutputDevice {
 public:
     CSphereError() = default;
-    void write(LiftCpu* cpu) override;
+    void write(const char* text) override;
 };
 
 class GrassMapMngr {
 public:
     GrassMapMngr() = default;
-    virtual void loadGrassMap(LiftCpu* cpu);
+    virtual void loadGrassMap(const std::uint16_t* tile, void* destination);
 };
 
-class HyperTextElement {
+class SferaHashMap {
 public:
-    HyperTextElement() = default;
-    virtual void elementType(LiftCpu* cpu);
-};
-
-class HyperTextElement_WordWrap : public HyperTextElement {
-public:
-    HyperTextElement_WordWrap() = default;
-};
-
-class HyperTextElementWithParameters : public HyperTextElement {
-public:
-    HyperTextElementWithParameters() = default;
-};
-
-class HyperTextElement_PlainText : public HyperTextElement {
-public:
-    HyperTextElement_PlainText() = default;
-};
-
-class HyperTextElement_Link : public HyperTextElementWithParameters {
-public:
-    HyperTextElement_Link() = default;
+    struct Entry { std::uint32_t value; std::uint32_t key_length; std::uint16_t next; std::uint8_t key[1]; };
+    std::uint32_t max_key_length;
+    std::uint32_t entries;
+    std::uint32_t entry_stride;
+    std::uint32_t entry_capacity;
+    std::uint32_t key_buffer;
+    std::uint16_t free_entry;
+    std::uint16_t field_16;
+    std::uint32_t buckets;
+    std::uint16_t invalid_entry;
+    std::uint8_t case_sensitive;
+    std::uint8_t field_1f;
+    std::uint32_t bucket_count;
+    std::uint32_t result_pointer;
+    std::uint32_t field_28;
+    std::uint32_t field_2c;
+    std::uint32_t allocator;
+    std::uint16_t current_index;
+    std::uint16_t field_36;
+    std::uint32_t current_entry;
+    std::uint32_t previous_entry;
+    std::uint16_t next_index;
+    std::uint16_t hash_value;
+    SferaHashMap() {}
+    SferaHashMap* initialize(std::uint32_t maximum_key_length, bool keys_case_sensitive, std::int32_t initial_capacity, std::uint32_t hash_bucket_count, StdAllocator* storage_allocator);
+    Entry* entry(std::uint16_t index);
+    const Entry* entry(std::uint16_t index) const;
+    std::uint32_t findEntry(const char* key, std::uint32_t length, bool normalize_case);
+    std::uint32_t findValue(const char* key);
+    bool erase(const char* key, std::uint32_t length);
+    std::uint32_t insert(const char* key, std::uint32_t length, const std::uint32_t* value);
+    void releaseStorage();
 };
 
 class CItem {
 public:
-    CItem() = default;
-    virtual void resetItem(LiftCpu* cpu);
-    virtual void releaseItem(LiftCpu* cpu);
+    char name[150];
+    std::uint8_t active;
+    float position_x;
+    float position_y;
+    float position_z;
+    CItem() {}
+    virtual void resetItem();
+    virtual void releaseItem();
 };
 
 class CCommonItem : public CItem {
 public:
-    CCommonItem() = default;
+    std::uint32_t field_a8;
+    std::uint32_t field_ac;
+    std::uint32_t field_b0;
+    std::uint32_t field_b4;
+    std::uint32_t field_b8;
+    std::uint8_t payload[256];
+    CCommonItem() {}
 };
 
 class CItemListCommonItem : public CItem {
 public:
-    CItemListCommonItem() = default;
-    void resetItem(LiftCpu* cpu) override;
+    std::uint32_t minimum_items;
+    std::uint32_t capacity;
+    std::uint32_t item_count;
+    std::uint32_t list_mode;
+    std::uint32_t item_parameter;
+    std::uint32_t field_bc;
+    std::uint32_t field_c0;
+    std::int32_t iterator_index;
+    std::uint8_t diagnostics_mode;
+    std::uint32_t item_index;
+    std::uint32_t item_storage;
+    CItemListCommonItem() {}
+    std::int32_t initialize(std::int32_t minimum, std::int32_t, std::uint32_t mode, const char* list_name, std::uint32_t parameter);
+    CCommonItem* findStoredItem(const CItem* key);
+    CCommonItem* firstItem();
+    CCommonItem* nextItem();
+    std::int32_t addItem(const CCommonItem* item);
+    std::int32_t removeItem(const CItem* key);
+    void resetItem() override;
 };
 
 class CBaseManagerCommonItem : public CItemListCommonItem {
 public:
-    CBaseManagerCommonItem() = default;
-    virtual void handleInsert(LiftCpu* cpu);
-    virtual void handleRemove(LiftCpu* cpu);
-    virtual void findItem(LiftCpu* cpu);
+    std::uint8_t manager_diagnostics_mode;
+    std::uint32_t field_d8;
+    CBaseManagerCommonItem() {}
+    std::int32_t initialize(std::int32_t minimum, std::int32_t, std::uint32_t mode, const char* list_name, std::uint32_t parameter);
+    CItemListCommonItem* findStoredList(const CItem* key);
+    CCommonItem* selectItem(CCommonItem* output, const char* list_name, std::int32_t field_ac_filter, std::int32_t field_a8_filter, std::int32_t field_b0_filter);
+    std::int32_t addList(const CItemListCommonItem* list);
+    std::int32_t removeList(const CItem* key);
+    virtual std::int32_t handleInsert(CItemListCommonItem* list, CCommonItem* item, CCommonItem* related_item);
+    virtual std::int32_t handleRemove(CItemListCommonItem* list, CCommonItem* item, CCommonItem* related_item);
+    virtual CItem* findItem(CItem* key);
 };
 
 class NatureRainListener final : public IEffectListener {
@@ -772,403 +827,164 @@ public:
     void onEffectChanged(std::uint32_t age_ticks, IEffect& effect, SferaActiveEffect& item) override;
 };
 
+class CSoundManager {
+public:
+    CSound* first;
+    CSound* last;
+    float volume;
+    std::uint32_t enabled;
+    std::uint32_t count;
+};
+
 class CSoundFX {
 public:
     CSoundFX() = default;
-    virtual void play(LiftCpu* cpu);
-    virtual void stop(LiftCpu* cpu);
-    virtual void rewind(LiftCpu* cpu);
+    virtual int play(int mode);
+    virtual void stop();
+    virtual int rewind();
+};
+
+struct SferaCursorPosition { std::int32_t x; std::int32_t y; };
+class SferaInterfaceCursor {
+public:
+    std::uint8_t system_visible;
+    std::uint8_t software_mode;
+    std::uint32_t texture_handles;
+    std::uint8_t kind;
 };
 
 class CCursor {
 public:
     CCursor() = default;
-    virtual void destroy(LiftCpu* cpu);
-    virtual void copyStateFrom(LiftCpu* cpu);
-    virtual void activate(LiftCpu* cpu);
-    virtual void deactivate(LiftCpu* cpu);
-    virtual void apply(LiftCpu* cpu);
-    virtual void setVisible(LiftCpu* cpu);
-    virtual void getPosition(LiftCpu* cpu);
-    virtual void setPosition(LiftCpu* cpu);
-    virtual void show(LiftCpu* cpu);
-    virtual void isInsideViewport(LiftCpu* cpu);
-    virtual void isSystemCursorVisible(LiftCpu* cpu);
-    virtual void setSystemCursorVisible(LiftCpu* cpu);
-    virtual void cursorKind(LiftCpu* cpu);
-    virtual void setCursorKind(LiftCpu* cpu);
+    virtual void destroy(bool free_storage) = 0;
+    virtual void copyStateFrom(const CCursor* previous) = 0;
+    virtual void activate() = 0;
+    virtual void deactivate() = 0;
+    virtual void apply() = 0;
+    virtual void updatePosition() = 0;
+    virtual SferaCursorPosition* getPosition(SferaCursorPosition* output) const = 0;
+    virtual void setPosition(std::int32_t x, std::int32_t y) = 0;
+    virtual void show() = 0;
+    virtual bool isInsideViewport() const = 0;
+    virtual bool isSystemCursorVisible() const = 0;
+    virtual void setSystemCursorVisible(bool visible) = 0;
+    virtual std::uint32_t cursorKind() const = 0;
+    virtual void setCursorKind(std::uint32_t kind) = 0;
 };
 
 class CHardwareCursor : public CCursor {
 public:
-    CHardwareCursor() = default;
-    void destroy(LiftCpu* cpu) override;
-    void copyStateFrom(LiftCpu* cpu) override;
-    void activate(LiftCpu* cpu) override;
-    void deactivate(LiftCpu* cpu) override;
-    void apply(LiftCpu* cpu) override;
-    void setVisible(LiftCpu* cpu) override;
-    void getPosition(LiftCpu* cpu) override;
-    void setPosition(LiftCpu* cpu) override;
-    void show(LiftCpu* cpu) override;
-    void isInsideViewport(LiftCpu* cpu) override;
-    void isSystemCursorVisible(LiftCpu* cpu) override;
-    void setSystemCursorVisible(LiftCpu* cpu) override;
-    void cursorKind(LiftCpu* cpu) override;
-    void setCursorKind(LiftCpu* cpu) override;
+    std::uint32_t texture_width = 0u;
+    std::uint32_t texture_height = 0u;
+    std::uint32_t cursor_handle = 0u;
+    std::uint8_t clip_enabled = 0u;
+    std::uint8_t saved_system_visible = 0u;
+    std::uint32_t kind = 255u;
+    std::int32_t saved_x = 0;
+    std::int32_t saved_y = 0;
+    CHardwareCursor();
+    void destroy(bool free_storage) override;
+    void copyStateFrom(const CCursor* previous) override;
+    void activate() override;
+    void deactivate() override;
+    void apply() override;
+    void updatePosition() override;
+    SferaCursorPosition* getPosition(SferaCursorPosition* output) const override;
+    void setPosition(std::int32_t x, std::int32_t y) override;
+    void show() override;
+    bool isInsideViewport() const override;
+    bool isSystemCursorVisible() const override;
+    void setSystemCursorVisible(bool visible) override;
+    std::uint32_t cursorKind() const override;
+    void setCursorKind(std::uint32_t kind) override;
 };
 
 class CSoftwareCursor : public CCursor {
 public:
-    CSoftwareCursor() = default;
-    void destroy(LiftCpu* cpu) override;
-    void copyStateFrom(LiftCpu* cpu) override;
-    void activate(LiftCpu* cpu) override;
-    void deactivate(LiftCpu* cpu) override;
-    void apply(LiftCpu* cpu) override;
-    void setVisible(LiftCpu* cpu) override;
-    void getPosition(LiftCpu* cpu) override;
-    void setPosition(LiftCpu* cpu) override;
-    void show(LiftCpu* cpu) override;
-    void isInsideViewport(LiftCpu* cpu) override;
-    void isSystemCursorVisible(LiftCpu* cpu) override;
-    void setSystemCursorVisible(LiftCpu* cpu) override;
-    void cursorKind(LiftCpu* cpu) override;
-    void setCursorKind(LiftCpu* cpu) override;
+    std::uint32_t texture_width = 0u;
+    std::uint32_t texture_height = 0u;
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::uint8_t active = 0u;
+    std::uint8_t saved_system_visible = 0u;
+    std::uint32_t saved_kind = 255u;
+    std::int32_t saved_x = 0;
+    std::int32_t saved_y = 0;
+    CSoftwareCursor();
+    void destroy(bool free_storage) override;
+    void copyStateFrom(const CCursor* previous) override;
+    void activate() override;
+    void deactivate() override;
+    void apply() override;
+    void updatePosition() override;
+    SferaCursorPosition* getPosition(SferaCursorPosition* output) const override;
+    void setPosition(std::int32_t x, std::int32_t y) override;
+    void show() override;
+    bool isInsideViewport() const override;
+    bool isSystemCursorVisible() const override;
+    void setSystemCursorVisible(bool visible) override;
+    std::uint32_t cursorKind() const override;
+    void setCursorKind(std::uint32_t kind) override;
 };
 
 class UnmanagedResourceBase {
 public:
-    UnmanagedResourceBase() = default;
-    virtual void restoreResource(LiftCpu* cpu);
-    virtual void releaseResource(LiftCpu* cpu);
+    union { std::uint32_t resource; IDirect3DTexture9* native_texture; };
+    UnmanagedResourceBase() {}
+    virtual void restoreResource();
+    virtual void releaseResource();
 };
 
 class UnmanagedResourceVB : public UnmanagedResourceBase {
 public:
-    UnmanagedResourceVB() = default;
-    void restoreResource(LiftCpu* cpu) override;
+    std::uint32_t length;
+    std::uint32_t usage;
+    std::uint32_t fvf;
+    std::uint32_t pool;
+    UnmanagedResourceVB() {}
+    void restoreResource() override;
 };
 
 class UnmanagedResourceIB : public UnmanagedResourceBase {
 public:
-    UnmanagedResourceIB() = default;
-    void restoreResource(LiftCpu* cpu) override;
+    std::uint32_t length;
+    std::uint32_t usage;
+    std::uint32_t format;
+    std::uint32_t pool;
+    UnmanagedResourceIB() {}
+    void restoreResource() override;
 };
 
 class UnmanagedResourceTexture : public UnmanagedResourceBase {
 public:
-    UnmanagedResourceTexture() = default;
-    void restoreResource(LiftCpu* cpu) override;
+    std::uint32_t width;
+    std::uint32_t height;
+    std::uint32_t levels;
+    std::uint32_t usage;
+    std::uint32_t format;
+    std::uint32_t pool;
+    std::uint8_t restore_marker;
+    UnmanagedResourceTexture() {}
+    void restoreResource() override;
 };
 
 class UnmanagedResourceVector {
 public:
-    UnmanagedResourceVector() = default;
-    virtual void reserve(LiftCpu* cpu);
+    union { std::uint32_t* resources; UnmanagedResourceBase** native_resources; };
+    std::uint32_t capacity;
+    std::uint32_t size;
+    std::uint32_t* invalidation_target;
+    float growth_factor;
+    std::uint32_t allocation_flags;
+    StdAllocator* allocator;
+    UnmanagedResourceVector() {}
+    virtual void reserve(std::uint32_t requested_capacity);
 };
 
 class StdAllocator {
 public:
     StdAllocator() = default;
-    virtual void allocate(LiftCpu* cpu);
-    virtual void reallocate(LiftCpu* cpu);
-    virtual void deallocate(LiftCpu* cpu);
+    virtual void* allocate(std::size_t size, std::uint32_t flags);
+    virtual void* reallocate(void* memory, std::size_t size, std::uint32_t flags);
+    virtual void deallocate(void* memory);
 };
-
-namespace SphereUI {
-
-enum class WindowEventHandler : std::uint8_t { none, description, help, authors, quit, sound_options, control_options, interface_options, graphics_options, options, font_options };
-
-class Window;
-void bindEventHandler(Window* window, WindowEventHandler handler);
-void copyEventHandler(Window* destination, const Window* source);
-bool hasEventHandler(const Window* window);
-void dispatchEvent(Window* window, LiftCpu* cpu, std::uint32_t callsite);
-void unbindEventHandler(const void* window);
-
-class Window {
-public:
-    Window() = default;
-    virtual void loadUi(LiftCpu* cpu);
-    virtual void clone(LiftCpu* cpu);
-    virtual void handleMessage(LiftCpu* cpu);
-    virtual void setPosition(LiftCpu* cpu);
-    virtual void draw(LiftCpu* cpu);
-    virtual void handleInput(LiftCpu* cpu);
-    virtual void setOpacity(LiftCpu* cpu);
-    virtual void hitTest(LiftCpu* cpu);
-    virtual void dispatchMessage(LiftCpu* cpu);
-    virtual void setFont(LiftCpu* cpu);
-    virtual void getFont(LiftCpu* cpu);
-    virtual void destroy(LiftCpu* cpu);
-};
-
-
-
-class ButtonCtrl : public Window {
-public:
-    ButtonCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class CheckBox : public Window {
-public:
-    CheckBox() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    virtual void playClickSound(LiftCpu* cpu);
-};
-
-class CDescriptionWindow : public Window {
-public:
-    CDescriptionWindow() = default;
-    void draw(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class EditCtrl : public Window {
-public:
-    EditCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class ListCtrl : public Window {
-public:
-    ListCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class FilterListCtrl : public ListCtrl {
-public:
-    FilterListCtrl() = default;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class FontPicker : public Window {
-public:
-    FontPicker() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void setFont(LiftCpu* cpu) override;
-    void getFont(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class HyperTextChatListControl : public Window {
-public:
-    HyperTextChatListControl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void setFont(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class HyperTextCtrl : public Window {
-public:
-    HyperTextCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class HyperTextEditControl : public Window {
-public:
-    HyperTextEditControl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class ImageCtrl : public Window {
-public:
-    ImageCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void setOpacity(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class ListItemCtrl : public Window {
-public:
-    ListItemCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void setOpacity(LiftCpu* cpu) override;
-    void hitTest(LiftCpu* cpu) override;
-    void dispatchMessage(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class CMenuListControl : public Window {
-public:
-    CMenuListControl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class ToolTipCtrl : public Window {
-public:
-    ToolTipCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class MiniHelpCtrl : public ToolTipCtrl {
-public:
-    MiniHelpCtrl() = default;
-    void clone(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-};
-
-class CMinimapControl : public Window {
-public:
-    CMinimapControl() = default;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class ProgressBar : public Window {
-public:
-    ProgressBar() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-};
-
-class RadioButtonCtrl : public CheckBox {
-public:
-    RadioButtonCtrl() = default;
-    void clone(LiftCpu* cpu) override;
-    void playClickSound(LiftCpu* cpu) override;
-};
-
-class RichEditCtrl : public Window {
-public:
-    RichEditCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class ScrollBar : public Window {
-public:
-    ScrollBar() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-    virtual void updateControlState(LiftCpu* cpu);
-    virtual void loadControlParameters(LiftCpu* cpu);
-};
-
-class SliderCtrl : public ScrollBar {
-public:
-    SliderCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void updateControlState(LiftCpu* cpu) override;
-    void loadControlParameters(LiftCpu* cpu) override;
-};
-
-class SlotCtrl : public Window {
-public:
-    SlotCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void hitTest(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-class SpinButton : public Window {
-public:
-    SpinButton() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-    virtual void updateStatus(LiftCpu* cpu);
-};
-
-class TextCtrl : public Window {
-public:
-    TextCtrl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-};
-
-class CWebBrowserControl : public Window {
-public:
-    CWebBrowserControl() = default;
-    void loadUi(LiftCpu* cpu) override;
-    void clone(LiftCpu* cpu) override;
-    void handleMessage(LiftCpu* cpu) override;
-    void draw(LiftCpu* cpu) override;
-    void handleInput(LiftCpu* cpu) override;
-    void destroy(LiftCpu* cpu) override;
-};
-
-}

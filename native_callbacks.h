@@ -277,6 +277,8 @@ public:
     void resize(LONG width, LONG height) noexcept;
     HWND documentWindow() noexcept;
     void refresh() noexcept;
+    HRESULT navigate(const char* url) noexcept;
+    void location(char* buffer, std::uint32_t capacity) noexcept;
     HRESULT draw(HDC target, LONG width, LONG height) noexcept;
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** output) override;
     ULONG STDMETHODCALLTYPE AddRef() override { return 1u; }

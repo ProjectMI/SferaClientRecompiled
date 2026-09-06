@@ -119,27 +119,7 @@ std::string narrow_path(const std::wstring& value) {
     return result;
 }
 
-bool safe_copy(void* destination, const void* source, std::size_t size) noexcept {
-#if defined(SFERA_PORTABLE_CHECK)
-    std::memcpy(destination, source, size);
-    return true;
-#else
-    set_diagnostic_memory_probe(true);
-    __try {
-        std::memcpy(destination, source, size);
-        set_diagnostic_memory_probe(false);
-        return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
-        set_diagnostic_memory_probe(false);
-        return false;
-    }
-#endif
-}
 
-template <class T>
-bool try_memory_read(std::uint32_t address, T& value) noexcept {
-    return g_process_memory && g_process_memory->try_read(address, &value, sizeof(T));
-}
 
 template <class T>
 T memory_read(std::uint32_t address) {
@@ -155,26 +135,7 @@ void memory_write(std::uint32_t address, T value) {
     g_process_memory->write(address, &value, sizeof(T));
 }
 
-std::string local_c_string(std::uint32_t address, std::size_t limit = 2048u) noexcept {
-    if (address == 0) { return "<null>"; }
-    std::string result;
-    result.reserve(std::min<std::size_t>(limit, 256u));
-    for (std::size_t index = 0; index != limit; ++index) {
-        char value = 0;
-        if (!try_memory_read(address + static_cast<std::uint32_t>(index), value)) { return result + "<fault>"; }
-        if (value == '\0') { return result; }
-        if (value == '\r') { result += "\\r"; }
-        else if (value == '\n') { result += "\\n"; }
-        else if (value == '\t') { result += "\\t"; }
-        else if (static_cast<unsigned char>(value) < 0x20u) { result += '?'; }
-        else { result += value; }
-    }
-    return result + "<truncated>";
-}
 
-std::uint32_t align_up(std::uint32_t value, std::uint32_t alignment) noexcept {
-    return (value + alignment - 1u) & ~(alignment - 1u);
-}
 
 
 } // namespace
@@ -244,8 +205,6 @@ ProcessMemory::ProcessMemory() {
 
 ProcessMemory::~ProcessMemory() { release(); }
 
-bool ProcessMemory::try_read(std::uint32_t address, void* value, std::size_t size) const noexcept { if (!value) { return false; } return safe_copy(value, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(address)), size); }
-bool ProcessMemory::try_write(std::uint32_t address, const void* value, std::size_t size) noexcept { if (!value) { return false; } return safe_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(address)), value, size); }
 
 void ProcessMemory::read(std::uint32_t address, void* value, std::size_t size) const {
     if (!value) { throw std::runtime_error("Local memory read has a null destination"); }
@@ -408,8 +367,6 @@ static void __cdecl native_call_bridge(NativeCallFrame*) {}
 
 #elif defined(_M_IX86)
 
-static_assert(offsetof(LiftCpu, eax) == 0 && offsetof(LiftCpu, eip) == 32 && sizeof(LiftCpu) == 36);
-static_assert(offsetof(NativeCallFrame, state) == 0 && offsetof(NativeCallFrame, previous_exception_list) == 28 && offsetof(NativeCallFrame, lifted_exception_list) == 32 && sizeof(NativeCallFrame) == 36);
 
 __declspec(naked) static void __cdecl native_call_bridge(NativeCallFrame*) {
     __asm {

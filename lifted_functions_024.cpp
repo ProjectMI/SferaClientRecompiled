@@ -558,20 +558,7 @@ __declspec(noinline) void sfera_sub_004EBD80(LiftCpu* cpu, uint32_t stop_address
     cpu->esp = cpu->ebp;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004EBE20(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->ebp);
-    cpu->ebp = cpu->esp;
-    cpu->ecx = *(uint32_t*)(cpu->ebp + 8u);
-    if (cpu->ecx == 0u) goto label_000EBE4F;
-    cpu->eax = g_sfera_memory_runtime.allocation_source_line;
-    cpu->edx = g_sfera_memory_runtime.allocation_source_file;
-    lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EBE3Bu)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4EBE3Bu));
-    g_sfera_memory_runtime.allocation_source_file = (uintptr_t)"Unknown";
-    g_sfera_memory_runtime.allocation_source_line = 0u;
-    label_000EBE4F:
-    cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+__declspec(noinline) void sfera_memory_deallocate(LiftCpu* cpu, uint32_t stop_address) { SphereUI::Runtime::deallocate(SferaAbi::pointer<void>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u))); cpu->esp += 4u; cpu->eip = stop_address; }
 __declspec(noinline) void sfera_sub_004EBE60(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
@@ -591,28 +578,7 @@ __declspec(noinline) void sfera_sub_004EBE80(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EBE92u)); sfera_sub_004EB8A0(cpu, LIFT_CODE_TOKEN_VA(0x4EBE92u));
     cpu->ebp = lift_pop32(cpu); cpu->esp += 0xCu; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004EBEA0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->ebp);
-    cpu->ebp = cpu->esp;
-    cpu->eax = g_sfera_memory_runtime.allocation_source_line;
-    cpu->ecx = g_sfera_memory_runtime.allocation_source_file;
-    lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
-    cpu->edi = *(uint32_t*)(cpu->ebp + 8u);
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
-    cpu->edx = 0u;
-    cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EBEBEu)); sfera_sub_004EB300(cpu, LIFT_CODE_TOKEN_VA(0x4EBEBEu));
-    lift_push32(cpu, cpu->edi);
-    cpu->esi = cpu->eax;
-    lift_push32(cpu, 0u); lift_push32(cpu, cpu->esi);
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4EBEC4u));
-    cpu->esp += 0xCu;
-    cpu->edi = lift_pop32(cpu);
-    cpu->eax = cpu->esi;
-    g_sfera_memory_runtime.allocation_source_file = (uintptr_t)"Unknown";
-    g_sfera_memory_runtime.allocation_source_line = 0u;
-    cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+__declspec(noinline) void sfera_memory_allocate_zeroed(LiftCpu* cpu, uint32_t stop_address) { cpu->eax = SferaAbi::address(SphereUI::Runtime::allocate(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u))); cpu->esp += 4u; cpu->eip = stop_address; }
 __declspec(noinline) void sfera_sub_004EBF40(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     lift_push32(cpu, cpu->ebp);
     cpu->ebp = cpu->esp;
@@ -2307,34 +2273,6 @@ __declspec(noinline) void sfera_sub_004ED620(LiftCpu* cpu, uint32_t stop_address
     label_000ED76B:
     cpu->esp = cpu->ebp;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004ED770(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->ebp);
-    cpu->ebp = cpu->esp;
-    cpu->edx = *(uint32_t*)(cpu->ebp + 0xCu);
-    cpu->ecx = *(uint32_t*)(cpu->ebp + 8u);
-    lift_push32(cpu, 0x17u); lift_push32(cpu, (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\service\\containers\\Allocator.h");
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4ED785u)); sfera_sub_004EB300(cpu, LIFT_CODE_TOKEN_VA(0x4ED785u));
-    cpu->ebp = lift_pop32(cpu); cpu->esp += 0xCu; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004ED790(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->ebp);
-    cpu->ebp = cpu->esp;
-    cpu->eax = *(uint32_t*)(cpu->ebp + 0x10u);
-    cpu->edx = *(uint32_t*)(cpu->ebp + 0xCu);
-    cpu->ecx = *(uint32_t*)(cpu->ebp + 8u);
-    lift_push32(cpu, 0x1Cu); lift_push32(cpu, (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\service\\containers\\Allocator.h"); lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4ED7A9u)); sfera_sub_004EB8A0(cpu, LIFT_CODE_TOKEN_VA(0x4ED7A9u));
-    cpu->ebp = lift_pop32(cpu); cpu->esp += 0x10u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004ED7B0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->ebp);
-    cpu->ebp = cpu->esp;
-    cpu->ecx = *(uint32_t*)(cpu->ebp + 8u);
-    lift_push32(cpu, 0x21u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\service\\containers\\Allocator.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4ED7C2u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4ED7C2u));
-    cpu->ebp = lift_pop32(cpu); cpu->esp += 8u; cpu->eip = stop_address; return;
 }
 __declspec(noinline) void sfera_sub_004ED7D0(LiftCpu* cpu, uint32_t stop_address) {
     cpu->eax = *(uint32_t*)(cpu->ecx);
@@ -4267,9 +4205,6 @@ __declspec(noinline) void sfera_sub_004EF2C9(LiftCpu* cpu, uint32_t stop_address
     g_sfera_crt_startup_runtime.processor_feature_10 = cpu->eax;
     cpu->eax = 0u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-[[noreturn]] __declspec(noinline) void sfera_sub_004EF2DA(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eip = LIFT_CODE_TOKEN_VA(0x4EF2DAu); std::terminate();
 }
 __declspec(noinline) void sfera_sub_004EF328(LiftCpu* cpu, uint32_t stop_address) {
     cpu->eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(::SetUnhandledExceptionFilter(&sfera_cpp_exception_filter)));

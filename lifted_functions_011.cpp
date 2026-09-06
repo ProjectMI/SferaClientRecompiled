@@ -5229,7 +5229,7 @@ __declspec(noinline) void sfera_sub_004731C0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esp + 0x80u;
     lift_push32(cpu, cpu->ecx);
     cpu->ecx = cpu->eax;
-    reinterpret_cast<CCursor*>(cpu->ecx)->getPosition(cpu);
+    cpu->eax = SferaAbi::address(reinterpret_cast<CCursor*>(cpu->ecx)->getPosition(SferaAbi::pointer<SferaCursorPosition>(*(uint32_t*)(cpu->esp)))); cpu->esp += 4u;
     x87_v0 = (double)*(float*)((uintptr_t)&g_sfera_view_geometry_runtime.reference_points[2].x);
     x87_v1 = (double)*(float*)((uintptr_t)&g_sfera_view_geometry_runtime.reference_points[1].x); x87_v2 = x87_v1;
     x87_v0 = x87_v0 - x87_v2; 
@@ -8999,7 +8999,7 @@ __declspec(noinline) void sfera_sub_00477020(LiftCpu* cpu, uint32_t stop_address
     if ((int32_t)g_sfera_client_main_scalar_runtime.counter_03 <= (int32_t)cpu->esi) goto label_0007729C;
     cpu->ebx = cpu->esp + 0xE8u;
     cpu->ebx &= 0xFFFFFFF0u;
-    cpu->eax = (uintptr_t)&g_sfera_collision_scratch_runtime.light_candidates[0][4];
+    cpu->eax = (uintptr_t)&g_sfera_collision_scratch_runtime.light_candidates[0].position.y;
     label_00077600:
     cpu->edi = cpu->ebx;
     *(uint32_t*)(cpu->esp + 0xD8u) = cpu->edi;

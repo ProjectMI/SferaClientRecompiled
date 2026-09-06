@@ -59,12 +59,7 @@ private:
 
 void install_crash_diagnostics() noexcept;
 void set_runtime_phase(RuntimePhase phase) noexcept;
-void set_diagnostic_instruction(std::uint32_t address, const char* operation) noexcept;
-void set_diagnostic_memory_probe(bool active) noexcept;
-void diagnostic_memory_write(std::uint32_t address, std::uint32_t size, std::uint64_t value) noexcept;
-bool diagnostic_last_memory_write(std::uint32_t address, MemoryWriteInfo& result) noexcept;
 void diagnostic_call(std::uint32_t callsite, std::uint32_t target, std::uint32_t return_address, std::uint32_t esp) noexcept;
-void diagnostic_return(std::uint32_t return_address) noexcept;
 void diagnostic_failure(const LiftCpu& state, const char* message) noexcept;
 void diagnostic_note(const char* message) noexcept;
 

@@ -20,13 +20,17 @@
 #include <vector>
 namespace {
     template <class T> T* ptr32(std::uint32_t address) { return reinterpret_cast<T*>(static_cast<std::uintptr_t>(address)); }
-    using SemanticLiftTarget = void (*)(LiftCpu*, std::uint32_t);
-    template <class T> void semantic_dispatch(T* self, LiftCpu* cpu, SemanticLiftTarget target) { cpu->ecx = address32(self); lifted::lift_push32(cpu, lifted::LIFT_RETURN_SENTINEL); target(cpu, lifted::LIFT_RETURN_SENTINEL); }
-    struct BoundUiEventHandler { std::uint32_t window; SphereUI::WindowEventHandler handler; };
-    std::vector<BoundUiEventHandler>& bound_ui_event_handlers() { static std::vector<BoundUiEventHandler> handlers; return handlers; }
-    SemanticLiftTarget ui_event_target(SphereUI::WindowEventHandler handler) { switch (handler) { case SphereUI::WindowEventHandler::description: return lifted::sfera_sub_004A2000; case SphereUI::WindowEventHandler::help: return lifted::sfera_sub_004B9540; case SphereUI::WindowEventHandler::authors: return lifted::sfera_sub_004C9C30; case SphereUI::WindowEventHandler::quit: return lifted::sfera_sub_004C9C40; case SphereUI::WindowEventHandler::sound_options: return lifted::sfera_sub_004CA180; case SphereUI::WindowEventHandler::control_options: return lifted::sfera_sub_004CA530; case SphereUI::WindowEventHandler::interface_options: return lifted::sfera_sub_004CABD0; case SphereUI::WindowEventHandler::graphics_options: return lifted::sfera_sub_004CB950; case SphereUI::WindowEventHandler::options: return lifted::sfera_sub_004CD0D0; case SphereUI::WindowEventHandler::font_options: return lifted::sfera_sub_004CD1F0; case SphereUI::WindowEventHandler::none: return nullptr; } return nullptr; }
-    SphereUI::WindowEventHandler bound_ui_event_handler(const SphereUI::Window* window) { const std::uint32_t address = address32(window); for (const auto& binding : bound_ui_event_handlers()) if (binding.window == address) return binding.handler; return SphereUI::WindowEventHandler::none; }
-    [[noreturn]] void semantic_abi_abstract_call(void* self, LiftCpu* cpu) { if (cpu != nullptr) cpu->ecx = address32(self); std::terminate(); }
+    SferaD3D9DeviceRuntime* d3d9_runtime() { return SferaAbi::pointer<SferaD3D9DeviceRuntime>(g_sfera_graphics_runtime.d3d9_device_runtime); }
+    IDirect3DDevice9* d3d9_device() { auto* runtime = d3d9_runtime(); return runtime == nullptr ? nullptr : SferaAbi::pointer<IDirect3DDevice9>(runtime->device); }
+    void store_d3d9_result(HRESULT result) { if (auto* runtime = d3d9_runtime()) runtime->last_hresult = static_cast<std::int32_t>(result); }
+    HWND main_window_handle() { return reinterpret_cast<HWND>(static_cast<std::uintptr_t>(g_sfera_window_runtime.main_window)); }
+    IDirectInputDevice8A* mouse_input_device() { return SferaAbi::pointer<IDirectInputDevice8A>(g_sfera_direct_input_runtime.mouse_device); }
+    SferaInterfaceCursor* interface_cursor() { return SferaAbi::pointer<SferaInterfaceCursor>(g_sfera_interface_core_runtime.state_02); }
+    void set_system_cursor_visibility(bool visible) { if (visible) { while (::ShowCursor(TRUE) < 0) {} } else { while (::ShowCursor(FALSE) >= 0) {} } }
+    bool cursor_uses_center_clip(std::uint32_t kind) { const char* name = kind < 4u ? sfera_cursor_texture_name(kind) : nullptr; return name != nullptr && name[0] != '_'; }
+    constexpr std::uint32_t kRgbColorMask = (1u << 24u) - 1u;
+    std::uint32_t opacity_alpha(double value) { return static_cast<std::uint32_t>(static_cast<std::int64_t>(std::trunc(value))); }
+    void replace_color_alpha(std::uint32_t& color, std::uint32_t alpha) { color = (color & kRgbColorMask) | (alpha << 24u); }
     char* duplicate_managed_string(const char* source) {
         if (source == nullptr || *source == '\0') return nullptr;
         const std::size_t length = std::strlen(source) + 1u;
@@ -454,8 +458,8 @@ char* SferaSimpleParser::readQuotedString(std::uint32_t index, char* output) con
 bool SferaSimpleParser::readBool(std::uint32_t index) const {
     const char* value_text = tokenAt(index);
     if (value_text == nullptr) return false;
-    char* parsed = reinterpret_cast<char*>(g_sfera_config_parse_scratch_runtime.token);
-    simple_parser_copy_token_bounded(value_text, parsed, sizeof(g_sfera_config_parse_scratch_runtime.token));
+    char parsed[1024]{};
+    simple_parser_copy_token_bounded(value_text, parsed, sizeof(parsed));
     if (parsed[0] == '\0') return false;
     if (parsed[0] == '1') return true;
     return equalsIgnoreCase(parsed, "true");
@@ -773,6 +777,22 @@ namespace {
     SferaEffectVec3F vec_normalized(const SferaEffectVec3F& value, const SferaEffectVec3F& fallback = {}) {
         const float length = vec_length(value);
         return length == 0.0f ? fallback : vec_scale(value, 1.0f / length);
+    }
+    void build_y_up_billboard_axes(const SferaEffectVec3F& view, float right_scale, float up_scale, SferaEffectVec3F& right, SferaEffectVec3F& up) {
+        right = {view.z, 0.0f, -view.x};
+        float length = vec_length(right);
+        right = length <= 0.00001f ? SferaEffectVec3F{1.0f, 0.0f, 0.0f} : vec_scale(right, 1.0f / length);
+        up = vec_cross(right, view);
+        length = vec_length(up);
+        up = length <= 0.00001f ? SferaEffectVec3F{0.0f, 0.0f, 1.0f} : vec_scale(up, 1.0f / length);
+        right = vec_scale(right, right_scale);
+        up = vec_scale(up, up_scale);
+    }
+    void set_full_quad_uv(SferaEffectRenderSlot& slot) {
+        slot.uv[0][0] = 0.0f; slot.uv[0][1] = 0.0f;
+        slot.uv[1][0] = 1.0f; slot.uv[1][1] = 0.0f;
+        slot.uv[2][0] = 1.0f; slot.uv[2][1] = 1.0f;
+        slot.uv[3][0] = 0.0f; slot.uv[3][1] = 1.0f;
     }
     float random_signed(float scale) {
         constexpr float random_scale = 3.0518509447574615e-05f;
@@ -1835,10 +1855,11 @@ void CRainEffect::initializeEffect(const SferaEffectInitializeContext& context) 
         }
         SferaEffectVec3F center = vec_add(base, particle.offset);
         center.y -= 4.0f;
+        set_full_quad_uv(*slot);
         const SferaEffectVec3F viewer{g_sfera_effect_manager.viewer_position.x, g_sfera_effect_manager.viewer_position.y, g_sfera_effect_manager.viewer_position.z};
         const SferaEffectVec3F to_viewer = vec_sub(center, viewer);
-        const SferaEffectVec3F right = vec_scale(vec_normalized(vec_cross(to_viewer, {0.0f, 0.0f, -1.0f}), {1.0f, 0.0f, 0.0f}), particle.half_width);
-        const SferaEffectVec3F up = vec_scale(vec_normalized(vec_cross(right, to_viewer), {0.0f, 0.0f, 1.0f}), particle.half_width);
+        SferaEffectVec3F right{}, up{};
+        build_y_up_billboard_axes(to_viewer, particle.half_width, particle.half_width, right, up);
         const SferaEffectVec3F left_center = vec_sub(center, right);
         const SferaEffectVec3F right_center = vec_add(center, right);
         slot->position[0] = vec_sub(left_center, up);
@@ -1939,17 +1960,365 @@ void CLightEffect::setParameter(const SferaEffectParameter* parameters, std::uin
     }
 }
 void CLightEffect::destroyEffect(bool free_storage) { g_sfera_light_runtime.release(field_78); field_78 = -1; field_74 = 0u; IEffect::destroyEffect(free_storage); }
-void IOutputDevice::write(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void COutputLogDevice::write(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0042E3F0); }
-void CSphereError::write(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0042E430); }
-void GrassMapMngr::loadGrassMap(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_00430AC0); }
-void HyperTextElement::elementType(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0041FBB0); }
-void CItem::resetItem(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0042B7D0); }
-void CItem::releaseItem(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0042B7D0); }
-void CItemListCommonItem::resetItem(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_00447DD0); }
-void CBaseManagerCommonItem::handleInsert(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0043B130); }
-void CBaseManagerCommonItem::handleRemove(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0043B130); }
-void CBaseManagerCommonItem::findItem(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004219F0); }
+IOutputDevice::IOutputDevice() { buffer = static_cast<char*>(g_sfera_std_allocator.allocate(0x4000u, 0u)); if (buffer != nullptr) buffer[0] = '\0'; }
+IOutputDevice::~IOutputDevice() { g_sfera_std_allocator.deallocate(buffer); buffer = nullptr; }
+COutputLogDevice::~COutputLogDevice() { g_sfera_std_allocator.deallocate(filename); filename = nullptr; }
+void COutputLogDevice::setFilename(const char* path) {
+    g_sfera_std_allocator.deallocate(filename);
+    filename = nullptr;
+    if (path == nullptr || *path == '\0') return;
+    const std::size_t length = std::strlen(path) + 1u;
+    filename = static_cast<char*>(g_sfera_std_allocator.allocate(length, 0u));
+    if (filename == nullptr) return;
+    std::memcpy(filename, path, length);
+    FILE* file = nullptr;
+    if (fopen_s(&file, filename, "wt") == 0 && file != nullptr) {
+        std::time_t now = std::time(nullptr);
+        char created_at[32]{};
+        if (ctime_s(created_at, sizeof(created_at), &now) != 0) created_at[0] = '\0';
+        std::fprintf(file, "Sphere log file\nCreated: %s\n", created_at);
+        std::fclose(file);
+    }
+}
+void COutputLogDevice::write(const char* text) { if (filename == nullptr || text == nullptr) return; FILE* file = nullptr; if (fopen_s(&file, filename, "a+t") == 0 && file != nullptr) { std::fprintf(file, "- %s\n", text); std::fclose(file); } }
+void CSphereError::write(const char* text) {
+    if (g_sfera_view_motion_runtime.initialized != 0u) { set_system_cursor_visibility(true); ::MessageBoxA(main_window_handle(), "Reenter in exit_msg detected!", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); }
+    g_sfera_view_motion_runtime.initialized = 1u;
+    std::snprintf(g_sfera_error_message_scratch_runtime.fatal_message, sizeof(g_sfera_error_message_scratch_runtime.fatal_message), "ServerN=%d  %s", static_cast<int>(g_sfera_recovered_static_runtime.server_number), text == nullptr ? "" : text);
+    set_system_cursor_visibility(true);
+    ::MessageBoxA(main_window_handle(), g_sfera_error_message_scratch_runtime.fatal_message, "Error", MB_OK | MB_ICONERROR);
+    ::ExitProcess(0u);
+}
+void GrassMapMngr::loadGrassMap(const std::uint16_t* tile, void* destination) {
+    if (tile == nullptr || destination == nullptr) return;
+    const std::int32_t x = static_cast<std::int8_t>(*tile & 255u);
+    const std::uint32_t y = static_cast<std::uint8_t>(*tile >> 8u);
+    char filename[64]{};
+    std::snprintf(filename, sizeof(filename), "Landscape\\GrassMap\\GrassMap_%02d_%02u.bin", x, y);
+    std::ifstream stream(filename, std::ios::binary);
+    if (!stream.is_open() && g_sfera_file_runtime.search_paths.data != 0u) {
+        const auto* paths = SferaAbi::pointer<const std::uint32_t>(g_sfera_file_runtime.search_paths.data);
+        const std::uint32_t count = std::min(g_sfera_file_runtime.search_path_count, g_sfera_file_runtime.search_paths.capacity);
+        for (std::uint32_t index = 0u; index < count && !stream.is_open(); ++index) {
+            const char* prefix = SferaAbi::pointer<const char>(paths[index]);
+            if (prefix == nullptr) continue;
+            stream = std::ifstream(std::string(prefix) + filename, std::ios::binary);
+        }
+    }
+    if (stream.is_open()) stream.read(static_cast<char*>(destination), 65536);
+}
+SferaHashMap* SferaHashMap::initialize(std::uint32_t maximum_key_length, bool keys_case_sensitive, std::int32_t initial_capacity, std::uint32_t hash_bucket_count, StdAllocator* storage_allocator) {
+    if (initial_capacity < 0 || maximum_key_length == 0u || hash_bucket_count == 0u || (hash_bucket_count & (hash_bucket_count - 1u)) != 0u) return nullptr;
+    g_sfera_string_lookup_runtime.initialize();
+    if (storage_allocator == nullptr) storage_allocator = &g_sfera_std_allocator;
+    allocator = SferaAbi::address(storage_allocator);
+    invalid_entry = 0xFFFFu;
+    case_sensitive = keys_case_sensitive ? 1u : 0u;
+    max_key_length = maximum_key_length;
+    bucket_count = hash_bucket_count;
+    entry_stride = maximum_key_length + 11u;
+    free_entry = 0u;
+    result_pointer = 0u;
+    field_2c = 0u;
+    field_28 = 0u;
+    entry_capacity = initial_capacity == 0 ? std::max<std::uint32_t>(((hash_bucket_count * 2u) >> 3u) / entry_stride, 20u) : static_cast<std::uint32_t>(initial_capacity);
+    entries = SferaAbi::address(storage_allocator->allocate(static_cast<std::size_t>(entry_stride) * entry_capacity, 0u));
+    key_buffer = SferaAbi::address(storage_allocator->allocate(maximum_key_length, 0u));
+    buckets = SferaAbi::address(storage_allocator->allocate(static_cast<std::size_t>(hash_bucket_count) * sizeof(std::uint16_t), 0u));
+    if (auto* bucket_table = SferaAbi::pointer<std::uint16_t>(buckets)) std::memset(bucket_table, 0xFF, static_cast<std::size_t>(hash_bucket_count) * sizeof(std::uint16_t));
+    for (std::uint32_t index = 0u; index < entry_capacity; ++index) { Entry* record = entry(static_cast<std::uint16_t>(index)); if (record == nullptr) break; record->key_length = 0u; record->next = index + 1u < entry_capacity ? static_cast<std::uint16_t>(index + 1u) : invalid_entry; }
+    return this;
+}
+SferaHashMap::Entry* SferaHashMap::entry(std::uint16_t index) {
+    auto* storage = SferaAbi::pointer<std::uint8_t>(entries);
+    return storage == nullptr || index == invalid_entry ? nullptr : reinterpret_cast<Entry*>(storage + static_cast<std::size_t>(index) * entry_stride);
+}
+const SferaHashMap::Entry* SferaHashMap::entry(std::uint16_t index) const {
+    const auto* storage = SferaAbi::pointer<const std::uint8_t>(entries);
+    return storage == nullptr || index == invalid_entry ? nullptr : reinterpret_cast<const Entry*>(storage + static_cast<std::size_t>(index) * entry_stride);
+}
+std::uint32_t SferaHashMap::findEntry(const char* key, std::uint32_t length, bool normalize_case) {
+    if (key == nullptr || length > max_key_length || bucket_count == 0u) return 0xFFFFFFFFu;
+    g_sfera_string_lookup_runtime.initialize();
+    auto* normalized_key = SferaAbi::pointer<std::uint8_t>(key_buffer);
+    auto* bucket_table = SferaAbi::pointer<std::uint16_t>(buckets);
+    if (normalized_key == nullptr || bucket_table == nullptr) return 0xFFFFFFFFu;
+    hash_value = 0u;
+    for (std::uint32_t index = 0u; index < length; ++index) { std::uint8_t byte = static_cast<std::uint8_t>(key[index]); if (normalize_case) byte = g_sfera_string_lookup_runtime.case_fold[byte]; normalized_key[index] = byte; hash_value = static_cast<std::uint16_t>((hash_value >> 1u) + g_sfera_string_lookup_runtime.hash_mix[byte]); }
+    hash_value = static_cast<std::uint16_t>(hash_value & static_cast<std::uint16_t>(bucket_count - 1u));
+    current_index = bucket_table[hash_value];
+    previous_entry = 0u;
+    Entry* current = entry(current_index);
+    if (current == nullptr) return 0xFFFFFFFFu;
+    current_entry = SferaAbi::address(current);
+    next_index = current->next;
+    while (current->key_length != length || std::memcmp(normalized_key, current->key, length) != 0) {
+        if (next_index == invalid_entry) return 0xFFFFFFFFu;
+        previous_entry = current_entry;
+        current_index = next_index;
+        current = entry(current_index);
+        if (current == nullptr) return 0xFFFFFFFFu;
+        current_entry = SferaAbi::address(current);
+        next_index = current->next;
+    }
+    if (previous_entry != 0u) { Entry* previous = SferaAbi::pointer<Entry>(previous_entry); if (previous != nullptr) previous->next = current->next; current->next = bucket_table[hash_value]; bucket_table[hash_value] = current_index; }
+    return current_index;
+}
+std::uint32_t SferaHashMap::findValue(const char* key) {
+    if (key == nullptr) return field_28;
+    const std::size_t length = std::strlen(key);
+    if (length > max_key_length) return field_28;
+    const std::uint32_t index = findEntry(key, static_cast<std::uint32_t>(length), case_sensitive == 0u);
+    const Entry* found = index == 0xFFFFFFFFu ? nullptr : entry(static_cast<std::uint16_t>(index));
+    return found == nullptr ? field_28 : found->value;
+}
+bool SferaHashMap::erase(const char* key, std::uint32_t length) {
+    if (auto* result = SferaAbi::pointer<std::uint32_t>(result_pointer)) *result = 0u;
+    if (key == nullptr) return false;
+    bool normalize_case = false;
+    if (length == 0u) { length = static_cast<std::uint32_t>(std::strlen(key)); normalize_case = case_sensitive == 0u; }
+    if (length > max_key_length || findEntry(key, length, normalize_case) == 0xFFFFFFFFu) return false;
+    Entry* current = SferaAbi::pointer<Entry>(current_entry);
+    if (current == nullptr) return false;
+    current->key_length = 0u;
+    if (previous_entry != 0u) { if (Entry* previous = SferaAbi::pointer<Entry>(previous_entry)) previous->next = next_index; } else if (auto* bucket_table = SferaAbi::pointer<std::uint16_t>(buckets)) bucket_table[hash_value] = next_index;
+    current->next = free_entry;
+    free_entry = current_index;
+    return true;
+}
+std::uint32_t SferaHashMap::insert(const char* key, std::uint32_t length, const std::uint32_t* value) {
+    if (auto* result = SferaAbi::pointer<std::uint32_t>(result_pointer)) *result = 0u;
+    if (key == nullptr) return 0xFFFFFFFFu;
+    bool normalize_case = false;
+    if (length == 0u) { length = static_cast<std::uint32_t>(std::strlen(key)); normalize_case = case_sensitive == 0u; }
+    if (length > max_key_length || findEntry(key, length, normalize_case) != 0xFFFFFFFFu) return 0xFFFFFFFFu;
+    if (free_entry == invalid_entry) {
+        if (entry_capacity == invalid_entry) return 0xFFFFFFFFu;
+        const std::uint32_t old_capacity = entry_capacity;
+        std::uint32_t growth = std::max<std::uint32_t>(entry_capacity / 2u, 10u);
+        entry_capacity = std::min<std::uint32_t>(entry_capacity + growth, invalid_entry);
+        growth = entry_capacity - old_capacity;
+        free_entry = static_cast<std::uint16_t>(old_capacity);
+        StdAllocator* storage_allocator = SferaAbi::pointer<StdAllocator>(allocator);
+        if (storage_allocator == nullptr) storage_allocator = &g_sfera_std_allocator;
+        void* replacement = storage_allocator->reallocate(SferaAbi::pointer<void>(entries), static_cast<std::size_t>(entry_capacity) * entry_stride, 0u);
+        if (replacement == nullptr) return 0xFFFFFFFFu;
+        entries = SferaAbi::address(replacement);
+        for (std::uint32_t offset = 0u; offset < growth; ++offset) { Entry* record = entry(static_cast<std::uint16_t>(old_capacity + offset)); record->key_length = 0u; record->next = offset + 1u < growth ? static_cast<std::uint16_t>(old_capacity + offset + 1u) : invalid_entry; }
+    }
+    const std::uint16_t inserted_index = free_entry;
+    Entry* record = entry(inserted_index);
+    const auto* normalized_key = SferaAbi::pointer<const std::uint8_t>(key_buffer);
+    auto* bucket_table = SferaAbi::pointer<std::uint16_t>(buckets);
+    if (record == nullptr || normalized_key == nullptr || bucket_table == nullptr) return 0xFFFFFFFFu;
+    std::memcpy(record->key, normalized_key, length);
+    record->key[length] = 0u;
+    free_entry = record->next;
+    if (value != nullptr) record->value = *value;
+    record->key_length = length;
+    record->next = bucket_table[hash_value];
+    bucket_table[hash_value] = inserted_index;
+    return inserted_index;
+}
+void SferaHashMap::releaseStorage() {
+    StdAllocator* storage_allocator = SferaAbi::pointer<StdAllocator>(allocator);
+    if (storage_allocator == nullptr) storage_allocator = &g_sfera_std_allocator;
+    storage_allocator->deallocate(SferaAbi::pointer<void>(entries));
+    storage_allocator->deallocate(SferaAbi::pointer<void>(key_buffer));
+    storage_allocator->deallocate(SferaAbi::pointer<void>(buckets));
+    entries = 0u;
+    key_buffer = 0u;
+    buckets = 0u;
+}
+void CItem::resetItem() {}
+void CItem::releaseItem() {}
+std::int32_t CItemListCommonItem::initialize(std::int32_t minimum, std::int32_t, std::uint32_t mode, const char* list_name, std::uint32_t parameter) {
+    minimum_items = static_cast<std::uint32_t>(minimum);
+    capacity = 30u;
+    item_count = 0u;
+    list_mode = mode;
+    item_parameter = parameter;
+    diagnostics_mode = 0u;
+    std::memset(name, 0, sizeof(name));
+    if (list_name != nullptr) std::memcpy(name, list_name, std::min<std::size_t>(std::strlen(list_name), sizeof(name) - 1u));
+    auto* index = static_cast<SferaHashMap*>(g_sfera_std_allocator.allocate(sizeof(SferaHashMap), 0u));
+    if (index != nullptr) { std::construct_at(index); index->initialize(sizeof(name), true, 0, 256u, nullptr); index->field_28 = 0xFFFFFFFFu; }
+    item_index = SferaAbi::address(index);
+    auto* storage = static_cast<CCommonItem*>(g_sfera_std_allocator.allocate(static_cast<std::size_t>(capacity) * sizeof(CCommonItem), 0u));
+    item_storage = SferaAbi::address(storage);
+    if (storage == nullptr) return -14;
+    std::memset(storage, 0, static_cast<std::size_t>(capacity) * sizeof(CCommonItem));
+    return 0;
+}
+std::int32_t CBaseManagerCommonItem::initialize(std::int32_t minimum, std::int32_t, std::uint32_t mode, const char* list_name, std::uint32_t parameter) {
+    minimum_items = static_cast<std::uint32_t>(minimum);
+    capacity = 30u;
+    item_count = 0u;
+    list_mode = mode;
+    item_parameter = parameter;
+    diagnostics_mode = 0u;
+    std::memset(name, 0, sizeof(name));
+    if (list_name != nullptr) std::memcpy(name, list_name, std::min<std::size_t>(std::strlen(list_name), sizeof(name) - 1u));
+    auto* index = static_cast<SferaHashMap*>(g_sfera_std_allocator.allocate(sizeof(SferaHashMap), 0u));
+    if (index != nullptr) { std::construct_at(index); index->initialize(sizeof(name), true, 0, 256u, nullptr); index->field_28 = 0xFFFFFFFFu; }
+    item_index = SferaAbi::address(index);
+    auto* storage = static_cast<CItemListCommonItem*>(g_sfera_std_allocator.allocate(static_cast<std::size_t>(capacity) * sizeof(CItemListCommonItem), 0u));
+    item_storage = SferaAbi::address(storage);
+    if (storage == nullptr) return -14;
+    std::memset(storage, 0, static_cast<std::size_t>(capacity) * sizeof(CItemListCommonItem));
+    return 0;
+}
+CCommonItem* CItemListCommonItem::findStoredItem(const CItem* key) {
+    if (key == nullptr) return nullptr;
+    SferaHashMap* index = SferaAbi::pointer<SferaHashMap>(item_index);
+    CCommonItem* storage = SferaAbi::pointer<CCommonItem>(item_storage);
+    if (index == nullptr || storage == nullptr) return nullptr;
+    const std::uint32_t slot = index->findValue(key->name);
+    return slot == 0xFFFFFFFFu || slot >= capacity ? nullptr : storage + slot;
+}
+CCommonItem* CItemListCommonItem::firstItem() {
+    CCommonItem* storage = SferaAbi::pointer<CCommonItem>(item_storage);
+    if (storage == nullptr) { iterator_index = -1; return nullptr; }
+    for (std::uint32_t index = 0u; index < capacity; ++index) if (storage[index].active == 1u) { iterator_index = static_cast<std::int32_t>(index); return storage + index; }
+    iterator_index = -1;
+    return nullptr;
+}
+CCommonItem* CItemListCommonItem::nextItem() {
+    CCommonItem* storage = SferaAbi::pointer<CCommonItem>(item_storage);
+    if (storage == nullptr || iterator_index < 0) return nullptr;
+    for (std::uint32_t index = static_cast<std::uint32_t>(iterator_index) + 1u; index < capacity; ++index) if (storage[index].active == 1u) { iterator_index = static_cast<std::int32_t>(index); return storage + index; }
+    return nullptr;
+}
+std::int32_t CItemListCommonItem::addItem(const CCommonItem* item) {
+    if (item == nullptr) return -3;
+    if (item_count == capacity) {
+        const std::uint32_t growth = std::max<std::uint32_t>(capacity / 4u, 50u);
+        auto* storage = static_cast<CCommonItem*>(g_sfera_std_allocator.reallocate(SferaAbi::pointer<void>(item_storage), static_cast<std::size_t>(capacity + growth) * sizeof(CCommonItem), 0u));
+        item_storage = SferaAbi::address(storage);
+        if (storage == nullptr) return -20;
+        std::memset(storage + capacity, 0, static_cast<std::size_t>(growth) * sizeof(CCommonItem));
+        capacity += growth;
+    }
+    SferaHashMap* index = SferaAbi::pointer<SferaHashMap>(item_index);
+    CCommonItem* storage = SferaAbi::pointer<CCommonItem>(item_storage);
+    if (index == nullptr || storage == nullptr) return -3;
+    const std::uint32_t existing_slot = index->findValue(item->name);
+    if (existing_slot != 0xFFFFFFFFu) {
+        if (existing_slot >= capacity) return -105;
+        CCommonItem* destination = storage + existing_slot;
+        std::construct_at(destination);
+        *destination = *item;
+        destination->active = 1u;
+        return -105;
+    }
+    std::uint32_t slot = 0u;
+    while (slot < capacity && storage[slot].active != 0u) ++slot;
+    if (slot == capacity) return 0;
+    if (index->insert(item->name, 0u, &slot) == 0xFFFFFFFFu) return -3;
+    CCommonItem* destination = storage + slot;
+    std::construct_at(destination);
+    *destination = *item;
+    destination->active = 1u;
+    ++item_count;
+    return 0;
+}
+std::int32_t CItemListCommonItem::removeItem(const CItem* key) {
+    if (key == nullptr) return -8;
+    SferaHashMap* index = SferaAbi::pointer<SferaHashMap>(item_index);
+    CCommonItem* storage = SferaAbi::pointer<CCommonItem>(item_storage);
+    if (index == nullptr || storage == nullptr) return -8;
+    const std::uint32_t slot = index->findValue(key->name);
+    if (slot == 0xFFFFFFFFu || slot >= capacity) return -8;
+    if (!index->erase(key->name, 0u)) return -9;
+    CCommonItem* removed = storage + slot;
+    removed->active = 0u;
+    removed->resetItem();
+    --item_count;
+    return static_cast<std::int32_t>(item_count) < static_cast<std::int32_t>(minimum_items) ? -6 : 0;
+}
+CItemListCommonItem* CBaseManagerCommonItem::findStoredList(const CItem* key) {
+    if (key == nullptr) return nullptr;
+    SferaHashMap* index = SferaAbi::pointer<SferaHashMap>(item_index);
+    CItemListCommonItem* storage = SferaAbi::pointer<CItemListCommonItem>(item_storage);
+    if (index == nullptr || storage == nullptr) return nullptr;
+    const std::uint32_t slot = index->findValue(key->name);
+    return slot == 0xFFFFFFFFu || slot >= capacity ? nullptr : storage + slot;
+}
+CCommonItem* CBaseManagerCommonItem::selectItem(CCommonItem* output, const char* list_name, std::int32_t field_ac_filter, std::int32_t field_a8_filter, std::int32_t field_b0_filter) {
+    if (output == nullptr) return nullptr;
+    CCommonItem empty; empty.name[0] = '\0'; empty.active = 0u;
+    CItem key; strncpy_s(key.name, sizeof(key.name), list_name == nullptr ? "" : list_name, _TRUNCATE); key.active = 0u;
+    CItemListCommonItem* list = findStoredList(&key);
+    CCommonItem* selected = &empty;
+    if (list != nullptr && (field_ac_filter != -1 || field_a8_filter != -1 || field_b0_filter != -1)) {
+        auto matches = [field_ac_filter, field_a8_filter, field_b0_filter](const CCommonItem& item) { return (field_ac_filter == -1 || item.field_ac == static_cast<std::uint32_t>(field_ac_filter)) && (field_a8_filter == -1 || item.field_a8 == static_cast<std::uint32_t>(field_a8_filter)) && (field_b0_filter == -1 || item.field_b0 == static_cast<std::uint32_t>(field_b0_filter)); };
+        std::uint32_t match_count = 0u;
+        for (CCommonItem* item = list->firstItem(); item != nullptr; item = list->nextItem()) if (matches(*item)) ++match_count;
+        if (match_count != 0u) {
+            std::uint32_t target = static_cast<std::uint32_t>(std::rand()) % match_count;
+            for (CCommonItem* item = list->firstItem(); item != nullptr; item = list->nextItem()) if (matches(*item) && target-- == 0u) { selected = item; break; }
+        }
+    }
+    std::construct_at(output); *output = *selected; return output;
+}
+std::int32_t CBaseManagerCommonItem::addList(const CItemListCommonItem* list) {
+    if (list == nullptr) return -3;
+    if (item_count == capacity) {
+        const std::uint32_t growth = std::max<std::uint32_t>(capacity / 4u, 50u);
+        auto* storage = static_cast<CItemListCommonItem*>(g_sfera_std_allocator.reallocate(SferaAbi::pointer<void>(item_storage), static_cast<std::size_t>(capacity + growth) * sizeof(CItemListCommonItem), 0u));
+        item_storage = SferaAbi::address(storage);
+        if (storage == nullptr) return -20;
+        std::memset(storage + capacity, 0, static_cast<std::size_t>(growth) * sizeof(CItemListCommonItem));
+        capacity += growth;
+    }
+    SferaHashMap* index = SferaAbi::pointer<SferaHashMap>(item_index);
+    CItemListCommonItem* storage = SferaAbi::pointer<CItemListCommonItem>(item_storage);
+    if (index == nullptr || storage == nullptr) return -3;
+    const std::uint32_t existing_slot = index->findValue(list->name);
+    if (existing_slot != 0xFFFFFFFFu) {
+        if (existing_slot >= capacity) return -105;
+        CItemListCommonItem* destination = storage + existing_slot;
+        std::construct_at(destination);
+        *destination = *list;
+        destination->active = 1u;
+        return -105;
+    }
+    std::uint32_t slot = 0u;
+    while (slot < capacity && storage[slot].active != 0u) ++slot;
+    if (slot == capacity) return 0;
+    if (index->insert(list->name, 0u, &slot) == 0xFFFFFFFFu) return -3;
+    CItemListCommonItem* destination = storage + slot;
+    std::construct_at(destination);
+    *destination = *list;
+    destination->active = 1u;
+    ++item_count;
+    return 0;
+}
+std::int32_t CBaseManagerCommonItem::removeList(const CItem* key) {
+    if (key == nullptr) return -8;
+    SferaHashMap* index = SferaAbi::pointer<SferaHashMap>(item_index);
+    CItemListCommonItem* storage = SferaAbi::pointer<CItemListCommonItem>(item_storage);
+    if (index == nullptr || storage == nullptr) return -8;
+    const std::uint32_t slot = index->findValue(key->name);
+    if (slot == 0xFFFFFFFFu || slot >= capacity) return -8;
+    if (!index->erase(key->name, 0u)) return -9;
+    CItemListCommonItem* removed = storage + slot;
+    removed->active = 0u;
+    removed->resetItem();
+    --item_count;
+    return static_cast<std::int32_t>(item_count) < static_cast<std::int32_t>(minimum_items) ? -6 : 0;
+}
+void CItemListCommonItem::resetItem() {
+    std::memset(name, 0, sizeof(name));
+    g_sfera_std_allocator.deallocate(SferaAbi::pointer<void>(item_storage));
+    if (auto* index = SferaAbi::pointer<SferaHashMap>(item_index)) {
+        index->releaseStorage();
+        g_sfera_std_allocator.deallocate(index);
+    }
+}
+std::int32_t CBaseManagerCommonItem::handleInsert(CItemListCommonItem*, CCommonItem*, CCommonItem*) { return 0; }
+std::int32_t CBaseManagerCommonItem::handleRemove(CItemListCommonItem*, CCommonItem*, CCommonItem*) { return 0; }
+CItem* CBaseManagerCommonItem::findItem(CItem*) { return nullptr; }
 bool NatureRainListener::onEffectAttached(IEffect& effect, SferaActiveEffect&, float) {
     return sfera_nature_manager() != nullptr && sfera_nature_manager()->attachRainEffect(effect);
 }
@@ -1969,224 +2338,136 @@ bool LightingListener::onEffectDetached(IEffect&, SferaActiveEffect&) {
 void LightingListener::onEffectChanged(std::uint32_t, IEffect& effect, SferaActiveEffect& item) {
     if (auto* manager = sfera_nature_manager()) manager->onLightingEffectChanged(effect, item);
 }
-void CSoundFX::play(LiftCpu* cpu) {
-    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<CSound*>(this)->CSound::Play(static_cast<int>(*ptr32<const std::uint32_t>(cpu->esp))));
-    cpu->esp += 4u;
+int CSoundFX::play(int mode) { return reinterpret_cast<CSound*>(this)->CSound::Play(mode); }
+void CSoundFX::stop() { reinterpret_cast<CSound*>(this)->CSound::Stop(); }
+int CSoundFX::rewind() { return reinterpret_cast<CSound*>(this)->CSound::Rewind(); }
+CHardwareCursor::CHardwareCursor() { set_system_cursor_visibility(false); }
+void CHardwareCursor::destroy(bool free_storage) { if (clip_enabled != 0u) { ::ClipCursor(nullptr); clip_enabled = 0u; } if (cursor_handle != 0u) { ::DestroyCursor(reinterpret_cast<HCURSOR>(static_cast<std::uintptr_t>(cursor_handle))); cursor_handle = 0u; } this->~CHardwareCursor(); if (free_storage) g_sfera_std_allocator.deallocate(this); }
+void CHardwareCursor::copyStateFrom(const CCursor* previous) { SferaCursorPosition position{}; if (previous != nullptr) { saved_system_visible = previous->isSystemCursorVisible() ? 1u : 0u; kind = previous->cursorKind(); previous->getPosition(&position); } else { saved_system_visible = 1u; kind = 255u; getPosition(&position); } saved_x = position.x; saved_y = position.y; }
+void CHardwareCursor::activate() { setSystemCursorVisible(saved_system_visible != 0u); setCursorKind(kind); setPosition(saved_x, saved_y); }
+void CHardwareCursor::deactivate() { set_system_cursor_visibility(false); }
+void CHardwareCursor::apply() { ::SetCursor(reinterpret_cast<HCURSOR>(static_cast<std::uintptr_t>(cursor_handle))); }
+void CHardwareCursor::updatePosition() {}
+SferaCursorPosition* CHardwareCursor::getPosition(SferaCursorPosition* output) const { if (output == nullptr) return nullptr; if (g_sfera_texture_cache_runtime.cache_enabled != 0u) { POINT point{}; ::GetCursorPos(&point); ::ScreenToClient(main_window_handle(), &point); output->x = point.x; output->y = point.y; } else { output->x = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width / 2u); output->y = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height / 2u); } return output; }
+void CHardwareCursor::setPosition(std::int32_t x, std::int32_t y) { if (g_sfera_texture_cache_runtime.cache_enabled == 0u) return; POINT point{static_cast<LONG>(x), static_cast<LONG>(y)}; ::ClientToScreen(main_window_handle(), &point); ::SetCursorPos(point.x, point.y); }
+void CHardwareCursor::show() { const bool enabled = cursor_uses_center_clip(kind); if ((clip_enabled != 0u) == enabled) return; if (enabled && g_sfera_texture_cache_runtime.cache_enabled != 0u) { POINT point{static_cast<LONG>(g_sfera_graphics_runtime.display_width / 2u), static_cast<LONG>(g_sfera_graphics_runtime.display_height / 2u)}; ::ClientToScreen(main_window_handle(), &point); RECT rectangle{point.x, point.y, point.x + 1, point.y + 1}; ::ClipCursor(&rectangle); } else { ::ClipCursor(nullptr); } clip_enabled = enabled ? 1u : 0u; }
+bool CHardwareCursor::isInsideViewport() const { SferaCursorPosition position{}; getPosition(&position); return position.x >= 0 && position.x < static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width) && position.y >= 0 && position.y < static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height); }
+bool CHardwareCursor::isSystemCursorVisible() const { ::ShowCursor(FALSE); return ::ShowCursor(TRUE) >= 0; }
+void CHardwareCursor::setSystemCursorVisible(bool visible) { set_system_cursor_visibility(visible); }
+std::uint32_t CHardwareCursor::cursorKind() const { return kind; }
+void CHardwareCursor::setCursorKind(std::uint32_t new_kind) {
+    kind = new_kind;
+    show();
+    if (cursor_handle != 0u) { ::DestroyCursor(reinterpret_cast<HCURSOR>(static_cast<std::uintptr_t>(cursor_handle))); cursor_handle = 0u; }
+    texture_width = 0u;
+    texture_height = 0u;
+    const char* name = new_kind < 4u ? sfera_cursor_texture_name(new_kind) : nullptr;
+    if (name == nullptr) { apply(); return; }
+    char relative_path[128]{};
+    std::snprintf(relative_path, sizeof(relative_path), "textures\\cursors\\%s.bmp", name);
+    HBITMAP color_bitmap = static_cast<HBITMAP>(::LoadImageA(nullptr, relative_path, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION));
+    if (color_bitmap == nullptr && g_sfera_file_runtime.search_paths.data != 0u) {
+        const auto* paths = SferaAbi::pointer<const std::uint32_t>(g_sfera_file_runtime.search_paths.data);
+        const std::uint32_t count = std::min(g_sfera_file_runtime.search_path_count, g_sfera_file_runtime.search_paths.capacity);
+        for (std::uint32_t index = 0u; index < count && color_bitmap == nullptr; ++index) {
+            const char* prefix = SferaAbi::pointer<const char>(paths[index]);
+            if (prefix == nullptr) continue;
+            std::string full_path(prefix);
+            full_path += relative_path;
+            color_bitmap = static_cast<HBITMAP>(::LoadImageA(nullptr, full_path.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION));
+        }
+    }
+    if (color_bitmap == nullptr) { ::MessageBoxA(main_window_handle(), "CreateCursor(): failed to load cursor image from file", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); }
+    BITMAP bitmap{};
+    if (::GetObjectA(color_bitmap, sizeof(bitmap), &bitmap) == 0 || bitmap.bmWidth != 32 || bitmap.bmHeight != 32 || bitmap.bmBitsPixel != 32 || bitmap.bmBits == nullptr) { ::DeleteObject(color_bitmap); ::MessageBoxA(main_window_handle(), "CreateCursor(): invalid cursor image format", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); }
+    texture_width = static_cast<std::uint32_t>(bitmap.bmWidth);
+    texture_height = static_cast<std::uint32_t>(bitmap.bmHeight);
+    const std::size_t mask_stride = (static_cast<std::size_t>(bitmap.bmWidth) + 15u) / 16u * 2u;
+    std::vector<std::uint8_t> mask_bits(mask_stride * static_cast<std::size_t>(bitmap.bmHeight), 0u);
+    const auto* pixels = static_cast<const std::uint32_t*>(bitmap.bmBits);
+    for (LONG y = 0; y < bitmap.bmHeight; ++y) for (LONG x = 0; x < bitmap.bmWidth; ++x) if ((pixels[static_cast<std::size_t>(y) * bitmap.bmWidth + x] & 0xFF000000u) == 0u) mask_bits[static_cast<std::size_t>(y) * mask_stride + static_cast<std::size_t>(x) / 8u] |= static_cast<std::uint8_t>(0x80u >> (x & 7));
+    HBITMAP mask_bitmap = ::CreateBitmap(bitmap.bmWidth, bitmap.bmHeight, 1u, 1u, mask_bits.data());
+    if (mask_bitmap == nullptr) { ::DeleteObject(color_bitmap); ::MessageBoxA(main_window_handle(), "CreateCursor(): failed to create cursor mask", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); }
+    const bool centered = cursor_uses_center_clip(new_kind);
+    ICONINFO info{};
+    info.fIcon = FALSE;
+    info.xHotspot = centered ? texture_width / 2u : 0u;
+    info.yHotspot = centered ? texture_height / 2u : 0u;
+    info.hbmMask = mask_bitmap;
+    info.hbmColor = color_bitmap;
+    HCURSOR created = static_cast<HCURSOR>(::CreateIconIndirect(&info));
+    ::DeleteObject(mask_bitmap);
+    ::DeleteObject(color_bitmap);
+    if (created == nullptr) { ::MessageBoxA(main_window_handle(), "CreateCursor(): failed to create cursor", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); }
+    cursor_handle = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(created));
+    apply();
 }
-void CSoundFX::stop(LiftCpu*) {
-    reinterpret_cast<CSound*>(this)->CSound::Stop();
+CSoftwareCursor::CSoftwareCursor() { x = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width / 2u); y = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height / 2u); }
+void CSoftwareCursor::destroy(bool free_storage) { this->~CSoftwareCursor(); if (free_storage) g_sfera_std_allocator.deallocate(this); }
+void CSoftwareCursor::copyStateFrom(const CCursor* previous) { if (previous != nullptr) { SferaCursorPosition position{}; saved_system_visible = previous->isSystemCursorVisible() ? 1u : 0u; saved_kind = previous->cursorKind(); previous->getPosition(&position); saved_x = position.x; saved_y = position.y; } else { saved_system_visible = 1u; saved_kind = 255u; saved_x = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width / 2u); saved_y = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height / 2u); } }
+void CSoftwareCursor::activate() { if (auto* mouse = mouse_input_device()) { mouse->Unacquire(); const HRESULT result = mouse->SetCooperativeLevel(main_window_handle(), DISCL_EXCLUSIVE | DISCL_FOREGROUND); if (FAILED(result)) { ::MessageBoxA(main_window_handle(), "CSoftwareCursor::Activate(): SetCooperativeLevel() failed", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); } mouse->Acquire(); } setSystemCursorVisible(saved_system_visible != 0u); setCursorKind(saved_kind); setPosition(saved_x, saved_y); }
+void CSoftwareCursor::deactivate() { if (auto* mouse = mouse_input_device()) { mouse->Unacquire(); const HRESULT result = mouse->SetCooperativeLevel(main_window_handle(), DISCL_NONEXCLUSIVE | DISCL_FOREGROUND); if (FAILED(result)) { ::MessageBoxA(main_window_handle(), "CSoftwareCursor::Deactivate(): SetCooperativeLevel() failed", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); } mouse->Acquire(); } setSystemCursorVisible(true); setCursorKind(255u); }
+void CSoftwareCursor::apply() {}
+void CSoftwareCursor::updatePosition() { if (active == 0u) return; x += static_cast<std::int32_t>(std::trunc(static_cast<double>(g_sfera_main_input_state_runtime.cursor_x) * 1.5)); y += static_cast<std::int32_t>(std::trunc(static_cast<double>(g_sfera_main_input_state_runtime.cursor_y) * 1.5)); }
+SferaCursorPosition* CSoftwareCursor::getPosition(SferaCursorPosition* output) const { if (output == nullptr) return nullptr; output->x = x; output->y = y; return output; }
+void CSoftwareCursor::setPosition(std::int32_t new_x, std::int32_t new_y) { x = new_x; y = new_y; }
+void CSoftwareCursor::show() { const std::int32_t width = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width); const std::int32_t height = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height); auto* mouse = mouse_input_device(); if (active != 0u) { const bool outside = x < 0 || x >= width || y < 0 || y >= height; if (outside || g_sfera_texture_cache_runtime.cache_enabled == 0u) { if (!cursor_uses_center_clip(cursorKind())) { if (mouse != nullptr) mouse->Unacquire(); set_system_cursor_visibility(true); POINT point{x, y}; ::ClientToScreen(main_window_handle(), &point); ::SetCursorPos(point.x, point.y); active = 0u; } } if (width > 0) x = std::clamp(x, 0, width - 1); if (height > 0) y = std::clamp(y, 0, height - 1); return; } POINT point{}; ::GetCursorPos(&point); ::ScreenToClient(main_window_handle(), &point); if (point.x < 0 || point.x >= width || point.y < 0 || point.y >= height || g_sfera_texture_cache_runtime.cache_enabled == 0u) return; x = point.x; y = point.y; set_system_cursor_visibility(false); if (mouse != nullptr) mouse->Acquire(); active = 1u; }
+bool CSoftwareCursor::isInsideViewport() const { return active != 0u; }
+bool CSoftwareCursor::isSystemCursorVisible() const { const auto* state = interface_cursor(); return state != nullptr && state->system_visible != 0u; }
+void CSoftwareCursor::setSystemCursorVisible(bool visible) { if (auto* state = interface_cursor()) state->system_visible = visible ? 1u : 0u; }
+std::uint32_t CSoftwareCursor::cursorKind() const { const auto* state = interface_cursor(); return state == nullptr ? 255u : state->kind; }
+void CSoftwareCursor::setCursorKind(std::uint32_t new_kind) {
+    auto* state = interface_cursor();
+    if (state != nullptr) { if (new_kind < 4u) { state->kind = static_cast<std::uint8_t>(new_kind); state->software_mode = new_kind >= 2u ? 1u : 0u; } else if (new_kind == 255u) { state->kind = 255u; state->software_mode = 0u; } }
+    texture_width = 0u;
+    texture_height = 0u;
+    const char* name = new_kind < 4u ? sfera_cursor_texture_name(new_kind) : nullptr;
+    if (name == nullptr) return;
+    const std::int32_t index = g_sfera_texture_registry_runtime.findTexture(name);
+    const auto* records = SferaAbi::pointer<const SferaTextureRegistryRecord>(g_sfera_texture_set_scalar_runtime.mode_01);
+    if (records == nullptr || index < 0) return;
+    auto* texture = SferaAbi::pointer<IDirect3DTexture9>(records[index].resource);
+    if (texture == nullptr) return;
+    D3DSURFACE_DESC description{};
+    if (SUCCEEDED(texture->GetLevelDesc(0u, &description))) { texture_width = description.Width; texture_height = description.Height; }
 }
-void CSoundFX::rewind(LiftCpu* cpu) {
-    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<CSound*>(this)->CSound::Rewind());
+void UnmanagedResourceBase::restoreResource() {}
+void UnmanagedResourceBase::releaseResource() { auto* object = SferaAbi::pointer<IUnknown>(resource); if (object == nullptr) return; object->Release(); resource = 0u; }
+void UnmanagedResourceVB::restoreResource() { if (resource != 0u) return; auto* device = d3d9_device(); if (device == nullptr) return; IDirect3DVertexBuffer9* created = nullptr; const HRESULT result = device->CreateVertexBuffer(length, usage, fvf, static_cast<D3DPOOL>(pool), &created, nullptr); store_d3d9_result(result); if (SUCCEEDED(result)) resource = SferaAbi::address(created); }
+void UnmanagedResourceIB::restoreResource() { if (resource != 0u) return; auto* device = d3d9_device(); if (device == nullptr) return; IDirect3DIndexBuffer9* created = nullptr; const HRESULT result = device->CreateIndexBuffer(length, usage, static_cast<D3DFORMAT>(format), static_cast<D3DPOOL>(pool), &created, nullptr); store_d3d9_result(result); if (SUCCEEDED(result)) resource = SferaAbi::address(created); }
+void UnmanagedResourceTexture::restoreResource() { if (resource == 0u) { auto* device = d3d9_device(); if (device != nullptr) { IDirect3DTexture9* created = nullptr; const HRESULT result = D3DXCreateTexture(device, width, height, levels, usage, static_cast<D3DFORMAT>(format), static_cast<D3DPOOL>(pool), &created); store_d3d9_result(result); if (SUCCEEDED(result)) resource = SferaAbi::address(created); } } if (pool != static_cast<std::uint32_t>(D3DPOOL_MANAGED)) restore_marker = 1u; }
+void UnmanagedResourceVector::reserve(std::uint32_t requested_capacity) {
+    if (requested_capacity <= capacity) return;
+    std::uint32_t target_capacity = static_cast<std::uint32_t>(std::trunc(static_cast<double>(growth_factor) * requested_capacity));
+    if (target_capacity - capacity < 10u) target_capacity = capacity + 10u;
+    if (target_capacity < size) target_capacity = size;
+    if (invalidation_target != nullptr) *invalidation_target = 0u;
+    if (allocator == nullptr) return;
+    auto* replacement = static_cast<std::uint32_t*>(allocator->allocate(static_cast<std::size_t>(target_capacity) * sizeof(std::uint32_t), allocation_flags));
+    if (replacement == nullptr) return;
+    if (resources != nullptr && size != 0u) std::memcpy(replacement, resources, static_cast<std::size_t>(size) * sizeof(std::uint32_t));
+    allocator->deallocate(resources);
+    resources = replacement;
+    capacity = target_capacity;
 }
-void CCursor::destroy(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::copyStateFrom(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::activate(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::deactivate(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::apply(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::setVisible(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::getPosition(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::setPosition(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::show(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::isInsideViewport(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::isSystemCursorVisible(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::setSystemCursorVisible(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::cursorKind(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CCursor::setCursorKind(LiftCpu* cpu) { semantic_abi_abstract_call(this, cpu); }
-void CHardwareCursor::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D8340); }
-void CHardwareCursor::copyStateFrom(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7C50); }
-void CHardwareCursor::activate(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7CB0); }
-void CHardwareCursor::deactivate(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7CF0); }
-void CHardwareCursor::apply(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7D00); }
-void CHardwareCursor::setVisible(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0042B7D0); }
-void CHardwareCursor::getPosition(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7D10); }
-void CHardwareCursor::setPosition(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7D60); }
-void CHardwareCursor::show(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7DA0); }
-void CHardwareCursor::isInsideViewport(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7DD0); }
-void CHardwareCursor::isSystemCursorVisible(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7E10); }
-void CHardwareCursor::setSystemCursorVisible(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7E30); }
-void CHardwareCursor::cursorKind(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7E50); }
-void CHardwareCursor::setCursorKind(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7E60); }
-void CSoftwareCursor::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D8340); }
-void CSoftwareCursor::copyStateFrom(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D7FB0); }
-void CSoftwareCursor::activate(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D8030); }
-void CSoftwareCursor::deactivate(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D80A0); }
-void CSoftwareCursor::apply(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0042B7D0); }
-void CSoftwareCursor::setVisible(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D8100); }
-void CSoftwareCursor::getPosition(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D8140); }
-void CSoftwareCursor::setPosition(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D8160); }
-void CSoftwareCursor::show(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D8180); }
-void CSoftwareCursor::isInsideViewport(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D82D0); }
-void CSoftwareCursor::isSystemCursorVisible(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D82E0); }
-void CSoftwareCursor::setSystemCursorVisible(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D82F0); }
-void CSoftwareCursor::cursorKind(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D8300); }
-void CSoftwareCursor::setCursorKind(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D8310); }
-void UnmanagedResourceBase::restoreResource(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0042B7D0); }
-void UnmanagedResourceBase::releaseResource(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D9820); }
-void UnmanagedResourceVB::restoreResource(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D9740); }
-void UnmanagedResourceIB::restoreResource(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D97B0); }
-void UnmanagedResourceTexture::restoreResource(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D9840); }
-void UnmanagedResourceVector::reserve(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004DA510); }
-void StdAllocator::allocate(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004ED770); }
-void StdAllocator::reallocate(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004ED790); }
-void StdAllocator::deallocate(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004ED7B0); }
-void SphereUI::Window::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D47B0); }
-void SphereUI::Window::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D5510); }
-void SphereUI::Window::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D2DD0); }
-void SphereUI::Window::setPosition(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D19E0); }
-void SphereUI::Window::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D25E0); }
-void SphereUI::Window::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D28B0); }
-void SphereUI::Window::setOpacity(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D2A40); }
-void SphereUI::Window::hitTest(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D2B80); }
-void SphereUI::Window::dispatchMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D2AE0); }
-void SphereUI::Window::setFont(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D1AC0); }
-void SphereUI::Window::getFont(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D1B00); }
-void SphereUI::Window::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A13C0); }
-void SphereUI::bindEventHandler(Window* window, WindowEventHandler handler) { if (window == nullptr) return; auto& bindings = bound_ui_event_handlers(); const std::uint32_t address = address32(window); for (auto& binding : bindings) if (binding.window == address) { binding.handler = handler; return; } if (handler != WindowEventHandler::none) bindings.push_back({address, handler}); }
-void SphereUI::copyEventHandler(Window* destination, const Window* source) { if (destination == nullptr || destination == source) return; const WindowEventHandler handler = bound_ui_event_handler(source); unbindEventHandler(destination); if (handler != WindowEventHandler::none) bindEventHandler(destination, handler); }
-bool SphereUI::hasEventHandler(const Window* window) { return window != nullptr && bound_ui_event_handler(window) != WindowEventHandler::none; }
-void SphereUI::dispatchEvent(Window* window, LiftCpu* cpu, std::uint32_t callsite) { const auto target = ui_event_target(bound_ui_event_handler(window)); if (target == nullptr) return; cpu->ecx = address32(window); lifted::lift_push32(cpu, callsite); target(cpu, callsite); }
-void SphereUI::unbindEventHandler(const void* window) { if (window == nullptr) return; auto& bindings = bound_ui_event_handlers(); const std::uint32_t address = address32(window); bindings.erase(std::remove_if(bindings.begin(), bindings.end(), [address](const BoundUiEventHandler& binding) { return binding.window == address; }), bindings.end()); }
-void SphereUI::ButtonCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0049EDE0); }
-void SphereUI::ButtonCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A0DB0); }
-void SphereUI::ButtonCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0049F5A0); }
-void SphereUI::ButtonCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0049F230); }
-void SphereUI::ButtonCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0049F7A0); }
-void SphereUI::ButtonCtrl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0049F1A0); }
-void SphereUI::CheckBox::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A0ED0); }
-void SphereUI::CheckBox::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A1740); }
-void SphereUI::CheckBox::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A12C0); }
-void SphereUI::CheckBox::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A13E0); }
-void SphereUI::CheckBox::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A1200); }
-void SphereUI::CheckBox::playClickSound(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A1350); }
-void SphereUI::CDescriptionWindow::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A2280); }
-void SphereUI::CDescriptionWindow::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A1DF0); }
-void SphereUI::EditCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A3000); }
-void SphereUI::EditCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A3C50); }
-void SphereUI::EditCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A3990); }
-void SphereUI::EditCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A2810); }
-void SphereUI::EditCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A3400); }
-void SphereUI::EditCtrl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A2FE0); }
-void SphereUI::ListCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C0D80); }
-void SphereUI::ListCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C04C0); }
-void SphereUI::ListCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C08C0); }
-void SphereUI::ListCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BF210); }
-void SphereUI::ListCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BEEF0); }
-void SphereUI::ListCtrl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BFE80); }
-void SphereUI::FilterListCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A49E0); }
-void SphereUI::FilterListCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A48A0); }
-void SphereUI::FilterListCtrl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A44D0); }
-void SphereUI::FontPicker::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A5800); }
-void SphereUI::FontPicker::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A5B70); }
-void SphereUI::FontPicker::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A57A0); }
-void SphereUI::FontPicker::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A56E0); }
-void SphereUI::FontPicker::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A5600); }
-void SphereUI::FontPicker::setFont(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A5990); }
-void SphereUI::FontPicker::getFont(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A59F0); }
-void SphereUI::FontPicker::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A5A50); }
-void SphereUI::HyperTextChatListControl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004A9CC0); }
-void SphereUI::HyperTextChatListControl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004AD590); }
-void SphereUI::HyperTextChatListControl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004ACE10); }
-void SphereUI::HyperTextChatListControl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004AB430); }
-void SphereUI::HyperTextChatListControl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004AB7C0); }
-void SphereUI::HyperTextChatListControl::setFont(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004AA0D0); }
-void SphereUI::HyperTextChatListControl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004AAB30); }
-void SphereUI::HyperTextCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004AEEA0); }
-void SphereUI::HyperTextCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B1210); }
-void SphereUI::HyperTextCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B08B0); }
-void SphereUI::HyperTextCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004AF040); }
-void SphereUI::HyperTextCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B0590); }
-void SphereUI::HyperTextCtrl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B0250); }
-void SphereUI::HyperTextEditControl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B6410); }
-void SphereUI::HyperTextEditControl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B7720); }
-void SphereUI::HyperTextEditControl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B45C0); }
-void SphereUI::HyperTextEditControl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B47D0); }
-void SphereUI::HyperTextEditControl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B6F30); }
-void SphereUI::HyperTextEditControl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B6F10); }
-void SphereUI::ImageCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B77F0); }
-void SphereUI::ImageCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B80A0); }
-void SphereUI::ImageCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B7DC0); }
-void SphereUI::ImageCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B7970); }
-void SphereUI::ImageCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B7AF0); }
-void SphereUI::ImageCtrl::setOpacity(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B7F10); }
-void SphereUI::ImageCtrl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004B7F90); }
-void SphereUI::ListItemCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BE3E0); }
-void SphereUI::ListItemCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BE8C0); }
-void SphereUI::ListItemCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BE170); }
-void SphereUI::ListItemCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BD000); }
-void SphereUI::ListItemCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BD340); }
-void SphereUI::ListItemCtrl::setOpacity(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BD880); }
-void SphereUI::ListItemCtrl::hitTest(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BD970); }
-void SphereUI::ListItemCtrl::dispatchMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BDA30); }
-void SphereUI::ListItemCtrl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004BE3C0); }
-void SphereUI::CMenuListControl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C1B30); }
-void SphereUI::CMenuListControl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C2FB0); }
-void SphereUI::CMenuListControl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C2A40); }
-void SphereUI::CMenuListControl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C1A40); }
-void SphereUI::CMenuListControl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C1660); }
-void SphereUI::CMenuListControl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C2A20); }
-void SphereUI::ToolTipCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D0230); }
-void SphereUI::ToolTipCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CFF20); }
-void SphereUI::ToolTipCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D0130); }
-void SphereUI::ToolTipCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CFA00); }
-void SphereUI::ToolTipCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CF7C0); }
-void SphereUI::ToolTipCtrl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C3270); }
-void SphereUI::MiniHelpCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C3520); }
-void SphereUI::MiniHelpCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C3060); }
-void SphereUI::CMinimapControl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C3670); }
-void SphereUI::CMinimapControl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C3710); }
-void SphereUI::CMinimapControl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C3750); }
-void SphereUI::CMinimapControl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C3720); }
-void SphereUI::ProgressBar::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C3FC0); }
-void SphereUI::ProgressBar::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C42B0); }
-void SphereUI::ProgressBar::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C3EB0); }
-void SphereUI::ProgressBar::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C3C00); }
-void SphereUI::ProgressBar::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_0042B0A0); }
-void SphereUI::RadioButtonCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C43C0); }
-void SphereUI::RadioButtonCtrl::playClickSound(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C4360); }
-void SphereUI::RichEditCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C4480); }
-void SphereUI::RichEditCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C5E10); }
-void SphereUI::RichEditCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C6370); }
-void SphereUI::RichEditCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C4D90); }
-void SphereUI::RichEditCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C6810); }
-void SphereUI::RichEditCtrl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C5990); }
-void SphereUI::ScrollBar::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C6B80); }
-void SphereUI::ScrollBar::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C7F20); }
-void SphereUI::ScrollBar::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C7AB0); }
-void SphereUI::ScrollBar::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C6EC0); }
-void SphereUI::ScrollBar::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C7120); }
-void SphereUI::ScrollBar::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C7DC0); }
-void SphereUI::ScrollBar::updateControlState(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C7880); }
-void SphereUI::ScrollBar::loadControlParameters(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C7CF0); }
-void SphereUI::SliderCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C80C0); }
-void SphereUI::SliderCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C8450); }
-void SphereUI::SliderCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C82E0); }
-void SphereUI::SliderCtrl::updateControlState(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C8270); }
-void SphereUI::SliderCtrl::loadControlParameters(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C8060); }
-void SphereUI::SlotCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C95F0); }
-void SphereUI::SlotCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C99D0); }
-void SphereUI::SlotCtrl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C9250); }
-void SphereUI::SlotCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C85E0); }
-void SphereUI::SlotCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C8D00); }
-void SphereUI::SlotCtrl::hitTest(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C8570); }
-void SphereUI::SlotCtrl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004C9150); }
-void SphereUI::SpinButton::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CD550); }
-void SphereUI::SpinButton::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CDE00); }
-void SphereUI::SpinButton::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CDA30); }
-void SphereUI::SpinButton::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CD760); }
-void SphereUI::SpinButton::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CD820); }
-void SphereUI::SpinButton::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CDA10); }
-void SphereUI::SpinButton::updateStatus(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CDBF0); }
-void SphereUI::TextCtrl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CF3E0); }
-void SphereUI::TextCtrl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CF670); }
-void SphereUI::TextCtrl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CF4C0); }
-void SphereUI::TextCtrl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004CF310); }
-void SphereUI::CWebBrowserControl::loadUi(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D0E10); }
-void SphereUI::CWebBrowserControl::clone(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D0BB0); }
-void SphereUI::CWebBrowserControl::handleMessage(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D0EC0); }
-void SphereUI::CWebBrowserControl::draw(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D0520); }
-void SphereUI::CWebBrowserControl::handleInput(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D0670); }
-void SphereUI::CWebBrowserControl::destroy(LiftCpu* cpu) { semantic_dispatch(this, cpu, lifted::sfera_sub_004D09D0); }
+void* StdAllocator::allocate(std::size_t size, std::uint32_t) {
+    if (size == 0u) return nullptr;
+    auto* base = static_cast<std::uint8_t*>(std::malloc(size + 8u));
+    if (base == nullptr) return nullptr;
+    *reinterpret_cast<std::uint32_t*>(base) = 0x61CCC864u;
+    *reinterpret_cast<std::uint32_t*>(base + size + 4u) = 0x61CCC864u;
+    return base + 4u;
+}
+void* StdAllocator::reallocate(void* memory, std::size_t size, std::uint32_t flags) {
+    if (memory == nullptr) return allocate(size, flags);
+    if (size == 0u) { deallocate(memory); return nullptr; }
+    auto* base = static_cast<std::uint8_t*>(std::realloc(static_cast<std::uint8_t*>(memory) - 4u, size + 8u));
+    if (base == nullptr) return nullptr;
+    *reinterpret_cast<std::uint32_t*>(base) = 0x61CCC864u;
+    *reinterpret_cast<std::uint32_t*>(base + size + 4u) = 0x61CCC864u;
+    return base + 4u;
+}
+void StdAllocator::deallocate(void* memory) { if (memory == nullptr) return; SphereUI::unbindEventHandler(memory); std::free(static_cast<std::uint8_t*>(memory) - 4u); }
 
 namespace {
 std::uint32_t effect_flag(const char* token) {
@@ -3244,30 +3525,8 @@ void SferaParticleSystemDefinition::commit() {
         if ((flags & (1u << 11u)) != 0u) for (std::uint32_t vertex = 0u; vertex < 4u; ++vertex) slot->position[vertex] = {particle.render_position.x + render_basis[vertex].x * particle.size, particle.render_position.y + render_basis[vertex].y * particle.size, particle.render_position.z + render_basis[vertex].z * particle.size};
         else {
             const SferaEffectVec3F view{particle.render_position.x - g_sfera_effect_manager.viewer_position.x, particle.render_position.y - g_sfera_effect_manager.viewer_position.y, particle.render_position.z - g_sfera_effect_manager.viewer_position.z};
-            SferaEffectVec3F right{view.z, 0.0f, -view.x};
-            float length = vec_length(right);
-            if (length <= 0.00001f) right = {1.0f, 0.0f, 0.0f};
-            else {
-                right.x /= length;
-                right.y /= length;
-                right.z /= length;
-            }
-            SferaEffectVec3F up{right.y * view.z - right.z * view.y, right.z * view.x - right.x * view.z, right.x * view.y - right.y * view.x};
-            length = vec_length(up);
-            if (length <= 0.00001f) up = {0.0f, 0.0f, 1.0f};
-            else {
-                up.x /= length;
-                up.y /= length;
-                up.z /= length;
-            }
-            const float right_scale = particle.size * render_basis[0].y;
-            const float up_scale = particle.size * render_basis[0].x;
-            right.x *= right_scale;
-            right.y *= right_scale;
-            right.z *= right_scale;
-            up.x *= up_scale;
-            up.y *= up_scale;
-            up.z *= up_scale;
+            SferaEffectVec3F right{}, up{};
+            build_y_up_billboard_axes(view, particle.size * render_basis[0].y, particle.size * render_basis[0].x, right, up);
             slot->position[0] = {particle.render_position.x - right.x - up.x, particle.render_position.y - right.y - up.y, particle.render_position.z - right.z - up.z};
             slot->position[1] = {particle.render_position.x - right.x + up.x, particle.render_position.y - right.y + up.y, particle.render_position.z - right.z + up.z};
             slot->position[2] = {particle.render_position.x + right.x + up.x, particle.render_position.y + right.y + up.y, particle.render_position.z + right.z + up.z};
@@ -3276,13 +3535,6 @@ void SferaParticleSystemDefinition::commit() {
     }
 }
 namespace {
-    struct SferaSoundManagerState {
-        std::uint32_t first;
-        std::uint32_t last;
-        float volume;
-        std::uint32_t enabled;
-        std::uint32_t count;
-    };
     struct SferaSoundEffectRegistry {
         std::uint32_t definitions;
         std::uint32_t end_or_reserved;
@@ -3390,7 +3642,7 @@ namespace {
         }
         return nullptr;
     }
-    CSound* create_cached_sound(SferaSoundManagerState& manager, const char* filename, const SferaSound3DParameters* parameters, std::int32_t cache_lifetime) {
+    CSound* create_cached_sound(CSoundManager& manager, const char* filename, const SferaSound3DParameters* parameters, std::int32_t cache_lifetime) {
         if (manager.enabled == 0u || filename == nullptr) return nullptr;
         CSound* sound = find_cached_sound(filename);
         if (sound == nullptr) {
@@ -3736,7 +3988,7 @@ void CSoundEffect::start(void* frame, bool after_start_time) {
         return;
     }
     const char* filename = source.filename;
-    auto* manager = ptr32<SferaSoundManagerState>(g_sfera_sound_runtime.manager);
+    auto* manager = ptr32<CSoundManager>(g_sfera_sound_runtime.manager);
     if (manager == nullptr || filename == nullptr) return;
     if ((flags & (1u << 5u)) != 0u) {
         auto random_component = [](float radius) {
@@ -3829,8 +4081,7 @@ CSoundEffect* SferaSoundRuntime::createEffect(std::uint32_t effect_id) {
     CSoundEffect* definition = find_sound_definition(effect_id);
     if (definition == nullptr) return nullptr;
     if (g_sfera_sound_effect_items.free_count == 0u && !grow_sound_effect_pool()) return nullptr;
-    const std::uint32_t address = g_sfera_sound_effect_items.take();
-    auto* result = ptr32<CSoundEffect>(address);
+    auto* result = static_cast<CSoundEffect*>(g_sfera_sound_effect_items.take());
     if (result == nullptr) return nullptr;
     result->resetFrom(*definition);
     return result;
@@ -3839,5 +4090,5 @@ CSoundEffect* SferaSoundRuntime::createEffect(std::uint32_t effect_id) {
 void SferaSoundRuntime::destroyEffect(CSoundEffect* effect) {
     if (effect == nullptr) return;
     effect->stop();
-    g_sfera_sound_effect_items.put(address32(effect));
+    g_sfera_sound_effect_items.put(effect);
 }

@@ -200,9 +200,6 @@ static void sfera_zlib_send_tree_code(uint32_t state_address, uint32_t tree_addr
 }
 
 
-uint32_t sfera_zlib_bit_reverse(uint32_t value, uint32_t bit_count) {
-    return sfera_zlib_reverse_bits(value, bit_count);
-}
 
 void sfera_zlib_bit_flush(uint32_t state_address) {
     uint16_t& bit_buffer = *sfera_zlib_pointer<uint16_t>(state_address + 0x16B0u);
@@ -367,13 +364,8 @@ static void sfera_zlib_generate_bit_lengths_impl(uint32_t state_address, uint32_
     }
 }
 
-void sfera_zlib_pq_down_heap(uint32_t state_address, uint32_t tree_address, uint32_t heap_index) {
-    sfera_zlib_pq_down_heap_impl(sfera_zlib_pointer<SferaDeflateState32>(state_address), sfera_zlib_pointer<SferaCtData32>(tree_address), heap_index);
-}
 
-void sfera_zlib_generate_bit_lengths(uint32_t state_address, uint32_t descriptor_address) { sfera_zlib_generate_bit_lengths_impl(state_address, descriptor_address); }
 
-void sfera_zlib_generate_codes(uint32_t tree_address, int32_t max_code, uint32_t bit_counts_address) { sfera_zlib_generate_codes_impl(sfera_zlib_pointer<SferaCtData32>(tree_address), max_code, sfera_zlib_pointer<uint16_t>(bit_counts_address)); }
 
 void sfera_zlib_init_block(uint32_t state_address) {
     SferaDeflateState32* state = sfera_zlib_pointer<SferaDeflateState32>(state_address);

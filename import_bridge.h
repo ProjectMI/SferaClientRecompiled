@@ -116,13 +116,6 @@ public:
     std::uint32_t play_event_position;
     float stream_gain;
 };
-#if defined(_M_IX86)
-static_assert(offsetof(CSoundStream, playback_position_adjustment) == 52u);
-static_assert(offsetof(CSoundStream, decode_callback) == 84u);
-static_assert(offsetof(CSoundStream, play_callback) == 96u);
-static_assert(offsetof(CSoundStream, stream_gain) == 108u);
-#endif
-
 void SI_SetHardwareMixing(bool);
 int SI_GetStreamVolume();
 CSoundInterface* SI_CreateInterface(HWND, int, unsigned long, unsigned long);

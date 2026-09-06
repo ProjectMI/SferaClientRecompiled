@@ -49,9 +49,6 @@ thread_local std::uint64_t g_memory_write_sequence = 0;
 constexpr std::size_t kMemoryWriteBucketCount = 65536;
 constexpr std::size_t kMemoryWriteCapacity = kMemoryWriteBucketCount * 4u;
 
-std::size_t memory_write_bucket(std::uint32_t address) noexcept {
-    return static_cast<std::size_t>((address * 2654435761u) >> 16u) * 4u;
-}
 
 [[maybe_unused]] const char* phase_name(RuntimePhase phase) noexcept {
     switch (phase) {
@@ -224,58 +221,14 @@ void install_crash_diagnostics() noexcept {
 }
 
 void set_runtime_phase(RuntimePhase phase) noexcept { g_phase = phase; }
-void set_diagnostic_instruction(std::uint32_t address, const char* operation) noexcept {
-    g_instruction = address;
-    g_operation = operation;
-    g_trace[static_cast<std::size_t>(g_trace_count % std::size(g_trace))] = {address, operation};
-    ++g_trace_count;
-}
-void set_diagnostic_memory_probe(bool active) noexcept { g_memory_probe = active; }
 
-void diagnostic_memory_write(std::uint32_t address, std::uint32_t size, std::uint64_t value) noexcept {
-    if (!g_memory_writes) { g_memory_writes.reset(new (std::nothrow) MemoryWriteRecord[kMemoryWriteCapacity]{}); }
-    if (!g_memory_writes) { return; }
-    const std::size_t bucket = memory_write_bucket(address);
-    MemoryWriteRecord* selected = &g_memory_writes[bucket];
-    for (std::size_t way = 0; way < 4; ++way) {
-        MemoryWriteRecord& candidate = g_memory_writes[bucket + way];
-        if (candidate.sequence == 0 || candidate.info.address == address) { selected = &candidate; break; }
-        if (candidate.sequence < selected->sequence) { selected = &candidate; }
-    }
-    selected->info = {address, g_instruction, size, value};
-    selected->sequence = ++g_memory_write_sequence;
-}
 
-bool diagnostic_last_memory_write(std::uint32_t address, MemoryWriteInfo& result) noexcept {
-    if (!g_memory_writes) { return false; }
-    const std::uint32_t search_begin = address >= 15u ? address - 15u : 0u;
-    const MemoryWriteRecord* selected = nullptr;
-    for (std::uint32_t candidate_address = search_begin; candidate_address <= address; ++candidate_address) {
-        const std::size_t bucket = memory_write_bucket(candidate_address);
-        for (std::size_t way = 0; way < 4; ++way) {
-            const MemoryWriteRecord& candidate = g_memory_writes[bucket + way];
-            const std::uint64_t end = static_cast<std::uint64_t>(candidate.info.address) + candidate.info.size;
-            if (candidate.sequence != 0 && candidate.info.address == candidate_address && address >= candidate.info.address && address < end && (!selected || candidate.sequence > selected->sequence)) { selected = &candidate; }
-        }
-    }
-    if (!selected) { return false; }
-    result = selected->info;
-    return true;
-}
 
 void diagnostic_call(std::uint32_t callsite, std::uint32_t target, std::uint32_t return_address, std::uint32_t esp) noexcept {
     if (g_call_count == std::size(g_calls)) { return; }
     g_calls[g_call_count++] = {callsite, target, return_address, esp};
 }
 
-void diagnostic_return(std::uint32_t return_address) noexcept {
-    for (std::size_t index = g_call_count; index != 0; --index) {
-        if (g_calls[index - 1].return_address == return_address) {
-            g_call_count = index - 1;
-            return;
-        }
-    }
-}
 
 void diagnostic_failure(const LiftCpu& state, const char* message) noexcept {
 #if !defined(SFERA_PORTABLE_CHECK)
