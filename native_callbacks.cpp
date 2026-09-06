@@ -475,7 +475,7 @@ LRESULT CALLBACK sfera_main_window_proc(HWND window, UINT message, WPARAM wparam
         ::PostQuitMessage(0);
         return 0;
     case WM_SETCURSOR:
-        if (g_sfera_cursor_manager_runtime.active_cursor != 0u) {
+        if (CCursorManager::hasActiveCursor()) {
             return TRUE;
         }
         return 0;

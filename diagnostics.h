@@ -49,7 +49,7 @@ private:
 
 class DiagnosticExecutionScope {
 public:
-    DiagnosticExecutionScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp) noexcept;
+    DiagnosticExecutionScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp, std::uint32_t callsite = 0u) noexcept;
     DiagnosticExecutionScope(const DiagnosticExecutionScope&) = delete;
     DiagnosticExecutionScope& operator=(const DiagnosticExecutionScope&) = delete;
     ~DiagnosticExecutionScope();

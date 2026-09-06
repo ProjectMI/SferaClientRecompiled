@@ -72,54 +72,6 @@ constexpr float kFullCircleRadians = 6.283185958862305f;
 constexpr std::size_t kRenderIndexBufferBytes = 60000u;
 constexpr std::size_t kRenderBatchBufferBytes = 32000u;
 void initialize_identity_frame(float* matrix);
-void buildEffectObjectOrientation(const SferaWorldObjectEffectRuntime* object, float* matrix) {
-    if (object == nullptr) { initialize_identity_frame(matrix); return; }
-    const auto& rotation = object->rotation;
-    const float cx = std::cos(rotation.x), sx = std::sin(rotation.x), cy = std::cos(rotation.y), sy = std::sin(rotation.y), cz = std::cos(rotation.z), sz = std::sin(rotation.z);
-    matrix[0] = cx * cz - sx * sy * sz; matrix[1] = -sz * cy; matrix[2] = -sx * cz - sy * cx * sz; matrix[3] = 0.0f;
-    matrix[4] = sz * cx + cz * sy * sx; matrix[5] = cz * cy; matrix[6] = cz * sy * cx - sz * sx; matrix[7] = 0.0f;
-    matrix[8] = sx * cy; matrix[9] = -sy; matrix[10] = cy * cx; matrix[11] = 0.0f; matrix[12] = 0.0f; matrix[13] = 0.0f; matrix[14] = 0.0f; matrix[15] = 1.0f;
-}
-struct SferaD3D9DeviceRuntime {
-    void* interface_vtable;
-    IDirect3DDevice9* device;
-    D3DPRESENT_PARAMETERS present_parameters;
-};
-bool loadingControlIsRegistered(std::uint32_t control) {
-    if (control == 0u || (g_sfera_control_reference_registry_guard & 1u) == 0u) return false;
-    auto* sentinel = SferaAbi::pointer<SferaControlReferenceNodeRuntime>(g_sfera_control_reference_registry.sentinel);
-    if (sentinel == nullptr) return false;
-    auto* candidate = sentinel;
-    auto* node = SferaAbi::pointer<SferaControlReferenceNodeRuntime>(sentinel->parent);
-    while (node != nullptr && node->is_nil == 0u) {
-        if (node->control >= control) { candidate = node; node = SferaAbi::pointer<SferaControlReferenceNodeRuntime>(node->left); }
-        else node = SferaAbi::pointer<SferaControlReferenceNodeRuntime>(node->right);
-    }
-    return candidate != sentinel && candidate->control == control;
-}
-void updateLoadingProgressControl(std::uint32_t percent) {
-    auto* load_screen = SferaAbi::pointer<SferaLoadScreenRuntime>(g_sfera_interface_core_runtime.load_screen);
-    if (load_screen == nullptr) return;
-    auto* node = SferaAbi::pointer<SferaLoadScreenControlNodeRuntime>(load_screen->child_sentinel);
-    for (std::uint32_t depth = 0u; depth < 3u && node != nullptr; ++depth) node = SferaAbi::pointer<SferaLoadScreenControlNodeRuntime>(node->next);
-    if (node == nullptr || !loadingControlIsRegistered(node->control)) return;
-    auto* progress = SferaAbi::pointer<SphereUI::ProgressBar>(node->control);
-    if (progress == nullptr) return;
-    progress->setProgressValue(static_cast<std::int32_t>(std::min(percent, 100u)));
-}
-SferaD3D9DeviceRuntime* effectLoadDeviceRuntime() { return SferaAbi::pointer<SferaD3D9DeviceRuntime>(g_sfera_graphics_runtime.d3d9_device_runtime); }
-bool beginEffectLoadScene(SferaD3D9DeviceRuntime& runtime) {
-    if (runtime.device == nullptr) return false;
-    const HRESULT state = runtime.device->TestCooperativeLevel();
-    if (state == D3DERR_DEVICELOST) return false;
-    if (state == D3DERR_DEVICENOTRESET && FAILED(runtime.device->Reset(&runtime.present_parameters))) return false;
-    runtime.device->BeginScene(); return true;
-}
-void synchronizeEffectLoadQuery() {
-    auto* query = SferaAbi::pointer<IDirect3DQuery9>(g_sfera_client_config_runtime.gpu_sync_query);
-    if (query == nullptr || query->Issue(D3DISSUE_END) == D3DERR_DEVICELOST) return;
-    while (query->GetData(nullptr, 0u, D3DGETDATA_FLUSH) == S_FALSE) ::Sleep(0u);
-}
 }
 
 void* SferaEffectManager::allocate(std::size_t size) const { return size == 0u ? nullptr : std::calloc(1u, size); }
@@ -195,7 +147,9 @@ bool SferaWorldObjectRuntime::buildEffectFrames(std::uint32_t handle, SferaEffec
         initialize_identity_frame(world_frames.frames[1]); initialize_identity_frame(world_frames.frames[2]); initialize_identity_frame(world_frames.frames[4]);
     }
     spatial_frames.frames[3] = {(spatial_frames.frames[1].x + spatial_frames.frames[2].x) * 0.5f, (spatial_frames.frames[1].y + spatial_frames.frames[2].y) * 0.5f, (spatial_frames.frames[1].z + spatial_frames.frames[2].z) * 0.5f};
-    buildEffectObjectOrientation(object, world_frames.frames[0]);
+    const auto rotation = object != nullptr ? SferaVec3F{object->rotation.x, object->rotation.y, object->rotation.z} : SferaVec3F{};
+    const auto orientation = SferaMatrix4x4F::fromEuler({}, rotation);
+    for (std::size_t row = 0; row < 4; ++row) std::copy_n(orientation.m[row], 4, world_frames.frames[0] + row * 4);
     return true;
 }
 
@@ -270,24 +224,6 @@ void SferaLightRuntime::release(std::int32_t handle) {
     auto* table = handleTable();
     if (table != nullptr) table[handle] = 0u;
     if (g_sfera_recovered_static_runtime.client_state_02 != 0u) --g_sfera_recovered_static_runtime.client_state_02;
-}
-
-std::int32_t SferaTextureRegistryRuntime::findTexture(const char* name) const {
-    if (name == nullptr || *name == '\0' || initialized == 0u) return 0;
-    std::uint16_t hash = 0u;
-    for (const char* cursor = name; *cursor != '\0'; ++cursor) {
-        const auto byte = static_cast<unsigned char>(*cursor);
-        hash = static_cast<std::uint16_t>((hash >> 1u) + hash_mix[byte]);
-    }
-    const auto* records = SferaAbi::pointer<const SferaTextureRegistryRecord>(g_sfera_texture_set_scalar_runtime.mode_01);
-    if (records == nullptr) return 0;
-    std::uint16_t index = hash_heads[hash];
-    while (index != kTextureHashEnd) {
-        const auto& record = records[index];
-        if (SferaSimpleParser::equalsIgnoreCase(record.name, name)) return index;
-        index = record.next_hash_index;
-    }
-    return 0;
 }
 
 IEffect* sfera_effect_definition(uint32_t address) { return SferaAbi::pointer<IEffect>(address); }
@@ -493,20 +429,8 @@ void sfera_shutdown_nature_manager() { SferaNatureManager* manager = sfera_natur
 
 void SferaEffectManager::registerEffectMeshFile(const char* filename) {
     if (filename == nullptr) return;
-    std::ifstream stream(filename, std::ios::binary);
-    if (!stream.is_open() && std::strchr(filename, '\\') == nullptr && g_sfera_file_runtime.search_paths.data != 0u) {
-        const auto* paths = SferaAbi::pointer<const std::uint32_t>(g_sfera_file_runtime.search_paths.data);
-        const std::uint32_t count = std::min(g_sfera_file_runtime.search_path_count, g_sfera_file_runtime.search_paths.capacity);
-        for (std::uint32_t index = 0u; index < count && !stream.is_open(); ++index) {
-            const char* prefix = SferaAbi::pointer<const char>(paths[index]);
-            if (prefix == nullptr) continue;
-            std::string path(prefix);
-            if (!path.empty() && path.back() != '\\' && path.back() != '/') path.push_back('\\');
-            path += filename;
-            stream.clear();
-            stream.open(path, std::ios::binary);
-        }
-    }
+    std::ifstream stream;
+    for (const std::string& path : g_sfera_files.candidatePaths(filename)) { stream.open(path, std::ios::binary); if (stream.is_open()) break; stream.clear(); }
     if (!stream.is_open()) return;
     auto read_exact = [&](void* output, std::size_t size) {
         stream.read(static_cast<char*>(output), static_cast<std::streamsize>(size));
@@ -573,21 +497,21 @@ void SferaEffectManager::reportLoadProgress(std::uint32_t progress) {
     percent = std::min(percent, 100);
     if (static_cast<std::uint32_t>(percent) == g_sfera_graphics_runtime.rebuild_percent) return;
     g_sfera_graphics_runtime.rebuild_percent = static_cast<std::uint32_t>(percent);
-    auto* device_runtime = effectLoadDeviceRuntime();
-    if (device_runtime == nullptr || !beginEffectLoadScene(*device_runtime)) return;
+    auto* device_runtime = g_sfera_graphics_runtime.d3d_runtime.get();
+    if (device_runtime == nullptr || !device_runtime->beginScene()) return;
     g_sfera_world_render_runtime.scene_active = 1u;
-    updateLoadingProgressControl(static_cast<std::uint32_t>(percent));
-    device_runtime->device->EndScene();
-    synchronizeEffectLoadQuery();
+    g_sfera_interface.setLoadingProgress(percent);
+    device_runtime->checkResult(device_runtime->native_device->EndScene(), "EndScene");
+    device_runtime->waitForGpu();
     g_sfera_world_render_runtime.scene_active = 0u;
-    device_runtime->device->Present(nullptr, nullptr, nullptr, nullptr);
+    device_runtime->checkResult(device_runtime->native_device->Present(nullptr, nullptr, nullptr, nullptr), "Present");
 }
 
 void SferaEffectManager::initializeBloodEffect() {
     if (g_sfera_blood_effect_instance != 0u) return;
     auto* runtime = static_cast<SferaBloodEffectRuntime*>(allocate(sizeof(SferaBloodEffectRuntime)));
     if (runtime == nullptr) return;
-    std::construct_at(runtime); runtime->change_tick = 64u; runtime->texture_id = static_cast<std::uint32_t>(g_sfera_texture_registry_runtime.findTexture("fx_bspot"));
+    std::construct_at(runtime); runtime->change_tick = 64u; runtime->texture_id = static_cast<std::uint32_t>(g_sfera_textures.find("fx_bspot"));
     registerListener(kBloodEffectId, *runtime); g_sfera_blood_effect_instance = SferaAbi::address(runtime);
 }
 void SferaEffectManager::shutdownBloodEffect() {

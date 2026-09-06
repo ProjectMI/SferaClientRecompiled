@@ -25,8 +25,8 @@ struct HyperTextGeometry {
 
 class HyperTextElement {
 public:
-    std::uint32_t type;
-    SphereUI::UiString text;
+    std::uint32_t type = 0;
+    SphereUI::UiString text{};
     HyperTextGeometry* geometry();
     const HyperTextGeometry* geometry() const;
     HyperTextElement* clone() const;
@@ -46,23 +46,23 @@ public:
 
 class HyperTextElementWithParameters : public HyperTextElement {
 public:
-    HyperTextGeometry bounds;
-    SphereUI::UiString parameters;
+    HyperTextGeometry bounds{};
+    SphereUI::UiString parameters{};
     HyperTextElementWithParameters() {
     }
 };
 
 class HyperTextElement_PlainText : public HyperTextElement {
 public:
-    HyperTextGeometry bounds;
+    HyperTextGeometry bounds{};
     HyperTextElement_PlainText() {
     }
 };
 
 class HyperTextElement_Link : public HyperTextElementWithParameters {
 public:
-    SphereUI::UiString target;
-    std::uint32_t link_kind;
+    SphereUI::UiString target{};
+    std::uint32_t link_kind = 0;
     const char* linkValue() const;
     HyperTextElement_Link() {
     }
@@ -90,11 +90,6 @@ namespace SphereUI {
     struct BrowserSurface;
     struct BrowserSession;
     struct UiContainerProxy;
-    void bindEventHandler(Window* window, WindowEventHandler handler);
-    void copyEventHandler(Window* destination, const Window* source);
-    bool hasEventHandler(const Window* window);
-    void dispatchEvent(Window* window, const struct WindowEvent& event);
-    void unbindEventHandler(const void* window);
     struct WindowInput {
         std::int32_t mouse_x;
         std::int32_t mouse_y;
@@ -171,6 +166,7 @@ namespace SphereUI {
         std::uint32_t width;
         std::uint32_t top;
         std::uint32_t height;
+        void setTexture(const char* texture_name, const std::uint32_t* texture_rectangle, const std::uint32_t* sprite_rectangle);
     };
 
     struct UiSprite {
@@ -178,12 +174,27 @@ namespace SphereUI {
         std::uint32_t width;
         std::uint32_t height;
         SpriteVertex vertices[4];
-        std::uint32_t storage_context;
+        std::uint32_t reference_count;
         SpritePart* parts;
         std::uint32_t part_count;
         void initialize();
+        void drawNatural(float left, float top, std::uint32_t color);
+        void draw(float left, float top, float right, float bottom, std::uint32_t color, float rotation = 0.0f);
         void copyFrom(const UiSprite& source);
+        static UiSprite* create();
+        UiSprite* clone() const;
+        void destroy();
         void release();
+        void setImage(const char* name);
+        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range);
+        void resizeParts(std::uint32_t count);
+        void setColors(std::uint32_t color);
+        void releaseReference();
+        void setDescription(const struct ImageDescription& description);
+    private:
+        void drawParts(float left, float top, float right, float bottom, bool natural);
+        void drawRotated(float left, float top, float right, float bottom, float rotation);
+        void setQuad(const SpritePart& part, float left, float top, float right, float bottom);
     };
 
     template<class T> struct UiVector {
@@ -468,6 +479,10 @@ namespace SphereUI {
         const char* getHelp() const;
         void setHelp(const char* value);
         void setName(const char* value);
+        Window* controlAt(std::uint32_t index) const;
+        void addModalReference(Window& window);
+        const char* getName() const;
+        const char* getResourceName() const;
         void setResourceName(const char* value);
         virtual bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range);
         virtual Window* clone();
@@ -694,39 +709,7 @@ namespace SphereUI {
         void destroy(bool free_storage) override;
     };
 
-    struct HyperTextRegion {
-        char target[128];
-        UiRect rectangles[10];
-        std::int32_t rectangle_count;
-        std::uint8_t visible;
-        std::uint8_t hovered;
-        std::uint8_t reserved[2];
-        bool contains(std::int32_t x, std::int32_t y) const;
-    };
-
-    struct HyperDocumentNode;
-    struct HyperDocumentLine;
-    struct HyperTextDocument {
-        char* name;
-        char* source;
-        char* parsed_source;
-        std::uint32_t source_size;
-        HyperDocumentNode* node_sentinel;
-        std::uint32_t node_count;
-        std::uint32_t node_context;
-        HyperDocumentLine** line_starts;
-        std::uint32_t line_count;
-        std::uint32_t line_capacity;
-        std::int32_t line_height;
-        std::uint32_t text_format;
-        UiArray<HyperTextRegion> links;
-        UiArray<HyperTextRegion> tooltips;
-        std::uint32_t link_color;
-        std::uint32_t hover_color;
-        UiArray<std::int32_t> line_heights;
-        std::int32_t totalHeight() const;
-        void resetRegions();
-    };
+    class HyperTextDocument;
 
     struct UiIndexRange {
         std::uint32_t first;
@@ -743,6 +726,7 @@ namespace SphereUI {
         void initialize(const char* text, std::uint32_t channel, std::uint32_t color);
         void release();
         void copyFrom(const HyperTextChatListItem& source);
+        void layout(std::int32_t width, std::uint32_t font);
     };
 
     class HyperTextChatListControl : public Window {
@@ -1358,3 +1342,199 @@ namespace SphereUI::Runtime {
 namespace SphereUI::Runtime {
     void invokeEventHandler(WindowEventHandler handler, Window* window, const WindowEvent& event);
 }
+
+namespace SphereUI {
+namespace UiMessage {
+    constexpr std::uint32_t close = 100u;
+    constexpr std::uint32_t horizontalScroll = 101u;
+    constexpr std::uint32_t verticalScroll = 102u;
+    constexpr std::uint32_t pointerEnter = 103u;
+    constexpr std::uint32_t pointerLeave = 104u;
+    constexpr std::uint32_t setInputEnabled = 105u;
+    constexpr std::uint32_t getInputEnabled = 106u;
+    constexpr std::uint32_t setTextRgb = 107u;
+    constexpr std::uint32_t setHidden = 108u;
+    constexpr std::uint32_t getHidden = 109u;
+    constexpr std::uint32_t setEnabled = 112u;
+    constexpr std::uint32_t getDisabled = 113u;
+    constexpr std::uint32_t setTextAlignment = 114u;
+    constexpr std::uint32_t animateVisibility = 115u;
+    constexpr std::uint32_t setPosition = 116u;
+    constexpr std::uint32_t getChildUnderCursor = 117u;
+    constexpr std::uint32_t updateScrollLayout = 118u;
+    constexpr std::uint32_t getModal = 119u;
+    constexpr std::uint32_t endModal = 120u;
+    constexpr std::uint32_t beginModal = 121u;
+    constexpr std::uint32_t setSize = 122u;
+    constexpr std::uint32_t setFont = 123u;
+    constexpr std::uint32_t leftClick = 1001u;
+    constexpr std::uint32_t setChecked = 1002u;
+    constexpr std::uint32_t getChecked = 1003u;
+    constexpr std::uint32_t activateButton = 1004u;
+    constexpr std::uint32_t rightClick = 1005u;
+    constexpr std::uint32_t setProgressValue = 2001u;
+    constexpr std::uint32_t setProgressRange = 2002u;
+    constexpr std::uint32_t getProgressRange = 2004u;
+    constexpr std::uint32_t getProgressValue = 2010u;
+    constexpr std::uint32_t setScrollValue = 2501u;
+    constexpr std::uint32_t setScrollRange = 2502u;
+    constexpr std::uint32_t getScrollRange = 2503u;
+    constexpr std::uint32_t setScrollParameters = 2504u;
+    constexpr std::uint32_t getScrollParameters = 2505u;
+    constexpr std::uint32_t increaseScroll = 2506u;
+    constexpr std::uint32_t decreaseScroll = 2507u;
+    constexpr std::uint32_t getScrollValue = 2600u;
+    constexpr std::uint32_t setImageName = 2601u;
+    constexpr std::uint32_t setImageRotation = 2602u;
+    constexpr std::uint32_t setImageDescription = 2603u;
+    constexpr std::uint32_t setImageAlpha = 2604u;
+    constexpr std::uint32_t previousHyperTextPage = 2701u;
+    constexpr std::uint32_t firstHyperTextPage = 2702u;
+    constexpr std::uint32_t loadHyperTextPage = 2703u;
+    constexpr std::uint32_t hyperTextPageChanged = 2704u;
+    constexpr std::uint32_t clearHyperTextHistory = 2705u;
+    constexpr std::uint32_t loadHyperTextBuffer = 2706u;
+    constexpr std::uint32_t resizeToHyperText = 2707u;
+    constexpr std::uint32_t setTooltipLine = 3001u;
+    constexpr std::uint32_t getTooltipLine = 3002u;
+    constexpr std::uint32_t appendTooltipLine = 3003u;
+    constexpr std::uint32_t setTooltipBackground = 3004u;
+    constexpr std::uint32_t setTooltipTextColor = 3500u;
+    constexpr std::uint32_t appendListText = 3601u;
+    constexpr std::uint32_t setListText = 3602u;
+    constexpr std::uint32_t setListColor = 3603u;
+    constexpr std::uint32_t setListFormatting = 3604u;
+    constexpr std::uint32_t alignListRow = 3605u;
+    constexpr std::uint32_t listSelectionChanged = 3606u;
+    constexpr std::uint32_t setListSelection = 3607u;
+    constexpr std::uint32_t getListSelection = 3608u;
+    constexpr std::uint32_t getListText = 3609u;
+    constexpr std::uint32_t getListSize = 3610u;
+    constexpr std::uint32_t getListColor = 3611u;
+    constexpr std::uint32_t listDoubleClick = 3612u;
+    constexpr std::uint32_t clearList = 3613u;
+    constexpr std::uint32_t removeListRow = 3614u;
+    constexpr std::uint32_t getListScroll = 3615u;
+    constexpr std::uint32_t setListScroll = 3616u;
+    constexpr std::uint32_t sliderValueChanged = 3800u;
+    constexpr std::uint32_t listItemEvent = 4001u;
+    constexpr std::uint32_t appendListItem = 4002u;
+    constexpr std::uint32_t listItemSelectionChanged = 4003u;
+    constexpr std::uint32_t getListItemSelection = 4004u;
+    constexpr std::uint32_t setListItemSelection = 4005u;
+    constexpr std::uint32_t getListItemCount = 4006u;
+    constexpr std::uint32_t removeListItem = 4007u;
+    constexpr std::uint32_t clearListItems = 4008u;
+    constexpr std::uint32_t editSubmit = 4501u;
+    constexpr std::uint32_t setEditText = 4502u;
+    constexpr std::uint32_t getEditText = 4503u;
+    constexpr std::uint32_t getEditFocus = 4504u;
+    constexpr std::uint32_t moveEditCaretToEnd = 4505u;
+    constexpr std::uint32_t editTab = 4506u;
+    constexpr std::uint32_t setSlotItem = 5001u;
+    constexpr std::uint32_t setSlotHighlight = 5002u;
+    constexpr std::uint32_t slotDrag = 5003u;
+    constexpr std::uint32_t slotHitTest = 5004u;
+    constexpr std::uint32_t setSlotDescription = 5005u;
+    constexpr std::uint32_t setSlotCount = 5006u;
+    constexpr std::uint32_t setSlotFillColor = 5007u;
+    constexpr std::uint32_t setSlotFillAlpha = 5008u;
+    constexpr std::uint32_t setSlotBorderColor = 5009u;
+    constexpr std::uint32_t setSlotTopLeftOverlay = 5010u;
+    constexpr std::uint32_t setSlotBottomRightOverlay = 5011u;
+    constexpr std::uint32_t setSlotBottomLeftOverlay = 5012u;
+    constexpr std::uint32_t spinValueChanged = 5501u;
+    constexpr std::uint32_t setSpinValue = 5502u;
+    constexpr std::uint32_t setSpinRange = 5503u;
+    constexpr std::uint32_t getSpinRange = 5504u;
+    constexpr std::uint32_t updateSpinStatus = 5505u;
+    constexpr std::uint32_t setSpinStep = 5506u;
+    constexpr std::uint32_t getSpinStep = 5507u;
+    constexpr std::uint32_t getSpinValue = 5600u;
+    constexpr std::uint32_t setRichEditContent = 6001u;
+    constexpr std::uint32_t getRichEditContent = 6002u;
+    constexpr std::uint32_t appendFilteredListText = 6501u;
+    constexpr std::uint32_t clearFilteredList = 6502u;
+    constexpr std::uint32_t setListFilter = 6503u;
+    constexpr std::uint32_t openBrowser = 7001u;
+    constexpr std::uint32_t updateBrowser = 7002u;
+    constexpr std::uint32_t navigateBrowser = 7003u;
+    constexpr std::uint32_t refreshBrowser = 7004u;
+    constexpr std::uint32_t getBrowserLocation = 7005u;
+    constexpr std::uint32_t menuItemActivated = 7100u;
+    constexpr std::uint32_t clearMenu = 7101u;
+    constexpr std::uint32_t appendMenuItem = 7102u;
+    constexpr std::uint32_t activateMenuItem = 7103u;
+    constexpr std::uint32_t setMenuItemEnabled = 7104u;
+    constexpr std::uint32_t setMenuItemText = 7105u;
+    constexpr std::uint32_t appendChatMessage = 7500u;
+    constexpr std::uint32_t addChatChannel = 7501u;
+    constexpr std::uint32_t setChatChannels = 7502u;
+    constexpr std::uint32_t clearChatChannels = 7503u;
+    constexpr std::uint32_t chatPlayerLeftClick = 7504u;
+    constexpr std::uint32_t chatPlayerRightClick = 7505u;
+    constexpr std::uint32_t getChatPlainText = 7508u;
+    constexpr std::uint32_t getChatHyperText = 7509u;
+    constexpr std::uint32_t getSelectedChatLink = 7510u;
+    constexpr std::uint32_t getSelectedChatHyperText = 7511u;
+    constexpr std::uint32_t getSelectedChatPlainText = 7512u;
+    constexpr std::uint32_t setHyperEditContent = 7600u;
+    constexpr std::uint32_t getHyperEditPlainText = 7601u;
+    constexpr std::uint32_t getHyperEditHyperText = 7602u;
+    constexpr std::uint32_t hyperEditSubmit = 7603u;
+    constexpr std::uint32_t getHyperEditLengths = 7604u;
+    constexpr std::uint32_t setHyperEditTextColor = 7606u;
+    constexpr std::uint32_t setSelectedFont = 7650u;
+    constexpr std::uint32_t getSelectedFont = 7651u;
+    constexpr std::uint32_t selectedFontChanged = 7652u;
+}
+namespace WindowStyle {
+    constexpr std::uint32_t skipDrawing = 1u << 1u;
+    constexpr std::uint32_t showTitle = 1u << 2u;
+    constexpr std::uint32_t handleEscape = 1u << 3u;
+    constexpr std::uint32_t preventOverlap = 1u << 4u;
+}
+namespace MouseInput {
+    constexpr std::uint32_t leftPress = 1u << 0u;
+    constexpr std::uint32_t rightPress = 1u << 1u;
+    constexpr std::uint32_t leftRelease = 1u << 2u;
+    constexpr std::uint32_t rightRelease = 1u << 3u;
+    constexpr std::uint32_t anyRelease = leftRelease | rightRelease;
+}
+namespace UiControlKind {
+    constexpr std::uint32_t window = 0u;
+    constexpr std::uint32_t button = 1u;
+    constexpr std::uint32_t text = 2u;
+    constexpr std::uint32_t image = 3u;
+    constexpr std::uint32_t progressBar = 4u;
+    constexpr std::uint32_t scrollBar = 5u;
+    constexpr std::uint32_t hyperText = 6u;
+    constexpr std::uint32_t checkBox = 7u;
+    constexpr std::uint32_t radioButton = 8u;
+    constexpr std::uint32_t tooltip = 9u;
+    constexpr std::uint32_t textList = 10u;
+    constexpr std::uint32_t slider = 11u;
+    constexpr std::uint32_t listItem = 12u;
+    constexpr std::uint32_t edit = 13u;
+    constexpr std::uint32_t slot = 14u;
+    constexpr std::uint32_t miniHelp = 15u;
+    constexpr std::uint32_t spinButton = 16u;
+    constexpr std::uint32_t richEdit = 17u;
+    constexpr std::uint32_t filteredList = 18u;
+    constexpr std::uint32_t webBrowser = 19u;
+    constexpr std::uint32_t minimap = 20u;
+    constexpr std::uint32_t menu = 21u;
+    constexpr std::uint32_t hyperTextChat = 22u;
+    constexpr std::uint32_t hyperTextEdit = 23u;
+    constexpr std::uint32_t fontPicker = 24u;
+    constexpr std::uint32_t colorPicker = 25u;
+}
+}
+namespace SphereUI::UiMessage {
+    constexpr std::uint32_t dropToScene = 13u;
+    constexpr std::uint32_t controlBindingCaptured = 15u;
+    constexpr std::uint32_t dragEnter = 110u;
+    constexpr std::uint32_t dragLeave = 111u;
+}
+
+namespace SphereUI::Runtime { void setTextInputActive(bool active); }

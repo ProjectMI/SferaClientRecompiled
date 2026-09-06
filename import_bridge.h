@@ -53,11 +53,41 @@ inline uint32_t native_strstr_address32() { using Function = char* (__cdecl*)(ch
 struct D3DXMATRIX;
 struct D3DXVECTOR3;
 struct D3DXQUATERNION;
-struct D3DXCONSTANTTABLE;
+// Native D3DX9Shader.h interface. Method order is the D3DX9 COM ABI.
+struct D3DXVECTOR4;
+struct D3DXCONSTANTTABLE_DESC;
+struct D3DXCONSTANT_DESC;
+using D3DXHANDLE = LPCSTR;
+struct ID3DXConstantTable : IUnknown {
+    virtual LPVOID STDMETHODCALLTYPE GetBufferPointer() = 0;
+    virtual DWORD STDMETHODCALLTYPE GetBufferSize() = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetDesc(D3DXCONSTANTTABLE_DESC* description) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetConstantDesc(D3DXHANDLE constant, D3DXCONSTANT_DESC* description, UINT* count) = 0;
+    virtual UINT STDMETHODCALLTYPE GetSamplerIndex(D3DXHANDLE constant) = 0;
+    virtual D3DXHANDLE STDMETHODCALLTYPE GetConstant(D3DXHANDLE parent, UINT index) = 0;
+    virtual D3DXHANDLE STDMETHODCALLTYPE GetConstantByName(D3DXHANDLE parent, LPCSTR name) = 0;
+    virtual D3DXHANDLE STDMETHODCALLTYPE GetConstantElement(D3DXHANDLE constant, UINT index) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetDefaults(IDirect3DDevice9* device) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetValue(IDirect3DDevice9* device, D3DXHANDLE constant, LPCVOID data, UINT bytes) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetBool(IDirect3DDevice9* device, D3DXHANDLE constant, BOOL value) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetBoolArray(IDirect3DDevice9* device, D3DXHANDLE constant, const BOOL* values, UINT count) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetInt(IDirect3DDevice9* device, D3DXHANDLE constant, INT value) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetIntArray(IDirect3DDevice9* device, D3DXHANDLE constant, const INT* values, UINT count) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetFloat(IDirect3DDevice9* device, D3DXHANDLE constant, FLOAT value) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetFloatArray(IDirect3DDevice9* device, D3DXHANDLE constant, const FLOAT* values, UINT count) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetVector(IDirect3DDevice9* device, D3DXHANDLE constant, const D3DXVECTOR4* vector) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetVectorArray(IDirect3DDevice9* device, D3DXHANDLE constant, const D3DXVECTOR4* vectors, UINT count) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetMatrix(IDirect3DDevice9* device, D3DXHANDLE constant, const D3DXMATRIX* matrix) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetMatrixArray(IDirect3DDevice9* device, D3DXHANDLE constant, const D3DXMATRIX* matrices, UINT count) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetMatrixPointerArray(IDirect3DDevice9* device, D3DXHANDLE constant, const D3DXMATRIX** matrices, UINT count) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetMatrixTranspose(IDirect3DDevice9* device, D3DXHANDLE constant, const D3DXMATRIX* matrix) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetMatrixTransposeArray(IDirect3DDevice9* device, D3DXHANDLE constant, const D3DXMATRIX* matrices, UINT count) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetMatrixTransposePointerArray(IDirect3DDevice9* device, D3DXHANDLE constant, const D3DXMATRIX** matrices, UINT count) = 0;
+};
 struct D3DXIMAGE_INFO;
 extern "C" {
 HRESULT WINAPI D3DXCreateTexture(IDirect3DDevice9*, UINT, UINT, UINT, DWORD, D3DFORMAT, D3DPOOL, IDirect3DTexture9**);
-HRESULT WINAPI D3DXGetShaderConstantTable(const DWORD*, D3DXCONSTANTTABLE**);
+HRESULT WINAPI D3DXGetShaderConstantTable(const DWORD*, ID3DXConstantTable**);
 D3DXMATRIX* WINAPI D3DXMatrixLookAtRH(D3DXMATRIX*, const D3DXVECTOR3*, const D3DXVECTOR3*, const D3DXVECTOR3*);
 D3DXMATRIX* WINAPI D3DXMatrixRotationQuaternion(D3DXMATRIX*, const D3DXQUATERNION*);
 HRESULT WINAPI D3DXCreateCubeTextureFromFileInMemory(IDirect3DDevice9*, const void*, UINT, IDirect3DCubeTexture9**);

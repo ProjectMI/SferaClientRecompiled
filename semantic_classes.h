@@ -1,9 +1,31 @@
 #pragma once
 
-struct IDirect3DTexture9;
+#include <winsock2.h>
+#include <d3d9.h>
+#include <cstdio>
+#include <chrono>
+#include <filesystem>
+#include <map>
 
+struct IDirect3DTexture9;
+struct IDirect3DBaseTexture9;
+struct SferaScreenVertex;
+
+#include <array>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <variant>
 #include <cstddef>
+#include <deque>
+#include <list>
+#include <span>
+#include <string_view>
+#include <unordered_set>
 #include <cstdint>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "semantic_window.h"
 
@@ -13,6 +35,103 @@ class CSound;
 class StdAllocator;
 
 
+struct SferaVec3F {
+    float x;
+    float y;
+    float z;
+
+    SferaVec3F operator+(const SferaVec3F& other) const;
+    SferaVec3F operator-(const SferaVec3F& other) const;
+    SferaVec3F operator*(float factor) const;
+    double dot(const SferaVec3F& other) const;
+    SferaVec3F cross(const SferaVec3F& other) const;
+    float component(std::size_t axis) const;
+    void setComponent(std::size_t axis, float value);
+    static void rotatePair(float& first, float& second, float angle);
+    bool containsConvexPolygonPoint(std::span<const SferaVec3F* const> vertices, const SferaVec3F& point) const;
+};
+
+struct SferaVec4F {
+    float x;
+    float y;
+    float z;
+    float w;
+};
+
+struct SferaMatrix3x3F {
+    float m[3][3];
+};
+
+struct SferaQuaternionF {
+    float w;
+    float x;
+    float y;
+    float z;
+
+    SferaMatrix3x3F rotationMatrix() const;
+    SferaQuaternionF interpolated(const SferaQuaternionF& other, float factor) const;
+};
+
+struct SferaMatrix4x4F {
+    float m[4][4];
+
+    static SferaMatrix4x4F identity();
+    static SferaMatrix4x4F fromEuler(const SferaVec3F& translation, const SferaVec3F& angles);
+    static SferaMatrix4x4F fromQuaternion(const SferaQuaternionF& rotation, const SferaVec3F& translation = {});
+    SferaVec3F transformPoint(const SferaVec3F& point) const;
+    SferaVec3F inverseTransformPoint(const SferaVec3F& point) const;
+    SferaMatrix4x4F multiplied(const SferaMatrix4x4F& other) const;
+    SferaMatrix4x4F transposed() const;
+    void scaleAxes(const SferaVec3F& scale);
+};
+
+struct SferaBoundsCornersRuntime {
+    SferaVec3F corners[8];
+
+    static SferaBoundsCornersRuntime fromExtents(const SferaVec3F& minimum, const SferaVec3F& maximum);
+    void getExtents(SferaVec3F& minimum, SferaVec3F& maximum) const;
+};
+
+struct SferaPlaneF {
+    SferaVec3F normal;
+    float distance;
+
+    double evaluate(const SferaVec3F& point) const;
+    int intersectLine(const SferaVec3F& start, const SferaVec3F& end, SferaVec3F& intersection) const;
+};
+
+struct SferaFrustumF {
+    SferaPlaneF planes[6];
+
+    int classifyPoints(std::span<const SferaVec3F> points) const;
+};
+
+class SferaPolygon3F {
+public:
+    std::vector<SferaVec3F> vertices;
+
+    void clipToAxis(std::size_t axis, float boundary, bool keepGreater);
+    bool clipTriangleToBounds(const SferaVec3F& first, const SferaVec3F& second, const SferaVec3F& third, const SferaVec3F& minimum, const SferaVec3F& maximum);
+};
+
+inline SferaPolygon3F g_sfera_clipped_polygon;
+
+struct SferaIntBounds3 {
+    std::uint32_t min_x;
+    std::uint32_t max_x;
+    std::uint32_t min_y;
+    std::uint32_t max_y;
+    std::uint32_t min_z;
+    std::uint32_t max_z;
+};
+
+struct SferaViewProjectionScratchRuntime {
+    SferaVec3F corners[8];
+    SferaIntBounds3 clipping_bounds;
+
+    SferaViewProjectionScratchRuntime translated(const SferaVec3F& offset) const;
+};
+
 struct SferaParserRange {
     std::int32_t begin;
     std::int32_t end;
@@ -20,10 +139,11 @@ struct SferaParserRange {
 
 class SferaSimpleParser {
 public:
-    std::uint32_t source_begin;
-    std::uint32_t source_end;
-    std::uint32_t line_table;
-    std::uint32_t line_count;
+    ~SferaSimpleParser() { release(); }
+    std::uint32_t source_begin = 0u;
+    std::uint32_t source_end = 0u;
+    std::uint32_t line_table = 0u;
+    std::uint32_t line_count = 0u;
     char token[1024];
     std::int32_t scan_begin;
     std::int32_t scan_end;
@@ -35,6 +155,7 @@ public:
     void rebuildLineTable();
     void load(const char* filename);
     const char* firstToken(const char* line) const;
+    const char* lineAt(std::int32_t index) const;
     std::int32_t findClosingBrace(std::int32_t begin, std::int32_t end) const;
     std::int32_t parseBlockAt(const char* first_token, std::int32_t line_index, std::int32_t end, SferaParserRange* output_range);
     bool findBlock(const char* name, SferaParserRange* output_range, const SferaParserRange* search_range, std::int32_t occurrence);
@@ -284,8 +405,8 @@ struct SferaSoundSource {
 struct SferaSoundTimeGroup {
     float begin;
     float end;
-    std::uint32_t source_begin;
-    std::uint32_t source_end;
+    std::uint32_t source_begin = 0u;
+    std::uint32_t source_end = 0u;
 };
 
 struct SferaSound3DParameters {
@@ -847,10 +968,34 @@ public:
 struct SferaCursorPosition { std::int32_t x; std::int32_t y; };
 class SferaInterfaceCursor {
 public:
-    std::uint8_t system_visible;
-    std::uint8_t software_mode;
-    std::uint32_t texture_handles;
-    std::uint8_t kind;
+    struct ImageLayer {
+        std::int32_t x = 0;
+        std::int32_t y = 0;
+        std::uint32_t texture = UINT32_MAX;
+        std::uint32_t width = 0u;
+        std::uint32_t height = 0u;
+    };
+    struct TextLayer {
+        std::int32_t x = 0;
+        std::int32_t y = 0;
+        std::string text;
+        std::uint32_t font = 0u;
+        std::uint32_t color = 0u;
+    };
+    bool system_visible = true;
+    bool centered_hotspot = false;
+    std::uint8_t kind = 255u;
+    SferaInterfaceCursor() = default;
+    bool loadTextures();
+    void setImage(std::size_t layer, const char* texture, std::int32_t x, std::int32_t y);
+    void setImageSize(std::size_t layer, std::uint32_t width, std::uint32_t height);
+    void setText(std::size_t layer, const char* text, std::int32_t x, std::int32_t y, std::uint32_t font, std::uint32_t color);
+    void setKind(std::uint32_t cursor_kind);
+    void draw(float x, float y) const;
+private:
+    std::array<std::uint32_t, 4> textures{};
+    std::array<ImageLayer, 3> images{};
+    std::array<TextLayer, 3> labels{};
 };
 
 class CCursor {
@@ -883,6 +1028,7 @@ public:
     std::int32_t saved_x = 0;
     std::int32_t saved_y = 0;
     CHardwareCursor();
+    ~CHardwareCursor();
     void destroy(bool free_storage) override;
     void copyStateFrom(const CCursor* previous) override;
     void activate() override;
@@ -927,59 +1073,145 @@ public:
     void setCursorKind(std::uint32_t kind) override;
 };
 
+// Include <d3d9.h> in semantic_classes.h. Replace the old unmanaged resource classes with this block.
+class CD3D9Device;
+class CShaderMgr;
+class CPostEffectsMgr;
+namespace SphereUI { struct DisplayMode { std::uint32_t width; std::uint32_t height; std::uint32_t depth; }; }
+
 class UnmanagedResourceBase {
 public:
-    union { std::uint32_t resource; IDirect3DTexture9* native_texture; };
-    UnmanagedResourceBase() {}
-    virtual void restoreResource();
-    virtual void releaseResource();
+    virtual ~UnmanagedResourceBase();
+    virtual void restoreResource() = 0;
+    virtual void releaseResource() = 0;
+    UnmanagedResourceBase(const UnmanagedResourceBase&) = delete;
+    UnmanagedResourceBase& operator=(const UnmanagedResourceBase&) = delete;
+protected:
+    explicit UnmanagedResourceBase(CD3D9Device& device, D3DPOOL pool);
+    CD3D9Device* device;
+private:
+    friend class CD3D9Device;
+    bool registered;
 };
 
-class UnmanagedResourceVB : public UnmanagedResourceBase {
+class UnmanagedResourceVB final : public UnmanagedResourceBase {
 public:
+    IDirect3DVertexBuffer9* native_buffer = nullptr;
     std::uint32_t length;
     std::uint32_t usage;
     std::uint32_t fvf;
-    std::uint32_t pool;
-    UnmanagedResourceVB() {}
+    D3DPOOL pool;
+    UnmanagedResourceVB(CD3D9Device& device, std::uint32_t length, std::uint32_t usage, std::uint32_t fvf, D3DPOOL pool);
+    ~UnmanagedResourceVB() override;
     void restoreResource() override;
+    void releaseResource() override;
 };
 
-class UnmanagedResourceIB : public UnmanagedResourceBase {
+class UnmanagedResourceIB final : public UnmanagedResourceBase {
 public:
+    IDirect3DIndexBuffer9* native_buffer = nullptr;
     std::uint32_t length;
     std::uint32_t usage;
-    std::uint32_t format;
-    std::uint32_t pool;
-    UnmanagedResourceIB() {}
+    D3DFORMAT format;
+    D3DPOOL pool;
+    UnmanagedResourceIB(CD3D9Device& device, std::uint32_t length, std::uint32_t usage, D3DFORMAT format, D3DPOOL pool);
+    ~UnmanagedResourceIB() override;
     void restoreResource() override;
+    void releaseResource() override;
 };
 
-class UnmanagedResourceTexture : public UnmanagedResourceBase {
+class UnmanagedResourceTexture final : public UnmanagedResourceBase {
 public:
+    IDirect3DTexture9* native_texture = nullptr;
     std::uint32_t width;
     std::uint32_t height;
     std::uint32_t levels;
     std::uint32_t usage;
-    std::uint32_t format;
-    std::uint32_t pool;
-    std::uint8_t restore_marker;
-    UnmanagedResourceTexture() {}
+    D3DFORMAT format;
+    D3DPOOL pool;
+    bool restore_marker = false;
+    UnmanagedResourceTexture(CD3D9Device& device, std::uint32_t width, std::uint32_t height, std::uint32_t levels, std::uint32_t usage, D3DFORMAT format, D3DPOOL pool);
+    ~UnmanagedResourceTexture() override;
     void restoreResource() override;
+    void releaseResource() override;
 };
 
-class UnmanagedResourceVector {
+class DynamicVertexStream {
 public:
-    union { std::uint32_t* resources; UnmanagedResourceBase** native_resources; };
-    std::uint32_t capacity;
-    std::uint32_t size;
-    std::uint32_t* invalidation_target;
-    float growth_factor;
-    std::uint32_t allocation_flags;
-    StdAllocator* allocator;
-    UnmanagedResourceVector() {}
-    virtual void reserve(std::uint32_t requested_capacity);
+    std::unique_ptr<UnmanagedResourceVB> buffer;
+    std::uint32_t capacity = 0u;
+    std::uint32_t position = 0u;
+    DynamicVertexStream(CD3D9Device& device, std::uint32_t stride, std::uint32_t fvf);
+    std::byte* lock(std::int32_t count);
+private:
+    CD3D9Device& device;
+    std::uint32_t stride;
+    std::uint32_t fvf;
 };
+
+class DynamicIndexStream {
+public:
+    std::unique_ptr<UnmanagedResourceIB> buffer;
+    std::uint32_t capacity = 0u;
+    std::uint32_t position = 0u;
+    explicit DynamicIndexStream(CD3D9Device& device);
+    std::uint16_t* lock(std::int32_t count);
+private:
+    CD3D9Device& device;
+};
+
+class CD3D9Device {
+public:
+    enum DrawFlag : std::uint32_t { disable_clipping = 1u, two_sided = 4u, lighting = 16u };
+    IDirect3D9* api = nullptr;
+    IDirect3DDevice9* native_device = nullptr;
+    D3DPRESENT_PARAMETERS presentation{};
+    D3DCAPS9 capabilities{};
+    HRESULT last_hresult = S_OK;
+    D3DMATRIX world_transform{};
+    IDirect3DQuery9* sync_query = nullptr;
+    bool supports_post_effects = false;
+    std::vector<SphereUI::DisplayMode> display_modes;
+    std::unique_ptr<CShaderMgr> shaders;
+    std::unique_ptr<CPostEffectsMgr> post_effects;
+    std::unique_ptr<UnmanagedResourceTexture> reflection_target;
+    std::unique_ptr<UnmanagedResourceTexture> minimap_target;
+    DynamicVertexStream vertices32;
+    DynamicVertexStream vertices28;
+    DynamicIndexStream indices_primary;
+    DynamicIndexStream indices_secondary;
+    D3DTEXTUREFILTERTYPE min_filter = D3DTEXF_ANISOTROPIC;
+    D3DTEXTUREFILTERTYPE mag_filter = D3DTEXF_LINEAR;
+    D3DTEXTUREFILTERTYPE mip_filter = D3DTEXF_LINEAR;
+    CD3D9Device();
+    ~CD3D9Device();
+    CD3D9Device(const CD3D9Device&) = delete;
+    CD3D9Device& operator=(const CD3D9Device&) = delete;
+    HRESULT checkResult(HRESULT result, const char* operation);
+    void initialize(HWND window, std::uint32_t width, std::uint32_t height, std::uint32_t depth_bits, bool windowed);
+    void enumerateDisplayModes(bool windowed);
+    bool supportsDisplayMode(std::uint32_t width, std::uint32_t height, std::uint32_t depth_bits) const;
+    void selectBackBufferFormat(const D3DDISPLAYMODE& display, bool windowed, D3DFORMAT& format);
+    void selectDepthFormat(D3DFORMAT adapter_format, D3DFORMAT& format);
+    void initializeRenderState();
+    void applyFiltering();
+    void setTransform(D3DTRANSFORMSTATETYPE kind, const D3DMATRIX& matrix);
+    void setAlphaBlending(D3DBLEND source, D3DBLEND destination);
+    void setColorOperation(std::uint32_t stage, D3DTEXTUREOP operation, std::uint32_t first, std::uint32_t second);
+    void setAlphaOperation(std::uint32_t stage, D3DTEXTUREOP operation, std::uint32_t first, std::uint32_t second);
+    void setWhiteMaterial(float alpha);
+    void drawBuffer(IDirect3DVertexBuffer9* vertices, D3DPRIMITIVETYPE topology, std::uint32_t flags, std::int32_t base_vertex, std::uint32_t vertex_count, IDirect3DIndexBuffer9* indices, std::uint32_t index_count, std::uint32_t start_index, std::uint32_t stride);
+    void drawVertices(D3DPRIMITIVETYPE topology, std::uint32_t flags, const void* vertices, std::uint32_t vertex_count, const std::uint16_t* indices, std::uint32_t index_count, std::uint32_t stride);
+    bool beginScene();
+    void releaseResources();
+    void restoreResources();
+    void waitForGpu();
+    UnmanagedResourceTexture& minimapTexture();
+private:
+    friend class UnmanagedResourceBase;
+    std::vector<UnmanagedResourceBase*> unmanaged_resources;
+};
+
 
 class StdAllocator {
 public:
@@ -988,3 +1220,852 @@ public:
     virtual void* reallocate(void* memory, std::size_t size, std::uint32_t flags);
     virtual void deallocate(void* memory);
 };
+
+// Begin recovered files cluster.
+class SferaFileManager {
+public:
+    SferaFileManager() = default;
+    ~SferaFileManager();
+    SferaFileManager(const SferaFileManager&) = delete;
+    SferaFileManager& operator=(const SferaFileManager&) = delete;
+    void setErrorReporting(bool enabled);
+    int open(const char* filename, int flags);
+    int create(const char* filename);
+    int read(int descriptor, void* destination, std::uint32_t size);
+    int write(int descriptor, const void* source, std::uint32_t size);
+    std::int32_t seek(int descriptor, std::int32_t offset, int origin);
+    int close(int descriptor);
+    std::int32_t fileSize(const char* filename);
+    std::vector<std::uint8_t> readAll(const char* filename);
+    void addSearchPath(const char* directory);
+    std::vector<std::string> candidatePaths(const char* filename, bool search_nested_paths = false) const;
+private:
+    static constexpr std::size_t maximum_open_files = 100u;
+    static constexpr std::size_t maximum_search_paths = 100u;
+    void reportError(const char* description, const char* filename) const;
+    bool error_reporting_enabled = false;
+    std::vector<std::string> search_paths;
+    std::unordered_map<int, std::string> open_files;
+    int registerDescriptor(int descriptor, const std::string& filename);
+    const std::string* filenameFor(int descriptor, const char* invalid_handle_message) const;
+};
+
+inline SferaFileManager g_sfera_files;
+
+// End recovered files cluster.
+
+// Begin recovered quickfile cluster.
+#pragma pack(push, 1)
+struct CHash16Entry {
+    std::uint32_t length;
+    std::uint32_t value;
+    std::uint16_t next;
+    std::uint8_t* key();
+    const std::uint8_t* key() const;
+};
+#pragma pack(pop)
+
+class CHash16 {
+public:
+    static constexpr std::uint16_t no_entry = 0xFFFFu;
+    std::uint32_t max_key_length;
+    std::uint32_t missing_value;
+    CHash16Entry* entries;
+    std::uint32_t entry_stride;
+    std::uint32_t entry_capacity;
+    std::uint16_t free_entry;
+    std::uint16_t buckets[65536];
+    CHash16* initialize(std::uint32_t maximum_key_length, std::uint32_t absent_value, std::uint32_t initial_capacity);
+    void release();
+    std::uint32_t find(const void* key, std::uint32_t length, bool fold_case);
+    bool insert(const void* key, std::uint32_t length, std::uint32_t value, bool fold_case);
+private:
+    CHash16Entry& entry(std::uint16_t index);
+    void reserve(std::uint32_t capacity);
+};
+
+struct QuickFileEntry {
+    std::uint32_t size;
+    std::uint8_t* data;
+};
+
+class QuickFile {
+public:
+    static constexpr std::size_t file_capacity = 400u;
+    QuickFileEntry files[file_capacity];
+    CHash16 index;
+    std::uint16_t count;
+    QuickFile* initialize(const char* directory);
+    void release();
+    std::int32_t load(const char* filename, std::uint32_t size);
+    std::uint8_t* find(const char* filename, std::uint32_t* size, std::uint16_t* file_id);
+};
+
+static_assert(sizeof(CHash16Entry) == 10u);
+#if UINTPTR_MAX == UINT32_MAX
+static_assert(offsetof(CHash16, entries) == 8u && offsetof(CHash16, free_entry) == 0x14u && offsetof(CHash16, buckets) == 0x16u && sizeof(CHash16) == 0x20018u);
+static_assert(sizeof(QuickFileEntry) == 8u && offsetof(QuickFile, index) == 0xC80u && offsetof(QuickFile, count) == 0x20C98u && sizeof(QuickFile) == 0x20C9Cu);
+#endif
+
+// End recovered quickfile cluster.
+
+// Begin recovered filemap cluster.
+class SferaFileMap {
+public:
+    const std::byte* mapped_view;
+    std::uint32_t file_size;
+    char filename[32];
+
+    explicit SferaFileMap(const char* path) noexcept;
+    SferaFileMap(const SferaFileMap&) = delete;
+    SferaFileMap& operator=(const SferaFileMap&) = delete;
+    ~SferaFileMap() noexcept;
+    bool open(const char* path) noexcept;
+    void close() noexcept;
+    bool isOpen() const noexcept;
+    std::uint32_t size() const noexcept;
+    const std::byte* data() const noexcept;
+
+private:
+    void reportError(const char* format, bool fatal) const noexcept;
+};
+
+#if UINTPTR_MAX == UINT32_MAX
+static_assert(sizeof(SferaFileMap) == 40u, "FileMap x86 layout");
+static_assert(offsetof(SferaFileMap, mapped_view) == 0u, "FileMap view offset");
+static_assert(offsetof(SferaFileMap, file_size) == 4u, "FileMap size offset");
+static_assert(offsetof(SferaFileMap, filename) == 8u, "FileMap filename offset");
+#endif
+
+// End recovered filemap cluster.
+
+
+namespace SphereUI {
+    struct CursorGeometry {
+        std::int32_t x;
+        std::int32_t y;
+        std::int32_t width;
+        std::int32_t height;
+        bool centered;
+    };
+}
+
+class CCursorManager {
+public:
+    static CCursorManager& instance();
+    static bool hasActiveCursor() noexcept;
+    CCursor* currentCursor() const noexcept;
+    CCursor* activeCursor() const;
+    SferaCursorPosition position() const;
+    SphereUI::CursorGeometry geometry() const;
+    void select(std::uint32_t mode);
+    bool usesSoftwareCursor() const noexcept;
+private:
+    CCursorManager() = default;
+    ~CCursorManager();
+    CCursorManager(const CCursorManager&) = delete;
+    CCursorManager& operator=(const CCursorManager&) = delete;
+    CSoftwareCursor software;
+    CHardwareCursor hardware;
+    CCursor* active = nullptr;
+    static CCursorManager* initialized;
+};
+
+namespace SphereUI {
+    struct FontGlyph {
+        std::uint16_t width = 0u;
+        std::uint16_t height = 0u;
+        std::int16_t bearing_x = 0;
+        std::int16_t bearing_y = 0;
+        std::int16_t advance = 0;
+        std::uint16_t reserved = 0u;
+        float u0 = 0.0f;
+        float v0 = 0.0f;
+        float u1 = 0.0f;
+        float v1 = 0.0f;
+    };
+
+    class FontFace {
+    public:
+        std::uint32_t texture = std::numeric_limits<std::uint32_t>::max();
+        std::array<FontGlyph, 256> glyphs{};
+        std::string name;
+        std::int32_t line_height = 0;
+        std::int32_t baseline = 0;
+        bool load(const char* display_name, const char* filename, const char* texture_name);
+    };
+
+    class InterfaceRenderer {
+    public:
+        static TextExtent measureText(const char* text, std::uint32_t font, bool initialized);
+        static std::uint32_t tracking(std::uint32_t font) noexcept;
+        static void drawText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, std::uint32_t font, bool initialized, const UiRect& clip, bool opaque);
+        static void reportError(const char* message);
+        static void drawTexture(IDirect3DBaseTexture9* texture, float left, float top, float right, float bottom, std::uint32_t color, float u = 1.0f, float v = 1.0f, bool textured = true);
+        static void setSpriteRenderMode(std::uint32_t mode);
+        static UiViewport viewport();
+        static void setViewport(const UiViewport& viewport);
+
+    private:
+        static void drawFaceText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, std::uint32_t font, const UiRect& clip);
+    };
+
+    class InterfaceConfiguration {
+    public:
+        static const char* value(const char* key);
+        static void open(const char* filename);
+        static void readInteger(const char* key, std::uint32_t& value);
+        static void writeInteger(const char* key, std::uint32_t value);
+        static void save();
+    };
+
+    class FontFactory {
+    public:
+        FontFactory();
+        ~FontFactory();
+        FontFactory(const FontFactory&) = delete;
+        FontFactory& operator=(const FontFactory&) = delete;
+        void initialize();
+        void clear();
+        bool load(const char* filename, const char* texture_name);
+        void loadNamedFont(const char* name);
+        void loadConfiguration();
+        std::uint32_t count() const noexcept;
+        const FontFace& face(std::uint32_t font) const;
+    private:
+        friend class InterfaceRenderer;
+        std::vector<std::unique_ptr<FontFace>> faces;
+        std::vector<SferaScreenVertex> vertices;
+        std::vector<std::uint16_t> quad_indices;
+        std::uint32_t vertex_count = 0u;
+    };
+}
+
+inline SphereUI::FontFactory g_sfera_fonts;
+
+namespace SphereUI {
+    enum class HyperTextCommand { text, lineBreak, color, linkStart, linkEnd, preserveSpaces, horizontalSpace, tab, image, tooltipStart, tooltipEnd, unknown };
+    enum class HyperTextImageAlignment { top, bottom, middle };
+
+    struct HyperTextRegion {
+        std::string target;
+        std::vector<UiRect> rectangles;
+        bool visible = false;
+        bool hovered = false;
+        bool contains(std::int32_t x, std::int32_t y) const;
+        void addRectangle(const UiRect& rectangle, const UiRect& clip);
+    };
+
+    struct HyperDocumentNode {
+        HyperTextCommand command = HyperTextCommand::text;
+        std::string text;
+        std::uint32_t color = 0xFFFFFFFFu;
+        std::size_t region_index = 0;
+        std::int32_t spacing = 0;
+        std::int32_t width = 0;
+        HyperTextImageAlignment image_alignment = HyperTextImageAlignment::top;
+        std::int32_t image_width = 0;
+        std::int32_t image_height = 0;
+        std::int32_t image_x = 0;
+        std::int32_t image_y = 0;
+        std::shared_ptr<UiSprite> sprite;
+    };
+
+    struct HyperDocumentLine {
+        std::vector<HyperDocumentNode> nodes;
+        std::int32_t height = 0;
+        std::int32_t baseline = 0;
+        std::uint32_t initial_color = 0xFFFFFFFFu;
+    };
+
+    class HyperTextDocument {
+    public:
+        std::string name;
+        std::vector<HyperTextRegion> links;
+        std::vector<HyperTextRegion> tooltips;
+        std::int32_t line_height = 0;
+        std::uint32_t font = 0;
+        std::uint32_t link_color = 0xFF50A0A0u;
+        std::uint32_t hover_color = 0xFFFFFF00u;
+        HyperTextDocument() = default;
+        HyperTextDocument(std::string_view text, std::int32_t width, std::uint32_t format, std::uint32_t font);
+        void setName(const char* value);
+        bool load(const char* filename);
+        void load(const SferaSimpleParser& parser, const SferaParserRange& range);
+        void parse(std::string_view input);
+        HyperTextDocument* clone(std::int32_t width, std::uint32_t format, std::uint32_t font) const;
+        void layout(std::int32_t width, std::uint32_t format, std::uint32_t font);
+        void draw(std::int32_t left, std::int32_t top, std::int32_t clip_offset, std::int32_t clip_height, std::uint32_t alpha);
+        std::int32_t totalHeight() const;
+        void resetRegions();
+    private:
+        std::vector<HyperDocumentNode> nodes;
+        std::vector<HyperDocumentLine> lines;
+        UiRect linkRectangle(std::int32_t left, std::int32_t right, std::int32_t y, std::int32_t baseline) const;
+    };
+
+    class HyperTextParser {
+    public:
+        static HyperTextCommand command(std::string_view name);
+        static bool parseCommand(std::string_view tag, HyperDocumentNode& node, std::string& argument);
+        static void parseImage(std::string_view argument, HyperDocumentNode& node);
+        static void parseElements(const UiString& text, UiDeque<HyperTextElement*>& elements, UiString& plain);
+        static void releaseElements(UiDeque<HyperTextElement*>& elements);
+    };
+}
+
+namespace SphereUI {
+// Types in namespace SphereUI, before InterfaceManager.
+struct SavedWindowPosition {
+    std::string name;
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+};
+
+struct LocalizedTextEntry {
+    std::string key;
+    std::string value;
+};
+
+
+class InterfaceManager {
+public:
+    std::vector<Window*> window_templates;
+    std::vector<std::unique_ptr<HyperTextDocument>> hypertext_documents;
+    std::deque<UiSprite> sprites;
+    std::vector<LocalizedTextEntry> localized_strings;
+    std::list<SavedWindowPosition> saved_positions;
+    std::string resolved_ui_path;
+    const char* localizedPath(const char* filename);
+    UiSprite* sharedSprite(const char* name);
+    UiSprite* acquireSprite(const char* name);
+    void loadSprites(const char* filename);
+    void clearSprites();
+    bool loadWindowTemplates(const char* filename);
+    Window* templateWindow(const char* name) const;
+    void clearWindowTemplates();
+    void loadHyperTexts();
+    HyperTextDocument* findHyperText(const char* name) const;
+    void clearHyperTexts();
+    bool loadLocalizedStrings();
+    std::string_view localizedValue(const char* key) const;
+    const char* localizedText(const char* key) const;
+    void clearLocalizedStrings();
+    SavedWindowPosition* savedPosition(const char* name, bool create);
+    bool findSavedPosition(const char* name, SferaCursorPosition& position);
+    void saveWindowPosition(Window& window);
+    std::uint32_t savedPositionsSize() const;
+    void writeSavedPositions(std::span<std::byte> destination) const;
+    void readSavedPositions(std::span<const std::byte> source);
+    enum OpenFlag : std::uint32_t { explicitPosition = 1u, preserveVisibility = 2u, skipOpeningAnimation = 4u, centerOnScreen = 8u };
+    bool initialized = false;
+    bool drag_drop_active = false;
+    bool capture_control_binding = false;
+    bool tooltip_disabled = false;
+    std::list<Window*> windows;
+    std::deque<WindowEvent> events;
+    std::unordered_set<Window*> registered_windows;
+    std::unordered_map<const Window*, WindowEventHandler> event_handlers;
+    std::unique_ptr<SferaInterfaceCursor> cursor;
+    Window* help_window = nullptr;
+    Window* load_screen = nullptr;
+    ToolTipCtrl* tooltip = nullptr;
+    std::string cursor_name;
+    InterfaceManager() = default;
+    ~InterfaceManager();
+    InterfaceManager(const InterfaceManager&) = delete;
+    InterfaceManager& operator=(const InterfaceManager&) = delete;
+    bool prepareResources();
+    void finishInitialization();
+    bool shutdown();
+    void clearWindows();
+    void queueEvent(const WindowEvent& event);
+    bool pollEvent(WindowEvent& event);
+    Window* findWindow(const char* name, bool exact = false) const;
+    Window* windowUnderCursor() const;
+    bool hasEscapeWindow() const;
+    void addTopLevelWindow(Window& window);
+    void raiseWindow(Window& window);
+    void lowerWindow(Window& window);
+    void collectCoveredWindows(Window& window);
+    Window* openWindow(const char* name, std::int32_t x = 0, std::int32_t y = 0, std::uint32_t flags = 0u);
+    void closeWindow(Window* window, bool animated = true);
+    void showHelpPage(const char* name);
+    void setTooltipText(const char* text);
+    void setCursorKind(std::uint32_t kind, std::int32_t x, std::int32_t y);
+    void setCursorImage(const char* texture, std::int32_t x, std::int32_t y);
+    void update(std::uint8_t key = 0u, std::uint8_t character = 0u, std::uint32_t mouse_buttons = 0u, std::int32_t wheel_delta = 0);
+    void draw();
+    std::uint32_t sendMessage(Window* window, std::uint32_t message, std::uint32_t first, std::uint32_t second);
+    void showLoadingScreen(bool visible, std::int32_t width, std::int32_t height, bool english);
+    void setLoadingProgress(std::int32_t percent);
+    void registerWindow(Window& window);
+    void unregisterWindow(Window& window);
+    bool isRegistered(const Window* window) const;
+    void bindEventHandler(Window* window, WindowEventHandler handler);
+    void copyEventHandler(Window* destination, const Window* source);
+    bool hasEventHandler(const Window* window) const;
+    void dispatchEvent(Window* window, const WindowEvent& event);
+    void unbindEventHandler(const void* window);
+
+};
+}
+inline SphereUI::InterfaceManager g_sfera_interface;
+
+namespace SphereUI {
+    struct ImageDescriptionParameters {
+        char texture_name[64];
+        std::uint32_t width;
+        std::uint32_t height;
+        std::uint32_t rectangle[4];
+        std::uint32_t flags;
+    };
+
+    struct ImageDescription {
+        char name[64];
+        ImageDescriptionParameters image;
+    };
+}
+
+
+namespace SphereRender {
+
+class ConfigDocument {
+public:
+    enum class Type { Integer, Float, Text, Binary, Object, IntegerArray, FloatArray, TextArray, ObjectArray };
+    enum class StorageMode { Plain, Encoded, Preserve };
+    struct Value {
+        std::string name;
+        Type type = Type::Integer;
+        std::variant<std::int32_t, float, std::string, std::vector<std::uint8_t>, std::vector<std::int32_t>, std::vector<float>, std::vector<std::string>, std::vector<ConfigDocument>> data;
+    };
+    static ConfigDocument parse(std::string_view source);
+    static ConfigDocument open(const char* path);
+    static void setStorageMode(StorageMode mode);
+    const Value* find(std::string_view name) const;
+    std::optional<std::int32_t> integer(std::string_view name) const;
+    std::optional<float> real(std::string_view name) const;
+    const char* text(std::string_view name) const;
+    std::optional<std::size_t> arraySize(std::string_view name) const;
+    std::optional<std::int32_t> integerAt(std::string_view name, std::size_t index) const;
+    std::optional<float> realAt(std::string_view name, std::size_t index) const;
+    const char* textAt(std::string_view name, std::size_t index) const;
+    const ConfigDocument* object(std::string_view name) const;
+    const ConfigDocument* objectAt(std::string_view name, std::size_t index) const;
+    std::span<const std::uint8_t> binary(std::string_view name) const;
+    const std::vector<Value>& values() const;
+private:
+    class Parser;
+    std::vector<Value> values_;
+    static StorageMode storage_mode_;
+};
+
+class ModelParameters {
+public:
+    void load(const char* path);
+    void parse(std::string_view source);
+    void clear();
+    bool contains(std::string_view model, std::string_view parameter) const;
+    bool hasModel(std::string_view model) const;
+    std::optional<float> floatValue(std::string_view model, std::string_view parameter) const;
+    std::optional<std::int32_t> intValue(std::string_view model, std::string_view parameter) const;
+    std::optional<std::string_view> stringValue(std::string_view model, std::string_view parameter) const;
+private:
+    struct Parameter { std::string name; std::optional<std::string> value; };
+    struct Object { std::string name; std::vector<Parameter> parameters; };
+    const Object* findObject(std::string_view name) const;
+    const Parameter* findParameter(std::string_view model, std::string_view parameter) const;
+    std::vector<Object> objects_;
+    bool initialized_ = false;
+};
+
+struct Material {
+    std::string name;
+    std::vector<std::int32_t> textures;
+    std::array<float, 4> color{};
+    std::array<float, 3> colorVariation{};
+    bool hasColorVariation = false;
+    static std::uint32_t randomColor(const std::array<float, 3>& variation);
+};
+
+class MaterialLibrary {
+public:
+    void load(const char* binary_path, const char* configuration_path = "Models\\Materials.cfg");
+    void clear();
+    const Material* find(std::string_view name) const;
+    std::optional<std::uint16_t> findIndex(std::string_view name) const;
+    std::optional<std::uint16_t> indexOf(const Material& material) const;
+    const Material* at(std::size_t index) const;
+    const Material* defaultMaterial() const;
+    std::size_t size() const;
+private:
+    std::vector<Material> materials_;
+    std::optional<std::uint16_t> default_index_;
+};
+
+}
+inline SphereRender::MaterialLibrary g_sfera_materials;
+
+
+namespace SphereRender {
+
+class ModelParameters;
+class MaterialLibrary;
+struct Material;
+
+struct ModelVertex {
+    SferaVec3F position{};
+    SferaVec3F normal{};
+    float u = 0.0f;
+    float v = 0.0f;
+    const Material* material = nullptr;
+};
+
+struct ModelFace {
+    std::uint16_t vertices[3]{};
+    std::uint32_t attributes = 0u;
+};
+
+struct Submesh {
+    std::uint8_t bone_and_flags = 0u;
+    std::uint16_t material_index = 0u;
+    std::uint16_t first_face = 0u;
+    std::uint16_t face_count = 0u;
+    std::uint16_t first_vertex = 0u;
+    std::uint16_t vertex_count = 0u;
+    std::uint8_t flags = 0u;
+    std::array<std::uint16_t, 2> export_metadata{};
+    std::uint8_t boneIndex() const noexcept { return bone_and_flags & 0x7fu; }
+};
+
+struct BoneBounds {
+    SferaBoundsCornersRuntime corners{};
+    SferaVec3F minimum{};
+    SferaVec3F maximum{};
+    SferaVec3F center{};
+    float diagonal_length = 0.0f;
+};
+
+struct BoneAnimation {
+    std::uint8_t suppress_secondary_animation = 0u;
+    std::uint8_t animated = 0u;
+    std::uint16_t pose_index = 0u;
+    std::uint8_t attachment_slot = 255u;
+};
+
+struct Bone {
+    char name[32]{};
+    std::uint8_t geometry_kind = 0u;
+    std::uint8_t child_count = 0u;
+    std::uint8_t first_child = 0u;
+    union { BoneBounds bounds{}; BoneAnimation animation; };
+};
+
+struct ModelKeyframe {
+    SferaVec3F translation{};
+    SferaQuaternionF rotation{};
+};
+
+#pragma pack(push, 1)
+struct AnimationFrame {
+    std::uint16_t keyframe = 0u;
+    std::uint8_t interpolation = 255u;
+};
+#pragma pack(pop)
+
+struct FaceColorIndices { std::uint16_t vertices[3]{}; };
+
+struct ModelCollisionGroup {
+    std::uint32_t bone = 0u;
+    std::uint32_t triangle_count = 0u;
+    std::uint32_t first_triangle = 0u;
+};
+
+struct ModelCollisionTriangle {
+    SferaVec3F minimum{};
+    SferaVec3F maximum{};
+    SferaVec3F vertices[3]{};
+    SferaVec3F normal{};
+    float plane_distance = 0.0f;
+    std::uint32_t collision_flags = 0u;
+};
+
+enum class VegetationKind : std::int32_t { None = -1, Grass = 0, SynchronizedGrass = 1, InteractiveGrass = 2, Tree = 3 };
+
+struct GrassInfluence {
+    enum : std::uint16_t { Fixed = 65535u, Horizontal = 65534u };
+    std::uint16_t anchor_vertex = Fixed;
+    std::uint16_t phase = 0u;
+    std::uint16_t share_phase = 0u;
+    float distance = 0.0f;
+};
+
+struct TreeInfluence {
+    float amplitude = 0.0f;
+    std::uint16_t phase = 0u;
+};
+
+struct GrassBendingBasis {
+    SferaVec3F first_axis{};
+    SferaVec3F second_axis{};
+    SferaVec3F anchor{};
+};
+
+struct VegetationVertex { SferaVec3F position{}; SferaVec3F normal{}; };
+
+class Model {
+public:
+    char name[32]{};
+    std::uint32_t vertex_count = 0u;
+    ModelVertex* vertices = nullptr;
+    std::uint32_t face_count = 0u;
+    ModelFace* faces = nullptr;
+    std::uint32_t submesh_count = 0u;
+    Submesh* submeshes = nullptr;
+    std::uint32_t bone_count = 0u;
+    Bone* bones = nullptr;
+    std::uint8_t render_flags = 0u;
+    std::uint32_t material_count = 0u;
+    std::uint16_t* material_indices = nullptr;
+    std::uint8_t* child_bones = nullptr;
+    std::uint8_t animation_count = 0u;
+    std::uint16_t frame_count = 0u;
+    ModelKeyframe* keyframes = nullptr;
+    AnimationFrame* animation_frames = nullptr;
+    std::uint16_t* animation_lengths = nullptr;
+    std::uint8_t has_vertex_colors = 0u;
+    std::uint32_t* vertex_colors = nullptr;
+    FaceColorIndices* face_colors = nullptr;
+    std::uint32_t collision_kind = 0u;
+    SferaVec3F minimum{};
+    SferaVec3F maximum{};
+    SferaBoundsCornersRuntime oriented_corners{};
+    SferaBoundsCornersRuntime collision_corners{};
+    SferaMatrix4x4F bounds_transform{};
+    SferaVec3F oriented_size{};
+    float radius = 0.0f;
+    float minimum_size = 0.0f;
+    std::uint32_t collision_group_count = 0u;
+    ModelCollisionGroup* collision_groups = nullptr;
+    ModelCollisionTriangle* collision_triangles = nullptr;
+    float lod_distance = 1000.0f;
+    float lod_power = -1.0f;
+    float shadow_fade = 0.5f;
+    float shadow_scale = 2.0f;
+    float shadow_spread = 0.85f;
+    std::uint32_t casts_static_shadow = 0u;
+    float trace_distance = -1.0f;
+    VegetationKind vegetation_kind = VegetationKind::None;
+    union { GrassInfluence* grass_influences = nullptr; TreeInfluence* tree_influences; };
+    GrassBendingBasis* grass_bending = nullptr;
+    VegetationVertex* cached_vegetation_vertices = nullptr;
+    std::array<float, 3> color_variation{};
+    std::uint32_t landscape_shadow_alpha = 0u;
+
+    Model() = default;
+    ~Model();
+    Model(const Model&) = delete;
+    Model& operator=(const Model&) = delete;
+    static std::unique_ptr<Model> load(const char* model_name, const char* directory, const ModelParameters& parameters, const MaterialLibrary& materials);
+    static std::unique_ptr<Model> decode(std::string_view model_name, std::span<const std::uint8_t> bytes, const ModelParameters& parameters, const MaterialLibrary& materials);
+    void prepareGrass(bool synchronized, float ground_y);
+    void prepareTree(float dead_radius, float phase_multiplier);
+    void prepareVegetation(const ModelParameters& parameters);
+    void initializeGrassGeometry(std::uint32_t vertices_needed, std::uint32_t faces_needed, float height);
+    void finishGrassGeometry(std::span<const Submesh> groups);
+
+private:
+    void recoverBounds();
+    void assignMaterials(const MaterialLibrary& materials);
+    std::unique_ptr<ModelVertex[]> vertex_storage_;
+    std::unique_ptr<ModelFace[]> face_storage_;
+    std::unique_ptr<Submesh[]> submesh_storage_;
+    std::unique_ptr<Bone[]> bone_storage_;
+    std::unique_ptr<std::uint16_t[]> material_storage_;
+    std::unique_ptr<std::uint8_t[]> child_bone_storage_;
+    std::unique_ptr<ModelKeyframe[]> keyframe_storage_;
+    std::unique_ptr<AnimationFrame[]> animation_frame_storage_;
+    std::unique_ptr<std::uint16_t[]> animation_length_storage_;
+    std::unique_ptr<std::uint32_t[]> vertex_color_storage_;
+    std::unique_ptr<FaceColorIndices[]> face_color_storage_;
+    std::unique_ptr<ModelCollisionGroup[]> collision_group_storage_;
+    std::unique_ptr<ModelCollisionTriangle[]> collision_triangle_storage_;
+    std::unique_ptr<GrassInfluence[]> grass_storage_;
+    std::unique_ptr<TreeInfluence[]> tree_storage_;
+    std::unique_ptr<GrassBendingBasis[]> bending_storage_;
+};
+
+}
+
+
+namespace SphereRender {
+    class TextureRepository {
+    public:
+        struct Entry {
+            std::string name;
+            std::filesystem::path filename;
+            std::unique_ptr<IDirect3DBaseTexture9, void(*)(IDirect3DBaseTexture9*)> texture{nullptr, [](IDirect3DBaseTexture9* value) { value->Release(); }};
+            bool has_alpha = false;
+        };
+        void initialize();
+        void addFolder(const char* directory);
+        void finishRegistration();
+        void clear();
+        std::int32_t find(const char* name) const;
+        IDirect3DBaseTexture9* resource(std::uint32_t index);
+        SphereUI::TextExtent size(std::uint32_t index);
+        bool hasAlpha(std::uint32_t index);
+        std::size_t count() const { return entries.size(); }
+        std::uint32_t defaultTexture() const { return default_texture; }
+    private:
+        std::vector<Entry> entries;
+        std::unordered_map<std::string, std::uint32_t> names;
+        std::uint32_t default_texture = UINT32_MAX;
+        bool initialized = false;
+        Entry* resolve(std::uint32_t index);
+        void load(Entry& entry, std::span<const std::uint8_t> bytes);
+    };
+
+    class ModelRepository {
+    public:
+        struct Entry {
+            std::string name;
+            std::string directory;
+            std::unique_ptr<Model> model;
+            std::chrono::steady_clock::time_point last_used;
+        };
+        void initialize();
+        void addFolder(const char* directory);
+        void finishRegistration();
+        std::int32_t find(const char* name) const;
+        Model* model(std::uint32_t index);
+        void releaseModels();
+        void evictUnused(std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now());
+        void clear();
+        void recordRequest(std::string_view name);
+        void writeRequestStatistics() const;
+        std::size_t count() const { return entries.size(); }
+        std::map<std::string, std::uint32_t> request_counts;
+        ModelParameters parameters;
+    private:
+        std::vector<Entry> entries;
+        std::unordered_map<std::string, std::uint32_t> names;
+        std::uint32_t requests_since_scan = 0;
+        std::size_t scan_index = 0;
+    };
+}
+
+inline SphereRender::TextureRepository g_sfera_textures;
+inline SphereRender::ModelRepository g_sfera_models;
+
+
+class CD3D9Device;
+struct ID3DXConstantTable;
+
+class CShaderMgr {
+public:
+    struct WaterParameters { float gradient = 0.0f; float specular = 0.0f; float reflection = 0.0f; };
+    struct TexelOffset { float x; float y; };
+    struct Variant {
+        std::string filename;
+        IDirect3DPixelShader9* pixel_shader = nullptr;
+        ID3DXConstantTable* constants = nullptr;
+        Variant() = default;
+        ~Variant();
+        Variant(const Variant&) = delete;
+        Variant& operator=(const Variant&) = delete;
+        void setConstant(CD3D9Device& device, const char* name, const void* data, std::uint32_t bytes);
+    };
+    std::unordered_map<std::uint64_t, Variant> variants;
+    std::string vertex_directory;
+    std::string pixel_directory;
+    std::array<float, 512> wave_samples;
+    std::array<TexelOffset, 16> downsample_offsets;
+    CShaderMgr(CD3D9Device& device, const char* vertex_directory, const char* pixel_directory);
+    CShaderMgr(const CShaderMgr&) = delete;
+    CShaderMgr& operator=(const CShaderMgr&) = delete;
+    static std::uint64_t instanceCode(std::string_view filename, bool pixel);
+    static std::array<float, 512> makeWaveSamples();
+    static std::array<TexelOffset, 16> makeDownsampleOffsets(float width, float height);
+    static WaterParameters waterParameters(float environment, float height);
+    void loadFolder(const char* directory, bool pixel);
+    void setPixelShader(std::uint32_t group);
+private:
+    CD3D9Device& device;
+    Variant& loadVariant(std::uint64_t code);
+};
+
+class CPostEffectsMgr {
+public:
+    bool enabled = false;
+    explicit CPostEffectsMgr(CD3D9Device& device);
+    ~CPostEffectsMgr();
+    CPostEffectsMgr(const CPostEffectsMgr&) = delete;
+    CPostEffectsMgr& operator=(const CPostEffectsMgr&) = delete;
+    void restoreResources();
+    void releaseResources();
+    void setEnabled(bool value);
+    void beginCapture();
+    void compose();
+private:
+    struct ScreenVertex { float x; float y; float z; float rhw; float u; float v; float u2; float v2; };
+    CD3D9Device& device;
+    IDirect3DSurface9* captured_backbuffer = nullptr;
+    IDirect3DTexture9* scene_texture = nullptr;
+    IDirect3DTexture9* blur_texture = nullptr;
+    IDirect3DTexture9* temporary_texture = nullptr;
+    IDirect3DVertexDeclaration9* vertex_declaration = nullptr;
+    void configureRenderState();
+    void drawQuad(std::uint32_t width, std::uint32_t height);
+    void renderToTexture(IDirect3DTexture9* target);
+    void blur();
+};
+
+
+struct WaterMaterial {
+    std::uint32_t primary_animation;
+    std::uint32_t secondary_animation;
+    float primary_opacity;
+    float secondary_opacity;
+    float reflection_opacity;
+    float wave_amplitude;
+};
+
+struct SferaGraphicsRuntime {
+    float fog_distance;
+    float saved_fog_distance;
+    uint32_t lods_enabled;
+    uint32_t hardware_cursor_enabled;
+    float environment_factor;
+    uint8_t render_mode_enabled;
+    uint32_t base_microtexture_id;
+    float view_parameter;
+    float view_scale;
+    uint32_t post_effects_enabled;
+    uint32_t rebuild_percent;
+    uint32_t runtime_counter;
+    float base_render_factor;
+    uint32_t display_width;
+    uint32_t display_height;
+    std::unique_ptr<CD3D9Device> d3d_runtime;
+    std::array<WaterMaterial, 10> water_materials{};
+    void initialize();
+    void initializeWater();
+};
+union SferaLogPath {
+    char text[52];
+    uint32_t words[13];
+};
+struct SferaLogFileRuntime {
+    SferaLogPath path;
+    uint32_t truncate_on_first_write;
+    uint32_t has_written;
+    uint32_t size_limit;
+    std::FILE* open() const;
+    void write(const char* text);
+    void write(std::int32_t number);
+};
+struct SferaLogRuntime {
+    SferaLogFileRuntime files[3];
+};
+

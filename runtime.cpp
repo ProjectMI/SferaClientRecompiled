@@ -313,6 +313,9 @@ NativeRuntime::NativeRuntime() {
 
 void NativeRuntime::call_native(LiftCpu& state, std::uint32_t target, std::uint32_t callsite) {
     if (target < 0x10000u) { throw std::runtime_error("Invalid native call target " + hex_u32(target) + " at " + hex_u32(callsite)); }
+    DiagnosticRunScope run_scope(&state);
+    DiagnosticPhaseScope phase(RuntimePhase::native_call);
+    DiagnosticExecutionScope execution_scope(target, callsite, state.esp, callsite);
     NativeCallFrame frame{&state, reinterpret_cast<void*>(static_cast<std::uintptr_t>(target)), 0, 0, 0, 0, 0, nullptr, g_lifted_exception_list};
     native_call_bridge(&frame);
 }

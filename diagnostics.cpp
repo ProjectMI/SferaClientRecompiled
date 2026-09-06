@@ -203,8 +203,8 @@ DiagnosticRunScope::~DiagnosticRunScope() {
     g_operation = previous_operation_;
 }
 
-DiagnosticExecutionScope::DiagnosticExecutionScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp) noexcept : previous_depth_(g_call_count) {
-    diagnostic_call(0, target, stop_target, esp);
+DiagnosticExecutionScope::DiagnosticExecutionScope(std::uint32_t target, std::uint32_t stop_target, std::uint32_t esp, std::uint32_t callsite) noexcept : previous_depth_(g_call_count) {
+    diagnostic_call(callsite, target, stop_target, esp);
 }
 
 DiagnosticExecutionScope::~DiagnosticExecutionScope() {
