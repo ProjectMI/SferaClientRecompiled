@@ -3652,7 +3652,7 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5D20(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5DB0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5DD0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5DE0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5E50(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5EC0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5F30(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
@@ -3664,7 +3664,7 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F61D0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6240(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F62B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6320(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
     
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6400(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6470(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
@@ -3674,19 +3674,19 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6720(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F67F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F68C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6950(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F69C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6A30(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6AA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6B10(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6B80(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6C10(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6C80(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6CF0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6D60(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6DD0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6E40(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6EB0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
     
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6FA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7010(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
@@ -3700,12 +3700,12 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7390(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7400(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7470(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F74E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7550(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F75C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7630(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F76A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7710(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
+    
+    
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7780(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F77B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F77F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
@@ -3726,7 +3726,7 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7B30(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7B70(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7BA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7BE0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    cpu->eax = static_cast<std::uint32_t>(0u);
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7BF0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7C20(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7CA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));

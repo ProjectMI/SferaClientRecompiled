@@ -2260,12 +2260,12 @@ __declspec(noinline) void sfera_sub_00497E00(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = *(uint32_t*)(cpu->esi + 0x60u);
     cpu->eax &= *(uint32_t*)(cpu->esi + 0x64u);
     if (cpu->eax != 0xFFFFFFFFu) goto label_00097E6A;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x497E62u)); sfera_sub_0049A670(cpu, LIFT_CODE_TOKEN_VA(0x497E62u));
+    { const auto result = WorldClock::nowTicks(); cpu->eax = static_cast<std::uint32_t>(result); cpu->edx = static_cast<std::uint32_t>(result >> 32u); }
     *(uint32_t*)(cpu->esi + 0x60u) = cpu->eax;
     *(uint32_t*)(cpu->esi + 0x64u) = cpu->edx;
     goto label_00097EAC;
     label_00097E6A:
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x497E6Fu)); sfera_sub_0049A670(cpu, LIFT_CODE_TOKEN_VA(0x497E6Fu));
+    { const auto result = WorldClock::nowTicks(); cpu->eax = static_cast<std::uint32_t>(result); cpu->edx = static_cast<std::uint32_t>(result >> 32u); }
     sub_pred[0] = cpu->eax < *(uint32_t*)(cpu->esi + 0x60u); cpu->eax -= *(uint32_t*)(cpu->esi + 0x60u);
     lift_push32(cpu, 0u);
     cpu->edx -= *(uint32_t*)(cpu->esi + 0x64u) + (sub_pred[0]);
@@ -3026,12 +3026,12 @@ __declspec(noinline) void sfera_sub_00498AD0(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = *(uint32_t*)(cpu->esi + 0x18u);
     cpu->eax &= *(uint32_t*)(cpu->esi + 0x1Cu);
     if (cpu->eax != 0xFFFFFFFFu) goto label_00098B26;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x498B1Eu)); sfera_sub_0049A670(cpu, LIFT_CODE_TOKEN_VA(0x498B1Eu));
+    { const auto result = WorldClock::nowTicks(); cpu->eax = static_cast<std::uint32_t>(result); cpu->edx = static_cast<std::uint32_t>(result >> 32u); }
     *(uint32_t*)(cpu->esi + 0x18u) = cpu->eax;
     *(uint32_t*)(cpu->esi + 0x1Cu) = cpu->edx;
     cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
     label_00098B26:
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x498B2Bu)); sfera_sub_0049A670(cpu, LIFT_CODE_TOKEN_VA(0x498B2Bu));
+    { const auto result = WorldClock::nowTicks(); cpu->eax = static_cast<std::uint32_t>(result); cpu->edx = static_cast<std::uint32_t>(result >> 32u); }
     sub_pred[0] = cpu->eax < *(uint32_t*)(cpu->esi + 0x18u); cpu->eax -= *(uint32_t*)(cpu->esi + 0x18u);
     lift_push32(cpu, 0u);
     cpu->edx -= *(uint32_t*)(cpu->esi + 0x1Cu) + (sub_pred[0]);
@@ -3973,160 +3973,11 @@ __declspec(noinline) void sfera_sub_004998A0(LiftCpu* cpu, uint32_t stop_address
 
 
 
-__declspec(noinline) void sfera_sub_0049A4D0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->esp -= 8u;
-    cpu->eax = cpu->esp;
-    lift_push32(cpu, cpu->eax);
-    lift_native_call(cpu, native_function_address32(&::QueryPerformanceFrequency), LIFT_CODE_TOKEN_VA(0x49A4D7u));
-    cpu->eax = *(uint32_t*)(cpu->esp + 4u);
-    cpu->ecx = *(uint32_t*)(cpu->esp);
-    cpu->edx = 0u;
-    g_sfera_high_resolution_clock_runtime.performance_frequency.low = cpu->ecx;
-    g_sfera_high_resolution_clock_runtime.performance_frequency.high = cpu->eax;
-    g_sfera_high_resolution_clock_runtime.frequency_shift = cpu->edx;
-    if (cpu->eax!=0u) goto label_0009A503;
-    if (cpu->ecx <= 0x1E8480u) goto label_0009A529;
-    label_0009A503:
-    cpu->ecx = (cpu->ecx >> 1u) | (cpu->eax << 31u);
-    cpu->eax >>= 1u;
-    ++cpu->edx;
-    if (cpu->eax!=0u) goto label_0009A503;
-    if (false) goto label_0009A518;
-    if (cpu->ecx > 0x1E8480u) goto label_0009A503;
-    label_0009A518:
-    g_sfera_high_resolution_clock_runtime.performance_frequency.low = cpu->ecx;
-    g_sfera_high_resolution_clock_runtime.performance_frequency.high = cpu->eax;
-    g_sfera_high_resolution_clock_runtime.frequency_shift = cpu->edx;
-    label_0009A529:
-    cpu->ecx = cpu->esp;
-    lift_push32(cpu, cpu->ecx);
-    lift_native_call(cpu, native_function_address32(&::QueryPerformanceCounter), LIFT_CODE_TOKEN_VA(0x49A52Du));
-    cpu->edx = *(uint32_t*)(cpu->esp);
-    cpu->eax = *(uint32_t*)(cpu->esp + 4u);
-    g_sfera_high_resolution_clock_runtime.counter_anchor.low = cpu->edx;
-    g_sfera_high_resolution_clock_runtime.counter_anchor.high = cpu->eax;
-    cpu->esp += 8u;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0049A550(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[4];
-    cpu->esp -= 8u;
-    if ((uint32_t)(g_sfera_high_resolution_clock_runtime.initialized) != 0u) goto label_0009A56B;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A561u)); sfera_sub_0049A4D0(cpu, LIFT_CODE_TOKEN_VA(0x49A561u));
-    g_sfera_high_resolution_clock_runtime.initialized = 1u;
-    label_0009A56B:
-    lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
-    cpu->eax = cpu->esp + 0x10u;
-    lift_push32(cpu, cpu->eax);
-    lift_native_call(cpu, native_function_address32(&::QueryPerformanceCounter), LIFT_CODE_TOKEN_VA(0x49A574u));
-    cpu->eax = *(uint32_t*)(cpu->esp + 0x10u);
-    cpu->ebx = g_sfera_high_resolution_clock_runtime.counter_anchor.low;
-    cpu->edx = *(uint32_t*)(cpu->esp + 0x14u);
-    cpu->ebp = g_sfera_high_resolution_clock_runtime.counter_anchor.high;
-    cpu->ecx = g_sfera_high_resolution_clock_runtime.frequency_shift;
-    sub_pred[0] = cpu->eax < cpu->ebx; cpu->eax -= cpu->ebx;
-    cpu->edx -= cpu->ebp + (sub_pred[0]);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A59Du)); sfera_sub_004EEE10(cpu, LIFT_CODE_TOKEN_VA(0x49A59Du));
-    cpu->edi = g_sfera_high_resolution_clock_runtime.elapsed_counter.low;
-    cpu->esi = g_sfera_high_resolution_clock_runtime.elapsed_counter.high;
-    cpu->ecx = g_sfera_high_resolution_clock_runtime.frequency_shift;
-    cpu->edi += cpu->eax;
-    cpu->esi += cpu->edx + (cpu->edi < cpu->eax);
-    g_sfera_high_resolution_clock_runtime.elapsed_counter.low = cpu->edi;
-    g_sfera_high_resolution_clock_runtime.elapsed_counter.high = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A5C4u)); sfera_sub_004EEDF0(cpu, LIFT_CODE_TOKEN_VA(0x49A5C4u));
-    cpu->ecx = g_sfera_high_resolution_clock_runtime.performance_frequency.high;
-    lift_push32(cpu, 0u);
-    cpu->ebx += cpu->eax;
-    lift_push32(cpu, 0x3E8u);
-    cpu->ebp += cpu->edx + (cpu->ebx < cpu->eax);
-    cpu->edx = g_sfera_high_resolution_clock_runtime.performance_frequency.low;
-    lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->edx);
-    g_sfera_high_resolution_clock_runtime.counter_anchor.low = cpu->ebx;
-    g_sfera_high_resolution_clock_runtime.counter_anchor.high = cpu->ebp;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A5EEu)); sfera_sub_004EED20(cpu, LIFT_CODE_TOKEN_VA(0x49A5EEu));
-    cpu->ecx = cpu->edx;
-    cpu->ebx = cpu->eax;
-    sub_pred[3] = cpu->esi <= cpu->ecx;
-    if (cpu->esi < cpu->ecx) goto label_0009A662;
-    if (!sub_pred[3]) goto label_0009A5FC;
-    if (cpu->edi <= cpu->ebx) goto label_0009A662;
-    label_0009A5FC:
-    cpu->ebx = g_sfera_high_resolution_clock_runtime.epoch_microseconds.high;
-    label_0009A602:
-    sub_pred[1] = cpu->edi < cpu->eax; cpu->edi -= cpu->eax;
-    cpu->esi -= cpu->edx + (sub_pred[1]);
-    g_sfera_high_resolution_clock_runtime.epoch_microseconds.low += 0x3B9ACA00u;
-    cpu->ebx += (g_sfera_high_resolution_clock_runtime.epoch_microseconds.low < 0x3B9ACA00u);
-    sub_pred[2] = cpu->esi < cpu->ecx;
-    if (cpu->esi > cpu->ecx) goto label_0009A602;
-    if (sub_pred[2]) goto label_0009A61D;
-    if (cpu->edi > cpu->eax) goto label_0009A602;
-    label_0009A61D:
-    g_sfera_high_resolution_clock_runtime.elapsed_counter.low = cpu->edi;
-    g_sfera_high_resolution_clock_runtime.elapsed_counter.high = cpu->esi;
-    g_sfera_high_resolution_clock_runtime.epoch_microseconds.high = cpu->ebx;
-    label_0009A62F:
-    lift_push32(cpu, 0u); lift_push32(cpu, 0xF4240u); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A63Du)); sfera_sub_004EED20(cpu, LIFT_CODE_TOKEN_VA(0x49A63Du));
-    cpu->ecx = g_sfera_high_resolution_clock_runtime.performance_frequency.high;
-    lift_push32(cpu, cpu->ecx);
-    cpu->ecx = g_sfera_high_resolution_clock_runtime.performance_frequency.low;
-    lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->edx); lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A652u)); sfera_sub_004EED80(cpu, LIFT_CODE_TOKEN_VA(0x49A652u));
-    cpu->eax += g_sfera_high_resolution_clock_runtime.epoch_microseconds.low;
-    cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu);
-    cpu->edx += cpu->ebx + (cpu->eax < (uint32_t)(g_sfera_high_resolution_clock_runtime.epoch_microseconds.low));
-    cpu->ebx = lift_pop32(cpu);
-    cpu->esp += 8u;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0009A662:
-    cpu->ebx = g_sfera_high_resolution_clock_runtime.epoch_microseconds.high;
-    goto label_0009A62F;
-}
-__declspec(noinline) void sfera_sub_0049A670(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A675u)); sfera_sub_0049A550(cpu, LIFT_CODE_TOKEN_VA(0x49A675u));
-    lift_push32(cpu, 0u); lift_push32(cpu, 0x64u); lift_push32(cpu, cpu->edx); lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A680u)); sfera_sub_004EEA40(cpu, LIFT_CODE_TOKEN_VA(0x49A680u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0049A690(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->esi);
-    cpu->esi = cpu->ecx;
-    cpu->ecx |= 0xFFFFFFFFu;
-    if (g_sfera_profiler_runtime.call_count[cpu->esi] == cpu->ecx) goto label_0009A6CB;
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (1u & 0xFFu);
-    if (g_sfera_profiler_runtime.active[cpu->esi] != (cpu->eax & 0xFFu)) goto label_0009A6B2;
-    g_sfera_profiler_runtime.call_count[cpu->esi] = cpu->ecx;
-    cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0009A6B2:
-    g_sfera_profiler_runtime.active[cpu->esi] = cpu->eax & 0xFFu;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A6BDu)); sfera_sub_0049A550(cpu, LIFT_CODE_TOKEN_VA(0x49A6BDu));
-    g_sfera_profiler_runtime.start_time_us[cpu->esi].low = cpu->eax;
-    g_sfera_profiler_runtime.start_time_us[cpu->esi].high = cpu->edx;
-    label_0009A6CB:
-    cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0049A6D0(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
-    lift_push32(cpu, cpu->esi);
-    cpu->esi = cpu->ecx;
-    cpu->eax |= 0xFFFFFFFFu;
-    if (g_sfera_profiler_runtime.call_count[cpu->esi] == cpu->eax) goto label_0009A722;
-    if (g_sfera_profiler_runtime.active[cpu->esi] != 0u) goto label_0009A6F1;
-    g_sfera_profiler_runtime.call_count[cpu->esi] = cpu->eax;
-    cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0009A6F1:
-    g_sfera_profiler_runtime.active[cpu->esi] = UINT8_C(0);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A6FDu)); sfera_sub_0049A550(cpu, LIFT_CODE_TOKEN_VA(0x49A6FDu));
-    g_sfera_profiler_runtime.report_clock_snapshot.low = cpu->eax;
-    sub_pred[0] = cpu->eax < (uint32_t)((uint64_t)(g_sfera_profiler_runtime.start_time_us[cpu->esi].low)); cpu->eax -= (uint64_t)(g_sfera_profiler_runtime.start_time_us[cpu->esi].low);
-    cpu->ecx = (uintptr_t)&g_sfera_profiler_runtime.accumulated_ticks[cpu->esi];
-    g_sfera_profiler_runtime.report_clock_snapshot.high = cpu->edx;
-    cpu->edx -= g_sfera_profiler_runtime.start_time_us[cpu->esi].high + (sub_pred[0]);
-    *(uint32_t*)(cpu->ecx) += cpu->eax;
-    *(uint32_t*)(cpu->ecx + 4u) += cpu->edx + (*(uint32_t*)(cpu->ecx) < cpu->eax);
-    label_0009A722:
-    cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
+
+
+
+
 __declspec(noinline) void sfera_sub_0049A730(LiftCpu* cpu, uint32_t stop_address) { double value_0, value_1, value_2, value_3, value_4;
  bool sub_pred[1]; double x87_p0, x87_p1, x87_p2;
     lift_push32(cpu, cpu->ebp);
@@ -4151,7 +4002,7 @@ __declspec(noinline) void sfera_sub_0049A730(LiftCpu* cpu, uint32_t stop_address
 label_0009A78E:
     value_3 = (value_0) / ((double)(((int32_t)(g_sfera_profiler_runtime.frame_count))));
     *(float*)(cpu->esp + 0x34u) = value_3; 
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49A79Du)); sfera_sub_0049A550(cpu, LIFT_CODE_TOKEN_VA(0x49A79Du));
+    { const auto result = WorldClock::microseconds(); cpu->eax = static_cast<std::uint32_t>(result); cpu->edx = static_cast<std::uint32_t>(result >> 32u); }
     value_4 = (double)*(float*)(cpu->esp + 0x34u);
     g_sfera_profiler_runtime.report_clock_snapshot.low = cpu->eax;
     g_sfera_profiler_runtime.report_clock_snapshot.high = cpu->edx;
@@ -4586,7 +4437,7 @@ __declspec(noinline) void sfera_sub_0049B4D0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = 0xAu;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x9B55Fu)); sfera_sub_004ED5E0(cpu, LIFT_CODE_TOKEN_RVA(0x9B55Fu));
     label_0009B55F:
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49B564u)); sfera_sub_0049A670(cpu, LIFT_CODE_TOKEN_VA(0x49B564u));
+    { const auto result = WorldClock::nowTicks(); cpu->eax = static_cast<std::uint32_t>(result); cpu->edx = static_cast<std::uint32_t>(result >> 32u); }
     *(uint32_t*)(cpu->edi) = cpu->eax;
     *(uint32_t*)(cpu->edi + 4u) = cpu->edx;
     if ((int32_t)cpu->ebp < (int32_t)0xAu) goto label_0009B779;
@@ -4630,7 +4481,7 @@ __declspec(noinline) void sfera_sub_0049B4D0(LiftCpu* cpu, uint32_t stop_address
     cpu->ebx = (int64_t)(int32_t)(cpu->ebx) * (int64_t)(int32_t)(0x850u);
     cpu->ebx += cpu->esi;
     *(uint32_t*)(cpu->esp + 0x10u) = cpu->ebx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49B5E6u)); sfera_sub_0049A670(cpu, LIFT_CODE_TOKEN_VA(0x49B5E6u));
+    { const auto result = WorldClock::nowTicks(); cpu->eax = static_cast<std::uint32_t>(result); cpu->edx = static_cast<std::uint32_t>(result >> 32u); }
     cpu->edi = 1u;
     cpu->eax += cpu->edi;
     cpu->edx += (cpu->eax < cpu->edi);
@@ -6300,7 +6151,7 @@ label_0009CF99:
     lift_push32(cpu, cpu->ecx);
     cpu->ecx = cpu->ebp;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49CFBCu)); sfera_sub_0049C980(cpu, LIFT_CODE_TOKEN_VA(0x49CFBCu));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49CFC1u)); sfera_sub_00457020(cpu, LIFT_CODE_TOKEN_VA(0x49CFC1u));
+    cpu->eax = static_cast<std::uint32_t>(SphereWorld::Vegetation::alternatePatterns());
     if (cpu->eax == 0u) goto label_0009CFF3;
     cpu->edx = cpu->esi + 0x170u;
     lift_push32(cpu, cpu->edx); lift_push32(cpu, (uintptr_t)"clouds8");

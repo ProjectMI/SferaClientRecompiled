@@ -29,6 +29,11 @@ struct SferaScreenVertex;
 
 #include "semantic_window.h"
 
+namespace SferaAbi {
+template <class T> inline T* pointer(std::uint32_t address) noexcept { return reinterpret_cast<T*>(static_cast<std::uintptr_t>(address)); }
+inline std::uint32_t address(const void* pointer) noexcept { return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer)); }
+}
+
 struct LiftCpu;
 struct SferaIntrusiveListHeader;
 class CSound;
@@ -44,6 +49,7 @@ struct SferaVec3F {
     SferaVec3F operator-(const SferaVec3F& other) const;
     SferaVec3F operator*(float factor) const;
     double dot(const SferaVec3F& other) const;
+    SferaVec3F normalized(std::int32_t diagnosticCode = 0) const;
     SferaVec3F cross(const SferaVec3F& other) const;
     float component(std::size_t axis) const;
     void setComponent(std::size_t axis, float value);
@@ -185,11 +191,7 @@ public:
 };
 
 
-struct SferaEffectVec3F {
-    float x;
-    float y;
-    float z;
-};
+using SferaEffectVec3F = SferaVec3F;
 
 struct SferaEffectRenderSlot {
     SferaEffectVec3F position[4];
@@ -833,6 +835,14 @@ class GrassMapMngr {
 public:
     GrassMapMngr() = default;
     virtual void loadGrassMap(const std::uint16_t* tile, void* destination);
+    std::uint32_t grassType(float x, float z);
+    std::uint32_t plantingType(float x, float z);
+    GrassMapMngr* reset();
+private:
+    struct Tile { std::uint16_t key = 0; std::uint32_t timestamp = 0; std::array<std::uint8_t, 65536> bytes{}; };
+    std::uint8_t sample(float x, float z);
+    std::unique_ptr<std::array<Tile, 10>> tiles_;
+    std::uint32_t timestamp_ = 0;
 };
 
 class SferaHashMap {
@@ -2067,5 +2077,575 @@ struct SferaLogFileRuntime {
 };
 struct SferaLogRuntime {
     SferaLogFileRuntime files[3];
+};
+
+
+struct SferaLandscapeMapRecord;
+struct SferaViewProjectionScratchRuntime;
+
+class WorldMemory {
+public:
+    static void* allocate(std::size_t size);
+    static void release(void* memory);
+};
+class WorldDiagnostics {
+public:
+    static void report(const char* message);
+    static void warning(const char* message);
+    [[noreturn]] static void fail(const char* message);
+};
+class WorldClock {
+public:
+    static void initialize();
+    static std::uint64_t microseconds();
+    static std::uint64_t nowTicks();
+};
+struct SferaBoundCheckArray {
+    uint32_t data;
+    uint32_t capacity;
+    char debug_file[32];
+    uint32_t debug_line;
+
+    template <class T> T* dataAs() const noexcept { return SferaAbi::pointer<T>(data); }
+    template <class T> T* element(std::size_t index) const noexcept { T* values = dataAs<T>(); return values != nullptr && index < capacity ? values + index : nullptr; }
+    void reserve(std::size_t count, std::size_t elementSize);
+};
+struct WorldObject {
+    uint32_t runtime_flags;
+    uint32_t model_handle;
+    SferaVec3F position;
+    SferaVec3F rotation;
+    uint32_t spatial_membership;
+    int32_t grid_min_x;
+    int32_t grid_max_x;
+    int32_t grid_min_y;
+    int32_t grid_max_y;
+    float render_fade;
+    uint32_t render_group;
+    SferaMatrix4x4F world_transform;
+    SferaVec3F bounds_minimum;
+    SferaVec3F bounds_maximum;
+    SferaVec3F bounds_corners[8];
+    uint32_t visibility_mark;
+    uint32_t linked_objects[5];
+    uint32_t attached_effects[10];
+    uint32_t lighting_color;
+    uint8_t extended_pose_available;
+    uint8_t visible;
+};
+struct ExtendedWorldObject : WorldObject {
+    uint32_t extended_object_index;
+    uint8_t motion_state;
+    uint8_t render_enabled;
+    uint8_t view_projection_mode;
+    int32_t render_cache_handle;
+    float scale;
+    SferaVec3F orientation_basis[3];
+    int32_t animation;
+    int32_t frame;
+    float interpolation;
+    int32_t frame_secondary;
+    int32_t animation_secondary;
+    uint32_t parent_object_handle;
+    uint32_t parent_link_slot;
+    uint32_t model_instance;
+    SferaVec3F effect_frame_position_a;
+    SferaVec3F effect_frame_position_b;
+    float effect_frame_transform_a[16];
+    float effect_frame_transform_b[16];
+    SferaVec3F effect_frame_position_c;
+    float effect_frame_transform_c[16];
+    std::uint8_t simulation_enabled;
+    std::uint8_t full_rate_simulation;
+    std::uint8_t gravity_enabled;
+    std::uint8_t motion_padding;
+    std::uint32_t airborne;
+    SferaVec3F commanded_velocity;
+    SferaVec3F physical_velocity;
+    float angular_velocity;
+    std::uint32_t unused_motion_words[2];
+    std::uint8_t movement_blocked;
+    std::uint8_t avoidance_enabled;
+    std::uint16_t contact_padding;
+    SferaVec3F avoidance_direction;
+    float avoidance_depth;
+    SferaVec3F previous_spatial_position;
+    SferaVec3F previous_spatial_rotation;
+    SferaVec3F previous_basis_rotation;
+    SferaVec3F previous_bounds_position;
+    SferaVec3F previous_bounds_rotation;
+    std::uint32_t last_simulation_tick;
+};
+
+class WorldObjects {
+public:
+    uint32_t max_occupied_object_handle;
+    uint32_t controlled_object_handle;
+    uint32_t contour_mode;
+    SferaBoundCheckArray object_handles;
+    SferaBoundCheckArray extended_object_handles;
+    uint32_t extended_object_count;
+
+    WorldObject* effectObject(std::uint32_t handle) const;
+    SferaEffectVec3F referencePosition() const;
+    SferaEffectVec3F objectPosition(std::uint32_t handle) const;
+    bool attachEffect(std::uint32_t handle, SferaActiveEffect& item);
+    void detachEffect(std::uint32_t handle, SferaActiveEffect& item);
+    SferaActiveEffect* firstEffect(std::uint32_t handle) const;
+    bool buildEffectFrames(std::uint32_t handle, SferaEffectSpatialFrames& spatial_frames, SferaEffectWorldFrames& world_frames) const;
+    WorldObject* object(std::uint32_t handle) const;
+    ExtendedWorldObject* extendedObject(std::uint32_t handle) const;
+    SphereRender::Model* model(const WorldObject& object) const;
+    std::uint32_t create(const char* name, std::uint32_t process, std::uint32_t kind, bool dynamic);
+    void destroy(std::uint32_t handle);
+    void destroyAll();
+    void removeSpatialIndex(std::uint32_t handle);
+    void updateSpatialIndex(std::uint32_t handle);
+    void recordSlotStatistics() const;
+    void updateExtendedSpatialIndices();
+    void rotate(std::uint32_t handle, const SferaVec3F& delta);
+    void moveLocal(std::uint32_t handle, const SferaVec3F& displacement);
+    void alignReferenceOrientation();
+    void reflectReferenceOrientation();
+    void recalculateBasis(std::uint32_t handle);
+    void appendCommand(std::uint32_t handle, const char* command);
+    bool actorActive(std::uint32_t handle) const;
+    void activateTrap(const WorldObject& obstacle);
+    void addExtended(std::uint32_t handle);
+    void removeExtended(std::uint32_t handle);
+    void unlink(std::uint32_t parent, std::uint32_t slot);
+    ExtendedWorldObject* linkModel(std::uint32_t parent, const char* name, std::uint32_t slot);
+};
+
+
+// Landscape assets retain their published 32-bit layouts while native methods own their lifecycle.
+struct TerrainVertex { SferaVec3F position; SferaVec3F normal; float textureU; float textureV; float detailU; float detailV; };
+struct TerrainTriangle { std::uint16_t indices[3]; std::uint16_t material; std::uint32_t attributes[2]; SferaVec3F normal; };
+struct TerrainCell { std::int32_t x; std::int32_t z; std::int32_t triangleCount; TerrainTriangle* triangles; std::uint16_t baseMicrotexture; std::uint16_t reserved; std::int32_t layerCount; std::uint16_t layers[10]; std::uint8_t* masks; };
+struct TerrainSurfaceGroup { std::uint32_t vertexCount; std::uint32_t firstVertex; std::uint32_t firstIndex; std::uint32_t runtime[2]; };
+struct TerrainWater { float height; std::uint32_t material; };
+struct TerrainBounds { SferaVec3F corners[8]; std::int32_t scaledBounds[6]; void lowerMinimum(float height); };
+class TerrainPatch {
+public:
+    std::uint32_t format; std::uint32_t vertexCount; TerrainVertex* vertices; TerrainCell cells[144]; TerrainSurfaceGroup* surfaceGroups; TerrainSurfaceGroup* renderGroups; TerrainVertex* groupedVertices; std::uint16_t* groupedIndices; TerrainWater* waters; TerrainBounds bounds; TerrainBounds quarterBounds[4]; TerrainBounds groupBounds[16]; TerrainBounds cellBounds[144]; std::uint32_t flags; std::uint16_t* cornerIndices[4]; std::uint32_t cornerCounts[4]; std::uint8_t cornerSmoothed[4]; std::uint16_t* edgeGroups[4]; std::uint32_t edgeGroupCounts[4];
+    void releaseResources();
+    void partitionEdges();
+    void rebuildSurfaceGroups();
+    void rebuildSurfaceGroup(const TerrainCell& cell);
+    void updateBounds();
+    bool validateEdge(const TerrainPatch& other, std::uint32_t side, std::uint32_t otherSide, int row, int column) const;
+    bool smoothEdge(TerrainPatch& other, std::uint32_t side, std::uint32_t otherSide, int row, int column);
+    void smoothCorner(TerrainPatch* diagonal, TerrainPatch* vertical, TerrainPatch* horizontal, std::uint32_t corner, std::uint32_t diagonalCorner, std::uint32_t verticalCorner, std::uint32_t horizontalCorner);
+    void readGeometry(int descriptor, const std::vector<std::uint8_t>& masks, const std::vector<std::uint8_t>& waterData, const std::uint16_t* microtextureRemap, std::uint16_t baseMicrotexture);
+};
+class TerrainRegion {
+public:
+    char name[30]; char directory[102]; std::int32_t rows; std::int32_t columns; TerrainPatch* patches[100]; std::uint32_t textureIds[100]; std::uint8_t* textures[100]; std::uint32_t expiry[100];
+    TerrainPatch* patch(int row, int column) const;
+    void loadPatch(int row, int column);
+    void touchPatch(int row, int column);
+    void destroyPatch(int row, int column);
+    void smoothPatch(int row, int column);
+};
+struct SferaLandscapeMapRecord;
+class TerrainAssets {
+public:
+    static TerrainRegion* regions();
+    static void loadMap();
+    static int saveMap(const SferaLandscapeMapRecord* editorRecords);
+    static void loadMapProbes(SferaLandscapeMapRecord* editorRecords);
+    static int loadDimensions(const char* name, std::int32_t* rows, std::int32_t* columns);
+    static void loadCatalog(const char* directory);
+    static void evictUnused();
+    static void releaseAll();
+    static bool saveDebugImage(const char* filename, int size, const std::uint16_t* pixels);
+    static void markSmoothingError(std::uint32_t color, float x, float z);
+};
+
+
+// Terrain contour records retain the contours.bin field order.
+struct Contour {
+    std::int32_t type = 0;
+    std::int32_t vertex_count = 0;
+    float min_x = 1000000.0f;
+    float max_x = -1000000.0f;
+    float min_z = 1000000.0f;
+    float max_z = -1000000.0f;
+    std::array<float, 64> x{};
+    std::array<float, 64> z{};
+    std::array<std::int32_t, 64> neighbour_contour{};
+    std::array<std::int32_t, 64> neighbour_edge{};
+    void updateBounds();
+    bool contains(float point_x, float point_z) const;
+};
+
+class Contours {
+public:
+    std::vector<Contour> records;
+    explicit Contours(std::int32_t first_server_type = 2000, std::int32_t last_server_type = 2999);
+    void clear();
+    void load();
+    void loadBytes(std::span<const std::uint8_t> bytes);
+    std::vector<std::uint8_t> saveBytes() const;
+    void save();
+    void sort();
+    void typeRange(std::int32_t first, std::int32_t last, std::int32_t& start, std::int32_t& count) const;
+    Contour* at(std::int32_t index);
+    void setEditableRange(std::int32_t first, std::int32_t last);
+    void setBackgroundRange(std::int32_t first, std::int32_t last);
+    void weldVertices(float tolerance);
+    bool sameEdge(std::int32_t first_contour, std::int32_t first_edge, std::int32_t second_contour, std::int32_t second_edge) const;
+    void setServerMap(const std::int32_t* types, const std::int32_t* servers, std::int32_t count);
+    std::int32_t serverByType(std::int32_t type) const;
+    void buildServerMask(std::int32_t server);
+    std::int32_t typeAt(float x, float z, std::int32_t first_type, std::int32_t last_type) const;
+    std::int32_t serverAt(float x, float z) const;
+    bool nearServer(float x, float z, std::int32_t server);
+    void connectEdges();
+    std::vector<std::array<float, 4>> serverBoundaries();
+    void rebuildServerWall();
+    void rasterizeServers();
+    void processEvent(std::int32_t command, std::int32_t first, std::int32_t second);
+    void drawContour(std::int32_t index, std::uint32_t color, std::int32_t origin_x, std::int32_t origin_y);
+    void drawEditor(std::int32_t origin_x, std::int32_t origin_y);
+    std::int32_t editorWindowId() const { return window_id; }
+    std::int32_t selectedContour() const { return selected_contour; }
+    std::int32_t selectedVertex() const { return selected_vertex; }
+private:
+    std::int32_t window_id = -1;
+    std::int32_t zoom_percent = 0;
+    std::int32_t selected_contour = -1;
+    std::int32_t selected_vertex = 0;
+    std::int32_t first_editable_type = 0;
+    std::int32_t last_editable_type = 0;
+    std::int32_t first_background_type = -1;
+    std::int32_t last_background_type = -1;
+    std::int32_t first_server_type;
+    std::int32_t last_server_type;
+    std::vector<std::pair<std::int32_t, std::int32_t>> server_map;
+    std::array<std::uint8_t, 160 * 160> server_grid{};
+    std::array<std::uint8_t, 160 * 160> server_mask{};
+    bool grid_initialized = false;
+    std::int32_t mask_server = -1;
+    std::uint32_t animation_frame = 0;
+    inline static std::uint32_t selection_counter = 0;
+    bool isServerContour(const Contour& contour) const;
+    void invalidateGrid();
+    void eraseSelected();
+    void sortSelected();
+};
+
+
+struct SferaServerWallEffectRecord {
+    SferaEffectVec3F positions[4]{};
+    float duration = 0.0f;
+    float remaining = -1.0f;
+    float animation_phase = 0.0f;
+};
+struct SferaServerWallTextureFrame { float uv[5][2]{}; };
+class SferaServerWall {
+public:
+    std::vector<std::array<SferaVec3F, 2>> segments;
+    std::vector<SferaVec3F> normals;
+    std::array<SferaServerWallEffectRecord, 100> effects{};
+    std::array<SferaServerWallTextureFrame, 16> texture_frames{};
+    std::uint32_t texture_id = UINT32_MAX;
+    void clear();
+    void setSegments(const float* coordinates, std::uint32_t count);
+    void prepareGeometry();
+    void generateEffects();
+    void generateEffects(const WorldObject& observer, float field_of_view, const float (*planes)[4]);
+    void updateEffectRendering();
+    static bool intersectPlane(const float* plane, const SferaVec3F& start, const SferaVec3F& end, SferaVec3F& output);
+    static std::uint32_t classifyVisibility(const float (*planes)[4], const SferaVec3F* points, std::int32_t count);
+    static std::int32_t intersectXZ(const SferaVec3F& first, const SferaVec3F& second, const SferaVec3F& other_first, const SferaVec3F& other_second, SferaVec3F& output);
+};
+
+
+namespace SphereWorld {
+struct Bounds {
+    SferaVec3F minimum{};
+    SferaVec3F maximum{};
+    bool intersects(const Bounds& other) const;
+    bool intersectsInterior(const Bounds& other) const;
+    bool contains(const Bounds& other) const;
+    bool overlapsTriangle(const SferaVec3F (&vertices)[3]) const;
+    Bounds expanded(float amount) const;
+    Bounds inverseTransformed(const SferaMatrix4x4F& transform) const;
+    SferaBoundsCornersRuntime corners() const;
+};
+struct SpatialLeaf {
+    std::int32_t object_count;
+    std::uint32_t object_capacity;
+    std::uint32_t* objects;
+    std::uint32_t contains_landscape;
+    TerrainRegion* region;
+    std::int32_t patch_row;
+    std::int32_t patch_column;
+    std::int32_t quarter;
+    std::int32_t group;
+    std::int32_t cell;
+    float origin_x;
+    float origin_z;
+};
+struct TerrainCandidate { TerrainPatch* patch; const TerrainCell* cell; float origin_x; float origin_z; };
+struct NearContact {
+    std::uint32_t handle = 0;
+    std::uint32_t subject_kind = 0;
+    std::uint32_t geometry_kind = 0;
+    Bounds bounds;
+    SferaBoundsCornersRuntime corners{};
+    std::vector<SphereRender::ModelCollisionTriangle> triangles;
+};
+class WorldSpatialIndex {
+public:
+    static SpatialLeaf* leafAt(std::int32_t cell_x, std::int32_t cell_z);
+    static void insert(std::uint32_t handle, std::int32_t cell_x, std::int32_t cell_z);
+    static void remove(std::uint32_t handle, std::int32_t cell_x, std::int32_t cell_z);
+    static bool typesInteract(std::uint32_t combined_type);
+    void gatherCell(std::int32_t cell_x, std::int32_t cell_z, bool include_terrain);
+    void gatherObject(std::uint32_t handle);
+    void gatherObjects(const SferaVec3F& center, float radius);
+    void gatherTerrain(const SferaVec3F& center, float radius);
+    std::uint32_t gatherShadowTriangles(const Bounds& bounds, const SferaVec3F& center, float radius, const SferaVec3F& origin, const SferaVec3F& direction);
+    const std::vector<std::uint32_t>& objects() const { return objects_; }
+    const std::vector<TerrainCandidate>& terrain() const { return terrain_; }
+    const std::vector<SferaVec3F>& shadowVertices() const { return shadow_vertices_; }
+private:
+    std::vector<std::uint32_t> objects_;
+    std::vector<TerrainCandidate> terrain_;
+    std::vector<SferaVec3F> shadow_vertices_;
+    void clearCandidates();
+    void finishCandidates();
+    void addTerrain(TerrainRegion& region, int row, int column, int cell, float origin_x, float origin_z);
+};
+class ContactQuery {
+public:
+    static bool projectionsOverlap(const SferaBoundsCornersRuntime& first, const SferaBoundsCornersRuntime& second, const SferaVec3F& axis);
+    static bool boxesOverlap(const SferaBoundsCornersRuntime& first, const SferaBoundsCornersRuntime& second);
+    static int intersectTriangle(const SferaVec3F& start, const SferaVec3F& end, const SphereRender::ModelCollisionTriangle& triangle, SferaVec3F& intersection);
+    static void sortTriangles(std::span<SphereRender::ModelCollisionTriangle> triangles);
+    static void updateBounds(std::uint32_t handle);
+    static bool lineOfSight(std::uint32_t handle);
+    void appendBoxNormals(const SferaBoundsCornersRuntime& corners);
+    void gather(std::uint32_t handle);
+    std::uint32_t test(std::uint32_t handle, std::uint32_t mode, bool reuse_cache);
+    std::uint32_t testMovement(std::uint32_t handle, bool reuse_cache);
+    void setIgnoredObjects(std::span<const std::uint32_t> handles);
+    std::span<const NearContact> nearContacts() const { return contacts_; }
+private:
+    std::vector<NearContact> contacts_;
+    static void publishNormal(const SferaVec3F& normal);
+    static void publishDirection(const SphereRender::ModelCollisionTriangle& triangle);
+    static bool trianglesHitBox(const SphereRender::Model& model, const SferaMatrix4x4F& transform, const Bounds& query_bounds, const Bounds& local_bounds, const SferaMatrix4x4F* box_transform, const SferaMatrix4x4F* box_basis);
+};
+}
+inline SphereWorld::WorldSpatialIndex g_sfera_world_spatial;
+inline SphereWorld::ContactQuery g_sfera_contacts;
+
+
+namespace SphereWorld {
+
+struct GrassCell {
+    std::uint32_t object_handle = 0;
+    std::uint32_t source_count = 0;
+    std::array<SphereRender::Model*, 36> source_models{};
+};
+
+struct GrassInstance {
+    SphereRender::Model* model = nullptr;
+    SferaVec3F position{};
+    SferaVec3F rotation{};
+    float vertical_scale = 1;
+    SferaVec3F normal{};
+};
+
+class GrassGeometry {
+public:
+    static std::unique_ptr<SphereRender::Model> build(std::span<const GrassInstance> instances, float height);
+};
+
+class VegetationPatterns {
+public:
+    struct GrassPattern { std::uint32_t id; std::array<std::string, 10> variants; };
+    struct PlantingEntry { std::string name; std::int32_t weight; float radius; };
+    struct PlantingPattern { std::int32_t spacing; std::vector<PlantingEntry> entries; };
+    void initializeGrass();
+    void addGrass(std::uint32_t id, const std::array<const char*, 10>& variants);
+    void loadPlanting(const char* path = "landscape\\planting.txt");
+    void decodePlanting(const SphereRender::ModelParameters& parameters);
+    const GrassPattern& grass(std::uint32_t id) const;
+    const PlantingPattern* planting(std::size_t index) const;
+    static void formatError(const char* section, const char* parameter);
+private:
+    std::vector<GrassPattern> grass_patterns_;
+    std::vector<PlantingPattern> planting_patterns_;
+};
+
+class DynamicVegetation {
+public:
+    DynamicVegetation(GrassCell* cells, std::uint32_t side);
+    ~DynamicVegetation();
+    void initializeNoise();
+    void initializeWind();
+    void setReference(const SferaVec3F& position);
+    void setDepthMode(std::uint32_t mode);
+    void addInfluence(float x, float z, float radius, std::uint32_t id);
+    void updateWind(const SferaVec3F& reference, float elapsed);
+    void deformGrass(SphereRender::Model& model, const SferaVec3F& position);
+    void deformInteractiveGrass(SphereRender::Model& model);
+    void deformTree(SphereRender::Model& model);
+    void collectModels(const std::uint32_t* records, std::uint32_t count);
+    void acquire();
+    void update();
+    void wait();
+    std::uint32_t recalculate();
+    std::span<const SphereRender::VegetationVertex> output() const { return output_; }
+    const std::array<float, 1024>& noise() const { return noise_; }
+private:
+    struct Influence { std::uint32_t id = UINT32_MAX; float x = 0; float z = 0; float radius_squared = 0; float minimum_x = 0; float minimum_z = 0; float maximum_x = 0; float maximum_z = 0; float flattening = 0.5f; std::int64_t timestamp = 0; };
+    struct Gust { bool active = false; float x = 0; float z = 0; float radius = 0; float radius_squared = 0; float speed = 0; };
+    SferaVec3F bendingPosition(const SphereRender::Model& model, std::size_t vertex, float first, float second) const;
+    void saveCache(SphereRender::Model& model);
+    GrassCell* cells_ = nullptr;
+    std::uint32_t side_ = 0;
+    std::uint32_t depth_mode_ = 0;
+    HANDLE worker_ = nullptr;
+    std::array<CRITICAL_SECTION, 4> locks_{};
+    std::array<Influence, 5> influences_{};
+    std::array<Influence, 5> active_influences_{};
+    std::array<Gust, 6> gusts_{};
+    std::array<float, 1024> noise_{};
+    std::vector<SphereRender::VegetationVertex> output_;
+    std::vector<SphereRender::Model*> models_;
+    SferaVec3F reference_{};
+    SferaVec3F wind_{};
+    float wind_strength_ = 0;
+    float phase_ = 0;
+    float phase_speed_ = 0;
+    float bend_x_ = 0;
+    float bend_z_ = 0;
+    bool alternating_lock_ = false;
+    static std::int64_t last_update_;
+};
+
+class Vegetation {
+public:
+    void initialize();
+    void updateGrassView();
+    void createCell(std::int32_t x, std::int32_t z, GrassCell& cell);
+    void updateCells();
+    void destroyOwnedModel(std::uint32_t& handle);
+    std::uint32_t placeTree(const char* name, bool persistent, float x, float z, float radius);
+    void plant(std::int32_t pattern);
+    static bool alternatePatterns();
+    VegetationPatterns patterns;
+private:
+    std::array<GrassInstance, 36> placements_{};
+};
+
+}
+
+inline SphereWorld::Vegetation g_sfera_vegetation;
+
+
+class TerrainQueries {
+public:
+    struct Location { int patchX; int patchZ; int cellX; int cellZ; int mapIndex; bool valid() const; int cellIndex() const; };
+    static Location locate(float worldX, float worldZ);
+    static void sampleColor(float worldX, float worldZ, std::uint32_t& red, std::uint32_t& green, std::uint32_t& blue);
+    static bool surface(float worldX, float worldZ, float& height, SferaPlaneF& plane);
+    static std::uint8_t placementOrientation(float worldX, float worldZ, SferaVec3F& angles, float& height, SferaPlaneF& plane);
+    static bool clearViewToFlare(const TerrainPatch& patch, const TerrainCell& cell);
+};
+struct TerrainVisibleCell { TerrainCell* cell; SferaBoundsCornersRuntime bounds; };
+struct TerrainWaterSurface { std::int32_t x; std::int32_t z; float height; std::uint32_t lightMask; std::uint32_t material; SferaBoundsCornersRuntime bounds; };
+class TerrainRenderer {
+public:
+    std::vector<TerrainVisibleCell> visibleCells;
+    std::vector<TerrainWaterSurface> waterSurfaces;
+    static bool visibleBounds(const TerrainBounds& source, const SferaVec3F& anchor, SferaViewProjectionScratchRuntime& translated);
+    bool gatherCells(TerrainPatch& patch);
+    void findReflectiveWater(TerrainPatch& patch);
+    void gatherReflectiveWater();
+    void prepareAndDraw(TerrainPatch& patch);
+    void drawCells(TerrainPatch& patch, int first, int last);
+    void drawLandscape();
+    void saveWater(std::uint32_t material, float height);
+    void sortWater(int first, int last);
+    void drawWater();
+private:
+    void drawDebugCells(const TerrainPatch& patch);
+    void visitPatches(bool draw);
+};
+inline TerrainRenderer g_sfera_terrain_renderer;
+class TerrainTextureCache {
+public:
+    static void bindLayer(const TerrainCell& cell, int layer);
+    static void release();
+    static void loadMicrotextures(const char* pattern);
+    static void blendLayer(const TerrainCell& cell, int layer, std::span<std::uint8_t> texture);
+};
+
+
+namespace SphereWorld {
+class Motion {
+public:
+    void initializeResponseCurve();
+    double responseValue(std::int32_t index) const noexcept;
+    std::uint32_t probe(std::uint32_t handle, SferaVec3F displacement, float yaw);
+    std::uint32_t probeGround(std::uint32_t handle, SferaVec3F displacement, float yaw, bool controlled = false);
+    void moveFree(std::uint32_t handle, bool vertical, float yaw, float elapsed, bool controlled);
+    void moveGround(std::uint32_t handle, float yaw, float elapsed, bool controlled);
+    void fall(std::uint32_t handle, float elapsed, bool controlled);
+    void updateObjects(float elapsed);
+    void updateControlled(float elapsed);
+    void updateOrientation();
+    std::uint32_t surfaceInteraction(std::uint32_t handle, std::uint32_t* material);
+    std::uint32_t pick(float* distance, SferaVec3F* direction);
+    static bool snapSmallComponents(SferaVec3F& value) noexcept;
+private:
+    bool avoidContact(std::uint32_t handle, SferaVec3F displacement, float yaw, bool grounded);
+    bool slideControlled(std::uint32_t handle, const SferaVec3F& displacement);
+    void dampMotion(std::uint32_t handle, float elapsed, bool controlled);
+};
+}
+inline SphereWorld::Motion g_sfera_motion;
+
+
+struct WorldGuiControl { std::uint32_t kind; std::uint32_t windowHandle; std::uint32_t windowSlot; std::int32_t left; std::int32_t top; std::int32_t right; std::int32_t bottom; std::uint32_t objectHandle; std::uint32_t alignment; float opacity; std::uint32_t color; };
+struct WorldGuiText : WorldGuiControl { std::uint32_t lineCount; std::int32_t lineX[300]; std::int32_t lineY[300]; char* lines[300]; };
+class WorldGuiControls {
+public:
+    static WorldGuiControl* control(std::uint32_t handle);
+    static void detachFromWindow(std::uint32_t window, std::uint32_t slot);
+    static void destroySprite(std::uint32_t handle);
+    static void destroyText(std::uint32_t handle);
+    static void removeForObject(std::uint32_t handle);
+};
+struct CharacterInstanceSlot { std::uint32_t owner; std::uint32_t model; std::uint32_t parameters[4]; };
+class CharacterInstanceCache {
+public:
+    explicit CharacterInstanceCache(std::span<CharacterInstanceSlot> slots) : slots(slots) {}
+    static CharacterInstanceCache fromManager(void* legacyManager);
+    void release(const ExtendedWorldObject& object);
+private:
+    std::span<CharacterInstanceSlot> slots;
+};
+
+
+class WorldDebugDraw {
+public:
+    struct Line { SferaVec3F from; SferaVec3F to; std::uint32_t color; std::uint32_t group; };
+    struct Vertex { SferaVec3F position; std::uint32_t diffuse; std::uint32_t specular; float u; float v; };
+    static std::uint32_t line(std::uint32_t color, std::uint32_t group, const SferaVec3F& from, const SferaVec3F& to);
+    static void clear();
+    static void draw();
+    static void drawBounds(std::uint32_t handle);
+    static std::span<const Line> lines() { return lines_; }
+    static std::array<Vertex, 4> ribbon(const Line& line, const SferaVec3F& camera);
+private:
+    inline static std::vector<Line> lines_;
+    static void box(const SferaBoundsCornersRuntime& corners, std::uint32_t color);
 };
 

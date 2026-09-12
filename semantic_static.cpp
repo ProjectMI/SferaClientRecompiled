@@ -105,53 +105,6 @@ float SferaEffectManager::viewerDistance(const SferaEffectVec3F& position) const
 }
 float SferaEffectManager::viewerDistance(std::uint32_t source_handle) const { return viewerDistance(g_sfera_world_objects.objectPosition(source_handle)); }
 
-SferaWorldObjectEffectRuntime* SferaWorldObjectRuntime::effectObject(std::uint32_t handle) const {
-    if (handle >= object_handles.capacity || object_handles.data == 0u) return nullptr;
-    const auto* handles = object_handles.dataAs<const std::uint32_t>();
-    return handles == nullptr ? nullptr : SferaAbi::pointer<SferaWorldObjectEffectRuntime>(handles[handle]);
-}
-SferaEffectVec3F SferaWorldObjectRuntime::referencePosition() const { return objectPosition(kReferenceObjectHandle); }
-SferaEffectVec3F SferaWorldObjectRuntime::objectPosition(std::uint32_t handle) const {
-    auto* object = effectObject(handle);
-    if (object == nullptr) object = effectObject(kReferenceObjectHandle);
-    return object == nullptr ? SferaEffectVec3F{} : object->position;
-}
-bool SferaWorldObjectRuntime::attachEffect(std::uint32_t handle, SferaActiveEffect& item) {
-    auto* object = effectObject(handle);
-    if (object == nullptr) return false;
-    for (auto& attached_effect : object->attached_effects) if (attached_effect == kInvalidHandle) { attached_effect = SferaAbi::address(&item); return true; }
-    return false;
-}
-void SferaWorldObjectRuntime::detachEffect(std::uint32_t handle, SferaActiveEffect& item) {
-    auto* object = effectObject(handle);
-    if (object == nullptr) return;
-    const std::uint32_t address = SferaAbi::address(&item);
-    for (auto& attached_effect : object->attached_effects) if (attached_effect == address) { attached_effect = kInvalidHandle; return; }
-}
-SferaActiveEffect* SferaWorldObjectRuntime::firstEffect(std::uint32_t handle) const {
-    auto* object = effectObject(handle);
-    if (object == nullptr) return nullptr;
-    const std::uint32_t address = object->attached_effects[0];
-    return address == 0u || address == kInvalidHandle ? nullptr : SferaAbi::pointer<SferaActiveEffect>(address);
-}
-bool SferaWorldObjectRuntime::buildEffectFrames(std::uint32_t handle, SferaEffectSpatialFrames& spatial_frames, SferaEffectWorldFrames& world_frames) const {
-    spatial_frames = {}; world_frames = {};
-    auto* object = effectObject(handle);
-    spatial_frames.frames[0] = objectPosition(handle);
-    if (object != nullptr && object->extended_pose_available != 0u) {
-        spatial_frames.frames[1] = object->effect_frame_position_a; spatial_frames.frames[2] = object->effect_frame_position_b; spatial_frames.frames[4] = object->effect_frame_position_c;
-        std::copy_n(object->effect_frame_transform_a, 16u, world_frames.frames[1]); std::copy_n(object->effect_frame_transform_b, 16u, world_frames.frames[2]); std::copy_n(object->effect_frame_transform_c, 16u, world_frames.frames[4]);
-    } else {
-        const SferaEffectVec3F attachment = object != nullptr ? object->position : referencePosition();
-        spatial_frames.frames[1] = attachment; spatial_frames.frames[2] = attachment; spatial_frames.frames[4] = attachment;
-        initialize_identity_frame(world_frames.frames[1]); initialize_identity_frame(world_frames.frames[2]); initialize_identity_frame(world_frames.frames[4]);
-    }
-    spatial_frames.frames[3] = {(spatial_frames.frames[1].x + spatial_frames.frames[2].x) * 0.5f, (spatial_frames.frames[1].y + spatial_frames.frames[2].y) * 0.5f, (spatial_frames.frames[1].z + spatial_frames.frames[2].z) * 0.5f};
-    const auto rotation = object != nullptr ? SferaVec3F{object->rotation.x, object->rotation.y, object->rotation.z} : SferaVec3F{};
-    const auto orientation = SferaMatrix4x4F::fromEuler({}, rotation);
-    for (std::size_t row = 0; row < 4; ++row) std::copy_n(orientation.m[row], 4, world_frames.frames[0] + row * 4);
-    return true;
-}
 
 bool SferaMainUiStateRuntime::effectVisible(const IEffect& effect, const SferaEffectVec3F& position) const {
     const SferaEffectVec3F minimum{position.x + effect.bounds_min[0], position.y + effect.bounds_min[1], position.z + effect.bounds_min[2]};
@@ -165,28 +118,6 @@ bool SferaMainUiStateRuntime::effectVisible(const IEffect& effect, const SferaEf
         if (all_outside) return false;
     }
     return true;
-}
-void SferaServerWall::updateEffectRendering() {
-    auto* records = SferaAbi::pointer<SferaServerWallEffectRecord>(effect_records);
-    auto* frames = SferaAbi::pointer<const SferaServerWallTextureFrame>(texture_frames);
-    if (records == nullptr || frames == nullptr || texture_frame_count == 0u) return;
-    for (std::uint32_t index = 0u; index < 100u; ++index) {
-        auto& record = records[index];
-        if (record.remaining <= 0.0f) continue;
-        if (g_sfera_effect_manager.render_slot_count + 1u >= kMaximumRenderSlots) break;
-        record.remaining -= 1.0f;
-        const float phase_ratio = record.duration != 0.0f ? record.remaining / record.duration : 0.0f;
-        const std::uint32_t alpha = static_cast<std::uint32_t>(std::trunc((0.5f - 0.5f * std::cos(phase_ratio * kFullCircleRadians)) * 100.0f));
-        SferaEffectRenderSlot* slot = g_sfera_effect_manager.acquireRenderSlot();
-        if (slot == nullptr) break;
-        slot->primitive_kind = 3u; slot->resource_id = static_cast<std::int32_t>(texture_id); slot->blend_mode = 255u;
-        for (std::uint32_t vertex = 0u; vertex < 4u; ++vertex) {
-            slot->position[vertex] = record.positions[vertex]; slot->color[0][vertex] = 255u; slot->color[1][vertex] = 255u; slot->color[2][vertex] = 255u; slot->color[3][vertex] = alpha;
-        }
-        record.animation_phase += 0.25f;
-        const std::uint32_t frame = static_cast<std::uint32_t>(std::trunc(record.animation_phase)) % texture_frame_count;
-        for (std::uint32_t vertex = 0u; vertex < 4u; ++vertex) { slot->uv[vertex][0] = frames[frame].uv[vertex + 1u][0]; slot->uv[vertex][1] = frames[frame].uv[vertex + 1u][1]; }
-    }
 }
 
 void SferaLightRecord::update(const SferaEffectVec3F& new_position, const float* new_color, float new_radius) {

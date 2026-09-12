@@ -809,27 +809,7 @@ __declspec(noinline) void sfera_sub_004F5DD0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime.object[0];
     goto label_0009B950;
 }
-__declspec(noinline) void sfera_sub_004F5DE0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x9C40u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F5DF1u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F5DF1u));
-    lift_push32(cpu, 0x9C40u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_light_runtime.cell_light_ids.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F5DFEu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_light_runtime.cell_light_ids.capacity = 0x4E20u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F5E1Cu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F5E1Cu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_light_runtime.cell_light_ids.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F5E22u));
-    *(uint8_t*)((uintptr_t)&g_sfera_light_runtime.cell_light_ids.debug_file[15]) = 0u;
-    g_sfera_light_runtime.cell_light_ids.debug_line = 0x16Cu;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FA590) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
 __declspec(noinline) void sfera_sub_004F5E50(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, 0x40u);
     cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
@@ -1061,27 +1041,7 @@ __declspec(noinline) void sfera_sub_004F62B0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0xCu;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004F6320(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x54F60u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6331u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F6331u));
-    lift_push32(cpu, 0x54F60u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_scene_array_runtime.scene_records.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F633Eu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_scene_array_runtime.scene_records.capacity = 0xBB8u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F635Cu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F635Cu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_scene_array_runtime.scene_records.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F6362u));
-    *(uint8_t*)((uintptr_t)&g_sfera_scene_array_runtime.scene_records.debug_file[15]) = 0u;
-    g_sfera_scene_array_runtime.scene_records.debug_line = 0x1E3u;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FA710) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
 
 __declspec(noinline) void sfera_sub_004F6400(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, 0x40u);
@@ -1349,90 +1309,10 @@ __declspec(noinline) void sfera_sub_004F68C0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0xCu;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004F6950(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x240u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6961u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F6961u));
-    lift_push32(cpu, 0x240u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_light_runtime.cell_indices.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F696Eu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_light_runtime.cell_indices.capacity = 0x90u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F698Cu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F698Cu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_light_runtime.cell_indices.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F6992u));
-    *(uint8_t*)((uintptr_t)&g_sfera_light_runtime.cell_indices.debug_file[15]) = 0u;
-    g_sfera_light_runtime.cell_indices.debug_line = 0x1247u;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FA850) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004F69C0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x3600u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F69D1u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F69D1u));
-    lift_push32(cpu, 0x3600u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_light_runtime.cell_records.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F69DEu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_light_runtime.cell_records.capacity = 0x90u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F69FCu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F69FCu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_light_runtime.cell_records.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F6A02u));
-    *(uint8_t*)((uintptr_t)&g_sfera_light_runtime.cell_records.debug_file[15]) = 0u;
-    g_sfera_light_runtime.cell_records.debug_line = 0x1248u;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FA870) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004F6A30(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x9C40u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6A41u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F6A41u));
-    lift_push32(cpu, 0x9C40u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_landscape_runtime.microtexture_handles.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F6A4Eu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_landscape_runtime.microtexture_handles.capacity = 0x2710u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6A6Cu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F6A6Cu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_landscape_runtime.microtexture_handles.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F6A72u));
-    *(uint8_t*)((uintptr_t)&g_sfera_landscape_runtime.microtexture_handles.debug_file[15]) = 0u;
-    g_sfera_landscape_runtime.microtexture_handles.debug_line = 0x124Au;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FA890) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004F6AA0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x1F40u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6AB1u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F6AB1u));
-    lift_push32(cpu, 0x1F40u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_scene_array_runtime.surface_handles.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F6ABEu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_scene_array_runtime.surface_handles.capacity = 0x7D0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6ADCu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F6ADCu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_scene_array_runtime.surface_handles.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F6AE2u));
-    *(uint8_t*)((uintptr_t)&g_sfera_scene_array_runtime.surface_handles.debug_file[15]) = 0u;
-    g_sfera_scene_array_runtime.surface_handles.debug_line = 0x124Bu;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FA8B0) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
+
+
+
 __declspec(noinline) void sfera_sub_004F6B10(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, 0x40u);
     cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
@@ -1499,48 +1379,8 @@ __declspec(noinline) void sfera_sub_004F6C10(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0xCu;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004F6C80(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x61A80u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6C91u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F6C91u));
-    lift_push32(cpu, 0x61A80u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_scene_array_runtime.surface_records.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F6C9Eu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_scene_array_runtime.surface_records.capacity = 0x2710u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6CBCu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F6CBCu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_scene_array_runtime.surface_records.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F6CC2u));
-    *(uint8_t*)((uintptr_t)&g_sfera_scene_array_runtime.surface_records.debug_file[15]) = 0u;
-    g_sfera_scene_array_runtime.surface_records.debug_line = 0x1264u;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FA930) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004F6CF0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x13880u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6D01u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F6D01u));
-    lift_push32(cpu, 0x13880u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_scene_array_runtime.surface_index_map.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F6D0Eu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_scene_array_runtime.surface_index_map.capacity = 0x9C40u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6D2Cu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F6D2Cu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_scene_array_runtime.surface_index_map.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F6D32u));
-    *(uint8_t*)((uintptr_t)&g_sfera_scene_array_runtime.surface_index_map.debug_file[15]) = 0u;
-    g_sfera_scene_array_runtime.surface_index_map.debug_line = 0x1266u;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FA950) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
+
 __declspec(noinline) void sfera_sub_004F6D60(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, 0x40u);
     cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
@@ -1604,27 +1444,7 @@ __declspec(noinline) void sfera_sub_004F6E40(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0xCu;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004F6EB0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x3E8u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6EC1u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F6EC1u));
-    lift_push32(cpu, 0x3E8u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_mesh_partition_indices.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F6ECEu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_mesh_partition_indices.capacity = 0x1F4u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F6EECu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F6EECu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_mesh_partition_indices.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F6EF2u));
-    g_sfera_mesh_partition_indices.debug_file[15] = '\0';
-    g_sfera_mesh_partition_indices.debug_line = 0x1392u;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FA9D0) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
 
 __declspec(noinline) void sfera_sub_004F6FA0(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, 0x40u);
@@ -1878,132 +1698,12 @@ __declspec(noinline) void sfera_sub_004F7470(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0xCu;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004F74E0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0xFA0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F74F1u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F74F1u));
-    lift_push32(cpu, 0xFA0u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_scene_array_runtime.render_ranges.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F74FEu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_scene_array_runtime.render_ranges.capacity = 0x1F4u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F751Cu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F751Cu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_scene_array_runtime.render_ranges.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F7522u));
-    *(uint8_t*)((uintptr_t)&g_sfera_scene_array_runtime.render_ranges.debug_file[15]) = 0u;
-    g_sfera_scene_array_runtime.render_ranges.debug_line = 0x3C0Du;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FAB70) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004F7550(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x9C400u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F7561u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F7561u));
-    lift_push32(cpu, 0x9C400u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_scene_array_runtime.render_work_records.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F756Eu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_scene_array_runtime.render_work_records.capacity = 0x4E20u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F758Cu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F758Cu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_scene_array_runtime.render_work_records.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F7592u));
-    *(uint8_t*)((uintptr_t)&g_sfera_scene_array_runtime.render_work_records.debug_file[15]) = 0u;
-    g_sfera_scene_array_runtime.render_work_records.debug_line = 0x3C0Fu;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FAB90) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004F75C0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0x168u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F75D1u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F75D1u));
-    lift_push32(cpu, 0x168u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_grass_runtime.type_records.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F75DEu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_grass_runtime.type_records.capacity = 0x14u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F75FCu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F75FCu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_grass_runtime.type_records.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F7602u));
-    *(uint8_t*)((uintptr_t)&g_sfera_grass_runtime.type_records.debug_file[15]) = 0u;
-    g_sfera_grass_runtime.type_records.debug_line = 0x4409u;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FABB0) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004F7630(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0xBB80u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F7641u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F7641u));
-    lift_push32(cpu, 0xBB80u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_grass_runtime.instance_offsets.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F764Eu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_grass_runtime.instance_offsets.capacity = 0x2EE0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F766Cu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F766Cu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_grass_runtime.instance_offsets.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F7672u));
-    *(uint8_t*)((uintptr_t)&g_sfera_grass_runtime.instance_offsets.debug_file[15]) = 0u;
-    g_sfera_grass_runtime.instance_offsets.debug_line = 0x440Au;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FABD0) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004F76A0(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0xBB80u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F76B1u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F76B1u));
-    lift_push32(cpu, 0xBB80u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_grass_runtime.instance_indices.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F76BEu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_grass_runtime.instance_indices.capacity = 0x2EE0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F76DCu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F76DCu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_grass_runtime.instance_indices.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F76E2u));
-    *(uint8_t*)((uintptr_t)&g_sfera_grass_runtime.instance_indices.debug_file[15]) = 0u;
-    g_sfera_grass_runtime.instance_indices.debug_line = 0x440Bu;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FABF0) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004F7710(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, 0x40u);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    cpu->ecx = 0xC8u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F7721u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4F7721u));
-    lift_push32(cpu, 0xC8u); lift_push32(cpu, 0u); lift_push32(cpu, cpu->eax);
-    g_sfera_grass_runtime.model_handles.data = cpu->eax;
-    lift_native_call(cpu, native_function_address32(&::memset), LIFT_CODE_TOKEN_VA(0x4F772Eu));
-    cpu->esp += 0xCu;
-    lift_push32(cpu, 0xFu);
-    cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    g_sfera_grass_runtime.model_handles.capacity = 0x32u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4F774Cu)); sfera_sub_00401000(cpu, LIFT_CODE_TOKEN_VA(0x4F774Cu));
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, (uintptr_t)&g_sfera_grass_runtime.model_handles.debug_file[0]);
-    lift_native_call(cpu, native_function_address32(&::strncpy), LIFT_CODE_TOKEN_VA(0x4F7752u));
-    *(uint8_t*)((uintptr_t)&g_sfera_grass_runtime.model_handles.debug_file[15]) = 0u;
-    g_sfera_grass_runtime.model_handles.debug_line = 0x440Cu;
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FAC10) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 0xCu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
+
+
+
+
+
 __declspec(noinline) void sfera_sub_004F7780(LiftCpu* cpu, uint32_t stop_address) {
     cpu->eax = (uintptr_t)&g_sfera_spatial_states[5u].transform.matrix;
     cpu->eax &= 0xFFFFFFF0u;
@@ -2284,10 +1984,7 @@ __declspec(noinline) void sfera_sub_004F7BA0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x18u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004F7BE0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = register_lifted_finalizer(&sfera_sub_004FAD90) ? 0u : 0xFFFFFFFFu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
 __declspec(noinline) void sfera_sub_004F7BF0(LiftCpu* cpu, uint32_t stop_address) {
     cpu->eax = (uintptr_t)&g_sfera_shadow_object_storage[0];
     cpu->eax &= 0xFFFFFFF0u;
@@ -4291,13 +3988,7 @@ __declspec(noinline) void sfera_sub_004FA570(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA582u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA582u));
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004FA590(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_light_runtime.cell_light_ids.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA5A2u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA5A2u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
 __declspec(noinline) void sfera_sub_004FA5B0(LiftCpu* cpu, uint32_t stop_address) {
     cpu->ecx = g_sfera_landscape_runtime.file_records.data;
     lift_push32(cpu, 0x4Bu);
@@ -4375,13 +4066,7 @@ __declspec(noinline) void sfera_sub_004FA6F0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA702u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA702u));
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004FA710(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_scene_array_runtime.scene_records.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA722u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA722u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
 
 __declspec(noinline) void sfera_sub_004FA750(LiftCpu* cpu, uint32_t stop_address) {
     cpu->ecx = g_sfera_scene_array_runtime.scene_points.data;
@@ -4439,34 +4124,10 @@ __declspec(noinline) void sfera_sub_004FA830(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA842u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA842u));
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004FA850(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_light_runtime.cell_indices.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA862u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA862u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004FA870(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_light_runtime.cell_records.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA882u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA882u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004FA890(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_landscape_runtime.microtexture_handles.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA8A2u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA8A2u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004FA8B0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_scene_array_runtime.surface_handles.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA8C2u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA8C2u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
+
+
+
 __declspec(noinline) void sfera_sub_004FA8D0(LiftCpu* cpu, uint32_t stop_address) {
     cpu->ecx = g_sfera_client_array_runtime.line_124d_records.data;
     lift_push32(cpu, 0x4Bu);
@@ -4488,20 +4149,8 @@ __declspec(noinline) void sfera_sub_004FA910(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA922u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA922u));
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004FA930(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_scene_array_runtime.surface_records.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA942u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA942u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004FA950(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_scene_array_runtime.surface_index_map.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA962u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA962u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
+
 __declspec(noinline) void sfera_sub_004FA970(LiftCpu* cpu, uint32_t stop_address) {
     cpu->ecx = g_sfera_light_runtime.handles.data;
     lift_push32(cpu, 0x4Bu);
@@ -4523,13 +4172,7 @@ __declspec(noinline) void sfera_sub_004FA9B0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA9C2u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA9C2u));
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004FA9D0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_mesh_partition_indices.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FA9E2u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FA9E2u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
 __declspec(noinline) void sfera_sub_004FA9F0(LiftCpu* cpu, uint32_t stop_address) {
     cpu->ecx = g_sfera_client_array_runtime.line_24de_records.data;
     lift_push32(cpu, 0x4Bu);
@@ -4614,48 +4257,12 @@ __declspec(noinline) void sfera_sub_004FAB50(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FAB62u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FAB62u));
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004FAB70(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_scene_array_runtime.render_ranges.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FAB82u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FAB82u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004FAB90(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_scene_array_runtime.render_work_records.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FABA2u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FABA2u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004FABB0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_grass_runtime.type_records.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FABC2u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FABC2u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004FABD0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_grass_runtime.instance_offsets.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FABE2u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FABE2u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004FABF0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_grass_runtime.instance_indices.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FAC02u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FAC02u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004FAC10(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = g_sfera_grass_runtime.model_handles.data;
-    lift_push32(cpu, 0x4Bu);
-    cpu->edx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\arrays.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4FAC22u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4FAC22u));
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
+
+
+
+
+
 
 __declspec(noinline) void sfera_sub_004FACF0(LiftCpu* cpu, uint32_t stop_address) {
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -4687,10 +4294,7 @@ __declspec(noinline) void sfera_sub_004FAD70(LiftCpu* cpu, uint32_t stop_address
 __declspec(noinline) void sfera_sub_004FAD80(LiftCpu* cpu, uint32_t stop_address) {
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004FAD90(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx = (uintptr_t)&g_sfera_server_wall;
-    sfera_sub_0048A6A0(cpu, stop_address); return;
-}
+
 __declspec(noinline) void sfera_sub_004FADA0(LiftCpu* cpu, uint32_t stop_address) {
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }

@@ -8196,17 +8196,7 @@ __declspec(noinline) void sfera_sub_0041B3C0(LiftCpu* cpu, uint32_t stop_address
     x87_v0 = (double)*(float*)(cpu->edi + 0x18u);
     goto label_0001B479;
 }
-__declspec(noinline) void sfera_sub_0041B530(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = *(uint32_t*)(cpu->esp + 4u);
-    cpu->eax = *(uint32_t*)(cpu->eax + 0x144u);
-    cpu->edx = cpu->eax + (cpu->eax * 2u);
-    cpu->edx += cpu->edx;
-    cpu->edx += cpu->edx;
-    cpu->edx += cpu->edx;
-    cpu->ecx -= cpu->edx;
-    *(uint32_t*)(cpu->ecx + 0x4F3Cu) = 0u;
-    cpu->esp += 8u; cpu->eip = stop_address; return;
-}
+
 __declspec(noinline) void sfera_sub_0041B560(LiftCpu* cpu, uint32_t stop_address) {
     cpu->eax = *(uint32_t*)(cpu->esp + 4u);
     cpu->eax = *(uint32_t*)(cpu->eax + 0x144u);
@@ -9322,18 +9312,18 @@ __declspec(noinline) void sfera_sub_0041C3E0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, 3u);
     cpu->edx = cpu->esp + 0x18u;
     cpu->ecx = cpu->ebp;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41C4D4u)); sfera_sub_00479FD0(cpu, LIFT_CODE_TOKEN_VA(0x41C4D4u));
+    cpu->eax = SferaAbi::address(g_sfera_world_objects.linkModel(cpu->ecx, SferaAbi::pointer<const char>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp)));  cpu->esp += 4u;
     goto label_0001C4F3;
     label_0001C4D6:
     cpu->ecx = cpu->ebp;
     if ((cpu->eax & 0xFFu) == 0u) goto label_0001C4E9;
     lift_push32(cpu, 3u);
     cpu->edx = cpu->esp + 0x18u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x41C4E7u)); sfera_sub_00479FD0(cpu, LIFT_CODE_TOKEN_VA(0x41C4E7u));
+    cpu->eax = SferaAbi::address(g_sfera_world_objects.linkModel(cpu->ecx, SferaAbi::pointer<const char>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp)));  cpu->esp += 4u;
     goto label_0001C4F3;
     label_0001C4E9:
     cpu->edx = 3u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x1C4F3u)); sfera_sub_004593C0(cpu, LIFT_CODE_TOKEN_RVA(0x1C4F3u));
+    g_sfera_world_objects.unlink(cpu->ecx, cpu->edx);
     label_0001C4F3:
     cpu->ecx = *(uint32_t*)(cpu->edi);
     cpu->edx = cpu->esi + (cpu->esi * 2u);
