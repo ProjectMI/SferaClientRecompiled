@@ -26,16 +26,10 @@
     <ClCompile Include="lifted_functions_007.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_008.cpp">
-      <Filter>lifted</Filter>
-    </ClCompile>
     <ClCompile Include="lifted_functions_009.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
     <ClCompile Include="lifted_functions_010.cpp">
-      <Filter>lifted</Filter>
-    </ClCompile>
-    <ClCompile Include="lifted_functions_011.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
     <ClCompile Include="lifted_functions_012.cpp">
@@ -44,25 +38,16 @@
     <ClCompile Include="lifted_functions_013.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_014.cpp">
-      <Filter>lifted</Filter>
-    </ClCompile>
     <ClCompile Include="lifted_functions_015.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
     <ClCompile Include="lifted_functions_016.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_017.cpp">
-      <Filter>lifted</Filter>
-    </ClCompile>
     <ClCompile Include="lifted_functions_018.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
     <ClCompile Include="lifted_functions_019.cpp">
-      <Filter>lifted</Filter>
-    </ClCompile>
-    <ClCompile Include="lifted_functions_020.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
     <ClCompile Include="lifted_functions_021.cpp">

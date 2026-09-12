@@ -1515,34 +1515,6 @@ __declspec(noinline) void sfera_sub_004226C0(LiftCpu* cpu, uint32_t stop_address
 
 
 
-__declspec(noinline) void sfera_sub_00425950(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->esp -= 0x144u;
-    lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
-    cpu->eax = cpu->esp + 8u;
-    lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
-    lift_native_call(cpu, native_function_address32(&::FindFirstFileA), LIFT_CODE_TOKEN_VA(0x42596Cu));
-    cpu->esi = cpu->eax;
-    cpu->edi = 0u;
-    if (cpu->esi == 0xFFFFFFFFu) goto label_00025997;
-    lift_push32(cpu, cpu->ebp);
-    cpu->ebp = native_function_address32(&::FindNextFileA);
-    label_00025982:
-    if (((*(uint8_t*)(cpu->esp + 0xCu)) & (0x10u)) != 0u) goto label_0002598A;
-    ++cpu->edi;
-    label_0002598A:
-    cpu->ecx = cpu->esp + 0xCu;
-
-    cpu->eax = reinterpret_cast<uint32_t (__stdcall*)(uint32_t, uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::FindNextFileA)))(cpu->esi, cpu->ecx);
-    if (cpu->eax != 0u) goto label_00025982;
-    cpu->ebp = lift_pop32(cpu);
-    label_00025997:
-    lift_push32(cpu, cpu->esi);
-    lift_native_call(cpu, native_function_address32(&::FindClose), LIFT_CODE_TOKEN_VA(0x425998u));
-    cpu->eax = cpu->edi;
-    cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
-    cpu->esp += 0x144u;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
 
 
 

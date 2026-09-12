@@ -3330,25 +3330,6 @@ __declspec(noinline) void sfera_sub_004EE690(LiftCpu* cpu, uint32_t stop_address
     cpu->esp = cpu->ebp;
     cpu->ebp = lift_pop32(cpu); cpu->esp += 0xCu; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_004EE7D0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = cpu->ecx;
-    lift_push32(cpu, cpu->esi);
-    cpu->esi = cpu->eax + 1u;
-    label_000EE7D6:
-    cpu->edx = (cpu->edx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->eax));
-    ++cpu->eax;
-    if ((cpu->edx & 0xFFu) != 0u) goto label_000EE7D6;
-    cpu->eax -= cpu->esi;
-    --cpu->eax;
-    cpu->esi = lift_pop32(cpu);
-    if ((int32_t)(cpu->eax) < 0) goto label_000EE7EC;
-    label_000EE7E3:
-    if (*(uint8_t*)(cpu->eax + cpu->ecx) == 0x5Cu) goto label_000EE7EC;
-    if ((int32_t)(--cpu->eax) >= 0) goto label_000EE7E3;
-    label_000EE7EC:
-    cpu->eax = cpu->eax + cpu->ecx + 1u;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
 [[noreturn]] __declspec(noinline) void sfera_sub_004EE92A(LiftCpu* cpu, uint32_t stop_address) {  (void)stop_address; cpu->eip = 0x4EE92Au; throw std::runtime_error("client C++ exception path reached"); }
 __declspec(noinline) void sfera_sub_004EE940(LiftCpu* cpu, uint32_t stop_address, double value) {
     if (((uint32_t)(g_sfera_crt_startup_runtime.processor_feature_10) == 0u)) {
@@ -3407,9 +3388,6 @@ label_000EE9E9:
     cpu->ebp = lift_pop32(cpu);
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-
-
-
 
 __declspec(noinline) void sfera_sub_004EEA10(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, cpu->ecx);
@@ -3478,35 +3456,6 @@ __declspec(noinline) void sfera_sub_004EED20(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x14u; cpu->eip = stop_address; return;
 }
 
-
-
-
-
-__declspec(noinline) void sfera_sub_004EED80(LiftCpu* cpu, uint32_t stop_address) {
-    const uint64_t left = ((uint64_t)*(uint32_t*)(cpu->esp + 8u) << 32u) | *(uint32_t*)(cpu->esp + 4u);
-    const uint64_t right = ((uint64_t)*(uint32_t*)(cpu->esp + 0x10u) << 32u) | *(uint32_t*)(cpu->esp + 0xCu);
-    const uint64_t quotient = left / right;
-    cpu->eax = (uint32_t)quotient; cpu->edx = (uint32_t)(quotient >> 32u);
-    cpu->esp += 0x14u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004EEDF0(LiftCpu* cpu, uint32_t stop_address) {
-    const uint32_t count = cpu->ecx & 0xFFu;
-    const uint64_t value = ((uint64_t)cpu->edx << 32u) | cpu->eax;
-    const uint64_t result = count < 64u ? value << count : 0u;
-    cpu->eax = (uint32_t)result;
-    cpu->edx = (uint32_t)(result >> 32u);
-    if (count >= 32u && count < 64u) cpu->ecx &= 0xFFFFFF1Fu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_004EEE10(LiftCpu* cpu, uint32_t stop_address) {
-    const uint32_t count = cpu->ecx & 0xFFu;
-    const uint64_t value = ((uint64_t)cpu->edx << 32u) | cpu->eax;
-    const uint64_t result = count < 64u ? value >> count : 0u;
-    cpu->eax = (uint32_t)result;
-    cpu->edx = (uint32_t)(result >> 32u);
-    if (count >= 32u && count < 64u) cpu->ecx &= 0xFFFFFF1Fu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
 __declspec(noinline) void sfera_sub_004EEE61(LiftCpu* cpu, uint32_t stop_address) {
     g_sfera_crt_startup_runtime.mainargs_result = 0u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -3620,24 +3569,18 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5360(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F53A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F53D0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5450(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5480(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F54C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F54F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5530(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5550(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5570(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5580(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5590(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F55B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F55E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5620(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5690(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5700(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5770(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F57A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F57E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5810(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5850(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5870(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5890(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
@@ -3650,7 +3593,7 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     g_sfera_camera = SphereRender::GameCamera{};
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5C90(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5D20(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5DB0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5DD0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5E50(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
@@ -3674,10 +3617,7 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6720(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F67F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F68C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    
-    
-    
-    
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6B10(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6B80(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F6C10(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
@@ -3700,215 +3640,118 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7390(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7400(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7470(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    
-    
-    
-    
-    
-    
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7780(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F77B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F77F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7820(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7860(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7890(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F78D0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7900(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7940(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7970(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F79B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F79E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7A20(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7A50(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7A90(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7AC0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7B00(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7B30(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7B70(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7BA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     cpu->eax = static_cast<std::uint32_t>(0u);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7BF0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7C20(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7CA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7CD0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7D10(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7D40(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7D80(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7DB0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7DF0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7E00(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7E30(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7E70(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7EA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7EE0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7EF0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7F20(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7F60(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7F90(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F7FD0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8000(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8040(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8070(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8120(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8150(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8190(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F81C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8200(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8220(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8240(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8270(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F82B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F82D0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F82F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8320(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8360(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8390(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F83D0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F83F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8410(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8440(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8480(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F84A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F84C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F84F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8530(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8550(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8570(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F85A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F85F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8620(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8660(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8680(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F86A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F86D0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8710(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8740(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8780(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F87A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F87C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F87F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8830(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8850(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8870(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F88A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F88E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8900(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8920(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8950(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8990(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F89B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F89D0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8A00(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8A40(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8A60(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8DA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8DD0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8E10(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8E30(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8E50(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8E80(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8EC0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8EF0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8F30(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8F50(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8F70(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8FA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9080(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F90B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F90F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9110(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9130(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9160(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F91A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F91C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F91E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9210(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9250(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9280(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F92C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F92E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9300(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9330(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9370(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9390(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F93B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F93E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9420(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9440(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9460(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9490(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F94D0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F94F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9510(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9540(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9580(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F95A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F95C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F95F0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9630(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9650(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9670(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F96A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F96E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9700(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9730(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9740(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9750(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9780(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F97C0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F97E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9800(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9830(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9870(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F98A0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F98E0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9900(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9920(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9950(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9990(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F99B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F99D0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9A00(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9A40(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9A60(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9A80(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9AB0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9AF0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9B50(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9B80(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
+    
+    
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9BC0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9BE0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9C00(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9C20(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9C50(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9C90(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9CC0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9D00(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9D30(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9D70(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9DA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9DE0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9E10(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9E50(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9E80(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9EC0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9EF0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9F30(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9F60(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9FA0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F9FD0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004FA010(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));

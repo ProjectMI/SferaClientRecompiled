@@ -414,52 +414,6 @@ LRESULT CALLBACK sfera_browser_subclass_proc(HWND window, UINT message, WPARAM w
     return ::DefWindowProcA(window, message, wparam, lparam);
 }
 
-static void clear_dialog_event_queue(SferaDialogState& dialog) noexcept {
-    dialog.events.count = 0u;
-    dialog.events.begin = 0u;
-    dialog.queued_event_count = 0u;
-}
-
-static bool reserve_dialog_event_queue(SferaDialogEventQueue& queue) noexcept {
-    const std::uint32_t growth = std::max(queue.capacity / 2u, 8u);
-    const std::uint32_t new_capacity = queue.capacity + growth;
-    if (new_capacity <= queue.capacity) {
-        return false;
-    }
-    auto** new_slots = static_cast<SferaDialogEvent**>(std::calloc(new_capacity, sizeof(SferaDialogEvent*)));
-    if (!new_slots) {
-        return false;
-    }
-    for (std::uint32_t index = 0u; index < queue.count && queue.slots && queue.capacity != 0u; ++index) {
-        new_slots[index] = queue.slots[(queue.begin + index) % queue.capacity];
-    }
-    std::free(queue.slots);
-    queue.slots = new_slots;
-    queue.capacity = new_capacity;
-    queue.begin = 0u;
-    return true;
-}
-
-static bool push_dialog_event(SferaDialogState& dialog, const SferaDialogEvent& event) noexcept {
-    auto& queue = dialog.events;
-    if (queue.capacity <= queue.count + 1u && !reserve_dialog_event_queue(queue)) {
-        return false;
-    }
-    if (queue.capacity == 0u || !queue.slots) {
-        return false;
-    }
-    const std::uint32_t slot_index = (queue.begin + queue.count) % queue.capacity;
-    if (!queue.slots[slot_index]) {
-        queue.slots[slot_index] = static_cast<SferaDialogEvent*>(std::malloc(sizeof(SferaDialogEvent)));
-    }
-    if (!queue.slots[slot_index]) {
-        return false;
-    }
-    *queue.slots[slot_index] = event;
-    ++queue.count;
-    return true;
-}
-
 LRESULT CALLBACK sfera_main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
     switch (message) {
     case WM_ACTIVATEAPP:
@@ -514,26 +468,7 @@ LRESULT CALLBACK sfera_main_window_proc(HWND window, UINT message, WPARAM wparam
 
 INT_PTR CALLBACK sfera_dialog_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
     auto* dialog = reinterpret_cast<SferaDialogState*>(::GetWindowLongPtrA(window, GWLP_USERDATA));
-    if (!dialog) {
-        return 0;
-    }
-    SferaDialogEvent event{};
-    event.dialog = dialog;
-    if (message == WM_COMMAND) {
-        event.control_id = LOWORD(wparam);
-        event.message = HIWORD(wparam);
-    } else {
-        event.control_id = dialog->owner == window ? 0u : static_cast<std::uint32_t>(::GetDlgCtrlID(window));
-        event.message = message;
-        event.wparam = wparam;
-        event.lparam = lparam;
-    }
-    if (dialog->queued_event_count >= 128u) {
-        clear_dialog_event_queue(*dialog);
-    }
-    if (push_dialog_event(*dialog, event)) {
-        ++dialog->queued_event_count;
-    }
+    if (dialog != nullptr) dialog->recordMessage(window, message, wparam, lparam);
     return 0;
 }
 

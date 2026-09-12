@@ -30,7 +30,6 @@
 namespace {
     template <class T> T* ptr32(std::uint32_t address) { return reinterpret_cast<T*>(static_cast<std::uintptr_t>(address)); }
     HWND main_window_handle() { return reinterpret_cast<HWND>(static_cast<std::uintptr_t>(g_sfera_window_runtime.main_window)); }
-    IDirectInputDevice8A* mouse_input_device() { return SferaAbi::pointer<IDirectInputDevice8A>(g_sfera_direct_input_runtime.mouse_device); }
     void set_system_cursor_visibility(bool visible) { if (visible) { while (::ShowCursor(TRUE) < 0) {} } else { while (::ShowCursor(FALSE) >= 0) {} } }
     bool cursor_uses_center_clip(std::uint32_t kind) { const char* name = kind < 4u ? sfera_cursor_texture_name(kind) : nullptr; return name != nullptr && name[0] != '_'; }
     constexpr std::uint32_t kRgbColorMask = (1u << 24u) - 1u;
@@ -2299,6 +2298,10 @@ void CItemListCommonItem::resetItem() {
         index->releaseStorage();
         g_sfera_std_allocator.deallocate(index);
     }
+    item_storage = 0;
+    item_index = 0;
+    capacity = 0;
+    item_count = 0;
 }
 std::int32_t CBaseManagerCommonItem::handleInsert(CItemListCommonItem*, CCommonItem*, CCommonItem*) { return 0; }
 std::int32_t CBaseManagerCommonItem::handleRemove(CItemListCommonItem*, CCommonItem*, CCommonItem*) { return 0; }
@@ -2380,13 +2383,13 @@ void CHardwareCursor::setCursorKind(std::uint32_t new_kind) {
 CSoftwareCursor::CSoftwareCursor() { x = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width / 2u); y = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height / 2u); }
 void CSoftwareCursor::destroy(bool free_storage) { this->~CSoftwareCursor(); if (free_storage) g_sfera_std_allocator.deallocate(this); }
 void CSoftwareCursor::copyStateFrom(const CCursor* previous) { if (previous != nullptr) { SferaCursorPosition position{}; saved_system_visible = previous->isSystemCursorVisible() ? 1u : 0u; saved_kind = previous->cursorKind(); previous->getPosition(&position); saved_x = position.x; saved_y = position.y; } else { saved_system_visible = 1u; saved_kind = 255u; saved_x = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width / 2u); saved_y = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height / 2u); } }
-void CSoftwareCursor::activate() { if (auto* mouse = mouse_input_device()) { mouse->Unacquire(); const HRESULT result = mouse->SetCooperativeLevel(main_window_handle(), DISCL_EXCLUSIVE | DISCL_FOREGROUND); if (FAILED(result)) { ::MessageBoxA(main_window_handle(), "CSoftwareCursor::Activate(): SetCooperativeLevel() failed", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); } mouse->Acquire(); } setSystemCursorVisible(saved_system_visible != 0u); setCursorKind(saved_kind); setPosition(saved_x, saved_y); }
-void CSoftwareCursor::deactivate() { if (auto* mouse = mouse_input_device()) { mouse->Unacquire(); const HRESULT result = mouse->SetCooperativeLevel(main_window_handle(), DISCL_NONEXCLUSIVE | DISCL_FOREGROUND); if (FAILED(result)) { ::MessageBoxA(main_window_handle(), "CSoftwareCursor::Deactivate(): SetCooperativeLevel() failed", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); } mouse->Acquire(); } setSystemCursorVisible(true); setCursorKind(255u); }
+void CSoftwareCursor::activate() { if (auto* mouse = g_sfera_direct_input_runtime.mouse_device) { mouse->Unacquire(); const HRESULT result = mouse->SetCooperativeLevel(main_window_handle(), DISCL_EXCLUSIVE | DISCL_FOREGROUND); if (FAILED(result)) { ::MessageBoxA(main_window_handle(), "CSoftwareCursor::Activate(): SetCooperativeLevel() failed", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); } mouse->Acquire(); } setSystemCursorVisible(saved_system_visible != 0u); setCursorKind(saved_kind); setPosition(saved_x, saved_y); }
+void CSoftwareCursor::deactivate() { if (auto* mouse = g_sfera_direct_input_runtime.mouse_device) { mouse->Unacquire(); const HRESULT result = mouse->SetCooperativeLevel(main_window_handle(), DISCL_NONEXCLUSIVE | DISCL_FOREGROUND); if (FAILED(result)) { ::MessageBoxA(main_window_handle(), "CSoftwareCursor::Deactivate(): SetCooperativeLevel() failed", "Error", MB_OK | MB_ICONERROR); ::ExitProcess(0u); } mouse->Acquire(); } setSystemCursorVisible(true); setCursorKind(255u); }
 void CSoftwareCursor::apply() {}
-void CSoftwareCursor::updatePosition() { if (active == 0u) return; x += static_cast<std::int32_t>(std::trunc(static_cast<double>(g_sfera_main_input_state_runtime.cursor_x) * 1.5)); y += static_cast<std::int32_t>(std::trunc(static_cast<double>(g_sfera_main_input_state_runtime.cursor_y) * 1.5)); }
+void CSoftwareCursor::updatePosition() { if (active == 0u) return; x += static_cast<std::int32_t>(std::trunc(static_cast<double>(g_sfera_main_input_state_runtime.mouse.dx) * 1.5)); y += static_cast<std::int32_t>(std::trunc(static_cast<double>(g_sfera_main_input_state_runtime.mouse.dy) * 1.5)); }
 SferaCursorPosition* CSoftwareCursor::getPosition(SferaCursorPosition* output) const { if (output == nullptr) return nullptr; output->x = x; output->y = y; return output; }
 void CSoftwareCursor::setPosition(std::int32_t new_x, std::int32_t new_y) { x = new_x; y = new_y; }
-void CSoftwareCursor::show() { const std::int32_t width = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width); const std::int32_t height = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height); auto* mouse = mouse_input_device(); if (active != 0u) { const bool outside = x < 0 || x >= width || y < 0 || y >= height; if (outside || g_sfera_texture_cache_runtime.cache_enabled == 0u) { if (!cursor_uses_center_clip(cursorKind())) { if (mouse != nullptr) mouse->Unacquire(); set_system_cursor_visibility(true); POINT point{x, y}; ::ClientToScreen(main_window_handle(), &point); ::SetCursorPos(point.x, point.y); active = 0u; } } if (width > 0) x = std::clamp(x, 0, width - 1); if (height > 0) y = std::clamp(y, 0, height - 1); return; } POINT point{}; ::GetCursorPos(&point); ::ScreenToClient(main_window_handle(), &point); if (point.x < 0 || point.x >= width || point.y < 0 || point.y >= height || g_sfera_texture_cache_runtime.cache_enabled == 0u) return; x = point.x; y = point.y; set_system_cursor_visibility(false); if (mouse != nullptr) mouse->Acquire(); active = 1u; }
+void CSoftwareCursor::show() { const std::int32_t width = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width); const std::int32_t height = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height); auto* mouse = g_sfera_direct_input_runtime.mouse_device; if (active != 0u) { const bool outside = x < 0 || x >= width || y < 0 || y >= height; if (outside || g_sfera_texture_cache_runtime.cache_enabled == 0u) { if (!cursor_uses_center_clip(cursorKind())) { if (mouse != nullptr) mouse->Unacquire(); set_system_cursor_visibility(true); POINT point{x, y}; ::ClientToScreen(main_window_handle(), &point); ::SetCursorPos(point.x, point.y); active = 0u; } } if (width > 0) x = std::clamp(x, 0, width - 1); if (height > 0) y = std::clamp(y, 0, height - 1); return; } POINT point{}; ::GetCursorPos(&point); ::ScreenToClient(main_window_handle(), &point); if (point.x < 0 || point.x >= width || point.y < 0 || point.y >= height || g_sfera_texture_cache_runtime.cache_enabled == 0u) return; x = point.x; y = point.y; set_system_cursor_visibility(false); if (mouse != nullptr) mouse->Acquire(); active = 1u; }
 bool CSoftwareCursor::isInsideViewport() const { return active != 0u; }
 bool CSoftwareCursor::isSystemCursorVisible() const { const auto* state = g_sfera_interface.cursor.get(); return state != nullptr && state->system_visible != 0u; }
 void CSoftwareCursor::setSystemCursorVisible(bool visible) { if (auto* state = g_sfera_interface.cursor.get()) state->system_visible = visible ? 1u : 0u; }
@@ -4469,7 +4472,7 @@ const SphereUI::FontFace& SphereUI::FontFactory::face(std::uint32_t font) const 
 }
 
 std::uint32_t SphereUI::InterfaceRenderer::tracking(std::uint32_t font) noexcept {
-    return font < 2u ? g_sfera_font_atlas_layout_runtime.code_base[font] : 0u;
+    return font < 2u ? g_sfera_font_runtime.layout.code_base[font] : 0u;
 }
 
 bool SferaInterfaceCursor::loadTextures() {
@@ -6467,7 +6470,7 @@ namespace {
             const auto character = uiAtlasGlyph(*cursor);
             if (x <= clip.right && SphereUI::detail::addCoordinate(x, size) > clip.left) {
                 const auto& glyph = g_sfera_font_runtime.glyphs[character];
-                const auto next_texture = g_sfera_static_render_lookup_runtime.atlas_textures[glyph.texture_index][font];
+                const auto next_texture = g_sfera_font_runtime.textures[glyph.texture_index][font];
                 if ((texture != nullptr && texture != next_texture) || vertex_count + 4u > std::size(g_sfera_landscape_screen_vertices)) flush();
                 texture = next_texture;
                 const auto left = static_cast<float>(x) - 0.5f, upper = static_cast<float>(top) - 0.5f;
@@ -6480,7 +6483,7 @@ namespace {
                 vertex_count += 4u;
                 index_count += 6u;
             }
-            x = SphereUI::detail::addCoordinate(x, static_cast<std::int32_t>((g_sfera_static_render_lookup_runtime.glyph_metrics[character][font] + g_sfera_font_atlas_layout_runtime.code_base[font]) * static_cast<std::uint32_t>(scale)));
+            x = SphereUI::detail::addCoordinate(x, static_cast<std::int32_t>((g_sfera_font_runtime.metrics[character][font] + g_sfera_font_runtime.layout.code_base[font]) * static_cast<std::uint32_t>(scale)));
         }
         flush();
         (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE));
@@ -6557,7 +6560,7 @@ SphereUI::TextExtent SphereUI::InterfaceRenderer::measureText(const char* text, 
         return {static_cast<std::int32_t>(std::max(width, line_width)), static_cast<std::int32_t>(extra_height + static_cast<std::uint32_t>(face.line_height))};
     }
     std::uint32_t lines = 1u;
-    const auto& layout = g_sfera_font_atlas_layout_runtime;
+    const auto& layout = g_sfera_font_runtime.layout;
     for (; *cursor != 0u; ++cursor) {
         if (*cursor == '\n') {
             const auto completed_width = initialized ? line_width : 0u;
@@ -6566,7 +6569,7 @@ SphereUI::TextExtent SphereUI::InterfaceRenderer::measureText(const char* text, 
             line_width = 0u;
         } else {
             if (static_cast<std::int32_t>(line_width) > 0) line_width += layout.code_base[font];
-            line_width += g_sfera_static_render_lookup_runtime.glyph_metrics[uiAtlasGlyph(*cursor)][font];
+            line_width += g_sfera_font_runtime.metrics[uiAtlasGlyph(*cursor)][font];
         }
     }
     if (static_cast<std::int32_t>(line_width) > static_cast<std::int32_t>(width)) width = line_width;
@@ -6581,7 +6584,7 @@ void SphereUI::InterfaceRenderer::drawText(const char* text, std::int32_t x, std
     g_sfera_screen_clip_runtime.bottom = clip.bottom;
     const bool disable_blending = opaque && font < 2u;
     if (disable_blending) SphereUI::InterfaceRenderer::setSpriteRenderMode(0u);
-    if (font < 2u) uiDrawAtlasText(text == nullptr ? "" : text, x, SphereUI::detail::subtractCoordinate(SphereUI::detail::subtractCoordinate(y, 2), static_cast<std::int32_t>(g_sfera_font_atlas_layout_runtime.origin[font])), color, font, initialized ? 1 : 0, clip, 0.0f, false);
+    if (font < 2u) uiDrawAtlasText(text == nullptr ? "" : text, x, SphereUI::detail::subtractCoordinate(SphereUI::detail::subtractCoordinate(y, 2), static_cast<std::int32_t>(g_sfera_font_runtime.layout.origin[font])), color, font, initialized ? 1 : 0, clip, 0.0f, false);
     else drawFaceText(text == nullptr ? "" : text, x, y, color, font, clip);
     if (disable_blending) SphereUI::InterfaceRenderer::setSpriteRenderMode(1u);
 }
@@ -6600,6 +6603,76 @@ void SferaVec3F::rotatePair(float& first, float& second, float angle) {
     const float rotatedFirst = static_cast<float>(double(first) * cosine - double(second) * sine);
     second = static_cast<float>(double(first) * sine + double(second) * cosine);
     first = rotatedFirst;
+}
+
+void SferaVec3F::normalize() {
+    const float squared = static_cast<float>(double(y) * y + double(x) * x + double(z) * z);
+    const float length = static_cast<float>(std::sqrt(double(squared)));
+    if (length == 0.0f) return;
+    x = static_cast<float>(double(x) / length);
+    y = static_cast<float>(double(y) / length);
+    z = static_cast<float>(double(z) / length);
+}
+
+SferaAngle8::SferaAngle8(float radians) {
+    if (!std::isfinite(radians)) throw std::invalid_argument("A finite angle is required");
+    const double wrapped = std::fmod(std::trunc(double(radians) * 40.74365997314453), 256.0);
+    steps = static_cast<std::uint8_t>(wrapped < 0.0 ? wrapped + 256.0 : wrapped);
+}
+
+float SferaAngle8::distanceTo(SferaAngle8 other) const {
+    const int distance = std::abs(int(steps) - int(other.steps));
+    return static_cast<float>(double(std::min(distance, 256 - distance)) * 0.024543695894260174);
+}
+
+SferaMatrix4x4F SferaMatrix4x4F::fromAxisRotation(Axis axis, float angle) {
+    SferaMatrix4x4F result = identity();
+    const std::size_t first = axis == Axis::x ? 1u : axis == Axis::y ? 2u : 0u;
+    const std::size_t second = (first + 1u) % 3u;
+    const float sine = static_cast<float>(std::sin(double(angle)));
+    const float cosine = static_cast<float>(std::cos(double(angle)));
+    result.m[first][first] = result.m[second][second] = cosine;
+    result.m[first][second] = -sine;
+    result.m[second][first] = sine;
+    return result;
+}
+
+SferaMatrix4x4F SferaMatrix4x4F::fromRollPitchYaw(float roll, float pitch, float yaw) {
+    const double sr = static_cast<float>(std::sin(double(roll))), cr = static_cast<float>(std::cos(double(roll)));
+    const double sp = static_cast<float>(std::sin(double(pitch))), cp = static_cast<float>(std::cos(double(pitch)));
+    const double sy = static_cast<float>(std::sin(double(yaw))), cy = static_cast<float>(std::cos(double(yaw)));
+    const float pitchRoll = static_cast<float>(sp * sr), yawRoll = static_cast<float>(cy * cr), sineYawRoll = static_cast<float>(sy * cr);
+    SferaMatrix4x4F result = identity();
+    result.m[0][0] = static_cast<float>(cp * cy);
+    result.m[1][0] = static_cast<float>(cp * sy);
+    result.m[2][0] = static_cast<float>(-sp);
+    result.m[0][1] = static_cast<float>(cy * pitchRoll - sineYawRoll);
+    result.m[1][1] = static_cast<float>(sy * pitchRoll + yawRoll);
+    result.m[2][1] = static_cast<float>(cp * sr);
+    result.m[0][2] = static_cast<float>(sy * sr + yawRoll * sp);
+    result.m[1][2] = static_cast<float>(sineYawRoll * sp - sr * cy);
+    result.m[2][2] = static_cast<float>(cr * cp);
+    return result;
+}
+
+SferaBoundsCornersRuntime SferaBoundsCornersRuntime::empty() {
+    constexpr float limit = std::numeric_limits<float>::max();
+    return fromExtents({limit, limit, limit}, {-limit, -limit, -limit});
+}
+
+void WorldObjects::approachHeading(std::uint32_t handle, float target) {
+    auto* instance = object(handle);
+    if (instance == nullptr) WorldDiagnostics::fail("SetAngle: wrong handle");
+    const auto* appearance = model(*instance);
+    if (appearance == nullptr) WorldDiagnostics::fail("SetAngle: object has no model");
+    constexpr float step = 0.15707965195178986f;
+    constexpr double fullTurn = 6.283185958862305;
+    float& heading = instance->rotation.x;
+    if (appearance->radius < 5.0f || SferaAngle8(heading).distanceTo(SferaAngle8(target)) <= step) { heading = target; return; }
+    const float clockwise = static_cast<float>(double(heading) + step);
+    const float counterclockwise = static_cast<float>(double(heading) - step);
+    if (SferaAngle8(clockwise).distanceTo(SferaAngle8(target)) < SferaAngle8(counterclockwise).distanceTo(SferaAngle8(target))) heading = clockwise > fullTurn ? static_cast<float>(double(clockwise) - fullTurn) : clockwise;
+    else heading = counterclockwise < 0.0f ? static_cast<float>(double(counterclockwise) + fullTurn) : counterclockwise;
 }
 
 SferaMatrix3x3F SferaQuaternionF::rotationMatrix() const {
@@ -9002,7 +9075,14 @@ void SferaBoundCheckArray::reserve(std::size_t count, std::size_t elementSize) {
     data = SferaAbi::address(replacement); capacity = static_cast<std::uint32_t>(count);
 }
 
-WorldObject* WorldObjects::object(std::uint32_t handle) const { return handle < object_handles.capacity && object_handles.data != 0u ? SferaAbi::pointer<WorldObject>(object_handles.dataAs<const std::uint32_t>()[handle]) : nullptr; }
+WorldObject* WorldObjects::object(std::uint32_t handle, const char* operation) const {
+    auto* result = handle < object_handles.capacity && object_handles.data != 0u ? SferaAbi::pointer<WorldObject>(object_handles.dataAs<const std::uint32_t>()[handle]) : nullptr;
+    if (result == nullptr && operation != nullptr) {
+        std::snprintf(g_sfera_window_runtime.diagnostic_message, sizeof(g_sfera_window_runtime.diagnostic_message), "%s: wrong handle", operation);
+        WorldDiagnostics::flushScriptContext();
+    }
+    return result;
+}
 ExtendedWorldObject* WorldObjects::extendedObject(std::uint32_t handle) const {
     auto* result = object(handle);
     if (result == nullptr) return nullptr;
@@ -9040,7 +9120,7 @@ std::uint32_t WorldObjects::create(const char* name, std::uint32_t process, std:
     g_sfera_client_main_scalar_runtime.mode_02 = handle + 1u;
     if (dynamic) {
         auto& extended = *static_cast<ExtendedWorldObject*>(created);
-        extended.extended_object_index = extendedIndex; extended.scale = 1.0f; extended.render_enabled = 1u; extended.view_projection_mode = 0u; extended.airborne = 1u; extended.model_instance = process; extended.last_simulation_tick = g_sfera_recovered_static_runtime.simulation_tick;
+        extended.extended_object_index = extendedIndex; extended.scale = 1.0f; extended.render_enabled = 1u; extended.view_projection_mode = 0u; extended.airborne = 1u; extended.process_handle = process; extended.last_simulation_tick = g_sfera_recovered_static_runtime.simulation_tick;
         recalculateBasis(handle);
     } else updateSpatialIndex(handle);
     ++g_sfera_main_render_runtime.world_object_count;
@@ -9143,15 +9223,15 @@ void SferaMbcProcessRecord::appendCommand(std::string_view command) {
     buffer[length] = '\r'; buffer[length + 1u] = '\n';
     std::memmove(buffer + length + 2u, command.data(), command.size()); buffer[length + 2u + command.size()] = '\0';
 }
-void WorldObjects::appendCommand(std::uint32_t handle, const char* command) { if (auto* item = extendedObject(handle); item != nullptr && item->model_instance != 0u) SferaAbi::pointer<SferaMbcProcessRecord>(item->model_instance)->appendCommand(command == nullptr ? "" : command); }
-bool WorldObjects::actorActive(std::uint32_t handle) const { const auto* item = extendedObject(handle); if (item == nullptr || item->model_instance == 0u) return false; const auto& state = SferaAbi::pointer<const SferaMbcProcessRecord>(item->model_instance)->field_09a; return state[0] != 0u || state[1] != 0u; }
+void WorldObjects::appendCommand(std::uint32_t handle, const char* command) { if (auto* item = extendedObject(handle); item != nullptr && item->process_handle != 0u) SferaAbi::pointer<SferaMbcProcessRecord>(item->process_handle)->appendCommand(command == nullptr ? "" : command); }
+bool WorldObjects::actorActive(std::uint32_t handle) const { const auto* item = extendedObject(handle); if (item == nullptr || item->process_handle == 0u) return false; const auto& state = SferaAbi::pointer<const SferaMbcProcessRecord>(item->process_handle)->field_09a; return state[0] != 0u || state[1] != 0u; }
 void WorldObjects::activateTrap(const WorldObject& obstacle) {
     const auto* resource = model(obstacle);
     const auto now = WorldClock::nowTicks();
     if (resource == nullptr || now - g_sfera_model_material_lookup_runtime.refresh_tick <= 10000u) return;
     const std::string_view name(resource->name), pattern("trap");
     if (std::search(name.begin(), name.end(), pattern.begin(), pattern.end(), [](unsigned char first, unsigned char second) { return std::tolower(first) == std::tolower(second); }) == name.end()) return;
-    if (auto* controlled = extendedObject(controlled_object_handle); controlled != nullptr && controlled->model_instance != 0u) {
+    if (auto* controlled = extendedObject(controlled_object_handle); controlled != nullptr && controlled->process_handle != 0u) {
         for (auto address : obstacle.attached_effects) if (address != UINT32_MAX) {
             const auto* effect = SferaAbi::pointer<const SferaActiveEffect>(address);
             const auto id = effect == nullptr ? 0u : effect->listener_key;
@@ -9194,6 +9274,17 @@ std::uint64_t WorldClock::microseconds() {
     return epoch + elapsed * 1000000u / frequency;
 }
 std::uint64_t WorldClock::nowTicks() { return WorldClock::microseconds() / 100u; }
+std::uint32_t WorldClock::calendarTicks() {
+    constexpr std::array<std::uint32_t, 13> daysBeforeMonth{0u, 31u, 59u, 90u, 120u, 151u, 181u, 212u, 243u, 273u, 304u, 334u, 365u};
+    const auto calendar = g_sfera_inter_scalar_runtime.mode_01;
+    const auto month = (calendar >> 18u) & 15u;
+    const auto priorDays = month >= 1u && month <= daysBeforeMonth.size() ? daysBeforeMonth[month - 1u] : 0u;
+    const auto days = (calendar >> 22u) * 365u + priorDays + ((calendar >> 13u) & 31u);
+    const auto hours = days * 24u + ((calendar >> 8u) & 31u);
+    const auto minutes = hours * 60u + ((calendar >> 2u) & 63u);
+    return minutes * 4u + (calendar & 3u);
+}
+
 void SferaProfilerRuntime::begin(std::size_t index) {
     if (index >= std::size(active) || call_count[index] == UINT32_MAX) return;
     if (active[index] == 1u) { call_count[index] = UINT32_MAX; return; }
@@ -10778,8 +10869,8 @@ void Vegetation::updateCells() {
 }
 
 void Vegetation::updateGrassView() {
-    const float factor = g_sfera_recovered_static_runtime.transition_factor;
-    const float direction_x = g_sfera_render_sample_runtime.direction_x.f32, direction_z = g_sfera_render_sample_runtime.direction_y.f32;
+    const float factor = g_sfera_weather_runtime.current.wind;
+    const float direction_x = g_sfera_weather_runtime.current.windX, direction_z = g_sfera_weather_runtime.current.windZ;
     float shift_x = 0, shift_z = 0;
     if (factor <= 1) { shift_x = static_cast<float>(static_cast<double>(direction_x) * factor); shift_z = static_cast<float>(static_cast<double>(direction_z) * factor); }
     else {
@@ -10867,7 +10958,7 @@ std::uint32_t Vegetation::placeTree(const char* name, bool persistent, float x, 
 
 void Vegetation::plant(std::int32_t index) {
     const auto* pattern = patterns.planting(static_cast<std::size_t>(index));
-    if (!pattern || g_sfera_world_render_runtime.render_queue_count == 3500u) return;
+    if (!pattern || g_sfera_world_objects.plantedObjects.size() >= 3500u) return;
     const auto* contours = SferaAbi::pointer<const Contours>(g_sfera_client_process_runtime.client_object);
     for (const auto& contour : contours->records) {
         if (contour.type != 999 || contour.vertex_count <= 0) continue;
@@ -10888,8 +10979,8 @@ void Vegetation::plant(std::int32_t index) {
                 if (!selected) vegetationError("internal error 743827592");
                 const auto handle = placeTree(selected->name.c_str(), false, plant_x, plant_z, selected->radius);
                 if (handle == UINT32_MAX) continue;
-                g_sfera_world_render_queue_runtime.entries[++g_sfera_world_render_runtime.render_queue_count] = handle;
-                if (g_sfera_world_render_runtime.render_queue_count == 3500u) return;
+                g_sfera_world_objects.plantedObjects.push_back(handle);
+                if (g_sfera_world_objects.plantedObjects.size() >= 3500u) return;
             }
         }
     }
@@ -11515,10 +11606,10 @@ void Motion::fall(std::uint32_t handle, float elapsed, bool controlled) {
         previous_y = object->position.y;
         object->position.y = static_cast<float>(double(previous_y) + step_distance);
         if (g_sfera_contacts.test(handle, 0u, true) != 0u) { blocked = true; break; }
-        if (controlled && object->model_instance != 0u && motionHazardBand(object->position.y)) crossed_hazard = true;
+        if (controlled && object->process_handle != 0u && motionHazardBand(object->position.y)) crossed_hazard = true;
     }
     if (!blocked) {
-        if (object->model_instance != 0u && (controlled ? crossed_hazard : motionHazardBand(object->position.y))) { if (controlled) object->physical_velocity.y = 0.0f; g_sfera_world_objects.appendCommand(handle, "phKILL 1"); object = g_sfera_world_objects.extendedObject(handle); if (object == nullptr) return; }
+        if (object->process_handle != 0u && (controlled ? crossed_hazard : motionHazardBand(object->position.y))) { if (controlled) object->physical_velocity.y = 0.0f; g_sfera_world_objects.appendCommand(handle, "phKILL 1"); object = g_sfera_world_objects.extendedObject(handle); if (object == nullptr) return; }
         if (object->position.y > 8000.0f) { object->position = {static_cast<float>((double(std::rand()) * 6.0 / 32767.0 + 77.0) - 3.0), 160.0f, static_cast<float>((double(std::rand()) * 6.0 / 32767.0 + 95.0) - 3.0)}; object->physical_velocity.y = 0.0f; }
         return;
     }
@@ -11529,7 +11620,7 @@ void Motion::fall(std::uint32_t handle, float elapsed, bool controlled) {
         object->position.y = previous_y;
     }
     if (!(object->physical_velocity.y > 0.0f)) { object->physical_velocity.y = 0.0f; return; }
-    if (object->model_instance != 0u && object->physical_velocity.y > (controlled ? 1.0f : 7.0f)) { char command[32]; std::snprintf(command, sizeof(command), "phDMG %5.1f", double(object->physical_velocity.y)); g_sfera_world_objects.appendCommand(handle, command); object = g_sfera_world_objects.extendedObject(handle); if (object == nullptr) return; }
+    if (object->process_handle != 0u && object->physical_velocity.y > (controlled ? 1.0f : 7.0f)) { char command[32]; std::snprintf(command, sizeof(command), "phDMG %5.1f", double(object->physical_velocity.y)); g_sfera_world_objects.appendCommand(handle, command); object = g_sfera_world_objects.extendedObject(handle); if (object == nullptr) return; }
     object->airborne = 0u;
     const float speed = std::fabs(object->physical_velocity.y);
     const auto normal = motionSurfaceNormal();
@@ -11612,7 +11703,7 @@ void Motion::updateObjects(float elapsed) {
         auto* object = g_sfera_world_objects.extendedObject(handle);
         if (object == nullptr || !object->simulation_enabled || !object->render_enabled || object->parent_object_handle != 0u) continue;
         if (!object->full_rate_simulation && g_sfera_grass_map_runtime.alternating_update_phase == 0u) continue;
-        if (object->model_instance != 0u && !g_sfera_world_objects.actorActive(handle) && g_sfera_recovered_static_runtime.simulation_tick - object->last_simulation_tick > 120u) continue;
+        if (object->process_handle != 0u && !g_sfera_world_objects.actorActive(handle) && g_sfera_recovered_static_runtime.simulation_tick - object->last_simulation_tick > 120u) continue;
         const float interval = object->full_rate_simulation ? elapsed : static_cast<float>(double(elapsed) * 2.0);
         const float yaw = static_cast<float>(double(object->angular_velocity) * interval);
         const auto velocity = motionAdd(object->physical_velocity, object->commanded_velocity);
@@ -11770,17 +11861,13 @@ std::uint32_t Motion::pick(float* distance, SferaVec3F* direction) {
 
 
 WorldGuiControl* WorldGuiControls::control(std::uint32_t handle) { const auto* slot = g_sfera_interface_runtime.window_handle_table.element<const std::uint32_t>(handle); return slot ? SferaAbi::pointer<WorldGuiControl>(*slot) : nullptr; }
-void WorldGuiControls::detachFromWindow(std::uint32_t window, std::uint32_t slot) {
-    const auto* entry = g_sfera_interface_runtime.windows.element<const std::uint32_t>(window);
-    if (!entry || !*entry) WorldDiagnostics::fail("internal error 75248635");
-    if (slot >= 7000) WorldDiagnostics::fail("Window control slot is outside the control table");
-    // This published array is shared with the remaining game-window renderer.
-    auto* controls = SferaAbi::pointer<std::uint32_t>(*entry + 0x44u); auto& count = *SferaAbi::pointer<std::uint32_t>(*entry + 0x40u);
-    if (controls[slot] == UINT32_MAX) WorldDiagnostics::fail("internal error 86557243");
-    controls[slot] = UINT32_MAX; --count;
+void WorldGuiControls::detachFromWindow(std::uint32_t windowHandle, std::uint32_t slot) {
+    auto* owner = GameInterface::window(windowHandle);
+    if (!owner) WorldDiagnostics::fail("internal error 75248635");
+    owner->detach(slot);
 }
-void WorldGuiControls::destroySprite(std::uint32_t handle) { auto* item = control(handle); if (!item) { WorldDiagnostics::warning("delete_sprite: wrong handle"); return; } detachFromWindow(item->windowHandle, item->windowSlot); *g_sfera_interface_runtime.window_handle_table.element<std::uint32_t>(handle) = 0; WorldMemory::release(item); --g_sfera_main_view_state_runtime.projection_sample_count; }
-void WorldGuiControls::destroyText(std::uint32_t handle) { if (handle == UINT32_MAX) WorldDiagnostics::fail("Wrong hand was used!"); auto* base = control(handle); if (!base) WorldDiagnostics::fail("delete_text: wrong handle"); auto* item = static_cast<WorldGuiText*>(base); detachFromWindow(item->windowHandle, item->windowSlot); *g_sfera_interface_runtime.window_handle_table.element<std::uint32_t>(handle) = 0; if (item->lines[0]) WorldMemory::release(item->lines[0]); WorldMemory::release(item); --g_sfera_main_view_state_runtime.projection_sample_count; }
+void WorldGuiControls::destroySprite(std::uint32_t handle) { auto* item = control(handle); if (!item) { WorldDiagnostics::warning("delete_sprite: wrong handle"); return; } detachFromWindow(item->windowHandle, item->windowSlot); *g_sfera_interface_runtime.window_handle_table.element<std::uint32_t>(handle) = 0; auto* element = static_cast<GameUiElement*>(item); std::destroy_at(element); WorldMemory::release(element); --g_sfera_main_view_state_runtime.projection_sample_count; }
+void WorldGuiControls::destroyText(std::uint32_t handle) { if (handle == UINT32_MAX) WorldDiagnostics::fail("Wrong hand was used!"); auto* base = control(handle); if (!base) WorldDiagnostics::fail("delete_text: wrong handle"); auto* item = static_cast<WorldGuiText*>(base); detachFromWindow(item->windowHandle, item->windowSlot); *g_sfera_interface_runtime.window_handle_table.element<std::uint32_t>(handle) = 0; std::destroy_at(static_cast<GameUiElement*>(item)); WorldMemory::release(item); --g_sfera_main_view_state_runtime.projection_sample_count; }
 void WorldGuiControls::removeForObject(std::uint32_t objectHandle) { auto remaining = g_sfera_main_view_state_runtime.projection_sample_count; for (std::uint32_t handle = 0; remaining && handle < g_sfera_interface_runtime.window_handle_table.capacity; ++handle) { const auto* item = control(handle); if (!item) continue; --remaining; if (item->objectHandle != objectHandle) continue; if (item->kind == 0) destroyText(handle); else if (item->kind == 1) destroySprite(handle); } }
 CharacterInstanceCache CharacterInstanceCache::fromManager(void* legacyManager) { if (!legacyManager) return CharacterInstanceCache({}); auto* instances = reinterpret_cast<CharacterInstanceSlot*>(static_cast<std::uint8_t*>(legacyManager) + 0x4F54u); return CharacterInstanceCache({instances, 400}); }
 void CharacterInstanceCache::release(const ExtendedWorldObject& object) { if (object.render_cache_handle >= 0) return; const auto index = static_cast<std::uint32_t>(-1 - static_cast<std::int64_t>(object.render_cache_handle)); if (index >= slots.size()) WorldDiagnostics::fail("Character instance handle is outside the cache"); slots[index].owner = 0; }
@@ -11806,7 +11893,7 @@ void WorldObjects::destroy(std::uint32_t handle) {
     } else removeSpatialIndex(handle);
     *object_handles.element<std::uint32_t>(handle) = 0; WorldMemory::release(owned); --g_sfera_main_render_runtime.world_object_count;
 }
-void WorldObjects::destroyAll() { const auto limit = std::min<std::uint32_t>(500000, object_handles.capacity); for (std::uint32_t handle = 2; handle < limit; ++handle) if (object(handle)) destroy(handle); }
+void WorldObjects::destroyAll() { const auto limit = std::min<std::uint32_t>(500000, object_handles.capacity); for (std::uint32_t handle = 2; handle < limit; ++handle) if (object(handle)) destroy(handle); plantedObjects.clear(); }
 ExtendedWorldObject* WorldObjects::linkModel(std::uint32_t parentHandle, const char* name, std::uint32_t slot) { auto* parent = extendedObject(parentHandle); if (!parent || slot >= 5) { WorldDiagnostics::warning("Wrong handle: Link_object_to_object"); return nullptr; } if (parent->linked_objects[slot]) unlink(parentHandle, slot); const auto childHandle = create(name, 0, 0, true); if (childHandle == UINT32_MAX) return nullptr; auto* child = extendedObject(childHandle); parent = extendedObject(parentHandle); if (!parent || !child) { if (child) destroy(childHandle); return nullptr; } parent->linked_objects[slot] = childHandle; child->parent_object_handle = parentHandle; child->parent_link_slot = slot; return child; }
 
 
@@ -12393,7 +12480,7 @@ std::uint32_t SceneSky::buildLayerGeometry(const SceneSkyLayer& layer, float opa
     for (std::uint16_t row = 0; row < 9; ++row) for (std::uint16_t column = 0; column < 11; ++column) { const auto index = static_cast<std::uint16_t>(row * 12 + column); const auto* visible = g_sfera_static_render_lookup_runtime.sample_flags; auto* indices = g_sfera_sky_runtime.indices; if (static_cast<std::int32_t>(visible[index] + visible[index + 1] + visible[index + 12]) > 0) { indices[count++] = index; indices[count++] = index + 1; indices[count++] = index + 12; } if (static_cast<std::int32_t>(visible[index + 1] + visible[index + 12] + visible[index + 13]) > 0) { indices[count++] = index + 1; indices[count++] = index + 13; indices[count++] = index + 12; } }
     return count;
 }
-void SceneSky::layerColor(const SceneSkyLayer& layer, SferaVec3F& output) { std::int32_t first; std::int32_t second; float amount; SferaAbi::pointer<const SkyEnvironment>(g_sfera_font_runtime.renderer)->interval(g_sfera_graphics_runtime.environment_factor, first, second, amount); output = {skyLerp(layer.colors[first].x, layer.colors[second].x, amount), skyLerp(layer.colors[first].y, layer.colors[second].y, amount), skyLerp(layer.colors[first].z, layer.colors[second].z, amount)}; }
+void SceneSky::layerColor(const SceneSkyLayer& layer, SferaVec3F& output) { std::int32_t first; std::int32_t second; float amount; SferaAbi::pointer<const SkyEnvironment>(g_sfera_primary_sky_environment)->interval(g_sfera_graphics_runtime.environment_factor, first, second, amount); output = {skyLerp(layer.colors[first].x, layer.colors[second].x, amount), skyLerp(layer.colors[first].y, layer.colors[second].y, amount), skyLerp(layer.colors[first].z, layer.colors[second].z, amount)}; }
 void SceneSky::drawColorLayer(const char* texture, const SferaVec3F& color, std::uint32_t indices) {
     if (*texture == '\0') return;
     for (std::size_t index = 0; index < 120; ++index) { const float additional = static_cast<float>(g_sfera_render_sample_runtime.samples[index] * 255.0); auto& vertex = g_sfera_sky_screen_vertices[index]; vertex.diffuse = (g_sfera_main_command_state_runtime.render_samples[index] << 24) | (skyChannel(static_cast<float>(static_cast<double>(color.x) + additional)) << 16) | (skyChannel(static_cast<float>(static_cast<double>(color.y) + additional)) << 8) | skyChannel(static_cast<float>(static_cast<double>(color.z) + additional)); vertex.specular = 0u; }
@@ -12405,7 +12492,7 @@ void SceneSky::drawMaskLayer(const char* texture, std::uint32_t indices) {
     auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.setAlphaBlending(D3DBLEND_ZERO, D3DBLEND_SRCCOLOR); device.checkResult(device.native_device->SetRenderState(D3DRS_SPECULARENABLE, TRUE), "SetRenderState"); SphereRender::SceneRenderer::bindTexture(g_sfera_textures.find(texture)); skySubmit(indices); device.checkResult(device.native_device->SetRenderState(D3DRS_SPECULARENABLE, FALSE), "SetRenderState"); device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
 }
 void SceneSky::drawLayers(const SceneSkyLayers& layers) {
-    if (layers.primary.texture[0] == '\0' && layers.secondary.texture[0] == '\0') { g_sfera_startup_command_line_runtime.text[0x148] = 0; g_sfera_view_render_objects_runtime.reset_flag = 0u; return; }
+    if (layers.primary.texture[0] == '\0' && layers.secondary.texture[0] == '\0') { g_sfera_startup_command_line_runtime.text[0x148] = 0; return; }
     const auto& source = layers.primary.texture[0] == '\0' ? layers.secondary : layers.primary; const auto indices = buildLayerGeometry(source, layers.opacity); drawMaskLayer(layers.secondary.texture, indices); if (layers.primary.texture[0] != '\0') { SferaVec3F color; layerColor(layers.primary, color); drawColorLayer(layers.primary.texture, color, indices); }
 }
 void SceneSky::orbit(float& x, float& y, std::uint32_t orbit) { const float angle = static_cast<float>(g_sfera_recovered_static_runtime.animation_phase * 3.1415929794311523 * 2.0 * static_cast<std::int32_t>(orbit + 1u)); x = static_cast<float>(static_cast<double>(x) + static_cast<float>(static_cast<float>(std::cos(static_cast<double>(angle))) * 0.019999999552965164)); y = static_cast<float>(static_cast<double>(y) + static_cast<float>(static_cast<float>(std::sin(static_cast<double>(angle))) * 0.019999999552965164)); }
@@ -12414,7 +12501,7 @@ void SceneSky::sampleDirection(bool refresh, const SferaVec3F& direction) {
     if (g_sfera_view_spatial_runtime.alternate_projection == 1u) { g_sfera_client_main_scalar_runtime.state_01 = 0u; g_sfera_main_aux_runtime.color_component = 0u; g_sfera_recovered_static_runtime.animation_result_b = 0u; g_sfera_recovered_static_runtime.render_state_09 = 0u; return; }
     const float azimuth = static_cast<float>(std::atan2(static_cast<double>(direction.z), direction.x)); const float cosine = static_cast<float>(std::cos(static_cast<double>(-azimuth))); const float sine = static_cast<float>(std::sin(static_cast<double>(-azimuth))); const float horizontal = static_cast<float>(static_cast<double>(cosine) * direction.x - static_cast<double>(sine) * direction.z); const float elevation = static_cast<float>(static_cast<float>(std::atan2(static_cast<double>(direction.y), horizontal)) + 1.5707964897155762); g_sfera_main_ui_state_runtime.scene_scale = azimuth; g_sfera_main_command_state_runtime.sky_blend_factor = elevation; const float latitude = static_cast<float>(elevation * 0.31830985316916194);
     float longitude = static_cast<float>(static_cast<float>(std::atan2(static_cast<double>(direction.y), direction.x)) - 1.5707964897155762); if (longitude < 0.0f) longitude = static_cast<float>(longitude + 6.283185958862305); longitude = static_cast<float>(longitude * 0.15915492658458097);
-    if (refresh) { SkyState state; const auto environment = SphereWorld::Vegetation::alternatePatterns() ? g_sfera_main_aux_runtime.secondary_world_manager : g_sfera_font_runtime.renderer; SferaAbi::pointer<const SkyEnvironment>(environment)->sample(g_sfera_graphics_runtime.environment_factor, state); std::memcpy(&g_sfera_sky_interpolation_runtime, &state, sizeof(g_sfera_sky_interpolation_runtime)); }
+    if (refresh) { SkyState state; const auto environment = SphereWorld::Vegetation::alternatePatterns() ? g_sfera_main_aux_runtime.secondary_world_manager : g_sfera_primary_sky_environment; SferaAbi::pointer<const SkyEnvironment>(environment)->sample(g_sfera_graphics_runtime.environment_factor, state); std::memcpy(&g_sfera_sky_interpolation_runtime, &state, sizeof(g_sfera_sky_interpolation_runtime)); }
     const auto& samples = g_sfera_sky_interpolation_runtime; auto color = skyPeriodicSample(samples.primary_key_positions, samples.primary_samples, longitude); const float length = static_cast<float>(std::sqrt(static_cast<float>(direction.dot(direction)))); const float inverse = static_cast<float>(1.0 / length); float reference = static_cast<float>((-0.30000001192092896 * direction.y - 0.9539999961853027 * std::fabs(direction.z)) * inverse); reference = static_cast<float>(static_cast<double>(reference) * reference); color = skyLerp(color, samples.primary_reference, reference);
     const auto sun = SferaVec3F{g_sfera_view_spatial_runtime.position_offset.x.f32, g_sfera_view_spatial_runtime.position_offset.y.f32, g_sfera_view_spatial_runtime.position_offset.z.f32}; float glow = static_cast<float>(direction.dot(sun) * inverse); if (glow < 0.0f) glow = 0.0f; else for (int square = 0; square < 6; ++square) glow = static_cast<float>(static_cast<double>(glow) * glow); g_sfera_scene_control_runtime.environment_parameter.f32 = glow;
     const auto overlay = skyPeriodicSample(samples.secondary_key_positions, samples.secondary_samples, latitude); const float amount = static_cast<float>(static_cast<double>(overlay.w) / 255.0); color.x = skyLerp(color.x, overlay.x, amount); color.y = skyLerp(color.y, overlay.y, amount); color.z = skyLerp(color.z, overlay.z, amount);
@@ -12476,8 +12563,8 @@ void SceneRenderer::setupEnvironment(std::uint32_t mode, bool useDefault, float 
         output.scale.y.f32 = mode == 2u ? 1005.0f : 80.0f; output.basis[0].y.f32 = static_cast<float>(output.scale.y.f32 - 20.0); output.basis[0].z.f32 = output.scale.y.f32; output.basis[3].x.f32 = 59.0f; output.basis[3].y.f32 = 37.0f; output.basis[3].z.f32 = 12.0f; output.basis[2].x.f32 = 19.0f; output.basis[2].y.f32 = 47.0f; output.basis[2].z.f32 = 71.0f; const float length = static_cast<float>(std::sqrt(14.0)); output.position_offset.x.f32 = static_cast<float>(1.0 / length); output.position_offset.y.f32 = static_cast<float>(-3.0 / length); output.position_offset.z.f32 = static_cast<float>(2.0 / length);
     } else {
         const float halfAngle = static_cast<float>(output.scale.z.f32 * 0.5); const float cosine = static_cast<float>(std::cos(static_cast<double>(halfAngle))); output.scale.y.f32 = static_cast<float>(static_cast<double>(cosine) * g_sfera_main_input_state_runtime.motion_y); output.basis[0].y.f32 = 150.0f; output.basis[0].z.f32 = 200.0f;
-        const bool alternate = SphereWorld::Vegetation::alternatePatterns(); const auto& sky = *SferaAbi::pointer<SkyEnvironment>(alternate ? g_sfera_main_aux_runtime.secondary_world_manager : g_sfera_font_runtime.renderer); SferaVec3F direction{}; sky.sunDirection(time, direction); output.position_offset.x.f32 = direction.x; output.position_offset.y.f32 = direction.y; output.position_offset.z.f32 = direction.z;
-        auto& zones = *SferaAbi::pointer<EnvironmentZones>(alternate ? g_sfera_world_render_queue_runtime.entries[0] : g_sfera_recovered_static_runtime.scene_state_08); EnvironmentLighting lighting{}; zones.calculate(useDefault, position.x, position.z, time, sky, lighting); const SferaVec3F* colors[] = {&lighting.fogParameters, &lighting.fogColor, &lighting.ambientColor, &lighting.sunColor}; for (std::size_t index = 0u; index < 4u; ++index) { output.basis[index].x.f32 = colors[index]->x; output.basis[index].y.f32 = colors[index]->y; output.basis[index].z.f32 = colors[index]->z; }
+        const bool alternate = SphereWorld::Vegetation::alternatePatterns(); const auto& sky = *SferaAbi::pointer<SkyEnvironment>(alternate ? g_sfera_main_aux_runtime.secondary_world_manager : g_sfera_primary_sky_environment); SferaVec3F direction{}; sky.sunDirection(time, direction); output.position_offset.x.f32 = direction.x; output.position_offset.y.f32 = direction.y; output.position_offset.z.f32 = direction.z;
+        auto& zones = *SferaAbi::pointer<EnvironmentZones>(alternate ? g_sfera_alternate_environment_zones : g_sfera_recovered_static_runtime.scene_state_08); EnvironmentLighting lighting{}; zones.calculate(useDefault, position.x, position.z, time, sky, lighting); const SferaVec3F* colors[] = {&lighting.fogParameters, &lighting.fogColor, &lighting.ambientColor, &lighting.sunColor}; for (std::size_t index = 0u; index < 4u; ++index) { output.basis[index].x.f32 = colors[index]->x; output.basis[index].y.f32 = colors[index]->y; output.basis[index].z.f32 = colors[index]->z; }
     }
     if (g_sfera_client_config_runtime.state_13 != 0u) { output.basis[0].y.f32 = 1040.0f; output.basis[0].z.f32 = 1050.0f; output.scale.x.f32 = 100.0f; output.scale.y.f32 = 1050.0f; output.scale.z.f32 = 0.20000000298023224f; }
     if (g_sfera_client_config_runtime.state_17 != 0u && mode != 2u) { output.basis[0].y.f32 = 180.0f; output.basis[0].z.f32 = 200.0f; output.scale.y.f32 = 200.0f; }
@@ -12519,7 +12606,7 @@ void sceneUnderwaterOverlay() {
 void SceneRenderer::drawPass(std::uint32_t mode) {
     auto& device = sceneDevice(); const auto width = mode == 1u || mode == 2u ? 256u : g_sfera_graphics_runtime.display_width; const auto height = mode == 1u || mode == 2u ? 256u : g_sfera_graphics_runtime.display_height; GameCamera::setupViewport(0u, 0u, width, height); device.checkResult(device.native_device->Clear(0u, nullptr, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xff000000u, 1.0f, 0u), "Clear");
     const float fogStart = mode == 2u ? static_cast<float>(g_sfera_view_spatial_runtime.scale.y.f32 - 1.0) : g_sfera_view_spatial_runtime.basis[0].y.f32; const float fogEnd = mode == 2u ? g_sfera_view_spatial_runtime.scale.y.f32 : g_sfera_view_spatial_runtime.basis[0].z.f32; sceneRenderState(D3DRS_FOGSTART, std::bit_cast<std::uint32_t>(fogStart)); sceneRenderState(D3DRS_FOGEND, std::bit_cast<std::uint32_t>(fogEnd)); setAmbientColor(); if (mode == 0u) { SferaNatureManager::updateRain(); SferaNatureManager::updateLightning(); } sceneRenderState(D3DRS_FOGENABLE, FALSE);
-    if ((g_sfera_view_spatial_runtime.alternate_projection == 0u && g_sfera_client_config_runtime.state_19 == 1u) || mode == 1u) { const float rotation = static_cast<float>(SceneSky::drawStars()); SceneSky::drawSunMoon(rotation); if (SphereWorld::Vegetation::alternatePatterns()) SceneSky::drawLayers(*reinterpret_cast<const SceneSkyLayers*>(&g_sfera_view_render_objects_runtime.primary)); SceneSky::drawLayers(*reinterpret_cast<const SceneSkyLayers*>(&g_sfera_view_render_objects_runtime.alternate)); } else GameInterface::drawTexture(0, 0, g_sfera_graphics_runtime.display_width, g_sfera_graphics_runtime.display_height, "black", 255u, 0.0f, nullptr);
+    if ((g_sfera_view_spatial_runtime.alternate_projection == 0u && g_sfera_client_config_runtime.state_19 == 1u) || mode == 1u) { const float rotation = static_cast<float>(SceneSky::drawStars()); SceneSky::drawSunMoon(rotation); if (SphereWorld::Vegetation::alternatePatterns()) SceneSky::drawLayers(g_sfera_weather_runtime.current.clouds); SceneSky::drawLayers(g_sfera_weather_runtime.current.sky); } else GameInterface::drawTexture(0, 0, g_sfera_graphics_runtime.display_width, g_sfera_graphics_runtime.display_height, "black", 255u, 0.0f, nullptr);
     device.checkResult(device.native_device->Clear(0u, nullptr, D3DCLEAR_ZBUFFER, 0xff000000u, 1.0f, 0u), "Clear"); sceneRenderState(D3DRS_FOGENABLE, TRUE); g_sfera_terrain_renderer.drawLandscape(); sceneRenderState(D3DRS_FOGCOLOR, sceneColor(g_sfera_view_spatial_runtime.basis[1])); drawObjects(mode != 1u); if (mode != 0u) return;
     setAmbientColor(); g_sfera_light_runtime.setDirectionalLight(sceneVector(g_sfera_view_spatial_runtime.position_offset) * -1.0f, sceneVector(g_sfera_view_spatial_runtime.basis[3])); g_sfera_terrain_renderer.drawWater(); SferaAbi::pointer<SferaBloodEffectRuntime>(g_sfera_blood_effect_instance)->render(); sceneRenderState(D3DRS_FOGENABLE, FALSE); g_sfera_server_wall.generateEffects(); g_sfera_effect_manager.renderParticles(); g_sfera_effect_manager.drawFlare(static_cast<std::int32_t>(g_sfera_flare_projection.x.f32), static_cast<std::int32_t>(g_sfera_flare_projection.y.f32), 220, g_sfera_recovered_static_runtime.scene_state_09 != 0u); sceneUnderwaterOverlay();
 }
@@ -13131,8 +13218,8 @@ void SkyEnvironment::lighting(float time, SferaVec3F& sun, SferaVec3F& ambient) 
 namespace {
     void updateNatureWeather(float value, std::uint32_t& enabled, void (SferaNatureManager::*start)(), void (SferaNatureManager::*stop)(), void (SferaNatureManager::*apply)(float)) { auto* nature = sfera_nature_manager(); if (value > 0.0010000000474974513f && g_sfera_view_spatial_runtime.alternate_projection == 0u) { if (enabled == 0u) { if (nature != nullptr) (nature->*start)(); enabled = 1u; } if (nature != nullptr) (nature->*apply)(value); } else if (enabled == 1u) { if (nature != nullptr) (nature->*stop)(); enabled = 0u; } }
 }
-void SferaNatureManager::updateRain() { updateNatureWeather(g_sfera_recovered_static_runtime.primary_frame_interval, g_sfera_frame_runtime.primary_toggle, &SferaNatureManager::startRain, &SferaNatureManager::stopRain, &SferaNatureManager::setRainIntensity); }
-void SferaNatureManager::updateLightning() { updateNatureWeather(g_sfera_recovered_static_runtime.secondary_frame_interval, g_sfera_frame_runtime.secondary_toggle, &SferaNatureManager::startLighting, &SferaNatureManager::stopLighting, &SferaNatureManager::setLightingLevel); }
+void SferaNatureManager::updateRain() { updateNatureWeather(g_sfera_weather_runtime.current.rain, g_sfera_frame_runtime.primary_toggle, &SferaNatureManager::startRain, &SferaNatureManager::stopRain, &SferaNatureManager::setRainIntensity); }
+void SferaNatureManager::updateLightning() { updateNatureWeather(g_sfera_weather_runtime.current.lightning, g_sfera_frame_runtime.secondary_toggle, &SferaNatureManager::startLighting, &SferaNatureManager::stopLighting, &SferaNatureManager::setLightingLevel); }
 
 
 
@@ -13293,6 +13380,29 @@ void CSoundManager::update() {
     if (auto* Interface = SI_GetInterface()) Interface->UpdateSettings();
 }
 void CSoundManager::clear() { for (auto* sound = first; sound != nullptr;) { auto* next = sound->cache_next; sound->~CSound(); WorldMemory::release(sound); sound = next; } first = last = nullptr; for (auto& entry : semantic_sound_cache()) destroy_semantic_sound(entry.sound); semantic_sound_cache().clear(); }
+bool SferaSoundRuntime::initialize() {
+    SI_SetLogFile(nullptr);
+    if (SI_CreateInterface(main_window_handle(), -1, 44100u, 0u) == nullptr) return false;
+    auto* activeManager = ensureManager();
+    if (activeManager != nullptr) {
+        activeManager->enabled = interfaceAvailable() ? 1u : 0u;
+        if (activeManager->enabled == 0u) {
+            for (auto* sound = activeManager->first; sound != nullptr; sound = sound->cache_next) sound->Stop();
+            activeManager->clear();
+        }
+    }
+    std::uint32_t soundVolume = 100u, musicVolume = 100u, hardwareMixing = 0u;
+    SphereUI::InterfaceConfiguration::open("config.cfg");
+    SphereUI::InterfaceConfiguration::readInteger("SNDVOL", soundVolume);
+    SphereUI::InterfaceConfiguration::readInteger("MUSVOL", musicVolume);
+    SphereUI::InterfaceConfiguration::readInteger("HWMIX", hardwareMixing);
+    SI_SetHardwareMixing(hardwareMixing != 0u);
+    loadDefinitions();
+    SI_SetStreamVolume(static_cast<std::int32_t>(musicVolume));
+    if (activeManager != nullptr) activeManager->setVolume(static_cast<std::int32_t>(soundVolume));
+    return true;
+}
+
 CSoundManager* SferaSoundRuntime::ensureManager() { if (sound_manager != nullptr) return sound_manager; if (!interfaceAvailable()) return nullptr; sound_manager = new (WorldMemory::allocate(sizeof(CSoundManager))) CSoundManager{nullptr, nullptr, 1.0f, 0u, 0u}; return sound_manager; }
 void SferaSoundRuntime::update() {
     auto* Interface = SI_GetInterface();
@@ -13314,6 +13424,17 @@ void SferaSoundRuntime::update() {
 void SferaSoundRuntime::shutdown() { clearDefinitions(); if (sound_manager != nullptr) { sound_manager->clear(); sound_manager->~CSoundManager(); WorldMemory::release(sound_manager); sound_manager = nullptr; } clearTracks(); SI_Close(); }
 
 float EnvironmentZone::weight(float x, float z) const { const float left = static_cast<float>(static_cast<double>(x) - (static_cast<double>(originX) + minimumX)); if (left < 0.0f) return 0.0f; const float top = static_cast<float>(static_cast<double>(z) - (static_cast<double>(originZ) + minimumZ)); if (top < 0.0f) return 0.0f; const float right = static_cast<float>(static_cast<double>(originX) + maximumX - x); if (right < 0.0f) return 0.0f; const float bottom = static_cast<float>(static_cast<double>(originZ) + maximumZ - z); if (bottom < 0.0f) return 0.0f; const float distance = std::min(std::min(left, top), std::min(right, bottom)); return borderFade <= distance ? 1.0f : distance / borderFade; }
+PathZones::~PathZones() { WorldMemory::release(cells); }
+
+bool PathZones::contains(float x, float z) const {
+    if (cells == nullptr || !std::isfinite(x) || !std::isfinite(z)) return false;
+    const double column = std::trunc((double(x) + 4000.0) / 10.0);
+    const double row = std::trunc((double(z) + 4000.0) / 10.0);
+    if (column < 0.0 || row < 0.0 || column >= side || row >= side) return false;
+    const auto cell = static_cast<std::size_t>(row) * side + static_cast<std::size_t>(column);
+    return (cells[cell / 8u] & (1u << (cell % 8u))) != 0u;
+}
+
 void EnvironmentZones::interval(float time, std::int32_t& first, std::int32_t& second, float& fraction) { constexpr float positions[]{0.0f, 0.19f, 0.27f, 0.34f, 0.50f, 0.66f, 0.73f, 0.81f, 1.0f}; first = second = 0; fraction = 0.0f; for (std::int32_t index = 0; index < 8; ++index) if (positions[index] <= time && positions[index + 1] >= time) { first = index; second = (index + 1) % 8; fraction = static_cast<float>((static_cast<double>(time) - positions[index]) / (static_cast<double>(positions[index + 1]) - positions[index])); return; } }
 void EnvironmentZone::sample(std::int32_t first, std::int32_t second, float fraction, EnvironmentLighting& output) const { output.fogParameters = fogParameters; output.fogColor = environmentBlend(fogColors[first], fogColors[second], fraction); output.ambientColor = environmentBlend(ambientColors[first], ambientColors[second], fraction); output.sunColor = environmentBlend(sunColors[first], sunColors[second], fraction); }
 void EnvironmentZones::setDefaultLighting(const SferaVec3F& sun, const SferaVec3F& ambient) { std::fill(std::begin(zones.back().sunColors), std::end(zones.back().sunColors), sun); std::fill(std::begin(zones.back().ambientColors), std::end(zones.back().ambientColors), ambient); }
@@ -13436,7 +13557,6 @@ WeatherScenarios* WeatherScenarios::load(const char* filename) {
         if (!parameters.hasModel(model)) break;
         skyNames(model, pairs[pairCount++]);
     }
-    for (std::uint32_t index = 0u; index < 4u; ++index) g_sfera_weather_runtime.interpolation_offsets[index] = (index + 1u) * sizeof(float);
     return this;
 }
 
@@ -13536,6 +13656,54 @@ void WeatherScenarios::selectSky(std::int32_t time, float dayTime, char* primary
     if (selected == nullptr) { primary[0] = secondary[0] = '\0'; return; }
     std::copy_n(selected->primary, std::strlen(selected->primary) + 1u, primary);
     std::copy_n(selected->secondary, std::strlen(selected->secondary) + 1u, secondary);
+}
+
+void WeatherScenarios::update(std::int32_t time, float dayTime, WeatherState& output, bool alternateClouds) {
+    if (time <= lastUpdate) return;
+    lastUpdate = time;
+    std::uint32_t sequenceIndex = 0u;
+    std::int32_t startTime = 0, localTime = 0;
+    locate(time, sequenceIndex, startTime, localTime);
+    constexpr std::array<float WeatherState::*, 4> destinations{&WeatherState::rain, &WeatherState::lightning, &WeatherState::wind, &WeatherState::cloud};
+    for (std::size_t index = 0; index < destinations.size(); ++index) {
+        const auto property = static_cast<Property>(index);
+        std::int32_t previousDistance = 0, nextDistance = 0;
+        const float previous = static_cast<float>(previousValue(sequenceIndex, localTime, property, previousDistance));
+        float value = previous;
+        if (previousDistance != 0) {
+            const float next = static_cast<float>(nextValue(sequenceIndex, localTime, property, nextDistance));
+            value = static_cast<float>((double(next) - previous) * previousDistance / (double(previousDistance) + nextDistance) + previous);
+        }
+        output.*destinations[index] = value;
+    }
+    WeatherSkyPair selected{};
+    selectSky(time, dayTime, selected.primary, selected.secondary);
+    output.sky.opacity = 0.0f;
+    if (selected.primary[0] != '\0' || selected.secondary[0] != '\0') {
+        constexpr std::int32_t transitionSteps = 81;
+        constexpr double dayStep = 0.00017361111531499773;
+        const auto distanceToChange = [&](std::int32_t direction) {
+            for (std::int32_t distance = 1; distance < transitionSteps; ++distance) {
+                WeatherSkyPair adjacent{};
+                const auto sampleTime = static_cast<std::int32_t>(static_cast<std::uint32_t>(time) + static_cast<std::uint32_t>(direction * distance));
+                const float sampleDay = static_cast<float>(double(dayTime) + double(direction * distance) * dayStep);
+                selectSky(sampleTime, sampleDay, adjacent.primary, adjacent.secondary);
+                if (std::strcmp(selected.primary, adjacent.primary) != 0 || std::strcmp(selected.secondary, adjacent.secondary) != 0) return distance;
+            }
+            return transitionSteps;
+        };
+        const auto nextChange = distanceToChange(1);
+        const auto previousChange = distanceToChange(-1);
+        windDirection(previousChange == 1, startTime, output.windX, output.windZ);
+        output.sky.opacity = static_cast<float>(double(std::min(nextChange, previousChange)) / transitionSteps);
+    }
+    copyTexture(selected.primary, output.sky.primary);
+    copyTexture(selected.secondary, output.sky.secondary);
+    if (alternateClouds) {
+        copyTexture("clouds8", output.clouds.primary);
+        copyTexture("clouds8a", output.clouds.secondary);
+        output.clouds.opacity = 1.0f;
+    }
 }
 
 void WeatherScenarios::windDirection(bool refresh, std::int32_t seed, float& x, float& z) {
@@ -13902,19 +14070,12 @@ void GameInterface::drawFullscreenOverlay() {
     device.last_hresult = device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
 }
 
-void GameInterface::releaseFontAtlas() {
-    for (std::size_t font = 0; font < std::size(g_sfera_font_atlas_layout_runtime.resource_count); ++font) {
-        for (std::uint32_t index = 0; index < g_sfera_font_atlas_layout_runtime.resource_count[font]; ++index) {
-            auto*& texture = g_sfera_static_render_lookup_runtime.atlas_textures[index][font];
-            if (texture) { texture->Release(); texture = nullptr; }
-        }
-    }
-}
 
-std::uint32_t GameInterface::fontHeight(std::uint32_t font, std::uint32_t scale) { return g_sfera_font_atlas_layout_runtime.span[font] * scale; }
-std::uint32_t GameInterface::glyphWidth(std::uint32_t character, std::uint32_t font) { return g_sfera_static_render_lookup_runtime.glyph_metrics[character][font] + g_sfera_font_atlas_layout_runtime.code_base[font]; }
-std::uint32_t GameInterface::textHeight(std::uint32_t font, std::uint32_t scale, std::uint32_t lines) { return ((lines - 1) * g_sfera_font_atlas_layout_runtime.cell_step[font] + g_sfera_font_atlas_layout_runtime.span[font]) * scale; }
-std::uint32_t GameInterface::lineOffset(std::uint32_t font, std::uint32_t scale, std::uint32_t line) { return g_sfera_font_atlas_layout_runtime.cell_step[font] * scale * line; }
+
+std::uint32_t GameInterface::fontHeight(std::uint32_t font, std::uint32_t scale) { return g_sfera_font_runtime.layout.span[font] * scale; }
+std::uint32_t GameInterface::glyphWidth(std::uint32_t character, std::uint32_t font) { return g_sfera_font_runtime.metrics[character][font] + g_sfera_font_runtime.layout.code_base[font]; }
+std::uint32_t GameInterface::textHeight(std::uint32_t font, std::uint32_t scale, std::uint32_t lines) { return ((lines - 1) * g_sfera_font_runtime.layout.cell_step[font] + g_sfera_font_runtime.layout.span[font]) * scale; }
+std::uint32_t GameInterface::lineOffset(std::uint32_t font, std::uint32_t scale, std::uint32_t line) { return g_sfera_font_runtime.layout.cell_step[font] * scale * line; }
 
 void GameInterface::setRenderState() {
     auto& device = *g_sfera_graphics_runtime.d3d_runtime;
@@ -14015,12 +14176,6 @@ void GameInterface::drawAtlasText(const char* text, std::int32_t x, std::int32_t
 }
 
 namespace {
-    GameUiWindow* interfaceWindow(std::int32_t handle) {
-        if (handle < 0) return nullptr;
-        const auto* entry = g_sfera_interface_runtime.windows.element<std::uint32_t>(handle);
-        return entry ? SferaAbi::pointer<GameUiWindow>(*entry) : nullptr;
-    }
-
     void interfaceWindowBorder(const GameUiWindow& window) {
         const auto width = window.contentRight - window.contentLeft + 1, height = window.contentBottom - window.contentTop + 1;
         const float u = static_cast<float>(width) / 256.0f, v = static_cast<float>(height) / 256.0f;
@@ -14076,7 +14231,7 @@ namespace {
 }
 
 void GameInterface::drawWindow(std::int32_t handle) {
-    auto* window = interfaceWindow(handle);
+    auto* window = GameInterface::window(handle);
     if (!window) {
         g_sfera_window_runtime.diagnostic_message[0] = 0;
         WorldDiagnostics::appendScriptContext("draw_window: wrong handle");
@@ -14126,22 +14281,12 @@ void GameInterface::drawAll() {
     std::vector<InterfaceWindowOrder> windows;
     const auto count = g_sfera_main_command_state_runtime.window_count;
     for (std::uint32_t handle = 0; handle < g_sfera_interface_runtime.windows.capacity && windows.size() < count; ++handle) {
-        if (const auto* window = interfaceWindow(handle)) windows.push_back({static_cast<std::int32_t>(handle), static_cast<std::int32_t>(window->layer * 1000u + window->order)});
+        if (const auto* window = GameInterface::window(handle)) windows.push_back({static_cast<std::int32_t>(handle), static_cast<std::int32_t>(window->layer * 1000u + window->order)});
     }
     interfaceSortWindows(windows);
     for (const auto& entry : windows) drawWindow(entry.window);
 }
 
-void GameInterface::sortWindows(std::int32_t first, std::int32_t last) {
-    if (first >= last) return;
-    std::vector<InterfaceWindowOrder> windows;
-    for (auto index = first; index <= last; ++index) windows.push_back({static_cast<std::int32_t>(g_sfera_spatial_index_runtime.ui_sort_indices[index]), static_cast<std::int32_t>(g_sfera_main_view_state_runtime.ui_sort_keys[index])});
-    interfaceSortWindows(windows);
-    for (const auto& entry : windows) {
-        g_sfera_spatial_index_runtime.ui_sort_indices[first] = entry.window;
-        g_sfera_main_view_state_runtime.ui_sort_keys[first++] = entry.order;
-    }
-}
 
 
 namespace {
@@ -14258,3 +14403,630 @@ const char* WorldDiagnostics::scriptContext() {
     return vm.diagnostic_context;
 }
 
+
+std::uint32_t SferaBoundCheckArray::firstVacant() const {
+    const auto* slots = dataAs<const std::uint32_t>();
+    if (!slots) WorldDiagnostics::fail("Handle table is not initialized");
+    const auto* empty = std::find(slots, slots + capacity, 0u);
+    if (empty == slots + capacity) WorldDiagnostics::fail("Handle table is full");
+    return static_cast<std::uint32_t>(empty - slots);
+}
+
+GameUiWindow* GameInterface::window(std::uint32_t handle, const char* operation) {
+    const auto* slot = g_sfera_interface_runtime.windows.element<const std::uint32_t>(handle);
+    auto* result = slot ? SferaAbi::pointer<GameUiWindow>(*slot) : nullptr;
+    if (!result && operation) {
+        g_sfera_window_runtime.diagnostic_message[0] = '\0';
+        WorldDiagnostics::appendScriptContext(operation);
+        WorldDiagnostics::appendScriptContext(": wrong handle");
+        WorldDiagnostics::flushScriptContext();
+    }
+    return result;
+}
+
+std::uint32_t GameInterface::createWindow(std::int32_t left, std::int32_t top, std::int32_t right, std::int32_t bottom, std::uint32_t layer, std::uint32_t opacity) {
+    const auto handle = g_sfera_interface_runtime.windows.firstVacant();
+    auto* created = new (WorldMemory::allocate(sizeof(GameUiWindow))) GameUiWindow{};
+    created->visible = 1u;
+    created->scrollable = 1u;
+    created->opacity = opacity;
+    created->left = created->contentLeft = left;
+    created->right = created->contentRight = right;
+    created->top = created->contentTop = top;
+    created->bottom = created->contentBottom = bottom;
+    created->width = right - left + 1;
+    created->height = bottom - top + 1;
+    created->layer = layer;
+    created->order = g_sfera_main_command_state_runtime.window_count++;
+    std::fill(std::begin(created->controls), std::end(created->controls), UINT32_MAX);
+    *g_sfera_interface_runtime.windows.element<std::uint32_t>(handle) = SferaAbi::address(created);
+    return handle;
+}
+
+void GameInterface::destroyWindow(std::uint32_t handle) {
+    auto* removed = window(handle, "delete_window");
+    if (!removed) return;
+    for (const auto controlHandle : removed->controls) {
+        if (controlHandle == UINT32_MAX) continue;
+        const auto* item = WorldGuiControls::control(controlHandle);
+        if (!item) WorldDiagnostics::fail("Window contains a missing control");
+        if (item->kind == GameUiElement::textKind) WorldGuiControls::destroyText(controlHandle);
+        else if (item->kind == GameUiElement::spriteKind) WorldGuiControls::destroySprite(controlHandle);
+        else WorldDiagnostics::fail("Window contains an unsupported control kind");
+    }
+    for (std::uint32_t index = 0; index < g_sfera_interface_runtime.windows.capacity; ++index) {
+        auto* other = window(index);
+        if (other && other->order > removed->order) --other->order;
+    }
+    *g_sfera_interface_runtime.windows.element<std::uint32_t>(handle) = 0u;
+    --g_sfera_main_command_state_runtime.window_count;
+    if (g_sfera_window_runtime.active_window_index == handle) g_sfera_window_runtime.active_window_index = UINT32_MAX;
+    std::destroy_at(removed);
+    WorldMemory::release(removed);
+}
+
+std::uint32_t GameUiWindow::attach(std::uint32_t control) {
+    const auto slot = std::find(std::begin(controls), std::end(controls), UINT32_MAX);
+    if (slot == std::end(controls)) WorldDiagnostics::fail("MNO_CONTROLS_IN_WINDOW exceed");
+    *slot = control;
+    ++controlCount;
+    return static_cast<std::uint32_t>(slot - std::begin(controls));
+}
+
+void GameUiWindow::detach(std::uint32_t slot) {
+    if (slot >= std::size(controls)) WorldDiagnostics::fail("Window control slot is outside the control table");
+    if (controls[slot] == UINT32_MAX || controlCount == 0u) WorldDiagnostics::fail("internal error 86557243");
+    controls[slot] = UINT32_MAX;
+    --controlCount;
+}
+
+void GameUiWindow::recalculateSize() {
+    std::int32_t maximumRight = 0, maximumBottom = 0;
+    for (auto handle : controls) {
+        if (handle == UINT32_MAX) continue;
+        const auto* item = WorldGuiControls::control(handle);
+        if (!item) WorldDiagnostics::fail("internal error 47581837");
+        maximumRight = std::max(maximumRight, item->right);
+        maximumBottom = std::max(maximumBottom, item->bottom);
+    }
+    width = std::max(maximumRight + 1, contentRight - contentLeft + 1);
+    height = std::max(maximumBottom + 1, contentBottom - contentTop + 1);
+}
+
+void GameUiWindow::enqueueInput(std::uint32_t control, std::uint32_t message) {
+    if (eventCount >= std::size(eventControls)) return;
+    std::move_backward(eventControls, eventControls + eventCount, eventControls + eventCount + 1u);
+    std::move_backward(eventMessages, eventMessages + eventCount, eventMessages + eventCount + 1u);
+    eventControls[0] = control;
+    eventMessages[0] = message;
+    ++eventCount;
+}
+
+bool GameUiWindow::takeInput(std::uint32_t& control, std::uint32_t& message) {
+    if (eventCount == 0u) return false;
+    --eventCount;
+    control = eventControls[eventCount];
+    message = eventMessages[eventCount];
+    return true;
+}
+
+SferaCursorPosition GameUiWindow::contentPosition(SferaCursorPosition point) const {
+    if (point.x < contentLeft || point.x >= contentRight || point.y < contentTop || point.y >= contentBottom) return {-1, -1};
+    return {point.x - contentLeft + static_cast<std::int32_t>(scrollX), point.y - contentTop + static_cast<std::int32_t>(scrollY)};
+}
+
+void GameUiWindow::scrollBy(float dx, float dy, SferaCursorPosition& cursor) {
+    scrollX -= dx;
+    scrollY -= dy;
+    const auto clampAxis = [](float& scroll, std::int32_t limit, std::int32_t& position) {
+        if (scroll < 0.0f) { position = static_cast<std::int32_t>(static_cast<double>(position) + scroll); scroll = 0.0f; }
+        const float maximum = static_cast<float>(limit);
+        if (scroll > maximum) { position = static_cast<std::int32_t>(static_cast<double>(scroll) - maximum + position); scroll = maximum; }
+    };
+    clampAxis(scrollX, width - (contentRight - contentLeft + 1), cursor.x);
+    clampAxis(scrollY, height - (contentBottom - contentTop + 1), cursor.y);
+}
+
+GameUiElement::~GameUiElement() {
+    if (kind == textKind) WorldMemory::release(lines[0]);
+}
+
+void GameUiElement::layoutText(const char* text, const GameUiWindow& window, std::int32_t x, std::int32_t y) {
+    if (!text || window.font >= std::size(g_sfera_font_runtime.layout.span)) WorldDiagnostics::fail("Invalid text or font");
+    const auto length = std::strlen(text);
+    if (length > std::numeric_limits<std::size_t>::max() - 2u) throw std::length_error("Text is too long");
+    lines[0] = static_cast<char*>(WorldMemory::allocate(length + 2u));
+    std::memcpy(lines[0], text, length);
+    lines[0][length] = '\n';
+    lines[0][length + 1u] = '\0';
+    std::array<std::int32_t, 300> widths{};
+    std::int32_t maximumWidth = 0;
+    font = window.font;
+    fontScale = window.fontScale;
+    color = window.textColor;
+    alpha = 255u;
+    for (char* cursor = lines[0]; *cursor; ++cursor) {
+        if (*cursor == '\n') {
+            widths[lineCount] *= static_cast<std::int32_t>(fontScale);
+            maximumWidth = std::max(maximumWidth, widths[lineCount]);
+            if (++lineCount == widths.size()) WorldDiagnostics::fail("MNO_LINES_IN_TEXT exceeded");
+            lines[lineCount] = cursor + 1;
+        } else {
+            auto& width = widths[lineCount];
+            if (width > 0) width += g_sfera_font_runtime.layout.code_base[font];
+            const auto character = static_cast<unsigned char>(*cursor);
+            width += g_sfera_font_runtime.metrics[g_sfera_font_runtime.glyphs[character].defined ? character : 124u][font];
+        }
+    }
+    if (lineCount == 0u || maximumWidth == 0) WorldDiagnostics::fail("Empty text created");
+    const auto textWidth = maximumWidth + 2;
+    const auto textHeight = static_cast<std::int32_t>(GameInterface::textHeight(font, fontScale, lineCount));
+    g_sfera_recovered_static_runtime.text_size_height = textWidth;
+    g_sfera_input_device_runtime.process_value = textHeight;
+    const auto style = window.textStyle;
+    left = x;
+    top = y;
+    if (style & GameUiWindow::centerHorizontal) left -= textWidth / 2;
+    if (style & GameUiWindow::alignBottom) top -= textHeight;
+    else if (style & GameUiWindow::centerVertical) top -= textHeight / 2;
+    right = left + textWidth - 1;
+    bottom = top + textHeight - 1;
+    const auto fitAxis = [](std::int32_t& begin, std::int32_t& end, std::int32_t maximum) {
+        if (end > maximum) { begin += maximum - end; end = maximum; }
+        if (begin < 0) { end -= begin; begin = 0; }
+    };
+    if (style & GameUiWindow::fitHorizontal) fitAxis(left, right, window.contentRight - window.contentLeft);
+    if (style & GameUiWindow::fitVertical) fitAxis(top, bottom, window.contentBottom - window.contentTop);
+    for (std::uint32_t line = 0; line < lineCount; ++line) {
+        lineX[line] = window.contentLeft + left + ((style & GameUiWindow::centerLines) ? (textWidth - widths[line]) / 2 : 0);
+        lineY[line] = window.contentTop + top + static_cast<std::int32_t>((line * g_sfera_font_runtime.layout.cell_step[font] - g_sfera_font_runtime.layout.origin[font]) * fontScale);
+    }
+}
+
+std::uint32_t WorldGuiControls::createText(std::int32_t x, std::int32_t y, const char* text, std::uint32_t windowHandle) {
+    auto* window = GameInterface::window(windowHandle, "create_text: wrong window");
+    if (!window) { windowHandle = 0u; window = GameInterface::window(windowHandle); }
+    if (!window) WorldDiagnostics::fail("create_text: root window is unavailable");
+    const auto handle = g_sfera_interface_runtime.window_handle_table.firstVacant();
+    auto* item = new (WorldMemory::allocate(sizeof(GameUiElement))) GameUiElement{};
+    try {
+        item->kind = GameUiElement::textKind;
+        item->windowHandle = windowHandle;
+        item->objectHandle = UINT32_MAX;
+        item->opacity = 1.0f;
+        item->layoutText(text, *window, x, y);
+        item->windowSlot = window->attach(handle);
+    } catch (...) { std::destroy_at(item); WorldMemory::release(item); throw; }
+    *g_sfera_interface_runtime.window_handle_table.element<std::uint32_t>(handle) = SferaAbi::address(item);
+    ++g_sfera_main_view_state_runtime.projection_sample_count;
+    if (window->textStyle & GameUiWindow::measureOnly) { destroyText(handle); return UINT32_MAX; }
+    window->recalculateSize();
+    return handle;
+}
+
+std::uint32_t WorldGuiControls::createSprite(std::int32_t x, std::int32_t y, std::int32_t width, std::int32_t height, const char* texture, std::uint32_t windowHandle, std::uint32_t alpha) {
+    auto* window = GameInterface::window(windowHandle, "create_sprite: wrong window");
+    if (!window) { windowHandle = 0u; window = GameInterface::window(windowHandle); }
+    if (!window) WorldDiagnostics::fail("create_sprite: root window is unavailable");
+    if (texture == nullptr) WorldDiagnostics::fail("Sprite texture name is null");
+    const std::string_view textureName(texture);
+    if (textureName.size() >= sizeof(GameUiElement::texture)) WorldDiagnostics::fail("Sprite texture name is too long");
+    const auto handle = g_sfera_interface_runtime.window_handle_table.firstVacant();
+    auto* item = new (WorldMemory::allocate(sizeof(GameUiElement))) GameUiElement{};
+    try {
+        item->kind = GameUiElement::spriteKind;
+        item->windowHandle = windowHandle;
+        item->objectHandle = UINT32_MAX;
+        item->opacity = 1.0f;
+        item->left = x;
+        item->top = y;
+        item->right = x + width - 1;
+        item->bottom = y + height - 1;
+        item->spriteLeft = window->contentLeft + x;
+        item->spriteTop = window->contentTop + y;
+        item->spriteWidth = width;
+        item->spriteHeight = height;
+        item->alpha = alpha;
+        std::ranges::copy(textureName, std::begin(item->texture));
+        item->texture[textureName.size()] = '\0';
+        item->windowSlot = window->attach(handle);
+    } catch (...) { std::destroy_at(item); WorldMemory::release(item); throw; }
+    *g_sfera_interface_runtime.window_handle_table.element<std::uint32_t>(handle) = SferaAbi::address(item);
+    ++g_sfera_main_view_state_runtime.projection_sample_count;
+    window->recalculateSize();
+    return handle;
+}
+
+void WorldGuiControls::setAppearance(std::uint32_t handle, std::uint32_t alpha, std::optional<std::uint32_t> color) {
+    auto* item = static_cast<GameUiElement*>(control(handle));
+    if (!item) WorldDiagnostics::fail(color ? "text_color: wrong handle" : "set_sprite_alpha: wrong handle");
+    item->alpha = alpha;
+    if (color) item->color = *color;
+}
+
+void WorldGuiControls::destroyAllText() {
+    for (std::uint32_t handle = 0; handle < g_sfera_interface_runtime.window_handle_table.capacity; ++handle) {
+        const auto* item = control(handle);
+        if (item && item->kind == GameUiElement::textKind) destroyText(handle);
+    }
+}
+
+GameUiHit GameInterface::hitTest(SferaCursorPosition point) {
+    std::vector<InterfaceWindowOrder> windows;
+    for (std::uint32_t handle = 0; handle < g_sfera_interface_runtime.windows.capacity; ++handle) {
+        const auto* item = window(handle);
+        if (item) windows.push_back({static_cast<std::int32_t>(handle), static_cast<std::int32_t>(0u - item->layer * 1000u - item->order)});
+    }
+    interfaceSortWindows(windows);
+    GameUiHit hit{};
+    for (const auto& entry : windows) {
+        const auto& item = *window(entry.window);
+        if (item.visible != 1u || point.x < item.left || point.x > item.right || point.y < item.top || point.y > item.bottom) continue;
+        hit.window = static_cast<std::uint32_t>(entry.window);
+        hit.border = point.x < item.contentLeft || point.x > item.contentRight || point.y < item.contentTop || point.y > item.contentBottom;
+        break;
+    }
+    if (hit.border) return hit;
+    const auto* owner = window(hit.window);
+    if (!owner) return hit;
+    const double x = static_cast<float>(point.x), y = static_cast<float>(point.y);
+    for (auto handle : owner->controls) {
+        if (handle == UINT32_MAX) continue;
+        const auto* item = WorldGuiControls::control(handle);
+        if (!item) WorldDiagnostics::fail("Window contains a missing control");
+        const double left = static_cast<double>(item->left + owner->contentLeft) - owner->scrollX;
+        const double right = static_cast<double>(item->right + owner->contentLeft) - owner->scrollX;
+        const double top = static_cast<double>(item->top + owner->contentTop) - owner->scrollY;
+        const double bottom = static_cast<double>(item->bottom + owner->contentTop) - owner->scrollY;
+        if (x >= left && x <= right && y >= top && y <= bottom) { hit.control = handle; break; }
+    }
+    return hit;
+}
+
+void GameInterface::updateInput() {
+    auto& cursor = *CCursorManager::instance().activeCursor();
+    auto& active = g_sfera_window_runtime.active_window_index;
+    const auto buttons = g_sfera_main_input_state_runtime.mouse.buttons;
+    if (g_sfera_recovered_static_runtime.interaction_enabled) {
+        if (active != 0u) cursor.updatePosition();
+        if (active == UINT32_MAX) {
+            if (buttons & 2u) active = hitTest(CCursorManager::instance().position()).window;
+        } else if (!(buttons & 2u)) active = UINT32_MAX;
+        else if (active != 0u) {
+            auto* selected = window(active);
+            if (selected && selected->scrollable == 1u) {
+                auto position = CCursorManager::instance().position();
+                selected->scrollBy(static_cast<float>(static_cast<double>(g_sfera_main_input_state_runtime.mouse.dx) * 1.5), static_cast<float>(static_cast<double>(g_sfera_main_input_state_runtime.mouse.dy) * 1.5), position);
+                cursor.setPosition(position.x, position.y);
+            }
+        }
+        cursor.show();
+    }
+    const auto previous = g_sfera_recovered_static_runtime.interaction_input_flags;
+    if ((buttons & 1u) != (previous & 1u)) {
+        const auto hit = g_sfera_recovered_static_runtime.interaction_enabled ? hitTest(CCursorManager::instance().position()) : GameUiHit{};
+        if (auto* selected = window(hit.window)) selected->enqueueInput(hit.control, (buttons & 1u) ? 1u : 2u);
+    }
+    g_sfera_recovered_static_runtime.interaction_input_flags = buttons;
+}
+
+SferaDialogState::~SferaDialogState() {
+    if (owner == nullptr) return;
+    ::SetWindowLongPtrA(owner, GWLP_USERDATA, 0);
+    ::DestroyWindow(owner);
+}
+
+void SferaDialogState::recordMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
+    if (eventCount == events.size()) { firstEvent = 0; eventCount = 0; }
+    auto& event = events[(firstEvent + eventCount) % events.size()];
+    event = {};
+    event.dialog = this;
+    if (message == WM_COMMAND) {
+        event.control_id = LOWORD(wparam);
+        event.message = HIWORD(wparam);
+    } else {
+        event.control_id = owner == window ? 0u : static_cast<std::uint32_t>(::GetDlgCtrlID(window));
+        event.message = message;
+        event.wparam = wparam;
+        event.lparam = lparam;
+    }
+    ++eventCount;
+}
+
+bool SferaDialogState::takeEvent(SferaDialogEvent& event) noexcept {
+    if (eventCount == 0) return false;
+    event = events[firstEvent];
+    --eventCount;
+    firstEvent = eventCount == 0 ? 0 : (firstEvent + 1) % events.size();
+    return true;
+}
+
+SferaDialogState* Win32Dialogs::create(HINSTANCE instance, std::uint32_t resource) {
+    if (resource == 0) return nullptr;
+    auto dialog = std::make_unique<SferaDialogState>();
+    dialog->owner = ::CreateDialogParamA(instance, MAKEINTRESOURCEA(static_cast<WORD>(resource)), nullptr, &sfera_dialog_proc, 0);
+    if (dialog->owner == nullptr) return nullptr;
+    auto* result = dialog.get();
+    ::SetWindowLongPtrA(result->owner, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(result));
+    ::SetClassLongPtrA(result->owner, GCLP_HICON, reinterpret_cast<LONG_PTR>(::LoadIconA(instance, MAKEINTRESOURCEA(113))));
+    dialogs.emplace(result, std::move(dialog));
+    return result;
+}
+
+void Win32Dialogs::destroy(SferaDialogState* dialog) {
+    dialogs.erase(dialog);
+}
+
+HWND Win32Dialogs::resolve(std::uintptr_t target) const {
+    const auto found = dialogs.find(reinterpret_cast<SferaDialogState*>(target));
+    return found == dialogs.end() ? reinterpret_cast<HWND>(target) : found->second->owner;
+}
+
+LRESULT Win32Dialogs::sendMessage(std::uintptr_t target, UINT message, WPARAM wparam, LPARAM lparam) const {
+    HWND window = resolve(target);
+    if (message == WM_ENABLE) { ::EnableWindow(window, static_cast<BOOL>(wparam)); return 0; }
+    if (message == WM_SETFOCUS) { ::SetFocus(window); return 0; }
+    return ::SendMessageA(window, message, wparam, lparam);
+}
+
+void Win32Dialogs::pumpMessages() const {
+    MSG message{};
+    while (::PeekMessageA(&message, nullptr, 0, 0, PM_REMOVE)) {
+        if (message.message == WM_QUIT) ::ExitProcess(0);
+        std::vector<HWND> windows;
+        windows.reserve(dialogs.size());
+        for (const auto& entry : dialogs) windows.push_back(entry.second->owner);
+        const bool handled = std::any_of(windows.begin(), windows.end(), [&](HWND window) { return ::IsDialogMessageA(window, &message) != FALSE; });
+        if (!handled) { ::TranslateMessage(&message); ::DispatchMessageA(&message); }
+    }
+}
+
+GameFontAtlas::~GameFontAtlas() { clear(); }
+
+void GameFontAtlas::clear() noexcept {
+    for (auto& page : textures) for (auto*& texture : page) if (texture != nullptr) { texture->Release(); texture = nullptr; }
+    std::fill(std::begin(layout.resource_count), std::end(layout.resource_count), 0u);
+}
+
+void GameFontAtlas::load(std::uint32_t font, const char* filename, std::int32_t outline, std::uint32_t spacing, std::uint32_t emptyWidth) {
+    if (font >= std::size(layout.span) || outline < 0 || outline > 3) WorldDiagnostics::fail("Invalid bitmap font parameters");
+    const auto image = g_sfera_files.readAll(filename);
+    constexpr std::size_t sourceWidth = 280;
+    constexpr std::size_t sourceCell = 26;
+    constexpr std::size_t atlasWidth = 256;
+    constexpr std::size_t atlasCell = 32;
+    if (image.size() < 128 + 768) WorldDiagnostics::fail("Truncated font image");
+    const auto word = [&](std::size_t offset) { return std::uint32_t(image[offset]) | (std::uint32_t(image[offset + 1]) << 8); };
+    if (word(10) < word(6)) WorldDiagnostics::fail("Invalid font image height");
+    const auto height = word(10) - word(6) + 1;
+    const auto palette = image.size() - 768;
+    std::vector<std::uint8_t> mask(sourceWidth * height);
+    std::size_t source = 128;
+    for (std::size_t destination = 0; destination < mask.size();) {
+        if (source >= palette) WorldDiagnostics::fail("Truncated font image pixels");
+        auto color = image[source++];
+        std::size_t count = 1;
+        if (color > 0xC0u) {
+            count = color & 0x3Fu;
+            if (source >= palette) WorldDiagnostics::fail("Truncated font image run");
+            color = image[source++];
+        }
+        if (count > mask.size() - destination) WorldDiagnostics::fail("Font image run exceeds its dimensions");
+        const auto entry = palette + std::size_t(color) * 3;
+        const auto white = image[entry] > 240 && image[entry + 1] > 240 && image[entry + 2] > 240;
+        std::fill_n(mask.begin() + destination, count, white ? 1u : 0u);
+        destination += count;
+    }
+    const auto language = g_sfera_client_config_runtime.state_09;
+    const auto mappingPath = language == 0 || language == 1 ? std::string("fonts\\font.txt") : std::string("fonts\\font") + language_suffix + ".txt";
+    const auto mappingBytes = g_sfera_files.readAll(mappingPath.c_str());
+    const std::string_view mapping(reinterpret_cast<const char*>(mappingBytes.data()), mappingBytes.size());
+    std::array<SferaFontGlyphRuntime, 256> placements{};
+    std::array<std::uint32_t, 256> widths{};
+    std::array<std::uint16_t, atlasWidth * atlasWidth> pixels{};
+    using Texture = std::unique_ptr<IDirect3DTexture9, void(*)(IDirect3DTexture9*)>;
+    std::vector<Texture> pages;
+    auto& graphics = *g_sfera_graphics_runtime.d3d_runtime;
+    const auto upload = [&]() {
+        IDirect3DTexture9* resource = nullptr;
+        const auto status = ::D3DXCreateTexture(graphics.native_device, atlasWidth, atlasWidth, 1, 0, D3DFMT_A4R4G4B4, D3DPOOL_MANAGED, &resource);
+        Texture texture(resource, [](IDirect3DTexture9* value) { if (value != nullptr) value->Release(); });
+        graphics.checkResult(status, "D3DXCreateTexture");
+        if (FAILED(status) || resource == nullptr) WorldDiagnostics::fail("Could not create font texture");
+        D3DLOCKED_RECT region{};
+        const auto lockStatus = resource->LockRect(0, &region, nullptr, 0);
+        graphics.checkResult(lockStatus, "LockRect");
+        if (FAILED(lockStatus)) WorldDiagnostics::fail("Could not lock font texture");
+        for (std::size_t row = 0; row < atlasWidth; ++row) std::memcpy(static_cast<std::uint8_t*>(region.pBits) + row * region.Pitch, pixels.data() + row * atlasWidth, atlasWidth * sizeof(pixels[0]));
+        const auto unlockStatus = resource->UnlockRect(0);
+        graphics.checkResult(unlockStatus, "UnlockRect");
+        if (FAILED(unlockStatus)) WorldDiagnostics::fail("Could not unlock font texture");
+        pages.push_back(std::move(texture));
+        pixels.fill(0);
+    };
+    std::size_t symbols = 0;
+    std::int32_t firstRow = sourceCell;
+    std::int32_t lastRow = -1;
+    for (std::size_t position = 0; (position = mapping.find('#', position)) != std::string_view::npos;) {
+        auto end = position;
+        while (end != 0 && mapping[end - 1] == ' ') --end;
+        if (end < 2 || mapping[end - 2] < 'A' || mapping[end - 2] > 'Z' || mapping[end - 1] < '0' || mapping[end - 1] > '9') WorldDiagnostics::fail("wrong format of font1.txt");
+        const auto sourceX = 20 + sourceCell * (mapping[end - 1] - '0');
+        const auto sourceY = 20 + sourceCell * (mapping[end - 2] - 'A');
+        ++position;
+        while (position < mapping.size() && mapping[position] == ' ') ++position;
+        if (position + 1 >= mapping.size() || mapping[position] != '\'') WorldDiagnostics::fail("wrong format of font1.txt");
+        const auto character = static_cast<std::uint8_t>(mapping[position + 1]);
+        position += 2;
+        if (position < mapping.size() && mapping[position] == '\'') ++position;
+        if (sourceX + sourceCell > sourceWidth || sourceY + sourceCell > height || symbols >= std::size(textures) * 64) WorldDiagnostics::fail("Font glyph is outside its image");
+        std::array<std::uint8_t, atlasCell * atlasCell> glyph{};
+        std::array<std::uint8_t, atlasCell * atlasCell> shadow{};
+        std::uint32_t rightmost = 0;
+        for (std::size_t y = 0; y < sourceCell; ++y) for (std::size_t x = 0; x < sourceCell; ++x) {
+            if (mask[(sourceY + y) * sourceWidth + sourceX + x] == 0) continue;
+            glyph[(y + 3) * atlasCell + x + 3] = 1;
+            rightmost = std::max(rightmost, static_cast<std::uint32_t>(x + 1));
+            firstRow = std::min(firstRow, static_cast<std::int32_t>(y));
+            lastRow = std::max(lastRow, static_cast<std::int32_t>(y));
+            for (std::int32_t dy = 0; dy <= outline; ++dy) for (std::int32_t dx = 0; dx <= outline; ++dx) {
+                const bool corner = (dx == -outline || dx == outline) && (dy == -outline || dy == outline);
+                if (outline == 1 || !corner) shadow[(y + 3 + dy) * atlasCell + x + 3 + dx] = 1;
+            }
+        }
+        const auto tileX = symbols % 8 * atlasCell;
+        const auto tileY = symbols / 8 % 8 * atlasCell;
+        for (std::size_t y = 0; y < atlasCell; ++y) for (std::size_t x = 0; x < atlasCell; ++x) pixels[(tileY + y) * atlasWidth + tileX + x] = glyph[y * atlasCell + x] ? 0xFFFFu : shadow[y * atlasCell + x] ? 0xF000u : 0u;
+        widths[character] = rightmost == 0 ? emptyWidth : rightmost;
+        placements[character] = {static_cast<std::uint32_t>(symbols / 64), static_cast<float>(tileX + 3 - outline) / atlasWidth, static_cast<float>(tileY + 3 - outline) / atlasWidth, 1u};
+        if (++symbols % 64 == 0) upload();
+    }
+    if (placements[124].defined == 0) WorldDiagnostics::fail("Symbol for CODE_FOR_UNDIFINED_SYMBOL is not found in font.txt");
+    if (lastRow < firstRow) WorldDiagnostics::fail("Font contains no visible glyphs");
+    if (symbols % 64 != 0) upload();
+    for (auto& page : textures) if (page[font] != nullptr) { page[font]->Release(); page[font] = nullptr; }
+    for (std::size_t page = 0; page < pages.size(); ++page) textures[page][font] = pages[page].release();
+    std::copy(placements.begin(), placements.end(), std::begin(glyphs));
+    for (std::size_t character = 0; character < widths.size(); ++character) metrics[character][font] = widths[character];
+    layout.span[font] = lastRow - firstRow + 3;
+    layout.origin[font] = firstRow;
+    layout.cell_step[font] = 20 - firstRow;
+    layout.resource_count[font] = static_cast<std::uint32_t>(pages.size());
+    layout.code_base[font] = spacing;
+}
+
+bool WorldObjects::takePlantedObject(std::span<char> name, SferaVec3F& position, SferaVec3F& rotation) {
+    while (!plantedObjects.empty()) {
+        const auto handle = plantedObjects.back();
+        plantedObjects.pop_back();
+        const auto* item = object(handle);
+        if (item == nullptr) continue;
+        const auto* resource = model(*item);
+        if (resource == nullptr) WorldDiagnostics::fail("Planted object has no model");
+        const std::string_view modelName(resource->name, std::size(resource->name));
+        const auto length = modelName.find('\0');
+        if (length == std::string_view::npos) WorldDiagnostics::fail("Planted object model name is not terminated");
+        if (length >= name.size()) WorldDiagnostics::fail("Planted object name buffer is too small");
+        std::ranges::copy(modelName.substr(0, length), name.begin());
+        name[length] = '\0';
+        position = item->position;
+        rotation = item->rotation;
+        destroy(handle);
+        return true;
+    }
+    return false;
+}
+
+void CBaseManagerCommonItem::resetItem() {
+    auto* lists = SferaAbi::pointer<CItemListCommonItem>(item_storage);
+    if (lists != nullptr) for (std::uint32_t index = 0; index < capacity; ++index) if (lists[index].active != 0u) lists[index].resetItem();
+    CItemListCommonItem::resetItem();
+}
+
+void SferaInputDevices::initialize(HWND window) {
+    release();
+    const auto require = [](HRESULT result, const char* operation) { if (FAILED(result)) WorldDiagnostics::fail(operation); };
+    try {
+        require(::DirectInput8Create(::GetModuleHandleW(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8A, reinterpret_cast<void**>(&direct_input), nullptr), "DirectInputCreate failed");
+        require(direct_input->CreateDevice(GUID_SysKeyboard, &keyboard_device, nullptr), "CreateDevice failed");
+        require(direct_input->CreateDevice(GUID_SysMouse, &mouse_device, nullptr), "CreateDevice failed");
+        for (auto* device : {keyboard_device, mouse_device}) require(device->SetCooperativeLevel(window, DISCL_NONEXCLUSIVE | DISCL_FOREGROUND), "SetCooperativeLevel failed");
+        require(keyboard_device->SetDataFormat(&c_dfDIKeyboard), "SetDataFormat failed");
+        require(mouse_device->SetDataFormat(&c_dfDIMouse), "SetDataFormat failed");
+        DIPROPDWORD buffering{{sizeof(DIPROPDWORD), sizeof(DIPROPHEADER), 0, DIPH_DEVICE}, 8};
+        require(keyboard_device->SetProperty(DIPROP_BUFFERSIZE, &buffering.diph), "SetProperty failed");
+        keyboard_device->Acquire();
+        mouse_device->Acquire();
+    } catch (...) { release(); throw; }
+}
+
+void SferaInputDevices::release() noexcept {
+    for (auto** device : {&keyboard_device, &mouse_device}) if (*device != nullptr) { (*device)->Unacquire(); (*device)->Release(); *device = nullptr; }
+    if (direct_input != nullptr) { direct_input->Release(); direct_input = nullptr; }
+    std::fill(std::begin(keyboard_state), std::end(keyboard_state), 0u);
+}
+
+void SferaInputDevices::pollKeyboard() {
+    if (keyboard_device == nullptr || g_sfera_texture_cache_runtime.cache_enabled == 0u) return;
+    std::array<std::uint8_t, 256> state{};
+    auto result = keyboard_device->GetDeviceState(static_cast<DWORD>(state.size()), state.data());
+    if (result == DIERR_INPUTLOST || result == DIERR_NOTACQUIRED) { keyboard_device->Acquire(); result = keyboard_device->GetDeviceState(static_cast<DWORD>(state.size()), state.data()); }
+    if (FAILED(result)) return;
+    std::transform(state.begin(), state.end(), std::begin(keyboard_state), [](std::uint8_t value) { return value & 0x80u; });
+}
+
+std::uint32_t SferaInputDevices::takeKeyPress() {
+    if (keyboard_device == nullptr || g_sfera_texture_cache_runtime.cache_enabled == 0u) return 0;
+    for (;;) {
+        DIDEVICEOBJECTDATA event{};
+        DWORD count = 1;
+        auto result = keyboard_device->GetDeviceData(sizeof(event), &event, &count, 0);
+        if (result == DIERR_INPUTLOST || result == DIERR_NOTACQUIRED) { keyboard_device->Acquire(); count = 1; result = keyboard_device->GetDeviceData(sizeof(event), &event, &count, 0); }
+        if (FAILED(result) || count == 0) return 0;
+        if ((event.dwData & 0x80u) != 0u) return event.dwOfs;
+    }
+}
+
+SferaMouseInputState SferaInputDevices::pollMouse() {
+    if (mouse_device == nullptr || g_sfera_texture_cache_runtime.cache_enabled == 0u) return {};
+    DIMOUSESTATE state{};
+    auto result = mouse_device->GetDeviceState(sizeof(state), &state);
+    if (result == DIERR_INPUTLOST || result == DIERR_NOTACQUIRED) {
+        if (CCursorManager::instance().activeCursor()->isInsideViewport()) mouse_device->Acquire();
+        result = mouse_device->GetDeviceState(sizeof(state), &state);
+    }
+    if (FAILED(result)) return {};
+    const auto primary = ::GetSystemMetrics(SM_SWAPBUTTON) != 0 ? 1u : 0u;
+    const auto buttons = ((state.rgbButtons[primary] & 0x80u) != 0u ? 1u : 0u) | ((state.rgbButtons[1u - primary] & 0x80u) != 0u ? 2u : 0u);
+    return {state.lX, state.lY, buttons, state.lZ / WHEEL_DELTA};
+}
+
+void GameInterface::registerNativeWindowClass() {
+    WNDCLASSEXA windowClass{};
+    windowClass.cbSize = sizeof(windowClass);
+    windowClass.style = CS_HREDRAW | CS_VREDRAW;
+    windowClass.lpfnWndProc = &sfera_main_window_proc;
+    windowClass.hInstance = reinterpret_cast<HINSTANCE>(static_cast<std::uintptr_t>(g_sfera_main_ui_state_runtime.active_ui_object));
+    windowClass.hIcon = ::LoadIconA(windowClass.hInstance, MAKEINTRESOURCEA(113));
+    windowClass.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
+    windowClass.hbrBackground = reinterpret_cast<HBRUSH>(::GetStockObject(BLACK_BRUSH));
+    windowClass.lpszClassName = nativeWindowClassName;
+    windowClass.hIconSm = windowClass.hIcon;
+    if (::RegisterClassExA(&windowClass) == 0) WorldDiagnostics::fail("RegisterClassEx() failed! => init_main_window_class()");
+}
+
+void GameInterface::createNativeWindow() {
+    const auto desktopWidth = ::GetSystemMetrics(SM_CXSCREEN);
+    const auto desktopHeight = ::GetSystemMetrics(SM_CYSCREEN);
+    g_sfera_scene_control_runtime.timing_anchor = static_cast<std::uint32_t>(desktopWidth);
+    g_sfera_recovered_static_runtime.scene_state_07 = static_cast<std::uint32_t>(desktopHeight);
+    auto& graphics = g_sfera_graphics_runtime;
+    graphics.display_width = static_cast<std::uint32_t>(std::max(800, static_cast<std::int32_t>(graphics.display_width)));
+    graphics.display_height = static_cast<std::uint32_t>(std::max(600, static_cast<std::int32_t>(graphics.display_height)));
+    auto width = static_cast<std::int32_t>(graphics.display_width);
+    auto height = static_cast<std::int32_t>(graphics.display_height);
+    DWORD style = WS_POPUP;
+    std::int32_t left = 0, top = 0;
+    if (g_sfera_window_runtime.windowed != 0) {
+        const DWORD windowedStyle = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+        RECT rectangle{0, 0, width, height};
+        if (!::AdjustWindowRect(&rectangle, windowedStyle, FALSE)) WorldDiagnostics::fail("AdjustWindowRect() failed! => init_main_window()");
+        const auto outerHeight = rectangle.bottom - rectangle.top;
+        if (outerHeight >= desktopHeight) g_sfera_window_runtime.windowed = 0;
+        else {
+            style = windowedStyle;
+            width = rectangle.right - rectangle.left;
+            height = outerHeight;
+            left = (desktopWidth - width) / 2;
+            top = (desktopHeight - height) / 2;
+        }
+    }
+    const auto instance = reinterpret_cast<HINSTANCE>(static_cast<std::uintptr_t>(g_sfera_main_ui_state_runtime.active_ui_object));
+    const auto window = ::CreateWindowExA(0, nativeWindowClassName, "Sphere", style, left, top, width, height, nullptr, nullptr, instance, nullptr);
+    g_sfera_window_runtime.main_window = SferaAbi::address(window);
+    if (window == nullptr) WorldDiagnostics::fail("CreateWindowEx() failed! => init_main_window()");
+    ::ShowWindow(window, SW_SHOWNORMAL);
+    ::InvalidateRect(window, nullptr, TRUE);
+    ::UpdateWindow(window);
+    ::BringWindowToTop(window);
+}

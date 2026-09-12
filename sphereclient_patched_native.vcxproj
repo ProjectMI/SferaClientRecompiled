@@ -164,12 +164,6 @@ if errorlevel 1 exit /b 1</Command>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_008.cpp">
-      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <SDLCheck>false</SDLCheck>
-      <FunctionLevelLinking>false</FunctionLevelLinking>
-      <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
-    </ClCompile>
     <ClCompile Include="lifted_functions_009.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
@@ -177,12 +171,6 @@ if errorlevel 1 exit /b 1</Command>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
     <ClCompile Include="lifted_functions_010.cpp">
-      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <SDLCheck>false</SDLCheck>
-      <FunctionLevelLinking>false</FunctionLevelLinking>
-      <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
-    </ClCompile>
-    <ClCompile Include="lifted_functions_011.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
@@ -200,12 +188,6 @@ if errorlevel 1 exit /b 1</Command>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_014.cpp">
-      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <SDLCheck>false</SDLCheck>
-      <FunctionLevelLinking>false</FunctionLevelLinking>
-      <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
-    </ClCompile>
     <ClCompile Include="lifted_functions_015.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
@@ -218,12 +200,6 @@ if errorlevel 1 exit /b 1</Command>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
-    <ClCompile Include="lifted_functions_017.cpp">
-      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <SDLCheck>false</SDLCheck>
-      <FunctionLevelLinking>false</FunctionLevelLinking>
-      <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
-    </ClCompile>
     <ClCompile Include="lifted_functions_018.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
@@ -231,12 +207,6 @@ if errorlevel 1 exit /b 1</Command>
       <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
     </ClCompile>
     <ClCompile Include="lifted_functions_019.cpp">
-      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <SDLCheck>false</SDLCheck>
-      <FunctionLevelLinking>false</FunctionLevelLinking>
-      <DebugInformationFormat Condition="'$(Configuration)'=='Debug'">OldStyle</DebugInformationFormat>
-    </ClCompile>
-    <ClCompile Include="lifted_functions_020.cpp">
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <SDLCheck>false</SDLCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>

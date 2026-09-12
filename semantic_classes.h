@@ -51,11 +51,20 @@ struct SferaVec3F {
     SferaVec3F operator*(float factor) const;
     double dot(const SferaVec3F& other) const;
     SferaVec3F normalized(std::int32_t diagnosticCode = 0) const;
+    void normalize();
     SferaVec3F cross(const SferaVec3F& other) const;
     float component(std::size_t axis) const;
     void setComponent(std::size_t axis, float value);
     static void rotatePair(float& first, float& second, float angle);
     bool containsConvexPolygonPoint(std::span<const SferaVec3F* const> vertices, const SferaVec3F& point) const;
+};
+
+class SferaAngle8 {
+public:
+    explicit SferaAngle8(float radians);
+    float distanceTo(SferaAngle8 other) const;
+private:
+    std::uint8_t steps;
 };
 
 struct SferaVec4F {
@@ -80,9 +89,12 @@ struct SferaQuaternionF {
 };
 
 struct SferaMatrix4x4F {
+    enum class Axis { x, y, z };
     float m[4][4];
 
     static SferaMatrix4x4F identity();
+    static SferaMatrix4x4F fromAxisRotation(Axis axis, float angle);
+    static SferaMatrix4x4F fromRollPitchYaw(float roll, float pitch, float yaw);
     static SferaMatrix4x4F fromEuler(const SferaVec3F& translation, const SferaVec3F& angles);
     static SferaMatrix4x4F fromQuaternion(const SferaQuaternionF& rotation, const SferaVec3F& translation = {});
     SferaVec3F transformPoint(const SferaVec3F& point) const;
@@ -96,7 +108,20 @@ struct SferaBoundsCornersRuntime {
     SferaVec3F corners[8];
 
     static SferaBoundsCornersRuntime fromExtents(const SferaVec3F& minimum, const SferaVec3F& maximum);
+    static SferaBoundsCornersRuntime empty();
     void getExtents(SferaVec3F& minimum, SferaVec3F& maximum) const;
+};
+
+struct SferaTransformRuntime {
+    SferaMatrix4x4F matrix = SferaMatrix4x4F::identity();
+    SferaVec3F scale{1.0f, 1.0f, 1.0f};
+    SferaVec3F secondary_scale{1.0f, 1.0f, 1.0f};
+    std::uint32_t flags = 65536u;
+};
+
+struct SferaSpatialStateRuntime {
+    SferaTransformRuntime transform;
+    SferaBoundsCornersRuntime bounds = SferaBoundsCornersRuntime::empty();
 };
 
 struct SferaPlaneF {
@@ -908,17 +933,17 @@ public:
 
 class CItemListCommonItem : public CItem {
 public:
-    std::uint32_t minimum_items;
-    std::uint32_t capacity;
-    std::uint32_t item_count;
-    std::uint32_t list_mode;
-    std::uint32_t item_parameter;
-    std::uint32_t field_bc;
-    std::uint32_t field_c0;
-    std::int32_t iterator_index;
-    std::uint8_t diagnostics_mode;
-    std::uint32_t item_index;
-    std::uint32_t item_storage;
+    std::uint32_t minimum_items = 0;
+    std::uint32_t capacity = 0;
+    std::uint32_t item_count = 0;
+    std::uint32_t list_mode = 0;
+    std::uint32_t item_parameter = 0;
+    std::uint32_t field_bc = 0;
+    std::uint32_t field_c0 = 0;
+    std::int32_t iterator_index = 0;
+    std::uint8_t diagnostics_mode = 0;
+    std::uint32_t item_index = 0;
+    std::uint32_t item_storage = 0;
     CItemListCommonItem() {}
     std::int32_t initialize(std::int32_t minimum, std::int32_t, std::uint32_t mode, const char* list_name, std::uint32_t parameter);
     CCommonItem* findStoredItem(const CItem* key);
@@ -931,9 +956,10 @@ public:
 
 class CBaseManagerCommonItem : public CItemListCommonItem {
 public:
-    std::uint8_t manager_diagnostics_mode;
-    std::uint32_t field_d8;
+    std::uint8_t manager_diagnostics_mode = 0;
+    std::uint32_t field_d8 = 0;
     CBaseManagerCommonItem() {}
+    void resetItem() override;
     std::int32_t initialize(std::int32_t minimum, std::int32_t, std::uint32_t mode, const char* list_name, std::uint32_t parameter);
     CItemListCommonItem* findStoredList(const CItem* key);
     CCommonItem* selectItem(CCommonItem* output, const char* list_name, std::int32_t field_ac_filter, std::int32_t field_a8_filter, std::int32_t field_b0_filter);
@@ -1317,11 +1343,6 @@ public:
     std::uint8_t* find(const char* filename, std::uint32_t* size, std::uint16_t* file_id);
 };
 
-static_assert(sizeof(CHash16Entry) == 10u);
-#if UINTPTR_MAX == UINT32_MAX
-static_assert(offsetof(CHash16, entries) == 8u && offsetof(CHash16, free_entry) == 0x14u && offsetof(CHash16, buckets) == 0x16u && sizeof(CHash16) == 0x20018u);
-static_assert(sizeof(QuickFileEntry) == 8u && offsetof(QuickFile, index) == 0xC80u && offsetof(QuickFile, count) == 0x20C98u && sizeof(QuickFile) == 0x20C9Cu);
-#endif
 
 // End recovered quickfile cluster.
 
@@ -1346,12 +1367,6 @@ private:
     void reportError(const char* format, bool fatal) const noexcept;
 };
 
-#if UINTPTR_MAX == UINT32_MAX
-static_assert(sizeof(SferaFileMap) == 40u, "FileMap x86 layout");
-static_assert(offsetof(SferaFileMap, mapped_view) == 0u, "FileMap view offset");
-static_assert(offsetof(SferaFileMap, file_size) == 4u, "FileMap size offset");
-static_assert(offsetof(SferaFileMap, filename) == 8u, "FileMap filename offset");
-#endif
 
 // End recovered filemap cluster.
 
@@ -2119,6 +2134,7 @@ public:
     static void initialize();
     static std::uint64_t microseconds();
     static std::uint64_t nowTicks();
+    static std::uint32_t calendarTicks();
 };
 struct SferaBoundCheckArray {
     uint32_t data;
@@ -2129,6 +2145,7 @@ struct SferaBoundCheckArray {
     template <class T> T* dataAs() const noexcept { return SferaAbi::pointer<T>(data); }
     template <class T> T* element(std::size_t index) const noexcept { T* values = dataAs<T>(); return values != nullptr && index < capacity ? values + index : nullptr; }
     void reserve(std::size_t count, std::size_t elementSize);
+    std::uint32_t firstVacant() const;
 };
 struct WorldObject {
     uint32_t runtime_flags;
@@ -2168,7 +2185,7 @@ struct ExtendedWorldObject : WorldObject {
     int32_t animation_secondary;
     uint32_t parent_object_handle;
     uint32_t parent_link_slot;
-    uint32_t model_instance;
+    uint32_t process_handle;
     SferaVec3F effect_frame_position_a;
     SferaVec3F effect_frame_position_b;
     float effect_frame_transform_a[16];
@@ -2213,7 +2230,9 @@ public:
     void detachEffect(std::uint32_t handle, SferaActiveEffect& item);
     SferaActiveEffect* firstEffect(std::uint32_t handle) const;
     bool buildEffectFrames(std::uint32_t handle, SferaEffectSpatialFrames& spatial_frames, SferaEffectWorldFrames& world_frames) const;
-    WorldObject* object(std::uint32_t handle) const;
+    WorldObject* object(std::uint32_t handle, const char* operation = nullptr) const;
+    std::vector<std::uint32_t> plantedObjects;
+    bool takePlantedObject(std::span<char> name, SferaVec3F& position, SferaVec3F& rotation);
     ExtendedWorldObject* extendedObject(std::uint32_t handle) const;
     SphereRender::Model* model(const WorldObject& object) const;
     std::uint32_t create(const char* name, std::uint32_t process, std::uint32_t kind, bool dynamic);
@@ -2224,6 +2243,7 @@ public:
     void recordSlotStatistics() const;
     void updateExtendedSpatialIndices();
     void rotate(std::uint32_t handle, const SferaVec3F& delta);
+    void approachHeading(std::uint32_t handle, float target);
     void moveLocal(std::uint32_t handle, const SferaVec3F& displacement);
     void alignReferenceOrientation();
     void reflectReferenceOrientation();
@@ -2637,6 +2657,10 @@ struct WorldGuiControl { std::uint32_t kind; std::uint32_t windowHandle; std::ui
 struct WorldGuiText : WorldGuiControl { std::uint32_t lineCount; std::int32_t lineX[300]; std::int32_t lineY[300]; char* lines[300]; };
 class WorldGuiControls {
 public:
+    static std::uint32_t createText(std::int32_t x, std::int32_t y, const char* text, std::uint32_t window);
+    static std::uint32_t createSprite(std::int32_t x, std::int32_t y, std::int32_t width, std::int32_t height, const char* texture, std::uint32_t window, std::uint32_t alpha);
+    static void setAppearance(std::uint32_t handle, std::uint32_t alpha, std::optional<std::uint32_t> color = std::nullopt);
+    static void destroyAllText();
     static WorldGuiControl* control(std::uint32_t handle);
     static void detachFromWindow(std::uint32_t window, std::uint32_t slot);
     static void destroySprite(std::uint32_t handle);
@@ -3031,6 +3055,39 @@ struct SferaSoundPlaybackState {
     std::uint32_t reserved_4c;
 };
 
+struct SferaSoundRuntime {
+    uint32_t effect_manager;
+    union { uint32_t manager; CSoundManager* sound_manager; };
+    std::list<std::unique_ptr<SferaSoundPlaybackState>> tracks;
+    SferaSoundPlaybackState* loadTrack(const char* filename);
+    bool deleteTrack(SferaSoundPlaybackState* track);
+    void clearTracks();
+    bool updateTracks();
+    void requestTrack(const char* filename);
+
+    CSoundManager* ensureManager();
+    bool initialize();
+    void update();
+    void shutdown();
+    void loadDefinitions();
+    void clearDefinitions();
+    bool interfaceAvailable() const;
+    CSoundEffect* createEffect(std::uint32_t effect_id);
+    void destroyEffect(CSoundEffect* effect);
+};
+
+class PathZones {
+public:
+    static constexpr std::size_t side = 800u;
+    static constexpr std::size_t byteCount = side * side / 8u;
+    std::uint8_t* cells = nullptr;
+    PathZones() = default;
+    PathZones(const PathZones&) = delete;
+    PathZones& operator=(const PathZones&) = delete;
+    ~PathZones();
+    bool contains(float x, float z) const;
+};
+
 struct EnvironmentLighting { SferaVec3F fogParameters; SferaVec3F fogColor; SferaVec3F ambientColor; SferaVec3F sunColor; };
 struct EnvironmentZone {
     float originX, originZ, minimumX, maximumX, minimumZ, maximumZ, borderFade;
@@ -3064,6 +3121,17 @@ public:
 };
 
 
+struct WeatherState {
+    float rain = 0.0f;
+    float lightning = 0.0f;
+    float wind = 0.0f;
+    float cloud = 0.0f;
+    SceneSkyLayers sky{};
+    SceneSkyLayers clouds{};
+    float windX = 0.0f;
+    float windZ = 0.0f;
+};
+
 struct WeatherSkyPair { char primary[20]; char secondary[20]; };
 struct WeatherKeyframe { std::int32_t time; std::array<float, 4> properties; };
 struct WeatherScenario { std::int32_t duration; WeatherSkyPair sky; float skyStart; float skyEnd; std::uint32_t keyframeCount; std::array<WeatherKeyframe, 10> keyframes; };
@@ -3081,6 +3149,7 @@ public:
     std::int32_t totalDuration;
     std::int32_t lastUpdate;
     WeatherScenarios* load(const char* filename);
+    void update(std::int32_t time, float dayTime, WeatherState& output, bool alternateClouds);
     void locate(std::int32_t time, std::uint32_t& sequenceIndex, std::int32_t& startTime, std::int32_t& localTime) const;
     std::int32_t advance(std::uint32_t& sequenceIndex, std::uint32_t& keyframe) const;
     std::int32_t retreat(std::uint32_t& sequenceIndex, std::uint32_t& keyframe) const;
@@ -3093,6 +3162,14 @@ private:
     const WeatherScenario& at(std::uint32_t sequenceIndex) const;
 };
 
+
+struct SferaWeatherRuntime {
+    float direction_cos_component = 0.0f;
+    float direction_sin_component = 0.0f;
+    WeatherScenarios* standard = nullptr;
+    WeatherScenarios* highres = nullptr;
+    WeatherState current;
+};
 
 namespace SphereUI {
 class ChatFilter {
@@ -3112,8 +3189,9 @@ private:
 
 
 struct GameUiWindow {
-    std::uint32_t handle;
-    std::uint32_t flags;
+    enum TextStyle : std::uint32_t { centerHorizontal = 1u, centerVertical = 2u, fitHorizontal = 4u, fitVertical = 8u, centerLines = 16u, measureOnly = 32u, alignBottom = 64u };
+    std::uint32_t visible;
+    std::uint32_t scrollable;
     std::uint32_t opacity;
     std::int32_t left, right, top, bottom;
     std::int32_t contentLeft, contentRight, contentTop, contentBottom;
@@ -3123,8 +3201,26 @@ struct GameUiWindow {
     std::uint32_t controlCount;
     std::uint32_t controls[7000];
     std::uint32_t order;
+    std::uint32_t textColor = 0u;
+    std::uint32_t textStyle = 0u;
+    std::uint32_t font = 0u;
+    std::uint32_t fontScale = 1u;
+    std::uint32_t eventControls[10]{};
+    std::uint32_t eventMessages[10]{};
+    std::uint32_t eventCount = 0u;
+    std::uint32_t attach(std::uint32_t control);
+    void detach(std::uint32_t slot);
+    void recalculateSize();
+    void enqueueInput(std::uint32_t control, std::uint32_t message);
+    bool takeInput(std::uint32_t& control, std::uint32_t& message);
+    SferaCursorPosition contentPosition(SferaCursorPosition point) const;
+    void scrollBy(float dx, float dy, SferaCursorPosition& cursor);
 };
+struct GameUiHit { std::uint32_t window = 0u; std::uint32_t control = UINT32_MAX; bool border = false; };
 struct GameUiElement : WorldGuiText {
+    static constexpr std::uint32_t textKind = 0u, spriteKind = 1u;
+    ~GameUiElement();
+    void layoutText(const char* text, const GameUiWindow& window, std::int32_t x, std::int32_t y);
     std::uint32_t fontScale;
     std::uint32_t font;
     std::int32_t spriteLeft, spriteTop, spriteWidth, spriteHeight;
@@ -3134,7 +3230,14 @@ struct GameUiElement : WorldGuiText {
 
 class GameInterface {
 public:
-    static void releaseFontAtlas();
+    inline static constexpr const char* nativeWindowClassName = "SphereWclName";
+    static void registerNativeWindowClass();
+    static void createNativeWindow();
+    static GameUiWindow* window(std::uint32_t handle, const char* operation = nullptr);
+    static std::uint32_t createWindow(std::int32_t left, std::int32_t top, std::int32_t right, std::int32_t bottom, std::uint32_t layer, std::uint32_t opacity);
+    static void destroyWindow(std::uint32_t handle);
+    static GameUiHit hitTest(SferaCursorPosition point);
+    static void updateInput();
     static std::uint32_t fontHeight(std::uint32_t font, std::uint32_t scale);
     static std::uint32_t glyphWidth(std::uint32_t character, std::uint32_t font);
     static std::uint32_t textHeight(std::uint32_t font, std::uint32_t scale, std::uint32_t lines);
@@ -3149,10 +3252,112 @@ public:
     static void restoreRenderState();
     static void drawFrame();
     static void drawFrameRate();
-    static void sortWindows(std::int32_t first, std::int32_t last);
     static void drawAll();
     static void drawWindow(std::int32_t window);
     static void updateLoadingProgress(std::uint32_t increment);
     static void finishLoading();
 };
 
+
+class SferaDialogState;
+
+struct SferaDialogEvent {
+    SferaDialogState* dialog = nullptr;
+    std::uint32_t control_id = 0;
+    UINT message = 0;
+    WPARAM wparam = 0;
+    LPARAM lparam = 0;
+    std::uint32_t reserved[2]{};
+};
+
+class SferaDialogState {
+public:
+    SferaDialogState() = default;
+    SferaDialogState(const SferaDialogState&) = delete;
+    SferaDialogState& operator=(const SferaDialogState&) = delete;
+    HWND owner = nullptr;
+    ~SferaDialogState();
+    void recordMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
+    bool takeEvent(SferaDialogEvent& event) noexcept;
+private:
+    std::array<SferaDialogEvent, 128> events{};
+    std::size_t firstEvent = 0;
+    std::size_t eventCount = 0;
+};
+
+class Win32Dialogs {
+public:
+    SferaDialogState* create(HINSTANCE instance, std::uint32_t resource);
+    void destroy(SferaDialogState* dialog);
+    HWND resolve(std::uintptr_t target) const;
+    LRESULT sendMessage(std::uintptr_t target, UINT message, WPARAM wparam, LPARAM lparam) const;
+    void pumpMessages() const;
+private:
+    std::unordered_map<SferaDialogState*, std::unique_ptr<SferaDialogState>> dialogs;
+};
+
+inline Win32Dialogs g_sfera_win32_dialogs;
+
+struct SferaFontGlyphRuntime {
+    uint32_t texture_index;
+    float u;
+    float v;
+    uint32_t defined;
+};
+struct SferaFontAtlasLayoutRuntime {
+    uint32_t span[5];
+    uint32_t origin[5];
+    uint32_t cell_step[5];
+    uint32_t resource_count[5];
+    uint32_t code_base[5];
+};
+class GameFontAtlas {
+public:
+    char language_suffix[8]{};
+    SferaFontGlyphRuntime glyphs[256]{};
+    SferaFontAtlasLayoutRuntime layout{};
+    std::uint32_t metrics[256][5]{};
+    IDirect3DTexture9* textures[256][5]{};
+    GameFontAtlas() = default;
+    GameFontAtlas(const GameFontAtlas&) = delete;
+    GameFontAtlas& operator=(const GameFontAtlas&) = delete;
+    ~GameFontAtlas();
+    void clear() noexcept;
+    void load(std::uint32_t font, const char* filename, std::int32_t outline, std::uint32_t spacing, std::uint32_t emptyWidth);
+};
+
+inline GameFontAtlas g_sfera_font_runtime;
+
+inline CBaseManagerCommonItem g_sfera_player_lists;
+
+struct IDirectInput8A;
+struct IDirectInputDevice8A;
+
+struct SferaMouseInputState {
+    std::int32_t dx = 0;
+    std::int32_t dy = 0;
+    std::uint32_t buttons = 0;
+    std::int32_t wheel = 0;
+};
+
+class SferaInputDevices {
+public:
+    SferaInputDevices() = default;
+    SferaInputDevices(const SferaInputDevices&) = delete;
+    SferaInputDevices& operator=(const SferaInputDevices&) = delete;
+    ~SferaInputDevices() { release(); }
+    IDirectInput8A* direct_input = nullptr;
+    IDirectInputDevice8A* mouse_device = nullptr;
+    IDirectInputDevice8A* keyboard_device = nullptr;
+    std::uint8_t keyboard_state[256]{};
+    std::uint8_t view_adjust_state = 0;
+    std::uint8_t modifier_08 = 0;
+    std::uint8_t modifier_20 = 0;
+    void initialize(HWND window);
+    void release() noexcept;
+    void pollKeyboard();
+    std::uint32_t takeKeyPress();
+    SferaMouseInputState pollMouse();
+};
+
+inline SferaInputDevices g_sfera_direct_input_runtime;

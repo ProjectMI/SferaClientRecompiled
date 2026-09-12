@@ -48,33 +48,6 @@ enum class SoundEventType : std::uint32_t {
     playlist = 8u << 16u
 };
 
-struct SferaDialogEvent;
-
-struct SferaDialogEventQueue {
-    std::uint32_t reserved;
-    SferaDialogEvent** slots;
-    std::uint32_t capacity;
-    std::uint32_t begin;
-    std::uint32_t count;
-};
-
-struct SferaDialogState {
-    std::uint8_t reserved[32];
-    HWND owner;
-    SferaDialogEventQueue events;
-    std::uint32_t reserved_after_events;
-    std::uint32_t queued_event_count;
-};
-
-struct SferaDialogEvent {
-    SferaDialogState* dialog;
-    std::uint32_t control_id;
-    UINT message;
-    WPARAM wparam;
-    LPARAM lparam;
-    std::uint32_t reserved[2];
-};
-
 struct SferaTcpConnectionContext {
     std::uint8_t receive_buffer[kTcpReceiveBufferCapacity];
     std::uint32_t receive_size;
