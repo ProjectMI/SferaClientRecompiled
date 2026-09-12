@@ -3647,7 +3647,7 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5AD0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5B60(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5BF0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5C80(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    g_sfera_camera = SphereRender::GameCamera{};
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5C90(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5D20(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F5DB0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
@@ -3749,7 +3749,7 @@ __declspec(noinline) void sfera_sub_004EF142(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8000(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8040(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8070(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F80B0(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
+    
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8120(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8150(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u)); sfera_sub_004F8190(cpu, LIFT_CODE_TOKEN_VA(0x4EEF80u));

@@ -1968,10 +1968,6 @@ namespace {
 
 namespace SphereUI {
 
-    struct OptionsShadowSettings {
-        std::uint8_t reserved[160];
-        std::uint8_t quality;
-    };
 
     struct OptionsLodSettings {
         float maximum_distance;
@@ -2247,7 +2243,6 @@ namespace {
 
 namespace {
     using OptionsDisplayMode = SphereUI::DisplayMode;
-    using SphereUI::OptionsShadowSettings;
     using SphereUI::OptionsLodSettings;
 
 
@@ -2302,7 +2297,7 @@ namespace {
         auto& values = g_sfera_graphics_options_runtime.graphics_values;
         auto& state = g_sfera_options_dialog_runtime;
         auto& graphics = g_sfera_graphics_runtime;
-        auto* shadows = g_sfera_shadow_runtime.settings;
+        auto* shadows = g_sfera_shadows.get();
         if (shadows == nullptr) throw std::runtime_error("Shadow manager is unavailable");
         if (show) {
             g_sfera_sphere_options_runtime.saved_fog_distance.f32 = graphics.fog_distance;
@@ -2533,7 +2528,7 @@ namespace {
             case 17u:
                 {
                     state.graphics_snapshot[2] = event.first;
-                    auto* shadows = g_sfera_shadow_runtime.settings;
+                    auto* shadows = g_sfera_shadows.get();
                     if (shadows != nullptr) shadows->quality = static_cast<std::uint8_t>(event.first);
                     optionText(window, 9u, g_sfera_sphere_options_runtime.option_labels[event.first]);
                     break;

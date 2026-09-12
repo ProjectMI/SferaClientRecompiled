@@ -6,6 +6,7 @@
 #include <chrono>
 #include <filesystem>
 #include <map>
+#include <cmath>
 
 struct IDirect3DTexture9;
 struct IDirect3DBaseTexture9;
@@ -597,6 +598,7 @@ struct SferaBloodSpot {
 };
 
 struct SferaBloodEffectRuntime : BloodEffListener {
+    void render();
     SferaBloodSpot spots[30];
     std::uint32_t active_count;
     float phase;
@@ -960,6 +962,10 @@ public:
 
 class CSoundManager {
 public:
+    void detach(CSound& sound);
+    void setVolume(std::int32_t percent);
+    void update();
+    void clear();
     CSound* first;
     CSound* last;
     float volume;
@@ -1516,6 +1522,11 @@ namespace SphereUI {
 
     class HyperTextParser {
     public:
+        static UiString* plainText(UiString& output, const UiString& input);
+        static UiString* buildLink(UiString& output, UiString& scheme, UiString& target, UiString& caption);
+        static bool extractPlayerPrefix(UiString& input, UiString* output, UiString* plain);
+        static bool removePlayerPrefix(UiString& input, UiString* output, UiString* plain);
+        static bool eraseRange(UiString& input, std::uint32_t first, std::uint32_t last, UiString* output, UiString* plain);
         static HyperTextCommand command(std::string_view name);
         static bool parseCommand(std::string_view tag, HyperDocumentNode& node, std::string& argument);
         static void parseImage(std::string_view argument, HyperDocumentNode& node);
@@ -1585,6 +1596,9 @@ public:
     ~InterfaceManager();
     InterfaceManager(const InterfaceManager&) = delete;
     InterfaceManager& operator=(const InterfaceManager&) = delete;
+    void loadAllWindowTemplates();
+    bool initializeResources();
+    void showOptions(bool visible);
     bool prepareResources();
     void finishInitialization();
     bool shutdown();
@@ -2090,6 +2104,12 @@ public:
 };
 class WorldDiagnostics {
 public:
+    static void appendScriptContext(const char* text);
+    static void flushScriptContext();
+    static std::uint32_t inspectInstruction(std::uint16_t& module, std::uint32_t& offset, std::uint8_t* bytes, std::uint32_t& count);
+    static void describeScript(bool includeTime);
+    static void appendCallStack(char* output);
+    static const char* scriptContext();
     static void report(const char* message);
     static void warning(const char* message);
     [[noreturn]] static void fail(const char* message);
@@ -2647,5 +2667,492 @@ public:
 private:
     inline static std::vector<Line> lines_;
     static void box(const SferaBoundsCornersRuntime& corners, std::uint32_t color);
+};
+
+
+namespace SphereRender {
+class ModelPose {
+public:
+    static void updateBone(const SferaMatrix4x4F& parent, std::uint32_t bone_index);
+    static std::int32_t animationLength(std::uint32_t handle, std::int32_t animation);
+    static std::int32_t* animation(std::uint32_t handle);
+    static std::int32_t* frame(std::uint32_t handle);
+    static float* interpolation(std::uint32_t handle);
+    static std::int32_t* secondaryFrame(std::uint32_t handle);
+    static std::int32_t* secondaryAnimation(std::uint32_t handle);
+    static SferaVec3F* neckPosition(SferaVec3F& output);
+private:
+    static ModelKeyframe keyframe(const Model& model, const BoneAnimation& animation, std::uint32_t frame);
+    static ExtendedWorldObject* queryObject(std::uint32_t handle, const char* operation);
+    static std::uint32_t frameOffset(const Model& model, std::int32_t animation, std::int32_t frame, bool secondary);
+};
+}
+
+
+namespace SphereRender {
+struct CharacterPose { SferaVec4F rotation; SferaVec3F translation; };
+struct CharacterSkeleton {
+    std::int32_t bone_count;
+    std::int32_t frame_count;
+    std::int32_t* parents;
+    char (*names)[30];
+    CharacterPose* poses;
+    std::int32_t animation_count;
+    std::int32_t* animation_lengths;
+    std::int32_t attachments[7];
+    SferaMatrix4x4F* initial_pose;
+    void calculate(std::int32_t frame, std::int32_t bone, const SferaMatrix4x4F& parent, SferaMatrix4x4F* output) const;
+    void calculateSplit(std::int32_t firstFrame, std::int32_t secondFrame, float interpolation, std::int32_t bone, const SferaMatrix4x4F& parent, std::int32_t region, SferaMatrix4x4F* output) const;
+    std::int32_t absoluteFrame(std::int32_t animation, std::int32_t frame) const;
+};
+struct CharacterVertex { SferaVec3F position; SferaVec3F normal; float u; float v; std::uint32_t bones; float weight; };
+struct CharacterSkinnedVertex { SferaVec3F position; SferaVec3F normal; float u; float v; };
+struct CharacterGeometry { std::vector<CharacterVertex> vertices; std::vector<std::uint16_t> indices; };
+struct CharacterAsset { char name[32]; std::int32_t directory; CharacterGeometry* geometry; std::uint32_t age; };
+struct CharacterPart { std::int32_t asset; std::int32_t textures[20]; };
+struct CharacterAppearance { std::int32_t sex; std::uint8_t parts[16]; };
+struct CharacterSlot { ExtendedWorldObject* owner; CharacterAppearance appearance; };
+class CharacterModels {
+public:
+    float maximum_distance;
+    float minimum_distance;
+    SferaMatrix4x4F root_transform;
+    SferaVec3F bounds[8];
+    CharacterSkeleton skeletons[2];
+    char directories[100][200];
+    std::int32_t directory_count;
+    CharacterAsset* assets;
+    std::int32_t asset_count;
+    CharacterPart* parts;
+    std::uint16_t* part_indices;
+    CharacterSlot instances[400];
+    std::int32_t small_helm[21];
+    std::uint64_t last_lod_update;
+    std::uint32_t rendered_count;
+    float lod_start;
+    float lod_end;
+    std::uint32_t reserved;
+    CharacterModels* load(const char* const* folders, std::int32_t count);
+    void clear();
+    void initializeBounds();
+    std::int32_t classify(const SferaMatrix4x4F& world) const;
+    void setDistances(float minimum, float range);
+    void updateLodDistance();
+    double visibility(const WorldObject& object) const;
+    void setAppearance(std::int32_t handle, const CharacterAppearance& appearance);
+    bool getAppearance(std::int32_t handle, CharacterAppearance& appearance) const;
+    std::int32_t partAnimationLength(const ExtendedWorldObject& object, std::int32_t animation) const;
+    std::int32_t usesSmallHelm(std::int32_t sex, std::int32_t code) const;
+    void loadSkeleton(const char* path, CharacterSkeleton& skeleton);
+    void preload(std::int32_t index, const CharacterSkeleton& skeleton);
+    void animate(const CharacterSkeleton& skeleton, std::int32_t animation, std::int32_t frame, std::int32_t secondaryAnimation, std::int32_t secondaryFrame, float interpolation, SferaMatrix4x4F* output, bool attachmentsOnly) const;
+    SferaVec3F neckPosition(const ExtendedWorldObject& object) const;
+    void drawPart(std::int32_t index, std::int32_t visibility, const CharacterSkeleton& skeleton, const SferaMatrix4x4F* pose, bool cull, std::int32_t transparent, std::int32_t textureCode, std::uint32_t passes);
+    void drawLowDetail(std::uint32_t handle);
+    void draw(std::uint32_t handle, std::uint32_t color);
+    static HRESULT setMaterial(float opacity, float detail, const SferaVec3F& color);
+    static std::int32_t textureVariants(bool female, char part);
+    static std::uint32_t* parameter(SferaBoundCheckArray& array, std::int32_t index);
+    static ExtendedWorldObject* checkedExtended(WorldObject* object, const char* source, std::uint32_t line);
+private:
+    const CharacterAppearance& appearance(const ExtendedWorldObject& object) const;
+    void updateEffectFrames(ExtendedWorldObject& object, const CharacterSkeleton& skeleton, std::span<SferaMatrix4x4F> pose, const SferaMatrix4x4F& world) const;
+};
+}
+
+
+namespace SphereRender {
+struct CameraRectangle { std::int32_t left = 0, top = 0, right = 0, bottom = 0; bool operator==(const CameraRectangle&) const = default; };
+class GameCamera {
+public:
+    GameCamera();
+    SferaMatrix4x4F transform = SferaMatrix4x4F::identity();
+    float near_distance = 1.0f, far_distance = 100.0f, field_of_view = 1.0f;
+    float pixel_scale_x = 0.0f, pixel_scale_y = 0.0f, center_x = 0.0f, center_y = 0.0f;
+    float minimum_depth = 0.0f, maximum_depth = 0.9999899864196777f, aspect_scale = 0.75f;
+    std::uint32_t viewport_x = 0u, viewport_y = 0u, viewport_width = 640u, viewport_height = 480u;
+    float tangent_half_fov = 0.0f;
+    float offset_x = 0.0f, offset_y = 0.0f, window_width = 1.0f, window_height = 1.0f, window_depth = 1.0f;
+    bool off_axis = false;
+    void setViewport(std::uint32_t x, std::uint32_t y, std::uint32_t width, std::uint32_t height, float aspect);
+    void setPerspective(float near_plane, float far_plane, float angle);
+    void setTransform(const SferaMatrix4x4F& matrix);
+    void transformPoints(std::span<SferaVec3F> destination, std::span<const SferaVec3F> source) const;
+    SferaVec3F cameraPoint(const SferaVec3F& world) const;
+    bool project(const SferaVec3F& world, SferaVec3F& screen) const;
+    bool projectObjectTop(std::uint32_t handle, SferaVec3F& output, float height_factor) const;
+    void volume(const CameraRectangle* rectangle, const SferaFrustumF** planes, const SferaVec3F** points);
+    static void cameraAxes(SferaVec3F& forward, SferaVec3F& up);
+    static void setupViewport(std::uint32_t x, std::uint32_t y, std::uint32_t width, std::uint32_t height);
+    static void rebuildVisibleVolume(std::int32_t left, std::int32_t top, std::int32_t right, std::int32_t bottom);
+    static void beginFrame(std::uint32_t mode, bool reflection, float water_height);
+    static void endFrame(std::uint32_t mode, bool reflection);
+private:
+    CameraRectangle rectangle_{};
+    std::array<SferaVec3F, 6> points_{};
+    SferaFrustumF planes_{};
+    bool points_current_ = false, planes_current_ = false;
+    SferaVec3F saved_camera_position_{}, saved_camera_rotation_{}, saved_controlled_position_{};
+    void buildPoints();
+    void buildPlanes();
+    static SferaPlaneF boundaryPlane(const SferaVec3F& first, const SferaVec3F& second, const SferaVec3F& third);
+};
+}
+inline SphereRender::GameCamera g_sfera_camera;
+
+
+struct SferaViewSpatialRuntime;
+namespace SphereRender {
+struct SceneSortEntry { std::uint32_t object; std::uint32_t key; float distance; };
+class SceneRenderer {
+public:
+    static void initializeRenderLookup();
+    static void waitForGpu();
+    static bool bindTexture(std::int32_t texture);
+    static void textureSize(std::int32_t texture, std::uint32_t* dimensions);
+    static void setAmbientColor();
+    static void setMaterialColor(std::int32_t red, std::int32_t green, std::int32_t blue);
+    static void setObjectMaterial(WorldObject& object, std::uint32_t shade, const std::array<float, 3>& variation);
+    static std::uint32_t terrainShade(std::uint32_t shade, float x, float z);
+    static void buildColorRemap(double exponent, double floor);
+    static void modelFade(float distance, float power, float& fade, float& remaining);
+    static std::uint32_t materialVariant(std::uint32_t first, std::uint32_t second, std::uint32_t third);
+    static bool hasMaterialVariant(std::uint32_t object, std::int32_t variant);
+    static void setMaterialVariant(std::uint32_t object, std::int32_t variant);
+    static std::uint32_t setOpacity(std::uint32_t opacity);
+    static void adaptFog();
+    static void raiseDistantObject(std::uint32_t object);
+    static void sortObjects(std::int32_t first, std::int32_t last);
+    static void sortLights(std::int32_t first, std::int32_t last);
+    static void collectLights();
+    static void activateObjectLights(std::uint32_t object);
+    static void classifyBone(std::uint32_t bone);
+    static void drawModel(std::uint32_t handle);
+    static void drawObject(std::uint32_t handle);
+    static void drawObjects(bool updateVegetation);
+    static void drawPass(std::uint32_t mode);
+    static void drawMinimap();
+    static void drawReflection();
+    static void drawFrame();
+    static SferaVec3F& observerPosition(SferaVec3F& output);
+    static void setupEnvironment(std::uint32_t mode, bool useDefault, float time, SferaViewSpatialRuntime& output);
+};
+}
+
+struct SceneSkyLayer { char texture[20]; float projectionWarp; float uvScale; std::uint32_t trackOffset; float minimumTime; float maximumTime; SferaVec3F colors[11]; };
+struct SceneSkyLayers { SceneSkyLayer primary; SceneSkyLayer secondary; float opacity; };
+class SceneSky {
+public:
+    static void rotateUv(float x, float y, float angle, float& u, float& v);
+    static std::uint32_t buildLayerGeometry(const SceneSkyLayer& layer, float opacity);
+    static void layerColor(const SceneSkyLayer& layer, SferaVec3F& output);
+    static void drawColorLayer(const char* texture, const SferaVec3F& color, std::uint32_t indices);
+    static void drawMaskLayer(const char* texture, std::uint32_t indices);
+    static void drawLayers(const SceneSkyLayers& layers);
+    static void orbit(float& x, float& y, std::uint32_t orbit);
+    static float horizonFog(float elevation, float amount);
+    static void sampleDirection(bool refresh, const SferaVec3F& direction);
+    static double drawStars();
+    static void drawSunMoon(float rotation);
+};
+
+
+
+
+struct ShadowPoint { float x = 0.0f; float y = 0.0f; };
+class ShadowRasterizer {
+public:
+    struct Span { int left = INT32_MAX; int right = INT32_MIN; std::uint32_t color = UINT32_MAX; };
+    struct Row { Span active; Span displaced; };
+    std::array<Row, 256> rows{};
+    bool pending = false;
+    void polygon(std::uint32_t color, std::span<const ShadowPoint> points, int width, int height, const D3DLOCKED_RECT& surface);
+    void flush(int height, const D3DLOCKED_RECT& surface);
+private:
+    void flushSpans(int height, const D3DLOCKED_RECT& surface, bool displaced);
+};
+
+
+class ShadowMap {
+public:
+    std::uint8_t quality = 0u;
+    std::uint8_t level = 0u;
+    SferaVec3F direction{};
+    SferaVec3F origin{};
+    float fade = 1.0f;
+    bool valid = false;
+    SferaMatrix4x4F projection{};
+    SferaMatrix4x4F light_basis{};
+    ShadowMap() = default;
+    ~ShadowMap();
+    void createTextures();
+    void setDirection(const SferaVec3F& value, float opacity);
+    void selectObjectLight(const WorldObject& object);
+    float projectionExtension(const WorldObject& object) const;
+    bool prepareModel(WorldObject& object, const SferaVec3F* position, float opacity, std::uint8_t detail);
+    bool prepareGeometry(WorldObject& object, const SferaVec3F* position, float opacity, std::uint8_t detail, float scale, float spot_scale);
+    void projectModel(const SphereRender::Model& model, std::uint32_t submesh, const SferaMatrix4x4F* world = nullptr);
+    void projectVertices(const void* vertices, std::uint32_t vertex_count, const std::uint16_t* indices, std::uint32_t index_count, std::uint32_t stride = 32u);
+    void draw(const SferaVec3F* vertices, std::uint32_t triangle_count);
+    void save();
+    void restore();
+    static void initialize(std::uint32_t default_quality);
+    static void shutdown();
+    static void prepareObject(std::uint32_t handle, ExtendedWorldObject& object, float width, float spot_scale, float& extension);
+    static void drawObject(ExtendedWorldObject& object, float width, float extension);
+private:
+    std::array<IDirect3DTexture9*, 3> textures{};
+    std::int32_t spot_texture = -1;
+    std::uint32_t raster_color = 0u;
+    std::uint32_t spot_color = UINT32_MAX;
+    ShadowRasterizer rasterizer;
+    std::vector<ShadowPoint> projected_points;
+    std::array<std::uint16_t, 1002> face_indices{};
+    std::array<SferaBloodVertex, 501> spot_vertices{};
+    D3DSURFACE_DESC surface{};
+    D3DLOCKED_RECT locked{};
+    SferaVec3F saved_direction{};
+    float saved_fade = 0.0f;
+    SferaMatrix4x4F saved_basis{};
+};
+inline std::unique_ptr<ShadowMap> g_sfera_shadows;
+
+
+class SoundEffectRegistry {
+public:
+    CSoundEffect** definitions;
+    std::uint32_t capacity;
+    std::uint32_t count;
+    std::uint32_t growth;
+    SoundEffectRegistry(std::int32_t initialCapacity = 100, std::uint32_t growthCount = 50);
+    ~SoundEffectRegistry();
+    CSoundEffect* add();
+    CSoundEffect* find(std::uint32_t id) const;
+    void sort(std::int32_t begin, std::int32_t end);
+    bool load();
+    void clear();
+};
+struct SkyState {
+    SferaVec4F primaryColors[10];
+    float primaryPositions[10];
+    SferaVec4F reference;
+    SferaVec4F secondaryColors[6];
+    float secondaryPositions[6];
+    float time;
+    float sunPhase;
+    SferaVec3F sunColor;
+    float sunReserved;
+    SferaVec3F ambientColor;
+    float ambientReserved;
+};
+class SkyEnvironment {
+public:
+    SkyState states[11];
+    std::int32_t sunsetState;
+    std::int32_t sunriseState;
+    SkyEnvironment* load(const char* filename);
+    void interval(float time, std::int32_t& first, std::int32_t& second, float& fraction) const;
+    void sample(float time, SkyState& output) const;
+    void sunDirection(float time, SferaVec3F& output) const;
+    void lighting(float time, SferaVec3F& sun, SferaVec3F& ambient) const;
+};
+
+
+
+
+
+
+
+
+
+// Sound playback owner.
+class CSoundStream;
+struct SoundEventRecord {
+    std::uint32_t code;
+    float signal;
+    std::uint32_t position;
+};
+
+struct SoundEventQueue {
+    SoundEventRecord* records;
+    std::uint32_t capacity;
+    std::uint32_t count;
+    std::uint32_t growth;
+};
+
+struct SferaSoundTiming {
+    float seek_time;
+    float signal;
+};
+
+struct SferaSoundEventList {
+    void clear();
+    void resize(std::uint32_t count);
+    void resizeGroup(std::uint32_t group, std::uint32_t count);
+    void parseGroup(std::uint32_t group, const char* text);
+    std::uint32_t** event_groups;
+    std::uint32_t* group_sizes;
+    std::uint32_t item_index;
+    std::uint32_t group_index;
+    std::uint32_t group_count;
+};
+
+struct SferaSoundPlaybackState {
+    SferaSoundPlaybackState();
+    ~SferaSoundPlaybackState();
+    void resizeTimings(std::uint32_t count);
+    void resizePatterns(std::uint32_t count);
+    static float parseTime(const char* text);
+    bool load(const char* filename);
+    bool start();
+    void stop();
+    void clear();
+    void update();
+    std::uint32_t nextEvent() noexcept;
+    SoundEventQueue* event_queue;
+    SferaSoundTiming* timings;
+    std::uint32_t timing_count;
+    std::uint32_t playing;
+    std::uint32_t pending_track;
+    std::uint32_t reserved_14;
+    std::uint32_t timer_low;
+    std::uint32_t timer_high;
+    float play_signal;
+    SferaSoundEventList* playlists;
+    std::uint32_t playlist_count;
+    SferaSoundEventList* current_list;
+    std::uint32_t playlist_index;
+    CSoundStream* stream;
+    void* source;
+    std::uint32_t finished;
+    std::uint32_t stopped;
+    std::uint32_t volume_scale;
+    std::uint32_t force_stop;
+    std::uint32_t reserved_4c;
+};
+
+struct EnvironmentLighting { SferaVec3F fogParameters; SferaVec3F fogColor; SferaVec3F ambientColor; SferaVec3F sunColor; };
+struct EnvironmentZone {
+    float originX, originZ, minimumX, maximumX, minimumZ, maximumZ, borderFade;
+    SferaVec3F fogParameters;
+    SferaVec3F fogColors[8];
+    SferaVec3F ambientColors[8];
+    SferaVec3F sunColors[8];
+    float weight(float x, float z) const;
+    void sample(std::int32_t first, std::int32_t second, float fraction, EnvironmentLighting& output) const;
+};
+class EnvironmentZones {
+public:
+    static void interval(float time, std::int32_t& first, std::int32_t& second, float& fraction);
+    void load(const char* filename);
+    void setDefaultLighting(const SferaVec3F& sun, const SferaVec3F& ambient);
+    void calculate(bool useDefault, float x, float z, float time, const SkyEnvironment& sky, EnvironmentLighting& output);
+    std::vector<EnvironmentZone> zones;
+};
+
+class SnowField {
+public:
+    struct Particle { SferaVec3F position; std::int32_t phase; };
+    struct Vertex { float x, y, z, reciprocalW; std::uint32_t diffuse, specular; float u, v; };
+    struct PathPoint { float x, y; };
+    explicit SnowField(const char* filename);
+    std::vector<Particle> particles;
+    std::vector<Vertex> vertices;
+    std::vector<std::uint16_t> indices;
+    std::vector<PathPoint> path;
+    float age = 0.0f;
+};
+
+
+struct WeatherSkyPair { char primary[20]; char secondary[20]; };
+struct WeatherKeyframe { std::int32_t time; std::array<float, 4> properties; };
+struct WeatherScenario { std::int32_t duration; WeatherSkyPair sky; float skyStart; float skyEnd; std::uint32_t keyframeCount; std::array<WeatherKeyframe, 10> keyframes; };
+class WeatherScenarios {
+public:
+    enum class Property : std::uint32_t { rain, lightning, wind, cloud };
+    std::array<SceneSkyLayer, 30> textures;
+    std::uint32_t textureCount;
+    std::array<WeatherSkyPair, 30> pairs;
+    std::uint32_t pairCount;
+    std::array<WeatherScenario, 100> scenarios;
+    std::uint32_t scenarioCount;
+    std::array<std::uint16_t, 200> sequence;
+    std::uint32_t sequenceCount;
+    std::int32_t totalDuration;
+    std::int32_t lastUpdate;
+    WeatherScenarios* load(const char* filename);
+    void locate(std::int32_t time, std::uint32_t& sequenceIndex, std::int32_t& startTime, std::int32_t& localTime) const;
+    std::int32_t advance(std::uint32_t& sequenceIndex, std::uint32_t& keyframe) const;
+    std::int32_t retreat(std::uint32_t& sequenceIndex, std::uint32_t& keyframe) const;
+    double nextValue(std::uint32_t sequenceIndex, std::int32_t time, Property property, std::int32_t& distance) const;
+    double previousValue(std::uint32_t sequenceIndex, std::int32_t time, Property property, std::int32_t& distance) const;
+    void selectSky(std::int32_t time, float dayTime, char* primary, char* secondary) const;
+    void copyTexture(const char* name, SceneSkyLayer& output) const;
+    static void windDirection(bool refresh, std::int32_t seed, float& x, float& z);
+private:
+    const WeatherScenario& at(std::uint32_t sequenceIndex) const;
+};
+
+
+namespace SphereUI {
+class ChatFilter {
+public:
+    struct Rule { std::string word; std::uint32_t kind = 0u; std::vector<std::string> exceptions; };
+    ChatFilter();
+    explicit ChatFilter(std::vector<Rule> entries);
+    bool rejects(std::string_view message) const;
+    static bool invalidIdentifier(std::string_view name);
+    static std::string normalize(std::string_view text, std::size_t alphabet);
+private:
+    std::vector<Rule> rules;
+    bool matchesWord(std::string_view word, std::size_t alphabet) const;
+    bool matchesMessage(std::string_view message, std::size_t alphabet) const;
+};
+}
+
+
+struct GameUiWindow {
+    std::uint32_t handle;
+    std::uint32_t flags;
+    std::uint32_t opacity;
+    std::int32_t left, right, top, bottom;
+    std::int32_t contentLeft, contentRight, contentTop, contentBottom;
+    std::int32_t width, height;
+    float scrollX, scrollY;
+    std::uint32_t layer;
+    std::uint32_t controlCount;
+    std::uint32_t controls[7000];
+    std::uint32_t order;
+};
+struct GameUiElement : WorldGuiText {
+    std::uint32_t fontScale;
+    std::uint32_t font;
+    std::int32_t spriteLeft, spriteTop, spriteWidth, spriteHeight;
+    char texture[40];
+    std::uint32_t alpha;
+};
+
+class GameInterface {
+public:
+    static void releaseFontAtlas();
+    static std::uint32_t fontHeight(std::uint32_t font, std::uint32_t scale);
+    static std::uint32_t glyphWidth(std::uint32_t character, std::uint32_t font);
+    static std::uint32_t textHeight(std::uint32_t font, std::uint32_t scale, std::uint32_t lines);
+    static std::uint32_t lineOffset(std::uint32_t font, std::uint32_t scale, std::uint32_t line);
+    static void drawAtlasText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, std::int32_t scale, std::uint32_t font, float depth);
+    static std::uint32_t drawSpriteQuad(std::uint32_t color, const float* uv, float left, float top, float right, float bottom);
+    static std::uint32_t drawSpriteTexture(std::uint32_t color, std::int32_t texture, float left, float top, float right, float bottom, const float* uv, bool reserved = false);
+    static void drawTexture(std::int32_t left, std::int32_t top, std::int32_t width, std::int32_t height, const char* name, std::uint32_t alpha, float depth, const float* uv);
+    static void tintTexture(std::int32_t left, std::int32_t top, std::int32_t width, std::int32_t height, const char* name, std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint32_t alpha, const float* uv);
+    static void drawFullscreenOverlay();
+    static void setRenderState();
+    static void restoreRenderState();
+    static void drawFrame();
+    static void drawFrameRate();
+    static void sortWindows(std::int32_t first, std::int32_t last);
+    static void drawAll();
+    static void drawWindow(std::int32_t window);
+    static void updateLoadingProgress(std::uint32_t increment);
+    static void finishLoading();
 };
 

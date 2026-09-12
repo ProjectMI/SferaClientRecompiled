@@ -69,8 +69,6 @@ constexpr int kFlareAlphaStep = 35;
 constexpr int kMaximumAlpha = 255;
 constexpr float kDefaultLightRadius = 10.0f;
 constexpr float kFullCircleRadians = 6.283185958862305f;
-constexpr std::size_t kRenderIndexBufferBytes = 60000u;
-constexpr std::size_t kRenderBatchBufferBytes = 32000u;
 void initialize_identity_frame(float* matrix);
 }
 
@@ -485,7 +483,7 @@ bool SferaEffectManager::initialize() {
     if (initialized != 0u) return true;
     if (deferred_lifecycle != 0u) deferred_lifecycle = 0u; else shutdown();
     initialize_particle_random_table(*this); loadDefinitions();
-    render_sort_indices = SferaAbi::address(std::calloc(1u, static_cast<std::size_t>(kMaximumRenderSlots) * sizeof(std::uint16_t))); render_index_buffer = SferaAbi::address(std::calloc(1u, kRenderIndexBufferBytes)); render_batch_buffer = SferaAbi::address(std::calloc(1u, kRenderBatchBufferBytes));
+    render_order.reserve(kMaximumRenderSlots);
     initializeBloodEffect(); sfera_initialize_nature_manager();
     append_fixed_effect<CLightEffect>(*this, [](CLightEffect& effect) { effect.initializePreset(); effect.assignScriptName("light_source.eff"); });
     append_fixed_effect<CSpiralEffect>(*this, [](CSpiralEffect& effect) { effect.initializePreset(); effect.assignScriptName("spiral.effect0"); });
@@ -503,7 +501,7 @@ void SferaEffectManager::shutdown() {
     shutdownBloodEffect(); sfera_shutdown_nature_manager();
     for (SferaActiveEffect* item = sfera_active_effect(active_effects.first); item != nullptr;) { SferaActiveEffect* next = item->next; if (item->effect != nullptr) { item->effect->releaseEffect(); item->effect = nullptr; } if (item->resource != nullptr) { g_sfera_sound_runtime.destroyEffect(item->resource); item->resource = nullptr; } item = next; }
     active_effects = {}; active_effect_count = 0u; active_resource_count = 0u; g_sfera_effect_items.clear(); destroyDefinitions(); clearListeners();
-    std::free(SferaAbi::pointer<void>(render_sort_indices)); std::free(SferaAbi::pointer<void>(render_index_buffer)); std::free(SferaAbi::pointer<void>(render_batch_buffer)); render_sort_indices = render_index_buffer = render_batch_buffer = 0u; initialized = 0u;
+    render_order.clear(); initialized = 0u;
 }
 
 std::uint32_t SferaEffectManager::createActiveEffect(std::uint32_t effect_id, std::uint32_t source_handle) {
@@ -561,11 +559,6 @@ void SferaEffectManager::updateActiveEffect(SferaActiveEffect& item, std::uint16
     if (effect->deactivated != 0u) effect->renderEffect(); effect->initializeEffect({&spatial.frames[0], item.position_source == 1u ? 1u : 5u, static_cast<float>(item.age_ticks), visible, &world.frames[0][0]});
 }
 
-void SferaEffectManager::sortRenderSlots() {
-    if (render_slot_count == 0u || render_sort_indices == 0u || render_slots.data == 0u) return;
-    auto* indices = SferaAbi::pointer<std::uint16_t>(render_sort_indices); auto* slots = render_slots.dataAs<SferaEffectRenderSlot>(); for (std::uint32_t index = 0u; index < render_slot_count; ++index) indices[index] = static_cast<std::uint16_t>(index);
-    std::sort(indices, indices + render_slot_count, [&](std::uint16_t left, std::uint16_t right) { const auto& a = slots[left]; const auto& b = slots[right]; const auto af = a.primitive_kind & 1u; const auto bf = b.primitive_kind & 1u; return af != bf ? af < bf : a.resource_id < b.resource_id; });
-}
 
 void SferaEffectManager::updateActiveEffects() {
     const SferaEffectVec3F viewer = g_sfera_world_objects.referencePosition(); viewer_position = {viewer.x, viewer.y, viewer.z};

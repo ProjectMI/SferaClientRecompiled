@@ -1071,7 +1071,7 @@ label_00044267:
     lift_push32(cpu, 0x27CBu);
     cpu->edx = (uintptr_t)"..\\ShareClientSeverCode\\Inter.cpp";
     cpu->ebx = (cpu->ebx & 0xFFFFFF00u) | ((uint32_t)((!lift_test[0]) ? 1u : 0u) & 0xFFu);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x444293u)); sfera_sub_0045CB30(cpu, LIFT_CODE_TOKEN_VA(0x444293u));
+    cpu->eax = SferaAbi::address(SphereRender::CharacterModels::checkedExtended(SferaAbi::pointer<WorldObject>(cpu->ecx), SferaAbi::pointer<const char>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp)));  cpu->esp += 4u;
     *(uint8_t*)(cpu->eax + 0x274u) = cpu->ebx & 0xFFu;
     goto label_000468DE;
 label_0004429E:
@@ -1093,7 +1093,7 @@ label_000442AE:
     lift_push32(cpu, 0x27DAu);
     cpu->edx = (uintptr_t)"..\\ShareClientSeverCode\\Inter.cpp";
     cpu->ebx = (cpu->ebx & 0xFFFFFF00u) | ((uint32_t)((!lift_test[1]) ? 1u : 0u) & 0xFFu);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4442FBu)); sfera_sub_0045CB30(cpu, LIFT_CODE_TOKEN_VA(0x4442FBu));
+    cpu->eax = SferaAbi::address(SphereRender::CharacterModels::checkedExtended(SferaAbi::pointer<WorldObject>(cpu->ecx), SferaAbi::pointer<const char>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp)));  cpu->esp += 4u;
     *(uint8_t*)(cpu->eax + 0x276u) = cpu->ebx & 0xFFu;
     goto label_000468DE;
 label_00044306:
@@ -1302,7 +1302,7 @@ label_00044640:
 label_0004464F:
     if (g_sfera_texture_cache_runtime.render_gate != 0u) goto label_00043FA1;
     if (g_sfera_client_process_runtime.ui_bridge != 0u) goto label_00043FA1;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44466Eu)); sfera_sub_004C9D30(cpu, LIFT_CODE_TOKEN_VA(0x44466Eu));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_options_dialog_runtime.widget_keys_initialized);
     lift_test[2]=cpu->eax==0u;
     goto label_00044BFE;
 label_00044675:
@@ -1622,7 +1622,7 @@ label_00044BC6:
     lift_push32(cpu, 0x2980u);
     cpu->edx = (uintptr_t)"..\\ShareClientSeverCode\\Inter.cpp";
     cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x444BF7u)); sfera_sub_0045CB30(cpu, LIFT_CODE_TOKEN_VA(0x444BF7u));
+    cpu->eax = SferaAbi::address(SphereRender::CharacterModels::checkedExtended(SferaAbi::pointer<WorldObject>(cpu->ecx), SferaAbi::pointer<const char>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp)));  cpu->esp += 4u;
     lift_test[2]=*(uint8_t*)(cpu->eax + 0x142u) == 1u;
 label_00044BFE:
     if (!lift_test[2]) goto label_00043FA1;
@@ -1773,7 +1773,7 @@ label_00044E6E:
 label_00044E7B:
     cpu->ecx = 0u;
 label_00044E7D:
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x444E82u)); sfera_sub_004998A0(cpu, LIFT_CODE_TOKEN_VA(0x444E82u));
+    g_sfera_sound_runtime.requestTrack(SferaAbi::pointer<const char>(cpu->ecx));
     goto label_000468DE;
 label_00044E87:
     cpu->ecx = g_sfera_client_process_runtime.client_object;
@@ -2170,18 +2170,18 @@ label_0004545F:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445464u)); sfera_sub_0043ACF0(cpu, LIFT_CODE_TOKEN_VA(0x445464u));
     cpu->ecx = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44546Fu)); sfera_sub_0042AFB0(cpu, LIFT_CODE_TOKEN_VA(0x44546Fu));
+    g_sfera_effect_manager.detail_setting = cpu->ecx;
     cpu->edx = g_sfera_world_objects.controlled_object_handle;
     if ((int32_t)cpu->edx <= 0) goto label_000468DE;
     if (*(uint32_t*)(cpu->esp + 0x14u) == 0u) goto label_00045498;
     cpu->ecx = 0x12Cu;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44548Eu)); sfera_sub_0042AB10(cpu, LIFT_CODE_TOKEN_VA(0x44548Eu));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_effect_manager.createActiveEffect(cpu->ecx, cpu->edx));
     g_sfera_network_runtime.pending_slot = cpu->eax;
     goto label_000468DE;
 label_00045498:
     cpu->ecx = g_sfera_network_runtime.pending_slot;
     if ((int32_t)cpu->ecx < 0) goto label_000468DE;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4454ABu)); sfera_sub_00429B20(cpu, LIFT_CODE_TOKEN_VA(0x4454ABu));
+    g_sfera_effect_manager.removeActiveEffect(cpu->ecx);
     g_sfera_network_runtime.pending_slot = 0xFFFFFFFFu;
     goto label_000468DE;
 label_000454BA:
@@ -2205,7 +2205,7 @@ label_000454D4:
     cpu->ecx = g_sfera_inter_scalar_runtime.mode_03;
     lift_push32(cpu, 0x2B35u);
     cpu->edx = (uintptr_t)"..\\ShareClientSeverCode\\Inter.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445524u)); sfera_sub_0045CB30(cpu, LIFT_CODE_TOKEN_VA(0x445524u));
+    cpu->eax = SferaAbi::address(SphereRender::CharacterModels::checkedExtended(SferaAbi::pointer<WorldObject>(cpu->ecx), SferaAbi::pointer<const char>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp)));  cpu->esp += 4u;
     *(float*)(cpu->eax + 0x148u) = (double)*(float*)(cpu->esp + 0x20u);
     goto label_000468DE;
 label_00045533:
@@ -2257,16 +2257,16 @@ label_000455DB:
     lift_push32(cpu, cpu->eax);
     cpu->edx = cpu->edi;
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x45605u)); sfera_sub_00451570(cpu, LIFT_CODE_TOKEN_RVA(0x45605u));
+    cpu->eax = static_cast<std::uint32_t>(SphereRender::SceneRenderer::materialVariant(cpu->ecx, cpu->edx, *SferaAbi::pointer<const std::uint32_t>(cpu->esp)));  cpu->esp += 4u;
 label_00045605:
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
     cpu->esi = cpu->eax;
     cpu->edx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445612u)); sfera_sub_00456D60(cpu, LIFT_CODE_TOKEN_VA(0x445612u));
+    cpu->eax = static_cast<std::uint32_t>(SphereRender::SceneRenderer::hasMaterialVariant(cpu->ecx, static_cast<int>(cpu->edx)));
     if (cpu->eax == 0u) goto label_000458C9;
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
     cpu->edx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445625u)); sfera_sub_00460C90(cpu, LIFT_CODE_TOKEN_VA(0x445625u));
+    SphereRender::SceneRenderer::setMaterialVariant(cpu->ecx, static_cast<int>(cpu->edx));
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44562Cu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x44562Cu));
     goto label_000468DE;
@@ -2642,7 +2642,7 @@ label_00045C92:
     *(uint32_t*)(cpu->esp + 0x44u) = 0x303030u;
     *(uint16_t*)(cpu->esp + 0x4Fu) = 0u;
     *(uint16_t*)(cpu->esp + 0x48u) = 0x3030u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445CCAu)); sfera_sub_0041C3E0(cpu, LIFT_CODE_TOKEN_VA(0x445CCAu));
+    SferaAbi::pointer<SphereRender::CharacterModels>(cpu->ecx)->setAppearance(*SferaAbi::pointer<const std::uint32_t>(cpu->esp), *SferaAbi::pointer<const SphereRender::CharacterAppearance>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u)));  cpu->esp += 8u;
     goto label_000468DE;
 label_00045CCF:
     if (g_sfera_recovered_static_runtime.render_state_08 == 0u) goto label_000468DE;
@@ -2670,7 +2670,7 @@ label_00045CCF:
     cpu->ecx = g_sfera_recovered_static_runtime.render_state_08;
     cpu->eax = cpu->esp + 0x38u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->esi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445D53u)); sfera_sub_0041C520(cpu, LIFT_CODE_TOKEN_VA(0x445D53u));
+    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<SphereRender::CharacterModels>(cpu->ecx)->getAppearance(*SferaAbi::pointer<const std::uint32_t>(cpu->esp), *SferaAbi::pointer<SphereRender::CharacterAppearance>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u))));  cpu->esp += 8u;
     if (cpu->eax == 0u) goto label_000468DE;
     cpu->eax = *(uint32_t*)(cpu->esp + 0x1Cu);
     if ((int32_t)cpu->eax <= 0) goto label_00045D67;
@@ -2715,7 +2715,7 @@ label_00045DD3:
     cpu->ecx = g_sfera_recovered_static_runtime.render_state_08;
     cpu->eax = cpu->esp + 0x38u;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->esi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445DE4u)); sfera_sub_0041C3E0(cpu, LIFT_CODE_TOKEN_VA(0x445DE4u));
+    SferaAbi::pointer<SphereRender::CharacterModels>(cpu->ecx)->setAppearance(*SferaAbi::pointer<const std::uint32_t>(cpu->esp), *SferaAbi::pointer<const SphereRender::CharacterAppearance>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u)));  cpu->esp += 8u;
     goto label_000468DE;
 label_00045DE9:
     if (g_sfera_recovered_static_runtime.render_state_08 == 0u) goto label_00043FA1;
@@ -2727,7 +2727,7 @@ label_00045DE9:
     if (cpu->eax != 0u) goto label_00045E2F;
     cpu->ecx = g_sfera_recovered_static_runtime.render_state_08;
     lift_push32(cpu, cpu->esi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445E23u)); sfera_sub_0041BF70(cpu, LIFT_CODE_TOKEN_VA(0x445E23u));
+    cpu->eax = static_cast<std::uint32_t>(SphereRender::CharacterModels::textureVariants(*SferaAbi::pointer<const std::uint32_t>(cpu->esp) != 0u, 'f'));  cpu->esp += 4u;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445E2Au)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x445E2Au));
     goto label_000468DE;
@@ -2735,7 +2735,7 @@ label_00045E2F:
     if (cpu->eax != 1u) goto label_00045E4C;
     cpu->ecx = g_sfera_recovered_static_runtime.render_state_08;
     lift_push32(cpu, cpu->esi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445E40u)); sfera_sub_0041BFF0(cpu, LIFT_CODE_TOKEN_VA(0x445E40u));
+    cpu->eax = static_cast<std::uint32_t>(SphereRender::CharacterModels::textureVariants(*SferaAbi::pointer<const std::uint32_t>(cpu->esp) != 0u, 'r'));  cpu->esp += 4u;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x445E47u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x445E47u));
     goto label_000468DE;
@@ -2886,7 +2886,7 @@ label_000460B4:
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000468DE;
     cpu->ecx = g_sfera_mbc_runtime->process_memory_base;
     cpu->ecx = cpu->ecx + cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4460D4u)); sfera_sub_00425D30(cpu, LIFT_CODE_TOKEN_VA(0x4460D4u));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_effect_manager.findDefinitionId(SferaAbi::pointer<const char>(cpu->ecx)));
     if (cpu->eax != 0xFFFFFFFFu) goto label_0004405A;
     cpu->ecx = 0u;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4460E4u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x4460E4u));
@@ -2905,7 +2905,7 @@ label_0004610E:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x446118u)); sfera_sub_0043ACF0(cpu, LIFT_CODE_TOKEN_VA(0x446118u));
     if (g_sfera_mbc_runtime->execution_failed != 0u) goto label_000468DE;
     cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44612Cu)); sfera_sub_00429B20(cpu, LIFT_CODE_TOKEN_VA(0x44612Cu));
+    g_sfera_effect_manager.removeActiveEffect(cpu->ecx);
     goto label_000468DE;
 label_00046131:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x446136u)); sfera_sub_0043ACF0(cpu, LIFT_CODE_TOKEN_VA(0x446136u));
@@ -3180,7 +3180,7 @@ label_00046567:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44656Eu)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x44656Eu));
     goto label_000468DE;
 label_00046573:
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x446578u)); sfera_sub_004BCD80(cpu, LIFT_CODE_TOKEN_VA(0x446578u));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_interface.initializeResources());
     goto label_000468DE;
 label_0004657D:
     lift_push32(cpu, (uintptr_t)"WorldMap.bmp");
@@ -3250,7 +3250,7 @@ label_00046676:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44668Fu)); sfera_sub_00454F70(cpu, LIFT_CODE_TOKEN_VA(0x44668Fu));
     cpu->edx = (uintptr_t)"..\\ShareClientSeverCode\\Inter.cpp";
     cpu->ecx = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44669Bu)); sfera_sub_0045CB30(cpu, LIFT_CODE_TOKEN_VA(0x44669Bu));
+    cpu->eax = SferaAbi::address(SphereRender::CharacterModels::checkedExtended(SferaAbi::pointer<WorldObject>(cpu->ecx), SferaAbi::pointer<const char>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp)));  cpu->esp += 4u;
     cpu->esi = cpu->eax;
     if (cpu->esi == 0u) goto label_000468DE;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4466AAu)); value_39 = sfera_sub_0043AD60(cpu, LIFT_CODE_TOKEN_VA(0x4466AAu));
@@ -3272,7 +3272,7 @@ label_000466F6:
     cpu->ecx = g_sfera_input_device_runtime.shared_object;
     cpu->edx += cpu->eax;
     lift_push32(cpu, cpu->edx);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x446720u)); sfera_sub_0047E700(cpu, LIFT_CODE_TOKEN_VA(0x446720u));
+    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<const SphereUI::ChatFilter>(cpu->ecx)->rejects(SferaAbi::pointer<const char>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp))));  cpu->esp += 4u;
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x446727u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x446727u));
     goto label_000468DE;
@@ -3282,7 +3282,7 @@ label_0004672C:
     if ((uint32_t)(g_sfera_mbc_runtime->execution_failed) != 0u) goto label_000468DE;
     cpu->ecx = g_sfera_mbc_runtime->process_memory_base;
     cpu->ecx += cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44674Fu)); sfera_sub_0047E760(cpu, LIFT_CODE_TOKEN_VA(0x44674Fu));
+    cpu->eax = static_cast<std::uint32_t>(SphereUI::ChatFilter::invalidIdentifier(SferaAbi::pointer<const char>(cpu->ecx)));
     cpu->ecx = cpu->eax;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x446756u)); sfera_sub_0043B0D0(cpu, LIFT_CODE_TOKEN_VA(0x446756u));
     goto label_000468DE;
@@ -3827,7 +3827,7 @@ label_00047245:
 label_00047252:
     cpu->ecx = g_sfera_mbc_runtime->value_stack_size;
     if ((int32_t)(cpu->ecx) < (int32_t)(0x100u)) goto label_000472D2;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x447265u)); sfera_sub_00434D90(cpu, LIFT_CODE_TOKEN_VA(0x447265u));
+    cpu->eax = SferaAbi::address(WorldDiagnostics::scriptContext());
     cpu->ecx = (uintptr_t)"\n---exit_inter start---\nMBINTER MESSAGE:";
     g_sfera_log_runtime.files[0].write(SferaAbi::pointer<const char>(cpu->ecx));
     cpu->ecx = (uintptr_t)"Stack overflow";
@@ -4168,7 +4168,7 @@ __declspec(noinline) void sfera_sub_00447770(LiftCpu* cpu, uint32_t stop_address
     label_0004782B:
     cpu->edx = g_sfera_mbc_runtime->value_stack_size;
     if ((int32_t)(cpu->edx) < (int32_t)(0x100u)) goto label_0004789B;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44783Eu)); sfera_sub_00434D90(cpu, LIFT_CODE_TOKEN_VA(0x44783Eu));
+    cpu->eax = SferaAbi::address(WorldDiagnostics::scriptContext());
     cpu->ecx = (uintptr_t)"\n---exit_inter start---\nMBINTER MESSAGE:";
     g_sfera_log_runtime.files[0].write(SferaAbi::pointer<const char>(cpu->ecx));
     cpu->ecx = (uintptr_t)"Stack overflow";
@@ -5712,7 +5712,7 @@ __declspec(noinline) void sfera_sub_004496F0(LiftCpu* cpu, uint32_t stop_address
     label_00049A63:
     if ((int32_t)g_sfera_network_runtime.active_slot < (int32_t)cpu->ebx) goto label_00049A9E;
     cpu->ecx = 1u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x449A75u)); sfera_sub_00434AF0(cpu, LIFT_CODE_TOKEN_VA(0x449A75u));
+    WorldDiagnostics::describeScript(cpu->ecx != 0);
     cpu->ecx = (uintptr_t)"\n";
     g_sfera_log_runtime.files[0].write(SferaAbi::pointer<const char>(cpu->ecx));
     cpu->ecx = (uintptr_t)&g_sfera_mbc_runtime->diagnostic_context[0];
@@ -5858,7 +5858,7 @@ __declspec(noinline) void sfera_sub_004496F0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0xCu;
     if ((int32_t)g_sfera_network_runtime.active_slot < (int32_t)cpu->ebx) goto label_00049D53;
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x449D35u)); sfera_sub_00434AF0(cpu, LIFT_CODE_TOKEN_VA(0x449D35u));
+    WorldDiagnostics::describeScript(cpu->ecx != 0);
     cpu->ecx = (uintptr_t)"\n";
     g_sfera_log_runtime.files[0].write(SferaAbi::pointer<const char>(cpu->ecx));
     cpu->ecx = (uintptr_t)&g_sfera_mbc_runtime->diagnostic_context[0];
@@ -5884,7 +5884,7 @@ __declspec(noinline) void sfera_sub_004496F0(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0xCu;
     sfera_sub_00449180(cpu, stop_address); return;
     label_00049DB2:
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x449DB7u)); sfera_sub_00434D90(cpu, LIFT_CODE_TOKEN_VA(0x449DB7u));
+    cpu->eax = SferaAbi::address(WorldDiagnostics::scriptContext());
     cpu->ecx = (uintptr_t)"\n---exit_inter start---\nMBINTER MESSAGE:";
     g_sfera_log_runtime.files[0].write(SferaAbi::pointer<const char>(cpu->ecx));
     cpu->ecx = (uintptr_t)"Endless cycle found";
@@ -6643,7 +6643,7 @@ __declspec(noinline) void sfera_sub_0044B130(LiftCpu* cpu, uint32_t stop_address
     cpu->ebp |= 0xFFFFFFFFu;
     cpu->ecx = cpu->esp + 0x7Cu;
     *(uint32_t*)(cpu->esp + 0xA4u) = cpu->ebp;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44AA13u)); sfera_sub_00492B40(cpu, LIFT_CODE_TOKEN_VA(0x44AA13u));
+    cpu->eax = SferaAbi::address(SphereUI::HyperTextParser::buildLink(*SferaAbi::pointer<SphereUI::UiString>(cpu->ecx), *SferaAbi::pointer<SphereUI::UiString>(SferaAbi::address(&*SferaAbi::pointer<const std::uint32_t>(cpu->esp))), *SferaAbi::pointer<SphereUI::UiString>(SferaAbi::address(&*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 28u))), *SferaAbi::pointer<SphereUI::UiString>(SferaAbi::address(&*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 56u)))));  cpu->esp += 84u;
     cpu->esi = 0x10u;
     if (*(uint32_t*)(cpu->eax + 0x14u) < cpu->esi) goto label_0004AA1F;
     cpu->eax = *(uint32_t*)(cpu->eax);
@@ -6724,7 +6724,7 @@ __declspec(noinline) void sfera_sub_0044B130(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = cpu->esp + 0x14u;
     cpu->ecx = cpu->esp + 0x30u;
     *(uint32_t*)(cpu->esp + 0x58u) = cpu->ebx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44AB66u)); sfera_sub_00491C80(cpu, LIFT_CODE_TOKEN_VA(0x44AB66u));
+    cpu->eax = SferaAbi::address(SphereUI::HyperTextParser::plainText(*SferaAbi::pointer<SphereUI::UiString>(cpu->ecx), *SferaAbi::pointer<SphereUI::UiString>(cpu->edx)));
     cpu->ebp = 0x10u;
     if (*(uint32_t*)(cpu->eax + 0x14u) < cpu->ebp) goto label_0004AB72;
     cpu->eax = *(uint32_t*)(cpu->eax);
@@ -6831,7 +6831,7 @@ __declspec(noinline) void sfera_sub_0044B130(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44AD12u)); sfera_sub_00406820(cpu, LIFT_CODE_TOKEN_VA(0x44AD12u));
     cpu->edx = cpu->edi;
     cpu->ecx = cpu->ebp;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44AD1Bu)); sfera_sub_004930A0(cpu, LIFT_CODE_TOKEN_VA(0x44AD1Bu));
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | static_cast<std::uint32_t>(SphereUI::HyperTextParser::extractPlayerPrefix(*SferaAbi::pointer<SphereUI::UiString>(SferaAbi::address(&*SferaAbi::pointer<const std::uint32_t>(cpu->esp))), SferaAbi::pointer<SphereUI::UiString>(cpu->ecx), SferaAbi::pointer<SphereUI::UiString>(cpu->edx)));  cpu->esp += 28u;
     cpu->esi = 0x10u;
     if ((cpu->eax & 0xFFu) != 1u) goto label_0004AD74;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x1Cu);
@@ -6939,7 +6939,7 @@ __declspec(noinline) void sfera_sub_0044B130(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44AEB2u)); sfera_sub_00406820(cpu, LIFT_CODE_TOKEN_VA(0x44AEB2u));
     cpu->edx = cpu->edi;
     cpu->ecx = cpu->ebp;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44AEBBu)); sfera_sub_00493430(cpu, LIFT_CODE_TOKEN_VA(0x44AEBBu));
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | static_cast<std::uint32_t>(SphereUI::HyperTextParser::removePlayerPrefix(*SferaAbi::pointer<SphereUI::UiString>(SferaAbi::address(&*SferaAbi::pointer<const std::uint32_t>(cpu->esp))), SferaAbi::pointer<SphereUI::UiString>(cpu->ecx), SferaAbi::pointer<SphereUI::UiString>(cpu->edx)));  cpu->esp += 28u;
     cpu->esi = 0x10u;
     if ((cpu->eax & 0xFFu) != 1u) goto label_0004AF14;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x1Cu);
@@ -7053,7 +7053,7 @@ __declspec(noinline) void sfera_sub_0044B130(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44B062u)); sfera_sub_00406820(cpu, LIFT_CODE_TOKEN_VA(0x44B062u));
     cpu->edx = cpu->ebp;
     cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x44B06Bu)); sfera_sub_00493920(cpu, LIFT_CODE_TOKEN_VA(0x44B06Bu));
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | static_cast<std::uint32_t>(SphereUI::HyperTextParser::eraseRange(*SferaAbi::pointer<SphereUI::UiString>(SferaAbi::address(&*SferaAbi::pointer<const std::uint32_t>(cpu->esp))), cpu->ecx, cpu->edx, SferaAbi::pointer<SphereUI::UiString>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 28u)), SferaAbi::pointer<SphereUI::UiString>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 32u))));  cpu->esp += 36u;
     cpu->esi = 0x10u;
     if ((cpu->eax & 0xFFu) != 1u) goto label_0004B0C4;
     cpu->edx = *(uint32_t*)(cpu->esp + 0x1Cu);
@@ -7132,94 +7132,8 @@ label_0004B141: ;
     sfera_sub_004385D0(cpu, stop_address); return;
 }
 
-__declspec(noinline) void sfera_sub_0044B7D0(LiftCpu* cpu, uint32_t stop_address) { double x87_v0, x87_v1, x87_v2, x87_v3, x87_v4;
-    x87_v0 = (double)*(float*)(cpu->esp + 0x14u);
-    cpu->eax = *(uint32_t*)(cpu->esp + 4u);
-    cpu->edx = *(uint32_t*)(cpu->esp + 8u);
-    *(float*)(cpu->ecx + 0x94u) = x87_v0;
-    lift_push32(cpu, cpu->esi);
-    cpu->esi = *(uint32_t*)(cpu->esp + 0x10u);
-    lift_push32(cpu, cpu->edi);
-    cpu->edi = *(uint32_t*)(cpu->esp + 0x18u);
-    *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->esi;
-    x87_v1 = (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x1Cu))));
-    *(uint32_t*)(cpu->ecx + 0x74u) = cpu->eax;
-    *(uint32_t*)(cpu->ecx + 0x78u) = cpu->edx;
-    *(uint32_t*)(cpu->ecx + 0x7Cu) = cpu->esi;
-    *(uint32_t*)(cpu->ecx + 0x80u) = cpu->edi;
-    if ((int32_t)cpu->esi >= 0) goto label_0004B80D;
-    x87_v1 = (x87_v1) + (((double)4294967296.0f));
-    label_0004B80D:
-    *(float*)(cpu->esp + 0x1Cu) = x87_v1; 
-    x87_v1 = (double)*(float*)(cpu->esp + 0x1Cu);
-    *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->eax;
-    x87_v2 = x87_v1;
-    x87_v3 = 0.5;
-    x87_v2 = (x87_v2) * (x87_v3);
-    x87_v4 = (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x1Cu))));
-    if ((int32_t)cpu->eax >= 0) goto label_0004B831;
-    x87_v4 = (x87_v4) + (((double)4294967296.0f));
-    label_0004B831:
-    x87_v2 = x87_v2 + x87_v4; 
-    *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->edi;
-    { double temporary = x87_v3; x87_v3 = x87_v2; x87_v2 = temporary; }
-    *(float*)(cpu->ecx + 0x64u) = x87_v3; 
-    x87_v3 = 2.0;
-    x87_v4 = x87_v3;
-    x87_v1 = x87_v4 / x87_v1; 
-    { double temporary = x87_v3; x87_v3 = x87_v1; x87_v1 = temporary; }
-    *(float*)(cpu->ecx + 0x5Cu) = x87_v3; 
-    x87_v3 = (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x1Cu))));
-    if ((int32_t)cpu->edi >= 0) goto label_0004B859;
-    x87_v3 = (x87_v3) + (((double)4294967296.0f));
-    label_0004B859:
-    *(float*)(cpu->esp + 0x1Cu) = x87_v3; 
-    x87_v3 = (double)*(float*)(cpu->esp + 0x1Cu);
-    *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->edx;
-    x87_v4 = x87_v3;
-    x87_v2 = x87_v2 * x87_v4; 
-    x87_v4 = (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x1Cu))));
-    if ((int32_t)cpu->edx >= 0) goto label_0004B877;
-    x87_v4 = (x87_v4) + (((double)4294967296.0f));
-    label_0004B877:
-    x87_v2 = x87_v2 + x87_v4; 
-    cpu->edi = lift_pop32(cpu);
-    { double temporary = x87_v3; x87_v3 = x87_v2; x87_v2 = temporary; }
-    cpu->esi = lift_pop32(cpu);
-    *(float*)(cpu->ecx + 0x68u) = x87_v3; 
-    x87_v1 = x87_v1 / x87_v2; 
-    x87_v0 = x87_v0 * x87_v1; 
-    *(float*)(cpu->ecx + 0x60u) = x87_v0; 
-    cpu->esp += 0x18u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044B890(LiftCpu* cpu, uint32_t stop_address) { double x87_v0, x87_v1, x87_v2;
-    lift_push32(cpu, cpu->esi);
-    cpu->esi = cpu->ecx;
-    x87_v0 = (double)*(float*)(cpu->esi + 0x58u);
-    x87_v1 = (double)*(float*)(cpu->esp + 0x10u); x87_v2 = x87_v1;
-    { const double lift_left=x87_v2; const double lift_right=x87_v0;  x87_v0=x87_v1;  if (lift_left!=lift_right) goto label_0004B8C7; }
-    { const double lift_right=(double)*(float*)(cpu->esi + 0x54u); const double lift_left=(double)*(float*)(cpu->esp + 0xCu); if (lift_left!=lift_right) goto label_0004B8C7; }
-    { const double lift_right=(double)*(float*)(cpu->esi + 0x50u); const double lift_left=(double)*(float*)(cpu->esp + 8u); if (lift_left==lift_right) goto label_0004B90E; }
-    label_0004B8C7:
-    *(float*)(cpu->esi + 0x58u) = x87_v0;
-    x87_v0 = (x87_v0) * (0.5);
-    *(float*)(cpu->esp + 0x10u) = x87_v0; 
-    x87_v0 = (double)*(float*)(cpu->esp + 0x10u);
-    x87_v0 = std::tan(x87_v0);
-    *(float*)(cpu->esp + 0x10u) = x87_v0; 
-    x87_v0 = (double)*(float*)(cpu->esp + 0x10u);
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | ((uint32_t)(((uint64_t)((cpu->eax & 0xFFu)) ^ (uint64_t)((cpu->eax & 0xFFu)))) & 0xFFu);
-    *(float*)(cpu->esi + 0x98u) = x87_v0; 
-    *(uint16_t*)(cpu->esi + 0x564u) = 0u;
-    x87_v0 = (double)*(float*)(cpu->esp + 0xCu);
-    *(uint8_t*)(cpu->esi + 0x566u) = cpu->eax & 0xFFu;
-    *(float*)(cpu->esi + 0x54u) = x87_v0; 
-    *(float*)(cpu->esi + 0x50u) = (double)*(float*)(cpu->esp + 8u);
-    cpu->esi = lift_pop32(cpu); cpu->esp += 0x10u; cpu->eip = stop_address; return;
-    label_0004B90E:
-    x87_v0 = x87_v0; 
-    cpu->esi = lift_pop32(cpu); cpu->esp += 0x10u; cpu->eip = stop_address; return;
-}
+
+
 
 
 
@@ -7340,30 +7254,7 @@ __declspec(noinline) void sfera_sub_0044C0A0(LiftCpu* cpu, uint32_t stop_address
     lift_native_call(cpu, native_function_address32(&::MessageBoxA), LIFT_CODE_TOKEN_VA(0x44C0C8u));
     cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0044C110(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
-    cpu->ebx = 0u;
-    label_0004C115:
-    cpu->edi = 0u;
-    if ((int32_t)*(uint32_t*)(cpu->ebx + ((uintptr_t)&g_sfera_font_atlas_layout_runtime.resource_count[0])) <= (int32_t)cpu->edi) goto label_0004C145;
-    cpu->esi = cpu->ebx + ((uintptr_t)&g_sfera_static_render_lookup_runtime.atlas_resources[0][0]);
-    label_0004C125:
-    cpu->eax = *(uint32_t*)(cpu->esi);
-    if (cpu->eax == 0u) goto label_0004C139;
-    cpu->ecx = *(uint32_t*)(cpu->eax);
-    cpu->edx = *(uint32_t*)(cpu->ecx + 8u);
-    lift_push32(cpu, cpu->eax);
-    lift_native_call(cpu, cpu->edx, LIFT_CODE_TOKEN_RVA(0x4C131u));
-    *(uint32_t*)(cpu->esi) = 0u;
-    label_0004C139:
-    ++cpu->edi;
-    cpu->esi += 0x14u;
-    if ((int32_t)cpu->edi < (int32_t)*(uint32_t*)(cpu->ebx + ((uintptr_t)&g_sfera_font_atlas_layout_runtime.resource_count[0]))) goto label_0004C125;
-    label_0004C145:
-    cpu->ebx += 4u;
-    if ((int32_t)cpu->ebx < (int32_t)0x14u) goto label_0004C115;
-    cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
 __declspec(noinline) void sfera_sub_0044C160(LiftCpu* cpu, uint32_t stop_address) {
     cpu->esp -= 0x1Cu;
     lift_push32(cpu, cpu->esi);
@@ -7572,429 +7463,12 @@ __declspec(noinline) void sfera_sub_0044CC70(LiftCpu* cpu, uint32_t stop_address
     cpu->eax = 0u;
     cpu->ecx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0044D190(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1]; double x87_v0, x87_v1, x87_v2, x87_v3, x87_v4, x87_v5, x87_v6, x87_v7;
-    cpu->esp -= 0x1Cu;
-    lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp); lift_push32(cpu, cpu->edi);
-    cpu->edi = 0u;
-    cpu->ebx = 0u;
-    *(uint32_t*)(cpu->esp + 0x24u) = cpu->edx;
-    cpu->ebp = cpu->ecx;
-    *(uint32_t*)(cpu->esp + 0x14u) = cpu->ecx;
-    *(uint32_t*)(cpu->esp + 0x18u) = cpu->edi;
-    if ((cpu->edx != (uint32_t)(g_sfera_screen_clip_runtime.bottom)) && ((int32_t)(cpu->edx) >= (int32_t)((uint32_t)(g_sfera_screen_clip_runtime.bottom)))) goto label_0004D58A;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x34u);
-    cpu->eax = cpu->ecx;
-    cpu->eax <<= 4u;
-    cpu->eax -= cpu->ecx;
-    cpu->eax += cpu->eax;
-    *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->eax;
-    cpu->eax += cpu->edx;
-    if ((int32_t)cpu->eax <= (int32_t)g_sfera_screen_clip_runtime.top) goto label_0004D58A;
-    cpu->eax = *(uint32_t*)(cpu->esp + 0x30u);
-    cpu->eax &= 0xFF000000u;
-    if (cpu->eax == 0xFF000000u) goto label_0004D1F2;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    lift_push32(cpu, 6u); lift_push32(cpu, 5u);
-    SferaAbi::pointer<CD3D9Device>(cpu->ecx)->setAlphaBlending(static_cast<D3DBLEND>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), static_cast<D3DBLEND>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u))); cpu->esp += 8u;
-    label_0004D1F2:
-    *(float*)(cpu->esp + 0x10u) = (double)(0.0);
-    *(float*)(cpu->esp + 0xCu) = (double)(1.0);
-    x87_v0 = (double)0.0010000000474974513f;
-    x87_v1 = (double)*(float*)(cpu->esp + 0x3Cu);
-    { const double lift_left=x87_v1; const double lift_right=x87_v0; x87_v0=x87_v1;  if (!(lift_left>lift_right)) goto label_0004D257; }
-    x87_v1 = (double)*(float*)((uintptr_t)&g_sfera_view_spatial_runtime.scale.x);
-    { const double lift_left=x87_v1; const double lift_right=x87_v0; if (lift_left>lift_right) goto label_0004D586; }
-    x87_v2 = (double)*(float*)((uintptr_t)&g_sfera_view_spatial_runtime.scale.y);
-    { const double lift_left=x87_v2; const double lift_right=x87_v0; if (lift_left<lift_right) goto label_0004D584; }
-    x87_v3 = x87_v2;
-    x87_v4 = x87_v1;
-    x87_v4 = (x87_v4) * (x87_v3);
-    x87_v4 = (x87_v4) / (x87_v0);
-    x87_v3 = x87_v3 - x87_v4; 
-    { double temporary = x87_v3; x87_v3 = x87_v2; x87_v2 = temporary; }
-    x87_v1 = x87_v3 - x87_v1; 
-    x87_v1 = x87_v2 / x87_v1; 
-    *(float*)(cpu->esp + 0x10u) = x87_v1; 
-    x87_v1 = 1.0;
-    x87_v0 = x87_v1 / x87_v0; 
-    *(float*)(cpu->esp + 0xCu) = x87_v0; 
-    goto label_0004D259;
-    label_0004D257:
-    x87_v0 = x87_v0; 
-    label_0004D259:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x2Cu);
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (*(uint8_t*)(cpu->ecx));
-    lift_push32(cpu, cpu->esi);
-    cpu->esi = 0u;
-    if ((cpu->eax & 0xFFu) == 0u) goto label_0004D56F;
-    x87_v0 = (double)*(float*)(cpu->esp + 0x14u);
-    x87_v1 = (double)*(float*)(cpu->esp + 0x10u);
-    label_0004D272:
-    if ((uint8_t)(cpu->eax) == 0xAu) goto label_0004D519;
-    cpu->edx = (cpu->edx & 0xFFFFFF00u) | ((cpu->eax & 0xFFu) & 0xFFu);
-    cpu->eax = cpu->edx & 0xFFu;
-    cpu->eax <<= 4u;
-    sub_pred[0] = *(uint32_t*)(cpu->eax + ((uintptr_t)&g_sfera_font_runtime.glyphs[0].defined)) == 0u;
-    *(uint8_t*)(cpu->esp + 0x40u) = cpu->edx & 0xFFu;
-    if (!sub_pred[0]) goto label_0004D298;
-    *(uint8_t*)(cpu->esp + 0x40u) = 0x7Cu;
-    cpu->edx = (cpu->edx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esp + 0x40u));
-    label_0004D298:
-    if ((int32_t)cpu->ebp > (int32_t)g_sfera_screen_clip_runtime.right) goto label_0004D4E2;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x20u);
-    cpu->ecx += cpu->ebp;
-    if ((cpu->ecx == (uint32_t)(g_sfera_screen_clip_runtime.left)) || ((int32_t)(cpu->ecx) < (int32_t)((uint32_t)(g_sfera_screen_clip_runtime.left)))) goto label_0004D4E2;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x3Cu);
-    cpu->ebp = cpu->edx & 0xFFu;
-    cpu->ebp = cpu->ebp << 4u;
-    cpu->eax = *(uint32_t*)(cpu->ebp + ((uintptr_t)&g_sfera_font_runtime.glyphs[0].texture_index));
-    cpu->ecx = cpu->ecx + (cpu->eax * 4u);
-    cpu->ecx += cpu->eax;
-    cpu->eax = *(uint32_t*)((cpu->ecx * 4u) + ((uintptr_t)&g_sfera_static_render_lookup_runtime.atlas_resources[0][0]));
-    *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->eax;
-    if (cpu->eax == cpu->ebx) goto label_0004D346;
-    if (cpu->ebx!=0u) goto label_0004D2E2;
-    cpu->ebx = cpu->eax;
-    goto label_0004D346;
-    label_0004D2E2:
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    x87_v0 = x87_v1; 
-    lift_push32(cpu, cpu->ebx);
-    x87_v0 = x87_v0; 
-    lift_push32(cpu, 0u);
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->checkResult(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->SetTexture(*SferaAbi::pointer<const std::uint32_t>(cpu->esp), SferaAbi::pointer<IDirect3DBaseTexture9>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u))), "SetTexture")); cpu->esp += 8u;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    lift_push32(cpu, 1u); lift_push32(cpu, 0x16u);
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->checkResult(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->SetRenderState(static_cast<D3DRENDERSTATETYPE>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u)), "SetRenderState")); cpu->esp += 8u;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    lift_push32(cpu, 0x1C4u);
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->checkResult(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->SetFVF(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), "SetFVF")); cpu->esp += 4u;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    lift_push32(cpu, 0x20u); lift_push32(cpu, cpu->edi); lift_push32(cpu, (uintptr_t)&g_sfera_screen_quad_indices[0]); lift_push32(cpu, cpu->esi); lift_push32(cpu, sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 0u, &SferaScreenVertex::x)); lift_push32(cpu, 0xFu); lift_push32(cpu, 4u);
-    SferaAbi::pointer<CD3D9Device>(cpu->ecx)->drawVertices(static_cast<D3DPRIMITIVETYPE>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u), SferaAbi::pointer<const void>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 8u)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 12u), SferaAbi::pointer<const std::uint16_t>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 16u)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 20u), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 24u)); cpu->esp += 28u;
-    x87_v0 = (double)*(float*)(cpu->esp + 0x10u);
-    x87_v1 = (double)*(float*)(cpu->esp + 0x14u);
-    cpu->ebx = *(uint32_t*)(cpu->esp + 0x1Cu);
-    cpu->edx = (cpu->edx & 0xFFFFFF00u) | (*(uint8_t*)(cpu->esp + 0x40u));
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    cpu->esi = 0u;
-    cpu->edi=0u;
-    label_0004D346:
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    cpu->eax = cpu->esi;
-    cpu->eax <<= 5u;
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 0u, &SferaScreenVertex::z)) = x87_v1;
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x34u);
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    *(uint32_t*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 0u, &SferaScreenVertex::diffuse)) = cpu->ecx;
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 0u, &SferaScreenVertex::rhw)) = x87_v1;
-    *(uint32_t*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 1u, &SferaScreenVertex::diffuse)) = cpu->ecx;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    *(uint32_t*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 2u, &SferaScreenVertex::diffuse)) = cpu->ecx;
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 1u, &SferaScreenVertex::z)) = x87_v1;
-    *(uint32_t*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 3u, &SferaScreenVertex::diffuse)) = cpu->ecx;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    *(uint16_t*)((cpu->edi * 2u) + ((uintptr_t)&g_sfera_screen_quad_indices[0])) = cpu->esi & 0xFFFFu;
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 1u, &SferaScreenVertex::rhw)) = x87_v1;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 2u, &SferaScreenVertex::z)) = x87_v1;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 2u, &SferaScreenVertex::rhw)) = x87_v1;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 3u, &SferaScreenVertex::z)) = x87_v1;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 3u, &SferaScreenVertex::rhw)) = x87_v1;
-    x87_v2 = (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x18u))));
-    x87_v3 = 0.5;
-    x87_v2 = (x87_v2) - (x87_v3);
-    { double temporary = x87_v3; x87_v3 = x87_v2; x87_v2 = temporary; }
-    *(float*)(cpu->esp + 0x40u) = x87_v3;
-    x87_v4 = (double)*(float*)(cpu->esp + 0x40u);
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 0u, &SferaScreenVertex::x)) = x87_v4;
-    x87_v5 = (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x28u))));
-    x87_v2 = x87_v5 - x87_v2; 
-    { double temporary = x87_v4; x87_v4 = x87_v2; x87_v2 = temporary; }
-    *(float*)(cpu->esp + 0x40u) = x87_v4;
-    x87_v5 = (double)*(float*)(cpu->esp + 0x40u);
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 0u, &SferaScreenVertex::y)) = x87_v5;
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 0u, &SferaScreenVertex::u)) = (double)*(float*)(cpu->ebp + ((uintptr_t)&g_sfera_font_runtime.glyphs[0].u));
-    *(float*)(cpu->esp + 0x40u) = (double)*(float*)(cpu->ebp + ((uintptr_t)&g_sfera_font_runtime.glyphs[0].v));
-    x87_v6 = (double)*(float*)(cpu->esp + 0x40u);
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 0u, &SferaScreenVertex::v)) = x87_v6;
-    *(float*)(cpu->esp + 0x40u) = (double)(((int32_t)(*(uint32_t*)(cpu->esp + 0x20u))));
-    x87_v7 = (double)*(float*)(cpu->esp + 0x40u);
-    x87_v3 = x87_v3 + x87_v7; 
-    { double temporary = x87_v6; x87_v6 = x87_v3; x87_v3 = temporary; }
-    *(float*)(cpu->esp + 0x24u) = x87_v6; 
-    x87_v6 = (double)*(float*)(cpu->esp + 0x24u);
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 1u, &SferaScreenVertex::x)) = x87_v6;
-    { double temporary = x87_v6; x87_v6 = x87_v5; x87_v5 = temporary; }
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 1u, &SferaScreenVertex::y)) = x87_v6; 
-    x87_v6 = (double)*(float*)(cpu->ebp + ((uintptr_t)&g_sfera_font_runtime.glyphs[0].u));
-    x87_v7 = 0.1171875;
-    x87_v6 = (x87_v6) + (x87_v7);
-    { double temporary = x87_v7; x87_v7 = x87_v6; x87_v6 = temporary; }
-    *(float*)(cpu->esp + 0x24u) = x87_v7; 
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 1u, &SferaScreenVertex::u)) = (double)*(float*)(cpu->esp + 0x24u);
-    { double temporary = x87_v6; x87_v6 = x87_v3; x87_v3 = temporary; }
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 1u, &SferaScreenVertex::v)) = x87_v6; 
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 2u, &SferaScreenVertex::x)) = x87_v5; 
-    x87_v4 = (x87_v4) + (((double)*(float*)(cpu->esp + 0x40u)));
-    *(float*)(cpu->esp + 0x40u) = x87_v4; 
-    x87_v4 = (double)*(float*)(cpu->esp + 0x40u);
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 2u, &SferaScreenVertex::y)) = x87_v4;
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 2u, &SferaScreenVertex::u)) = (double)*(float*)(cpu->esp + 0x24u);
-    x87_v5 = (double)*(float*)(cpu->ebp + ((uintptr_t)&g_sfera_font_runtime.glyphs[0].v));
-    x87_v3 = x87_v3 + x87_v5; 
-    { double temporary = x87_v4; x87_v4 = x87_v3; x87_v3 = temporary; }
-    *(float*)(cpu->esp + 0x40u) = x87_v4; 
-    x87_v4 = (double)*(float*)(cpu->esp + 0x40u);
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 2u, &SferaScreenVertex::v)) = x87_v4;
-    { double temporary = x87_v4; x87_v4 = x87_v2; x87_v2 = temporary; }
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 3u, &SferaScreenVertex::x)) = x87_v4; 
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 3u, &SferaScreenVertex::y)) = x87_v3; 
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 3u, &SferaScreenVertex::u)) = (double)*(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 0u, &SferaScreenVertex::u));
-    *(float*)(cpu->eax + sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 3u, &SferaScreenVertex::v)) = x87_v2; 
-    cpu->ebp = *(uint32_t*)(cpu->esp + 0x18u);
-    cpu->eax = cpu->esi + 1u;
-    *(uint16_t*)((cpu->edi * 2u) + ((uintptr_t)&g_sfera_screen_quad_indices[1])) = cpu->eax & 0xFFFFu;
-    cpu->eax = cpu->esi + 2u;
-    cpu->ecx = cpu->esi + 3u;
-    *(uint16_t*)((cpu->edi * 2u) + ((uintptr_t)&g_sfera_screen_quad_indices[3])) = cpu->esi & 0xFFFFu;
-    *(uint16_t*)((cpu->edi * 2u) + ((uintptr_t)&g_sfera_screen_quad_indices[2])) = cpu->eax & 0xFFFFu;
-    *(uint16_t*)((cpu->edi * 2u) + ((uintptr_t)&g_sfera_screen_quad_indices[4])) = cpu->eax & 0xFFFFu;
-    *(uint16_t*)((cpu->edi * 2u) + ((uintptr_t)&g_sfera_screen_quad_indices[5])) = cpu->ecx & 0xFFFFu;
-    cpu->esi += 4u;
-    cpu->edi += 6u;
-    label_0004D4E2:
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x3Cu);
-    ++*(uint32_t*)(cpu->esp + 0x30u);
-    cpu->eax = cpu->edx & 0xFFu;
-    cpu->edx = cpu->ecx + (cpu->eax * 4u);
-    cpu->edx += cpu->eax;
-    cpu->eax = *(uint32_t*)((cpu->edx * 4u) + ((uintptr_t)&g_sfera_static_render_lookup_runtime.glyph_metrics[0][0]));
-    cpu->eax += *(uint32_t*)((cpu->ecx * 4u) + ((uintptr_t)&g_sfera_font_atlas_layout_runtime.code_base[0]));
-    cpu->ecx = *(uint32_t*)(cpu->esp + 0x30u);
-    cpu->eax = (int64_t)(int32_t)(cpu->eax) * (int64_t)(int32_t)(*(uint32_t*)(cpu->esp + 0x38u));
-    cpu->ebp += cpu->eax;
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | (*(uint8_t*)(cpu->ecx));
-    *(uint32_t*)(cpu->esp + 0x18u) = cpu->ebp;
-    if ((cpu->eax & 0xFFu) != 0u) goto label_0004D272;
-    label_0004D519:
-    x87_v0 = x87_v1; 
-    x87_v0 = x87_v0; 
-    if (cpu->esi == 0u) goto label_0004D56F;
-    cpu->edx = *(uint32_t*)(cpu->esp + 0x1Cu);
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    lift_push32(cpu, cpu->edx); lift_push32(cpu, 0u);
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->checkResult(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->SetTexture(*SferaAbi::pointer<const std::uint32_t>(cpu->esp), SferaAbi::pointer<IDirect3DBaseTexture9>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u))), "SetTexture")); cpu->esp += 8u;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    lift_push32(cpu, 1u); lift_push32(cpu, 0x16u);
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->checkResult(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->SetRenderState(static_cast<D3DRENDERSTATETYPE>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u)), "SetRenderState")); cpu->esp += 8u;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    lift_push32(cpu, 0x1C4u);
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->checkResult(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->SetFVF(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), "SetFVF")); cpu->esp += 4u;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    lift_push32(cpu, 0x20u); lift_push32(cpu, cpu->edi); lift_push32(cpu, (uintptr_t)&g_sfera_screen_quad_indices[0]); lift_push32(cpu, cpu->esi); lift_push32(cpu, sfera_screen_vertex_address(g_sfera_landscape_screen_vertices, 0u, &SferaScreenVertex::x)); lift_push32(cpu, 0xFu); lift_push32(cpu, 4u);
-    SferaAbi::pointer<CD3D9Device>(cpu->ecx)->drawVertices(static_cast<D3DPRIMITIVETYPE>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u), SferaAbi::pointer<const void>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 8u)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 12u), SferaAbi::pointer<const std::uint16_t>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 16u)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 20u), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 24u)); cpu->esp += 28u;
-    label_0004D56F:
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE));
-    cpu->esi = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
-    cpu->esp += 0x1Cu;
-    cpu->esp += 0x18u; cpu->eip = stop_address; return;
-    label_0004D584:
-    x87_v0 = x87_v2; 
-    label_0004D586:
-    x87_v0 = x87_v1; 
-    x87_v0 = x87_v0; 
-    label_0004D58A:
-    cpu->edi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu);
-    cpu->esp += 0x1Cu;
-    cpu->esp += 0x18u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044D5A0(LiftCpu* cpu, uint32_t stop_address) { double x87_v0, x87_v1, x87_v2, x87_v3;
-    lift_push32(cpu, cpu->esi);
-    cpu->esi = 0u;
-    if (*(uint32_t*)(void*)&g_sfera_main_ui_state_runtime.ui_state_02 == cpu->esi) goto label_0004D6F7;
-    x87_v0 = 0.0;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[0].x) = x87_v0;
-    lift_push32(cpu, 6u);
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[0].y) = x87_v0;
-    lift_push32(cpu, 5u);
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[0].u) = x87_v0;
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[0].v) = x87_v0;
-    x87_v1 = (double)(((int32_t)(g_sfera_graphics_runtime.display_width)));
-    x87_v2 = 0.0;
-    x87_v1 = (x87_v1) + (x87_v2);
-    { double temporary = x87_v2; x87_v2 = x87_v1; x87_v1 = temporary; }
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[1].x) = x87_v2; 
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[1].y) = x87_v1;
-    x87_v2 = 1.0;
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[1].u) = x87_v2;
-    { double temporary = x87_v2; x87_v2 = x87_v1; x87_v1 = temporary; }
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[1].v) = x87_v2;
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[2].x) = (double)*(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[1].x);
-    x87_v3 = (double)(((int32_t)(g_sfera_graphics_runtime.display_height)));
-    x87_v0 = x87_v0 + x87_v3; 
-    { double temporary = x87_v2; x87_v2 = x87_v0; x87_v0 = temporary; }
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[2].y) = x87_v2; 
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[2].u) = x87_v1;
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[2].v) = x87_v1;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[3].x) = x87_v1;
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[3].y) = (double)*(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[2].y);
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[3].u) = x87_v1; 
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[3].v) = x87_v0; 
-    SferaAbi::pointer<CD3D9Device>(cpu->ecx)->setAlphaBlending(static_cast<D3DBLEND>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), static_cast<D3DBLEND>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u))); cpu->esp += 8u;
-    x87_v0 = 0.0;
-    cpu->eax = *(uint32_t*)(void*)&g_sfera_main_ui_state_runtime.ui_state_02;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[0].z) = x87_v0;
-    x87_v1 = 1.0;
-    cpu->eax <<= 24u;
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[0].rhw) = x87_v1;
-    cpu->eax |= 0xFFFFFFu;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    lift_push32(cpu, 0x1C4u);
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[1].z) = x87_v1;
-    g_sfera_scene_render_runtime.textured_quad[0].diffuse = cpu->eax;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    g_sfera_scene_render_runtime.textured_quad[0].specular = cpu->esi;
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[1].rhw) = x87_v1;
-    g_sfera_scene_render_runtime.textured_quad[1].diffuse = cpu->eax;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    g_sfera_scene_render_runtime.textured_quad[1].specular = cpu->esi;
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[2].z) = x87_v1;
-    g_sfera_scene_render_runtime.textured_quad[2].diffuse = cpu->eax;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    g_sfera_scene_render_runtime.textured_quad[2].specular = cpu->esi;
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[2].rhw) = x87_v1;
-    g_sfera_scene_render_runtime.textured_quad[3].diffuse = cpu->eax;
-    { double temporary = x87_v1; x87_v1 = x87_v0; x87_v0 = temporary; }
-    g_sfera_scene_render_runtime.textured_quad[3].specular = cpu->esi;
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[3].z) = x87_v1; 
-    *(float*)((uintptr_t)&g_sfera_scene_render_runtime.textured_quad[3].rhw) = x87_v0; 
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->checkResult(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->SetFVF(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), "SetFVF")); cpu->esp += 4u;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    lift_push32(cpu, 0x20u); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->esi); lift_push32(cpu, 4u); lift_push32(cpu, (uintptr_t)&g_sfera_scene_render_runtime.textured_quad[0].x); lift_push32(cpu, 0xEu); lift_push32(cpu, 6u);
-    SferaAbi::pointer<CD3D9Device>(cpu->ecx)->drawVertices(static_cast<D3DPRIMITIVETYPE>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u), SferaAbi::pointer<const void>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 8u)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 12u), SferaAbi::pointer<const std::uint16_t>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 16u)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 20u), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 24u)); cpu->esp += 28u;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    cpu->esi = lift_pop32(cpu);
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE)); cpu->esp += 4u; cpu->eip = stop_address; return;
-    label_0004D6F7:
-    cpu->esi = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-__declspec(noinline) void sfera_sub_0044D700(LiftCpu* cpu, uint32_t stop_address) { double x87_v0;
-    cpu->esp -= 0x6Cu;
-    { const auto result = WorldClock::nowTicks(); cpu->eax = static_cast<std::uint32_t>(result); cpu->edx = static_cast<std::uint32_t>(result >> 32u); }
-    cpu->eax -= g_sfera_client_main_scalar_runtime.counter_04;
-    ++g_sfera_frame_runtime.fps_sample_count;
-    *(uint32_t*)(cpu->esp) = cpu->eax;
-    if ((int32_t)cpu->eax <= (int32_t)0x2710u) goto label_0004D758;
-    x87_v0 = (double)(((int32_t)(g_sfera_frame_runtime.fps_sample_count)));
-    g_sfera_frame_runtime.fps_sample_count = 0u;
-    x87_v0 = (x87_v0) * (10000.0);
-    x87_v0 = (x87_v0) / ((double)(((int32_t)(*(uint32_t*)(cpu->esp)))));
-    g_sfera_frame_runtime.fps = x87_v0; 
-    { const auto result = WorldClock::nowTicks(); cpu->eax = static_cast<std::uint32_t>(result); cpu->edx = static_cast<std::uint32_t>(result >> 32u); }
-    g_sfera_client_main_scalar_runtime.counter_04 = cpu->eax;
-    g_sfera_frame_runtime.fps_anchor.high = cpu->edx;
-    label_0004D758:
-    if (g_sfera_landscape_map_runtime.show_fps == 0u) goto label_0004D7C5;
-    x87_v0 = (double)g_sfera_frame_runtime.fps;
-    cpu->eax = g_sfera_graphics_runtime.display_width;
-    cpu->ecx = g_sfera_graphics_runtime.display_height;
-    cpu->esp -= 8u;
-    *(double*)(cpu->esp) = x87_v0;
-    cpu->edx = cpu->esp + 0xCu;
-    --cpu->eax;
-    --cpu->ecx;
-    lift_push32(cpu, (uintptr_t)"FPS: %4.1f"); lift_push32(cpu, cpu->edx);
-    g_sfera_screen_clip_runtime.left = 0u;
-    g_sfera_screen_clip_runtime.top = 0u;
-    g_sfera_screen_clip_runtime.right = cpu->eax;
-    g_sfera_screen_clip_runtime.bottom = cpu->ecx;
-    lift_native_call(cpu, native_function_address32(&::sprintf), LIFT_CODE_TOKEN_VA(0x44D7A3u));
-    x87_v0 = 0.0;
-    cpu->esp += 0xCu;
-    *(float*)(cpu->esp) = x87_v0; 
-    lift_push32(cpu, 0u); lift_push32(cpu, 1u); lift_push32(cpu, 0xFFFFFFFFu);
-    cpu->eax = cpu->esp + 0x14u;
-    lift_push32(cpu, cpu->eax);
-    cpu->edx = 0u;
-    cpu->ecx = 0u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x4D7C5u)); sfera_sub_0044D190(cpu, LIFT_CODE_TOKEN_RVA(0x4D7C5u));
-    label_0004D7C5:
-    cpu->esp += 0x6Cu;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
 
 
-__declspec(noinline) void sfera_sub_0044DAC0(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->ecx=0u;
-    label_0004DAC2:
-    cpu->eax = cpu->ecx;
-    cpu->eax >>= 1u;
-    if ((((cpu->ecx & 0xFFu)) & (1u)) == 0u) goto label_0004DAD0;
-    cpu->eax ^= 0xEDB88320u;
-    label_0004DAD0:
-    if (((cpu->eax & 0xFFu)&1u)==0u) goto label_0004DADD;
-    cpu->eax >>= 1u;
-    cpu->eax ^= 0xEDB88320u;
-    goto label_0004DADF;
-    label_0004DADD:
-    cpu->eax >>= 1u;
-    label_0004DADF:
-    if (((cpu->eax & 0xFFu)&1u)==0u) goto label_0004DAEC;
-    cpu->eax >>= 1u;
-    cpu->eax ^= 0xEDB88320u;
-    goto label_0004DAEE;
-    label_0004DAEC:
-    cpu->eax >>= 1u;
-    label_0004DAEE:
-    if (((cpu->eax & 0xFFu)&1u)==0u) goto label_0004DAFB;
-    cpu->eax >>= 1u;
-    cpu->eax ^= 0xEDB88320u;
-    goto label_0004DAFD;
-    label_0004DAFB:
-    cpu->eax >>= 1u;
-    label_0004DAFD:
-    if (((cpu->eax & 0xFFu)&1u)==0u) goto label_0004DB0A;
-    cpu->eax >>= 1u;
-    cpu->eax ^= 0xEDB88320u;
-    goto label_0004DB0C;
-    label_0004DB0A:
-    cpu->eax >>= 1u;
-    label_0004DB0C:
-    if (((cpu->eax & 0xFFu)&1u)==0u) goto label_0004DB19;
-    cpu->eax >>= 1u;
-    cpu->eax ^= 0xEDB88320u;
-    goto label_0004DB1B;
-    label_0004DB19:
-    cpu->eax >>= 1u;
-    label_0004DB1B:
-    if (((cpu->eax & 0xFFu)&1u)==0u) goto label_0004DB28;
-    cpu->eax >>= 1u;
-    cpu->eax ^= 0xEDB88320u;
-    goto label_0004DB2A;
-    label_0004DB28:
-    cpu->eax >>= 1u;
-    label_0004DB2A:
-    if (((cpu->eax & 0xFFu)&1u)==0u) goto label_0004DB37;
-    cpu->eax >>= 1u;
-    cpu->eax ^= 0xEDB88320u;
-    goto label_0004DB39;
-    label_0004DB37:
-    cpu->eax >>= 1u;
-    label_0004DB39:
-    *(uint8_t*)(cpu->ecx + ((uintptr_t)&g_sfera_static_render_lookup_runtime.legacy_crc_low_table[0])) = cpu->eax & 0xFFu;
-    ++cpu->ecx;
-    if ((int32_t)(cpu->ecx) < (int32_t)(0x100u)) goto label_0004DAC2;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
+
+
+
 
 
 

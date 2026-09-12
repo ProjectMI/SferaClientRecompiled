@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include "semantic_classes.h"
 
 using SferaDirectPlayMessageHandler = HRESULT (WINAPI*)(void* context, DWORD message, void* payload);
 
@@ -198,54 +199,6 @@ struct SferaUpdateDownloadContext {
     FILE* output;
 };
 
-struct SoundEventRecord {
-    std::uint32_t code;
-    float signal;
-    std::uint32_t position;
-};
-
-struct SoundEventQueue {
-    SoundEventRecord* records;
-    std::uint32_t capacity;
-    std::uint32_t count;
-    std::uint32_t growth;
-};
-
-struct SferaSoundTiming {
-    float seek_time;
-    float signal;
-};
-
-struct SferaSoundEventList {
-    std::uint32_t** event_groups;
-    std::uint32_t* group_sizes;
-    std::uint32_t item_index;
-    std::uint32_t group_index;
-    std::uint32_t group_count;
-};
-
-struct SferaSoundPlaybackState {
-    SoundEventQueue* event_queue;
-    SferaSoundTiming* timings;
-    std::uint32_t timing_count;
-    std::uint32_t playing;
-    std::uint32_t pending_track;
-    std::uint32_t reserved_14;
-    std::uint32_t timer_low;
-    std::uint32_t timer_high;
-    float play_signal;
-    SferaSoundEventList* playlists;
-    std::uint32_t playlist_count;
-    SferaSoundEventList* current_list;
-    std::uint32_t playlist_index;
-    CSoundStream* stream;
-    void* source;
-    std::uint32_t finished;
-    std::uint32_t stopped;
-    std::uint32_t volume_scale;
-    std::uint32_t force_stop;
-    std::uint32_t reserved_4c;
-};
 
 class SferaBrowserHost final : public IOleClientSite, public IOleInPlaceSite, public IOleInPlaceFrame, public IDocHostUIHandler {
     class Storage final : public IStorage {

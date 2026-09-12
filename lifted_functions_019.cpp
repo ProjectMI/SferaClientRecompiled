@@ -23,30 +23,7 @@ static void sfera_u32_to_sso_decimal(LiftCpu* cpu) {
     *(uint32_t*)(destination + 0x14u) = 15u;
     cpu->eax = destination;
 }
-__declspec(noinline) void sfera_sub_004BA370(LiftCpu* cpu, uint32_t stop_address) {
-    const LiftCpu saved_cpu = *cpu;
-    std::vector<std::filesystem::path> files;
-    std::error_code error;
-    for (std::filesystem::directory_iterator entry("Effects", error), end; !error && entry != end; entry.increment(error)) {
-        if (entry->is_directory(error)) continue;
-        if (SferaSimpleParser::equalsIgnoreCase(entry->path().extension().string().c_str(), ".ui")) files.push_back(entry->path());
-    }
-    float completed_fraction = 0.0f;
-    const float file_fraction = files.empty() ? 0.0f : static_cast<float>(1.0 / static_cast<double>(files.size()));
-    for (const auto& file : files) {
-        if (SferaSimpleParser::equalsIgnoreCase(file.filename().string().c_str(), "loadscreen.ui")) continue;
-        g_sfera_interface.loadWindowTemplates(file.string().c_str());
-        completed_fraction += file_fraction;
-        cpu->ecx = static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<double>(completed_fraction) * 30.0 + 30.0));
-        lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4BA62Fu)); sfera_sub_00461700(cpu, LIFT_CODE_TOKEN_VA(0x4BA62Fu));
-    }
-    cpu->ebx = saved_cpu.ebx;
-    cpu->ebp = saved_cpu.ebp;
-    cpu->esi = saved_cpu.esi;
-    cpu->edi = saved_cpu.edi;
-    cpu->esp = saved_cpu.esp + 4u;
-    cpu->eip = stop_address;
-}
+
 __declspec(noinline) void sfera_sub_004BC130(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->edi = cpu->ecx;
@@ -79,31 +56,9 @@ __declspec(noinline) void sfera_sub_004BC130(LiftCpu* cpu, uint32_t stop_address
     label_000BC181:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_ui_tool_tip_ctrl_release(LiftCpu* cpu, uint32_t stop_address) { reinterpret_cast<SphereUI::ToolTipCtrl*>(static_cast<std::uintptr_t>(cpu->ecx))->ToolTipCtrl::destroy(false); cpu->esp += 4u; cpu->eip = stop_address; }
-__declspec(noinline) void sfera_sub_004BCD80(LiftCpu* cpu, uint32_t stop_address) {
-    const LiftCpu saved_cpu = *cpu;
-    if (!g_sfera_interface.prepareResources()) {
-        cpu->eax = 0u;
-        cpu->esp += 4u;
-        cpu->eip = stop_address;
-        return;
-    }
-    cpu->ecx = 15u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4BCEB5u)); sfera_sub_00461700(cpu, LIFT_CODE_TOKEN_VA(0x4BCEB5u));
-    g_sfera_interface.loadHyperTexts();
-    cpu->ecx = 30u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4BCEC4u)); sfera_sub_00461700(cpu, LIFT_CODE_TOKEN_VA(0x4BCEC4u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4BCEC9u)); sfera_sub_004BA370(cpu, LIFT_CODE_TOKEN_VA(0x4BCEC9u));
-    g_sfera_interface.finishInitialization();
-    cpu->ebx = saved_cpu.ebx;
-    cpu->ebp = saved_cpu.ebp;
-    cpu->esi = saved_cpu.esi;
-    cpu->edi = saved_cpu.edi;
-    cpu->esp = saved_cpu.esp + 4u;
-    cpu->eax = 1u;
-    cpu->eip = stop_address;
-}
-__declspec(noinline) void sfera_ui_list_item_ctrl_item_at(LiftCpu* cpu, uint32_t stop_address) { cpu->eax = address32(reinterpret_cast<SphereUI::ListItemCtrl*>(static_cast<std::uintptr_t>(cpu->ecx))->itemAt(*reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(cpu->esp + 4u)))); cpu->esp += 8u; cpu->eip = stop_address; }
+
+
+
 
 
 __declspec(noinline) void sfera_ui_pointer_vector_reserve_additional(LiftCpu* cpu, uint32_t stop_address) { auto* self = reinterpret_cast<SphereUI::UiIndexVector*>(static_cast<std::uintptr_t>(cpu->ecx)); const auto additional = *reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(cpu->esp + 4u)); if (additional > 0x3fffffffu - self->size()) throw std::length_error("UI pointer vector too long"); self->reserve(self->size() + additional); cpu->esp += 8u; cpu->eip = stop_address; }

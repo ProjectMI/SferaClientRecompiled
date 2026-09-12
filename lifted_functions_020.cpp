@@ -14,10 +14,7 @@ namespace lifted {
 
 
 
-__declspec(noinline) void sfera_sub_004C9D30(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->eax = g_sfera_options_dialog_runtime.widget_keys_initialized;
-    cpu->esp += 4u; cpu->eip = stop_address; return;
-}
+
 
 __declspec(noinline) void sfera_sub_004C9E50(LiftCpu* cpu, uint32_t stop_address) {
     cpu->ecx = *(uint32_t*)(cpu->esp + 4u);
@@ -175,7 +172,7 @@ __declspec(noinline) void sfera_sub_004CA100(LiftCpu* cpu, uint32_t stop_address
     label_000CA174:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->esp += 8u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_ui_handle_control_options_event(LiftCpu* cpu, uint32_t stop_address) { SphereUI::Runtime::invokeEventHandler(SphereUI::WindowEventHandler::control_options, SferaAbi::pointer<SphereUI::Window>(cpu->ecx), *SferaAbi::pointer<const SphereUI::WindowEvent>(cpu->edx)); cpu->esp += 4u; cpu->eip = stop_address; }
+
 
 
 

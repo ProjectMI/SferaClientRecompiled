@@ -96,8 +96,8 @@ HRESULT WINAPI D3DXCreateTextureFromFileInMemoryEx(IDirect3DDevice9*, const void
 D3DXMATRIX* WINAPI D3DXMatrixMultiply(D3DXMATRIX*, const D3DXMATRIX*, const D3DXMATRIX*);
 }
 
-class CSoundListener { public: void GetOrientation(D3DVECTOR*, D3DVECTOR*) const; int SetPosition(float, float, float, int); int SetVelocity(float, float, float, int); int SetOrientation(const D3DVECTOR&, const D3DVECTOR&, int); };
-class CSoundInterface { public: int UpdateSettings(); };
+class CSoundListener { public: std::uint8_t backend_state[8]; D3DVECTOR position; void GetOrientation(D3DVECTOR*, D3DVECTOR*) const; int SetPosition(float, float, float, int); int SetVelocity(float, float, float, int); int SetOrientation(const D3DVECTOR&, const D3DVECTOR&, int); };
+class CSoundInterface { public: std::uint8_t backend_state[16]; CSoundListener* listener; int UpdateSettings(); };
 class CSound {
 public:
     CSound();
@@ -137,7 +137,9 @@ public:
     SferaSoundBackendNative* backend;
     std::uint8_t reserved_backend_state[48];
     std::uint32_t playback_position_adjustment;
-    std::uint8_t reserved_playback_state[28];
+    std::uint8_t reserved_playback_before_decoder[8];
+    std::uint32_t decoder_state;
+    std::uint8_t reserved_playback_after_decoder[16];
     SferaSoundStreamCallback decode_callback;
     void* decode_state;
     std::uint32_t decode_event_position;

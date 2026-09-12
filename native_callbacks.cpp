@@ -729,39 +729,7 @@ static bool pop_sound_event(SoundEventQueue* queue, SoundEventRecord& record) no
     return true;
 }
 
-static std::uint32_t next_sound_event(SferaSoundPlaybackState& state) noexcept {
-    for (;;) {
-        SferaSoundEventList* list = state.current_list;
-        if (!list || !list->event_groups || !list->group_sizes || list->group_index >= list->group_count) {
-        return UINT32_MAX;
-    }
-        if (list->item_index >= list->group_sizes[list->group_index]) {
-        return UINT32_MAX;
-    }
-        const std::uint32_t* events = list->event_groups[list->group_index];
-        if (!events) {
-        return UINT32_MAX;
-    }
-        const std::uint32_t event = events[list->item_index++];
-        if (event == UINT32_MAX) {
-        return UINT32_MAX;
-    }
-        const auto type = static_cast<SoundEventType>(event & kSoundEventTypeMask);
-        if (type != SoundEventType::playlist) {
-        return event;
-    }
-        const std::uint32_t playlist_index = (event & kSoundEventIndexMask) - 1u;
-        if (playlist_index >= state.playlist_count || !state.playlists) {
-        return 0u;
-    }
-        state.current_list = &state.playlists[playlist_index];
-        if (state.current_list->group_count == 0u) {
-        return UINT32_MAX;
-    }
-        state.current_list->item_index = 0u;
-        state.current_list->group_index = static_cast<std::uint32_t>(std::rand()) % state.current_list->group_count;
-    }
-}
+static std::uint32_t next_sound_event(SferaSoundPlaybackState& state) noexcept { return state.nextEvent(); }
 
 static std::int32_t run_network_probe() noexcept {
     std::array<char, kPathBufferCapacity> system_directory{};

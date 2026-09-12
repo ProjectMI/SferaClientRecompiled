@@ -3489,11 +3489,6 @@ void SferaParticleSystemDefinition::commit() {
     }
 }
 namespace {
-    struct SferaSoundEffectRegistry {
-        std::uint32_t definitions;
-        std::uint32_t end_or_reserved;
-        std::uint32_t count;
-    };
     std::uint64_t sound_clock_ticks() {
         return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 100);
     }
@@ -3730,23 +3725,7 @@ namespace {
         effect.start(frame, false);
         return true;
     }
-    CSoundEffect* find_sound_definition(std::uint32_t effect_id) {
-        auto* registry = ptr32<SferaSoundEffectRegistry>(g_sfera_sound_runtime.effect_manager);
-        if (registry == nullptr || registry->definitions == 0u || registry->count == 0u) return nullptr;
-        auto* definitions = ptr32<std::uint32_t>(registry->definitions);
-        std::uint32_t left = 0u;
-        std::uint32_t right = registry->count;
-        while (left < right) {
-            const std::uint32_t middle = left + (right - left) / 2u;
-            auto* definition = ptr32<CSoundEffect>(definitions[middle]);
-            if (definition == nullptr) return nullptr;
-            if (definition->effect_number < effect_id) left = middle + 1u;
-            else right = middle;
-        }
-        if (left >= registry->count) return nullptr;
-        auto* definition = ptr32<CSoundEffect>(definitions[left]);
-        return definition != nullptr && definition->effect_number == effect_id ? definition : nullptr;
-    }
+    CSoundEffect* find_sound_definition(std::uint32_t effect_id) { auto* registry = ptr32<SoundEffectRegistry>(g_sfera_sound_runtime.effect_manager); return registry == nullptr ? nullptr : registry->find(effect_id); }
     bool grow_sound_effect_pool() {
         auto& pool = g_sfera_sound_effect_items;
         if (pool.growth_count == 0u) return false;
@@ -3791,7 +3770,7 @@ void CSoundEffect::initialize() {
     sound_parameters.structure_size = sizeof(SferaSound3DParameters);
     sound_parameters.inside_cone_angle = 360u;
     sound_parameters.outside_cone_angle = 360u;
-    sound_parameters.cone_outside_volume = -1;
+    sound_parameters.cone_orientation = {0.0f, 0.0f, -1.0f};
     sound_parameters.min_distance = 1.0f;
     sound_parameters.max_distance = 1000000000.0f;
 }
@@ -3859,7 +3838,7 @@ bool CSoundEffect::loadDefinition(SferaSimpleParser& parser, const SferaParserRa
         }
         parser.clearScanRange();
     }
-    if (parser.findValue("flags", &range)) for (std::uint32_t index = 0u; index < parser.tokenCount(); index += 2u) flags |= sound_flag(parser.tokenAt(index));
+    if (parser.findValue("flags", &range)) for (std::uint32_t index = 0u; index < parser.tokenCount(); index += 2u) flags |= sound_flag(parser.readStringBounded(index, text, sizeof(text)));
     if (parser.findValue("region_radius", &range)) parser.readFloatSequence(0u, &region_radius.x, 3u);
     bool has_min = false;
     bool has_max = false;
@@ -3880,7 +3859,7 @@ bool CSoundEffect::loadDefinition(SferaSimpleParser& parser, const SferaParserRa
     if (has_min && !has_max && barrier > 0.0f) sound_parameters.max_distance = sound_parameters.min_distance / barrier;
     else if (has_max && !has_min) sound_parameters.min_distance = sound_parameters.max_distance * barrier;
     if (parser.findValue("offset_vec", &range)) parser.readFloatSequence(0u, &offset.x, 3u);
-    if (parser.findValue("cache_lifetime", &range)) cache_lifetime = std::clamp(parser.readInt(0u), 0, 10);
+    if (parser.findValue("cache_lifetime", &range)) cache_lifetime = std::min(parser.readInt(0u), 10);
     return true;
 }
 CSoundEffect* CSoundEffect::clone() const {
@@ -6437,6 +6416,8 @@ void SphereUI::InterfaceConfiguration::save() {
 }
 
 namespace {
+    bool interfaceDepth(float depth, float& z, float& reciprocal);
+
     std::uint8_t uiAtlasGlyph(std::uint8_t character) {
         return g_sfera_font_runtime.glyphs[character].defined != 0u ? character : static_cast<std::uint8_t>('|');
     }
@@ -6461,12 +6442,14 @@ namespace {
         if (auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device)) (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0u, vertex_count, index_count / 3u, indices, D3DFMT_INDEX16, vertices, sizeof(SferaScreenVertex)));
     }
 
-    void uiDrawAtlasText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, std::uint32_t font, bool initialized, const SphereUI::UiRect& clip) {
+    void uiDrawAtlasText(const char* text, std::int32_t x, std::int32_t top, std::uint32_t color, std::uint32_t font, std::int32_t scale, const SphereUI::UiRect& clip, float depth, bool configureAlpha) {
         auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device);
         if (device == nullptr) return;
-        const auto top = SphereUI::detail::subtractCoordinate(SphereUI::detail::subtractCoordinate(y, 2), static_cast<std::int32_t>(g_sfera_font_atlas_layout_runtime.origin[font]));
-        const auto size = initialized ? 30 : 0;
+        const auto size = static_cast<std::int32_t>(static_cast<std::uint32_t>(scale) * 30u);
         if (top > clip.bottom || SphereUI::detail::addCoordinate(top, size) <= clip.top) return;
+        if (configureAlpha && (color >> 24) != 255) g_sfera_graphics_runtime.d3d_runtime->setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA);
+        float z, reciprocal;
+        if (!interfaceDepth(depth, z, reciprocal)) return;
         IDirect3DBaseTexture9* texture = nullptr;
         std::uint32_t vertex_count = 0u, index_count = 0u;
         const auto flush = [&]() {
@@ -6489,11 +6472,15 @@ namespace {
                 texture = next_texture;
                 const auto left = static_cast<float>(x) - 0.5f, upper = static_cast<float>(top) - 0.5f;
                 uiFontQuad(g_sfera_landscape_screen_vertices + vertex_count, left, upper, left + size, upper + size, color, glyph.u, glyph.v, glyph.u + 30.0f / 256.0f, glyph.v + 30.0f / 256.0f, true);
+                for (std::uint32_t corner = 0; corner < 4; ++corner) {
+                    g_sfera_landscape_screen_vertices[vertex_count + corner].z = z;
+                    g_sfera_landscape_screen_vertices[vertex_count + corner].rhw = reciprocal;
+                }
                 uiFontTriangles(g_sfera_screen_quad_indices + index_count, vertex_count, true);
                 vertex_count += 4u;
                 index_count += 6u;
             }
-            if (initialized) x = SphereUI::detail::addCoordinate(x, static_cast<std::int32_t>(g_sfera_static_render_lookup_runtime.glyph_metrics[character][font] + g_sfera_font_atlas_layout_runtime.code_base[font]));
+            x = SphereUI::detail::addCoordinate(x, static_cast<std::int32_t>((g_sfera_static_render_lookup_runtime.glyph_metrics[character][font] + g_sfera_font_atlas_layout_runtime.code_base[font]) * static_cast<std::uint32_t>(scale)));
         }
         flush();
         (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE));
@@ -6594,7 +6581,7 @@ void SphereUI::InterfaceRenderer::drawText(const char* text, std::int32_t x, std
     g_sfera_screen_clip_runtime.bottom = clip.bottom;
     const bool disable_blending = opaque && font < 2u;
     if (disable_blending) SphereUI::InterfaceRenderer::setSpriteRenderMode(0u);
-    if (font < 2u) uiDrawAtlasText(text == nullptr ? "" : text, x, y, color, font, initialized, clip);
+    if (font < 2u) uiDrawAtlasText(text == nullptr ? "" : text, x, SphereUI::detail::subtractCoordinate(SphereUI::detail::subtractCoordinate(y, 2), static_cast<std::int32_t>(g_sfera_font_atlas_layout_runtime.origin[font])), color, font, initialized ? 1 : 0, clip, 0.0f, false);
     else drawFaceText(text == nullptr ? "" : text, x, y, color, font, clip);
     if (disable_blending) SphereUI::InterfaceRenderer::setSpriteRenderMode(1u);
 }
@@ -9324,17 +9311,17 @@ void TerrainPatch::releaseResources() {
 void TerrainPatch::partitionEdges() {
     if (vertexCount > 65536u || (vertexCount && !vertices)) throw std::runtime_error("Invalid landscape vertex count");
     std::vector<std::uint8_t> membership(vertexCount);
-    const auto nearEdge = [](float value, float boundary) { return value > boundary - 0.01f && value < boundary + 0.01f; };
+    const auto Near = [](float value, float boundary) { return value > boundary - 0.01f && value < boundary + 0.01f; };
     for (std::size_t corner = 0; corner < 4; ++corner) {
         std::vector<std::uint16_t> indices; const float x = corner % 2 ? 100.0f : 0.0f; const float z = corner < 2 ? 100.0f : 0.0f;
-        for (std::uint32_t i = 0; i < vertexCount; ++i) if (nearEdge(vertices[i].position.x, x) && nearEdge(vertices[i].position.z, z)) { indices.push_back(static_cast<std::uint16_t>(i)); membership[i] = 2; }
+        for (std::uint32_t i = 0; i < vertexCount; ++i) if (Near(vertices[i].position.x, x) && Near(vertices[i].position.z, z)) { indices.push_back(static_cast<std::uint16_t>(i)); membership[i] = 2; }
         terrainReplace(cornerIndices[corner], indices); cornerCounts[corner] = static_cast<std::uint32_t>(indices.size());
     }
     for (std::size_t side = 0; side < 4; ++side) {
         struct Group { float coordinate; std::vector<std::uint16_t> indices; }; std::vector<Group> groups;
         const bool horizontal = side < 2; const float boundary = side == 0 || side == 3 ? 100.0f : 0.0f;
         for (std::uint32_t i = 0; i < vertexCount; ++i) {
-            const auto& position = vertices[i].position; if (membership[i] == 2 || !nearEdge(horizontal ? position.z : position.x, boundary)) continue;
+            const auto& position = vertices[i].position; if (membership[i] == 2 || !Near(horizontal ? position.z : position.x, boundary)) continue;
             membership[i] = 2; Group group{horizontal ? position.x : position.z, {static_cast<std::uint16_t>(i)}};
             for (std::uint32_t j = i + 1; j < vertexCount; ++j) { const auto& candidate = vertices[j].position; if (membership[j] == 2 || candidate.x != position.x || candidate.y != position.y || candidate.z != position.z) continue; membership[j] = 2; group.indices.push_back(static_cast<std::uint16_t>(j)); }
             groups.push_back(std::move(group));
@@ -11858,3 +11845,2416 @@ void WorldDebugDraw::drawBounds(std::uint32_t handle) {
     else if (model->collision_kind == 0u) box(SferaBoundsCornersRuntime::fromExtents(object->bounds_minimum, object->bounds_maximum), 0xFF0000FFu);
     draw(); clear();
 }
+
+namespace SphereRender {
+namespace { void poseWarning(const char* message) { g_sfera_window_runtime.diagnostic_message[0] = 0; WorldDiagnostics::appendScriptContext(message); WorldDiagnostics::flushScriptContext(); } }
+ModelKeyframe ModelPose::keyframe(const Model& model, const BoneAnimation& animation, std::uint32_t frame) {
+    if (animation.animated == 0u) return model.keyframes[animation.pose_index];
+    const auto& sample = model.animation_frames[animation.pose_index + frame];
+    const auto& first = model.keyframes[sample.keyframe];
+    if (sample.interpolation == 255u) return first;
+    const auto& second = model.keyframes[sample.keyframe + 1u];
+    const float weight = static_cast<float>(sample.interpolation) / 256.0f;
+    return {first.translation + (second.translation - first.translation) * weight, first.rotation.interpolated(second.rotation, weight)};
+}
+
+void ModelPose::updateBone(const SferaMatrix4x4F& parent, std::uint32_t bone_index) {
+    auto* model = SferaAbi::pointer<Model>(g_sfera_world_render_runtime.active_model);
+    if (model == nullptr || bone_index >= model->bone_count) WorldDiagnostics::fail("Model animation: wrong bone index");
+    const auto& bone = model->bones[bone_index];
+    auto pose = keyframe(*model, bone.animation, g_sfera_client_main_scalar_runtime.state_06);
+    if (bone.animation.animated != 0u && g_sfera_main_input_state_runtime.input_enabled != 0u && bone.animation.suppress_secondary_animation == 0u) {
+        const auto second = keyframe(*model, bone.animation, g_sfera_render_sample_runtime.material_base);
+        const float weight = g_sfera_sky_runtime.horizon_scale.f32;
+        pose = {pose.translation + (second.translation - pose.translation) * weight, pose.rotation.interpolated(second.rotation, weight)};
+    }
+    auto local = SferaMatrix4x4F::identity();
+    const auto rotation = pose.rotation.rotationMatrix();
+    for (std::size_t row = 0u; row < 3u; ++row) for (std::size_t column = 0u; column < 3u; ++column) local.m[row][column] = rotation.m[column][row];
+    local.m[0][3] = pose.translation.x; local.m[1][3] = pose.translation.y; local.m[2][3] = pose.translation.z;
+    const auto transform = parent.multiplied(local);
+    auto& matrices = g_sfera_scene_array_runtime.model_matrices;
+    matrices.reserve(bone_index + 1u, sizeof(SferaMatrix4x4F));
+    matrices.dataAs<SferaMatrix4x4F>()[bone_index] = transform;
+    const auto slot = bone.animation.attachment_slot;
+    SferaVec3Word* position = slot == 100u ? &g_sfera_scene_vector_runtime.transform_scratch : slot == 101u ? &g_sfera_scene_vector_runtime.frame_101_position : slot == 102u ? &g_sfera_scene_vector_runtime.frame_102_position : nullptr;
+    if (position != nullptr) { position->x.f32 = transform.m[0][3]; position->y.f32 = transform.m[1][3]; position->z.f32 = transform.m[2][3]; }
+    if (slot < 5u) { auto& attachments = g_sfera_scene_array_runtime.character_matrices; attachments.reserve(slot + 1u, sizeof(SferaMatrix4x4F)); attachments.dataAs<SferaMatrix4x4F>()[slot] = transform; }
+    for (std::uint32_t child = 0u; child < bone.child_count; ++child) updateBone(transform, model->child_bones[bone.first_child + child]);
+}
+
+ExtendedWorldObject* ModelPose::queryObject(std::uint32_t handle, const char* operation) {
+    auto* object = g_sfera_world_objects.extendedObject(handle);
+    if (object == nullptr) poseWarning((std::string(operation) + ": wrong handle").c_str());
+    return object;
+}
+
+std::int32_t ModelPose::animationLength(std::uint32_t handle, std::int32_t animation) {
+    auto* object = queryObject(handle, "GetSubAnimLen");
+    if (object == nullptr) return -1;
+    if (object->render_cache_handle < 0) return SferaAbi::pointer<CharacterModels>(g_sfera_recovered_static_runtime.render_state_08)->partAnimationLength(*object, animation);
+    auto* model = g_sfera_world_objects.model(*object);
+    if (model == nullptr || model->animation_count == 0u) { poseWarning("GetSubAnimLen: model has no animation"); return -1; }
+    if (animation < 0) { poseWarning("GetSubAnimLen: negative subanimation number"); return -1; }
+    return animation < model->animation_count ? model->animation_lengths[animation] : -1;
+}
+
+std::int32_t* ModelPose::animation(std::uint32_t handle) { auto* object = queryObject(handle, "GetAnimation"); return object == nullptr ? nullptr : &object->animation; }
+std::int32_t* ModelPose::frame(std::uint32_t handle) { auto* object = queryObject(handle, "GetFrame"); return object == nullptr ? nullptr : &object->frame; }
+float* ModelPose::interpolation(std::uint32_t handle) { auto* object = queryObject(handle, "GetInterp"); return object == nullptr ? nullptr : &object->interpolation; }
+std::int32_t* ModelPose::secondaryFrame(std::uint32_t handle) { auto* object = queryObject(handle, "GetFrame2"); return object == nullptr ? nullptr : &object->frame_secondary; }
+std::int32_t* ModelPose::secondaryAnimation(std::uint32_t handle) { auto* object = queryObject(handle, "GetAnimation2"); return object == nullptr ? nullptr : &object->animation_secondary; }
+
+std::uint32_t ModelPose::frameOffset(const Model& model, std::int32_t animation, std::int32_t frame, bool secondary) {
+    if (model.animation_count == 0u || model.animation_lengths == nullptr) WorldDiagnostics::fail("CalcCharacterNeck: model has no animation");
+    if (animation < 0 || animation >= model.animation_count) { poseWarning(secondary ? "CalcCharacterNeck: wrong animation 2" : "CalcCharacterNeck: wrong animation"); animation = 0; frame = 0; }
+    std::uint32_t offset = 0u;
+    for (std::int32_t index = 0; index < animation; ++index) offset += model.animation_lengths[index];
+    if (frame < 0 || frame >= model.animation_lengths[animation]) { poseWarning(secondary ? "CalcCharacterNeck: wrong frame 2" : "CalcCharacterNeck: wrong frame"); frame = 0; }
+    return offset + static_cast<std::uint32_t>(frame);
+}
+
+SferaVec3F* ModelPose::neckPosition(SferaVec3F& output) {
+    auto* object = g_sfera_world_objects.extendedObject(g_sfera_world_objects.controlled_object_handle);
+    if (object == nullptr) WorldDiagnostics::fail("CalcCharacterNeck: wrong handle");
+    if (object->render_cache_handle < 0) { output = SferaAbi::pointer<CharacterModels>(g_sfera_recovered_static_runtime.render_state_08)->neckPosition(*object); return &output; }
+    auto* model = g_sfera_world_objects.model(*object);
+    if (model == nullptr) WorldDiagnostics::fail("CalcCharacterNeck: missing model");
+    g_sfera_world_render_runtime.active_model = SferaAbi::address(model);
+    g_sfera_client_main_scalar_runtime.state_06 = frameOffset(*model, object->animation, object->frame, false);
+    g_sfera_main_input_state_runtime.input_enabled = object->interpolation > 0.00001f ? 1u : 0u;
+    if (g_sfera_main_input_state_runtime.input_enabled != 0u) { g_sfera_sky_runtime.horizon_scale.f32 = object->interpolation; g_sfera_render_sample_runtime.material_base = frameOffset(*model, object->animation_secondary, object->frame_secondary, true); }
+    g_sfera_character_frame_matrix = SferaMatrix4x4F::fromEuler(object->position, object->rotation);
+    updateBone(g_sfera_character_frame_matrix, model->render_flags);
+    const auto& position = g_sfera_scene_vector_runtime.frame_102_position;
+    output = {position.x.f32, position.y.f32, position.z.f32};
+    return &output;
+}
+}
+
+
+namespace SphereRender {
+namespace {
+SferaMatrix4x4F characterMultiply(const SferaMatrix4x4F& first, const SferaMatrix4x4F& second) { SferaMatrix4x4F result; ::D3DXMatrixMultiply(reinterpret_cast<D3DXMATRIX*>(&result), reinterpret_cast<const D3DXMATRIX*>(&first), reinterpret_cast<const D3DXMATRIX*>(&second)); return result; }
+SferaMatrix4x4F characterPoseMatrix(const CharacterPose& pose) { SferaMatrix4x4F result; ::D3DXMatrixRotationQuaternion(reinterpret_cast<D3DXMATRIX*>(&result), reinterpret_cast<const D3DXQUATERNION*>(&pose.rotation)); result.m[3][0] = pose.translation.x; result.m[3][1] = pose.translation.y; result.m[3][2] = pose.translation.z; return result; }
+template<class T> T characterRead(std::span<const std::uint8_t> bytes, std::size_t offset) { if (offset > bytes.size() || sizeof(T) > bytes.size() - offset) WorldDiagnostics::fail("Truncated character model"); T value; std::memcpy(&value, bytes.data() + offset, sizeof(value)); return value; }
+std::span<const std::uint8_t> characterRange(std::span<const std::uint8_t> bytes, std::size_t offset, std::size_t length) { if (offset > bytes.size() || length > bytes.size() - offset) WorldDiagnostics::fail("Truncated character model"); return bytes.subspan(offset, length); }
+void characterDisableLights(std::uint32_t line) { for (std::uint32_t index = 0; index < g_sfera_client_main_scalar_runtime.counter_03; ++index) if (g_sfera_light_runtime.render_candidate_active[index] == 1u) g_sfera_light_runtime.setActive(g_sfera_light_runtime.render_candidate_indices[index], false, line); }
+}
+void CharacterSkeleton::calculate(std::int32_t frame, std::int32_t bone, const SferaMatrix4x4F& parent, SferaMatrix4x4F* output) const {
+    output[bone] = characterMultiply(characterPoseMatrix(poses[frame * bone_count + bone]), parent);
+    for (std::int32_t child = 0; child < bone_count; ++child) if (parents[child] == bone) calculate(frame, child, output[bone], output);
+}
+void CharacterSkeleton::calculateSplit(std::int32_t firstFrame, std::int32_t secondFrame, float interpolation, std::int32_t bone, const SferaMatrix4x4F& parent, std::int32_t region, SferaMatrix4x4F* output) const {
+    if (region == 0) { if (names[bone][0] == 'u') region = 1; else if (names[bone][0] == 'd') region = 2; }
+    output[bone] = characterMultiply(characterPoseMatrix(poses[(region == 1 ? secondFrame : firstFrame) * bone_count + bone]), parent);
+    for (std::int32_t child = 0; child < bone_count; ++child) if (parents[child] == bone) calculateSplit(firstFrame, secondFrame, interpolation, child, output[bone], region, output);
+}
+std::int32_t CharacterSkeleton::absoluteFrame(std::int32_t animation, std::int32_t frame) const {
+    if (animation < 0 || animation >= animation_count || frame < 0 || frame >= animation_lengths[animation]) return 0;
+    for (std::int32_t index = 0; index < animation; ++index) frame += animation_lengths[index];
+    return frame;
+}
+void CharacterModels::animate(const CharacterSkeleton& skeleton, std::int32_t animation, std::int32_t frame, std::int32_t secondaryAnimation, std::int32_t secondaryFrame, float interpolation, SferaMatrix4x4F* output, bool attachmentsOnly) const {
+    if (animation < 0 || animation >= skeleton.animation_count || frame < 0 || frame >= skeleton.animation_lengths[animation]) { animation = 0; frame = 0; }
+    const auto first = skeleton.absoluteFrame(animation, frame);
+    const auto second = skeleton.absoluteFrame(secondaryAnimation, secondaryFrame);
+    for (std::int32_t bone = 0; bone < skeleton.bone_count; ++bone) if (skeleton.parents[bone] == -1) { if (interpolation < 0.01f) skeleton.calculate(first, bone, root_transform, output); else skeleton.calculateSplit(first, second, interpolation, bone, root_transform, 0, output); }
+    if (attachmentsOnly && animation == 0 && frame == 0) for (std::int32_t bone = 0; bone < skeleton.bone_count; ++bone) if (std::find(skeleton.attachments, skeleton.attachments + 4, bone) == skeleton.attachments + 4) output[bone] = root_transform;
+}
+void CharacterModels::initializeBounds() { for (std::size_t index = 0; index < 8; ++index) bounds[index] = {index & 2u ? 1.0f : -1.0f, index & 4u ? -2.5f : 0.0f, index & 1u ? 1.0f : -1.0f}; }
+std::int32_t CharacterModels::classify(const SferaMatrix4x4F& world) const { std::array<SferaVec3F, 8> transformed; std::transform(std::begin(bounds), std::end(bounds), transformed.begin(), [&](const auto& point) { return world.transformPoint(point); }); return reinterpret_cast<const SferaFrustumF*>(g_sfera_main_ui_state_runtime.clip_planes)->classifyPoints(transformed); }
+void CharacterModels::setDistances(float minimum, float range) { minimum_distance = minimum; maximum_distance = static_cast<float>(double(minimum) + range); lod_end = static_cast<float>(double(minimum) + double(range) * 0.5); lod_start = static_cast<float>(double(lod_end) * 0.699999988079071); }
+void CharacterModels::updateLodDistance() { const auto previous = last_lod_update; last_lod_update = WorldClock::nowTicks(); if (previous == 0u) return; const auto elapsed = static_cast<std::int64_t>(last_lod_update - previous); if (rendered_count < 5u || rendered_count > 10u) { const bool expand = rendered_count < 5u; const float exponent = static_cast<float>(double(elapsed) * (expand ? 9.999999747378752e-05 : 0.00039999998989515007)); const float factor = static_cast<float>(std::pow(expand ? 1.100000023841858 : 0.8999999761581421, double(exponent))); lod_end *= factor; lod_end = expand ? std::min(lod_end, maximum_distance) : std::max(lod_end, minimum_distance); } rendered_count = 0u; lod_start = static_cast<float>(double(lod_end) * 0.699999988079071); }
+double CharacterModels::visibility(const WorldObject& object) const { const auto delta = object.position - g_sfera_world_objects.object(1u)->position; const float squared = static_cast<float>(delta.dot(delta)); const float distance = static_cast<float>(std::sqrt(double(squared))); const float result = static_cast<float>(1.0 - (double(distance) - lod_start) / (double(lod_end) - lod_start)); return std::clamp(result, 0.0f, 1.0f); }
+const CharacterAppearance& CharacterModels::appearance(const ExtendedWorldObject& object) const { const auto index = -1 - object.render_cache_handle; if (index < 0 || index >= 400) WorldDiagnostics::fail("Invalid character instance"); return instances[index].appearance; }
+std::int32_t CharacterModels::partAnimationLength(const ExtendedWorldObject& object, std::int32_t animation) const { const auto& skeleton = skeletons[appearance(object).sex]; return animation < 0 || animation >= skeleton.animation_count ? -1 : skeleton.animation_lengths[animation]; }
+std::int32_t CharacterModels::usesSmallHelm(std::int32_t sex, std::int32_t code) const { return sex == 0 ? 0 : small_helm[code > '9' ? code - 'a' + 10 : code - '0']; }
+std::uint32_t* CharacterModels::parameter(SferaBoundCheckArray& array, std::int32_t index) { auto* result = array.element<std::uint32_t>(static_cast<std::size_t>(index)); if (result == nullptr) WorldDiagnostics::fail("Character parameter index is out of bounds"); return result; }
+ExtendedWorldObject* CharacterModels::checkedExtended(WorldObject* object, const char* source, std::uint32_t line) { if (object == nullptr || object->extended_pose_available) return static_cast<ExtendedWorldObject*>(object); const auto* model = g_sfera_world_objects.model(*object); const auto message = std::string("Try to get extended from superstatic: ") + (model == nullptr ? "<none>" : model->name) + ", " + source + ":" + std::to_string(line); WorldDiagnostics::fail(message.c_str()); }
+void CharacterModels::setAppearance(std::int32_t handle, const CharacterAppearance& value) {
+    if (handle < 0) { g_sfera_log_runtime.files[0].write("Wrong handle: set_char_param\n"); return; }
+    auto* object = checkedExtended(g_sfera_world_objects.object(handle), "..\\ShareClientSeverCode\\CharMdl.cpp", 566u);
+    if (object->render_cache_handle > 0) WorldDiagnostics::fail("Character model has a non-character render cache");
+    if (object->render_cache_handle >= 0) { auto slot = std::find_if(std::begin(instances), std::end(instances), [](const auto& entry) { return entry.owner == nullptr; }); if (slot == std::end(instances)) WorldDiagnostics::fail("Character model instance limit reached"); slot->owner = object; object->render_cache_handle = -1 - static_cast<std::int32_t>(slot - instances); }
+    auto& current = instances[-1 - object->render_cache_handle].appearance;
+    if (value.parts[12] != 0u) { const char name[]{'m', 's', static_cast<char>(value.parts[12]), '\0'}; g_sfera_world_objects.linkModel(handle, name, 3u); } else if (current.parts[12] != 0u) g_sfera_world_objects.unlink(handle, 3u);
+    current = value;
+}
+bool CharacterModels::getAppearance(std::int32_t handle, CharacterAppearance& value) const { if (handle < 0) { g_sfera_log_runtime.files[0].write("Wrong handle: get_char_param\n"); return false; } const auto* object = checkedExtended(g_sfera_world_objects.object(handle), "..\\ShareClientSeverCode\\CharMdl.cpp", 618u); if (object->render_cache_handle >= 0) return false; value = appearance(*object); return true; }
+SferaVec3F CharacterModels::neckPosition(const ExtendedWorldObject& object) const { const auto world = SferaMatrix4x4F::fromEuler(object.position, object.rotation); const auto& skeleton = skeletons[appearance(object).sex]; std::vector<SferaMatrix4x4F> pose(skeleton.bone_count); animate(skeleton, object.animation, object.frame, object.animation_secondary, object.frame_secondary, object.interpolation, pose.data(), true); const auto neck = skeleton.attachments[6]; const auto combined = characterMultiply(skeleton.initial_pose[neck], pose[neck]); return world.transformPoint({combined.m[3][0], combined.m[3][1], combined.m[3][2]}); }
+HRESULT CharacterModels::setMaterial(float opacity, float detail, const SferaVec3F& color) { const float intensity = static_cast<float>(double(detail) * 0.699999988079071 + 0.30000001192092896); D3DMATERIAL9 material{}; material.Diffuse = {intensity * color.x, intensity * color.y, intensity * color.z, opacity}; material.Ambient = {material.Diffuse.r, material.Diffuse.g, material.Diffuse.b, 0.0f}; auto& device = *g_sfera_graphics_runtime.d3d_runtime; return device.checkResult(device.native_device->SetMaterial(&material), "SetMaterial"); }
+std::int32_t CharacterModels::textureVariants(bool female, char part) { std::string path = "models\\textures\\wf00.dds"; path[16] = female ? 'w' : 'm'; path[17] = part; g_sfera_files.setErrorReporting(false); std::int32_t count = 0; for (;;) { path[18] = static_cast<char>(count <= 9 ? '0' + count : 'a' + count - 10); if (g_sfera_files.fileSize(path.c_str()) == -1) break; ++count; } g_sfera_files.setErrorReporting(true); return count; }
+void CharacterModels::loadSkeleton(const char* path, CharacterSkeleton& skeleton) {
+    const auto bytes = g_sfera_files.readAll(path); const auto data = std::span<const std::uint8_t>(bytes);
+    skeleton.bone_count = characterRead<std::int32_t>(data, 0); skeleton.frame_count = characterRead<std::int32_t>(data, 4);
+    if (skeleton.bone_count < 0 || skeleton.frame_count < 0) WorldDiagnostics::fail("Invalid character skeleton size");
+    const auto animationOffset = (std::size_t(skeleton.frame_count) * sizeof(CharacterPose) + 34u) * skeleton.bone_count;
+    skeleton.animation_count = characterRead<std::int32_t>(data, 8u + animationOffset);
+    if (skeleton.animation_count < 0) WorldDiagnostics::fail("Invalid character animation count");
+    const auto payload = characterRange(data, 8u, animationOffset + 4u + std::size_t(skeleton.animation_count) * 4u);
+    skeleton.parents = static_cast<std::int32_t*>(WorldMemory::allocate(payload.size())); std::memcpy(skeleton.parents, payload.data(), payload.size());
+    skeleton.names = reinterpret_cast<char (*)[30]>(skeleton.parents + skeleton.bone_count); skeleton.poses = reinterpret_cast<CharacterPose*>(skeleton.names + skeleton.bone_count); skeleton.animation_lengths = reinterpret_cast<std::int32_t*>(skeleton.poses + skeleton.bone_count * skeleton.frame_count) + 1;
+    for (std::int32_t bone = 0; bone < skeleton.bone_count; ++bone) if (skeleton.names[bone][0] == '_') { const auto slot = skeleton.names[bone][1] - '0'; if (slot < 0 || slot >= 7) WorldDiagnostics::fail("Invalid character attachment name"); skeleton.attachments[slot] = bone; }
+    skeleton.initial_pose = static_cast<SferaMatrix4x4F*>(WorldMemory::allocate(std::size_t(skeleton.bone_count) * sizeof(SferaMatrix4x4F))); animate(skeleton, 0, 0, 0, 0, 0.0f, skeleton.initial_pose, false);
+}
+void CharacterModels::preload(std::int32_t index, const CharacterSkeleton& skeleton) {
+    if (index < 0 || index >= asset_count) WorldDiagnostics::fail("Invalid character asset index"); auto& asset = assets[index]; if (asset.geometry != nullptr) return;
+    const auto bytes = g_sfera_files.readAll((std::string(directories[asset.directory]) + asset.name + ".chr").c_str()); const auto data = std::span<const std::uint8_t>(bytes);
+    if (characterRead<std::uint32_t>(data, 0) != 0x30686373u) WorldDiagnostics::fail("preload_model: wrong file format");
+    std::span<const std::uint8_t> vertexBytes, indexBytes, structureBytes, boneBytes; const auto count = characterRead<std::int32_t>(data, 8);
+    for (std::int32_t block = 0; block < count; ++block) { const auto offset = 12u + std::size_t(block) * 12u; const auto kind = characterRead<std::uint32_t>(data, offset); const auto chunk = characterRange(data, characterRead<std::uint32_t>(data, offset + 4u), characterRead<std::uint32_t>(data, offset + 8u)); if (kind == 1u) vertexBytes = chunk; else if (kind == 2u) indexBytes = chunk; else if (kind == 6u) structureBytes = chunk; else if (kind == 7u) boneBytes = chunk; }
+    if (vertexBytes.size() % sizeof(CharacterVertex) != 0u) WorldDiagnostics::fail("Invalid character vertex block");
+    auto geometry = std::make_unique<CharacterGeometry>(); geometry->vertices.resize(vertexBytes.size() / sizeof(CharacterVertex)); std::memcpy(geometry->vertices.data(), vertexBytes.data(), vertexBytes.size());
+    const auto groupOffset = characterRead<std::uint32_t>(structureBytes, 4u); const auto triangleCount = characterRead<std::uint32_t>(structureBytes, groupOffset + 6u); const auto usedIndices = characterRange(indexBytes, 0, std::size_t(triangleCount) * 6u); geometry->indices.resize(std::size_t(triangleCount) * 3u); std::memcpy(geometry->indices.data(), usedIndices.data(), usedIndices.size());
+    const auto boneCount = characterRead<std::int32_t>(boneBytes, 0); if (boneCount < 0) WorldDiagnostics::fail("Invalid character bone names"); std::vector<std::uint16_t> remap(boneCount); std::size_t offset = 4u;
+    for (std::int32_t bone = 0; bone < boneCount; ++bone) { const auto length = characterRead<std::int8_t>(boneBytes, offset++); if (length <= 0) WorldDiagnostics::fail("Invalid character bone name length"); const auto name = characterRange(boneBytes, offset, length); if (name.back() != 0u) WorldDiagnostics::fail("Unterminated character bone name"); std::int32_t match = 0; while (match < skeleton.bone_count && ::_stricmp(reinterpret_cast<const char*>(name.data()), skeleton.names[match]) != 0) ++match; if (match == skeleton.bone_count) WorldDiagnostics::fail("Match for bone name not found"); remap[bone] = static_cast<std::uint16_t>(match); offset += length; }
+    for (auto& vertex : geometry->vertices) { const auto first = vertex.bones & 255u; const auto second = (vertex.bones >> 8u) & 255u; if (first >= remap.size() || second >= remap.size()) WorldDiagnostics::fail("Invalid character vertex bone"); vertex.bones = remap[first] + (std::uint32_t(remap[second]) << 8u); }
+    asset.geometry = geometry.release();
+}
+void CharacterModels::clear() { for (std::int32_t index = 0; index < asset_count; ++index) delete assets[index].geometry; WorldMemory::release(assets); assets = nullptr; asset_count = 0; for (auto& skeleton : skeletons) { WorldMemory::release(skeleton.parents); skeleton.parents = nullptr; WorldMemory::release(skeleton.initial_pose); skeleton.initial_pose = nullptr; } WorldMemory::release(parts); parts = nullptr; WorldMemory::release(part_indices); part_indices = nullptr; }
+CharacterModels* CharacterModels::load(const char* const* folders, std::int32_t count) {
+    if (count < 0 || count >= 100) WorldDiagnostics::fail("Character model directory limit exceeded");
+    *this = CharacterModels{}; root_transform = SferaMatrix4x4F::identity(); initializeBounds(); loadSkeleton("xadd\\man.skl", skeletons[0]); loadSkeleton("xadd\\woman.skl", skeletons[1]); directory_count = count;
+    std::vector<CharacterAsset> found;
+    for (std::int32_t directory = 0; directory < count; ++directory) {
+        const auto path = std::string_view(folders[directory]); if (path.size() >= sizeof(directories[directory])) WorldDiagnostics::fail("Character model directory name too long"); path.copy(directories[directory], path.size()); directories[directory][path.size()] = '\0';
+        _finddata64i32_t entry{}; const auto search = (std::string(path) + "*.chr"); const auto handle = ::_findfirst64i32(search.c_str(), &entry); if (handle == -1) continue;
+        do { if ((entry.attrib & _A_SUBDIR) != 0u) continue; std::string name(entry.name); if (name.size() < 5u || name.size() >= 32u) { ::_findclose(handle); WorldDiagnostics::fail("Invalid character model filename"); } name.resize(name.find_last_of('.')); std::transform(name.begin(), name.end(), name.begin(), [](unsigned char value) { return static_cast<char>(value >= 'A' && value <= 'Z' ? value + ('a' - 'A') : value); }); CharacterAsset asset{}; name.copy(asset.name, name.size()); asset.directory = directory; found.push_back(asset); } while (::_findnext64i32(handle, &entry) == 0);
+        ::_findclose(handle);
+    }
+    asset_count = static_cast<std::int32_t>(found.size()); assets = static_cast<CharacterAsset*>(WorldMemory::allocate(found.size() * sizeof(CharacterAsset))); if (!found.empty()) std::memcpy(assets, found.data(), found.size() * sizeof(CharacterAsset));
+    ConfigDocument::setStorageMode(ConfigDocument::StorageMode::Plain); auto configuration = ConfigDocument::open("xadd\\subobjs.dat"); const auto countParts = configuration.arraySize("subobjs"); if (!countParts || *countParts == 0u) WorldDiagnostics::fail("wrong format of subobjs.dat");
+    parts = static_cast<CharacterPart*>(WorldMemory::allocate(*countParts * sizeof(CharacterPart))); part_indices = static_cast<std::uint16_t*>(WorldMemory::allocate(0x6800u)); std::fill_n(part_indices, 0x3400u, 0xffffu);
+    for (std::size_t index = 0; index < *countParts; ++index) {
+        auto* record = configuration.objectAt("subobjs", index); const char* code = record == nullptr ? nullptr : record->text("s"); const char* name = record == nullptr ? nullptr : record->text("m"); if (code == nullptr || name == nullptr) WorldDiagnostics::fail("wrong format of subobjs.dat");
+        auto asset = std::find_if(found.begin(), found.end(), [&](const auto& value) { return std::strcmp(value.name, name) == 0; }); if (asset == found.end()) WorldDiagnostics::fail((std::string("char model not found. name=") + name).c_str());
+        auto& part = parts[index]; part.asset = static_cast<std::int32_t>(asset - found.begin()); std::fill(std::begin(part.textures), std::end(part.textures), -1);
+        const auto textures = record->arraySize("t"); if (!textures || *textures == 0u || *textures > std::size(part.textures)) WorldDiagnostics::fail("wrong format of subobjs.dat");
+        for (std::size_t texture = 0; texture < *textures; ++texture) { const auto* textureName = record->textAt("t", texture); if (textureName == nullptr) WorldDiagnostics::fail("wrong format of subobjs.dat"); part.textures[texture] = g_sfera_textures.find(textureName); if (part.textures[texture] == -1) WorldDiagnostics::fail((std::string("texture for char model not found. name=") + textureName).c_str()); }
+        if (std::strlen(code) != 3u || (code[0] != 'm' && code[0] != 'w') || code[1] < 'a' || code[1] > 'z') WorldDiagnostics::fail("wrong format of subobjs.dat"); const auto key = (code[0] == 'w' ? 0x1a00u : 0u) + std::uint32_t(code[1] - 'a') * 256u + static_cast<unsigned char>(code[2]); part_indices[key] = static_cast<std::uint16_t>(index);
+    }
+    const auto helms = configuration.arraySize("womanhelmsmall"); if (!helms || *helms == 0u || *helms > std::size(small_helm)) WorldDiagnostics::fail("wrong format of subobjs.dat"); for (std::size_t index = 0; index < *helms; ++index) { const auto value = configuration.integerAt("womanhelmsmall", index); if (!value) WorldDiagnostics::fail("wrong format of subobjs.dat"); small_helm[index] = *value; }
+    return this;
+}
+void CharacterModels::drawPart(std::int32_t index, std::int32_t visibility, const CharacterSkeleton& skeleton, const SferaMatrix4x4F* pose, bool cull, std::int32_t transparent, std::int32_t textureCode, std::uint32_t passes) {
+    const auto partIndex = part_indices[index]; if (partIndex == 0xffffu) return; auto& part = parts[partIndex]; preload(part.asset, skeleton); const auto& geometry = *assets[part.asset].geometry;
+    if (textureCode == 0) textureCode = '0'; if (!((textureCode >= '0' && textureCode <= '9') || (textureCode >= 'a' && textureCode <= 'z'))) WorldDiagnostics::fail("Invalid character texture code");
+    std::vector<CharacterSkinnedVertex> skinned(geometry.vertices.size());
+    for (std::size_t vertex = 0; vertex < geometry.vertices.size(); ++vertex) {
+        const auto& input = geometry.vertices[vertex]; auto& output = skinned[vertex]; output.u = input.u; output.v = input.v;
+        const auto first = pose[input.bones & 255u].transposed(); output.position = first.transformPoint(input.position); auto basis = first; basis.m[0][3] = basis.m[1][3] = basis.m[2][3] = 0.0f; output.normal = basis.transformPoint(input.normal);
+        if (input.weight < 0.9900000095367432) { const auto second = pose[(input.bones >> 8u) & 255u].transposed(); const auto position = second.transformPoint(input.position); basis = second; basis.m[0][3] = basis.m[1][3] = basis.m[2][3] = 0.0f; const auto normal = basis.transformPoint(input.normal); for (std::size_t axis = 0; axis < 3; ++axis) { output.position.setComponent(axis, static_cast<float>((double(output.position.component(axis)) - position.component(axis)) * input.weight + position.component(axis))); output.normal.setComponent(axis, static_cast<float>((double(output.normal.component(axis)) - normal.component(axis)) * input.weight + normal.component(axis))); } }
+    }
+    if ((passes & 2u) != 0u) g_sfera_shadows->projectVertices(skinned.data(), static_cast<std::uint32_t>(skinned.size()), geometry.indices.data(), static_cast<std::uint32_t>(geometry.indices.size()));
+    if ((passes & 1u) == 0u) return;
+    const auto variant = textureCode > '9' ? textureCode - 'a' + 10 : textureCode - '0'; if (variant >= static_cast<std::int32_t>(std::size(part.textures))) WorldDiagnostics::fail("Character texture variant is out of range"); auto texture = part.textures[variant]; if (texture == -1) texture = part.textures[0]; if (texture == -1) WorldDiagnostics::fail("Character texture is missing"); SceneRenderer::bindTexture(texture);
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime; auto* vertexData = device.vertices32.lock(static_cast<std::int32_t>(skinned.size())); if (vertexData == nullptr) return; std::memcpy(vertexData, skinned.data(), skinned.size() * sizeof(CharacterSkinnedVertex)); device.checkResult(device.vertices32.buffer->native_buffer->Unlock(), "VertexBuffer::Unlock");
+    std::uint32_t flags = visibility == 2 && g_sfera_main_render_runtime.secondary_render_pass == 0u ? CD3D9Device::disable_clipping : 0u; if (!cull) flags |= CD3D9Device::two_sided;
+    auto* indices = device.indices_primary.lock(static_cast<std::int32_t>(geometry.indices.size())); std::copy(geometry.indices.begin(), geometry.indices.end(), indices); device.checkResult(device.indices_primary.buffer->native_buffer->Unlock(), "IndexBuffer::Unlock");
+    device.drawBuffer(device.vertices32.buffer->native_buffer, D3DPT_TRIANGLELIST, flags | CD3D9Device::lighting, device.vertices32.position, static_cast<std::uint32_t>(skinned.size()), device.indices_primary.buffer->native_buffer, static_cast<std::uint32_t>(geometry.indices.size()), device.indices_primary.position, sizeof(CharacterSkinnedVertex)); device.indices_primary.position += static_cast<std::uint32_t>(geometry.indices.size()); device.vertices32.position += static_cast<std::uint32_t>(skinned.size());
+}
+void CharacterModels::updateEffectFrames(ExtendedWorldObject& object, const CharacterSkeleton& skeleton, std::span<SferaMatrix4x4F> pose, const SferaMatrix4x4F& world) const {
+    auto& first = pose[skeleton.attachments[4]]; first = characterMultiply(skeleton.initial_pose[skeleton.attachments[4]], first); object.effect_frame_position_a = world.transformPoint({first.m[3][0], first.m[3][1], first.m[3][2]}); first.m[3][0] = first.m[3][1] = first.m[3][2] = 0.0f; auto firstFrame = characterMultiply(world, first); firstFrame.m[0][3] = firstFrame.m[1][3] = firstFrame.m[2][3] = 0.0f; std::memcpy(object.effect_frame_transform_a, &firstFrame, sizeof(firstFrame));
+    auto& second = pose[skeleton.attachments[5]]; second = characterMultiply(skeleton.initial_pose[skeleton.attachments[5]], second); object.effect_frame_position_b = world.transformPoint({second.m[3][0], second.m[3][1], second.m[3][2]});
+    auto& attached = pose[skeleton.attachments[0]]; object.effect_frame_position_c = world.transformPoint({attached.m[3][0], attached.m[3][1], attached.m[3][2]}); attached.m[3][0] = attached.m[3][1] = attached.m[3][2] = 0.0f; attached = attached.transposed(); auto attachmentFrame = characterMultiply(world, attached); attachmentFrame.m[0][3] = attachmentFrame.m[1][3] = attachmentFrame.m[2][3] = 0.0f; std::memcpy(object.effect_frame_transform_b, &attachmentFrame, sizeof(attachmentFrame)); std::memcpy(object.effect_frame_transform_c, &attachmentFrame, sizeof(attachmentFrame));
+}
+void CharacterModels::drawLowDetail(std::uint32_t handle) {
+    auto* object = checkedExtended(g_sfera_world_objects.object(handle), "..\\ShareClientSeverCode\\CharMdl.cpp", 1149u); if (!object->render_enabled) return;
+    const auto world = SferaMatrix4x4F::fromEuler(object->position, object->rotation); const auto visible = classify(world); if (visible == 0) return; const auto transform = world.transposed(); auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(transform));
+    const auto& view = g_sfera_view_spatial_runtime; g_sfera_light_runtime.setDirectionalLight({-view.position_offset.x.f32, -view.position_offset.y.f32, -view.position_offset.z.f32}, {view.basis[3].x.f32, view.basis[3].y.f32, view.basis[3].z.f32}); SceneRenderer::activateObjectLights(handle); SceneRenderer::setAmbientColor();
+    const auto& parameters = appearance(*object); const auto& skeleton = skeletons[parameters.sex]; std::vector<SferaMatrix4x4F> pose(skeleton.bone_count); animate(skeleton, object->animation, object->frame, object->animation_secondary, object->frame_secondary, object->interpolation, pose.data(), true);
+    setMaterial(object->scale, 0.0f, {1.0f, 1.0f, 1.0f}); if (object->scale != 1.0f) device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA); drawPart(parameters.sex * 0x1a00 + 0x330, visible, skeleton, pose.data(), true, object->scale != 1.0f, '0', 1u); setMaterial(1.0f, 1.0f, {1.0f, 1.0f, 1.0f}); if (object->scale != 1.0f) device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE); characterDisableLights(1208u); updateEffectFrames(*object, skeleton, pose, world);
+}
+void CharacterModels::draw(std::uint32_t handle, std::uint32_t color) {
+    auto* object = checkedExtended(g_sfera_world_objects.object(handle), "..\\ShareClientSeverCode\\CharMdl.cpp", 946u); if (!object->render_enabled) return; const auto world = SferaMatrix4x4F::fromEuler(object->position, object->rotation); const auto visible = classify(world); if (visible == 0) return; ++rendered_count;
+    const float detail = g_sfera_graphics_runtime.lods_enabled == 0u ? 1.0f : static_cast<float>(visibility(*object)); if (detail < 0.001f) { drawLowDetail(handle); return; }
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime; const auto transform = world.transposed(); device.setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(transform)); const auto& view = g_sfera_view_spatial_runtime; g_sfera_light_runtime.setDirectionalLight({-view.position_offset.x.f32, -view.position_offset.y.f32, -view.position_offset.z.f32}, {view.basis[3].x.f32, view.basis[3].y.f32, view.basis[3].z.f32}); SceneRenderer::activateObjectLights(handle); SceneRenderer::setAmbientColor();
+    float shadowFade = 0.0f; ShadowMap::prepareObject(handle, *object, 1.0f, 1.0f, shadowFade);
+    const auto& parameters = appearance(*object); const auto& skeleton = skeletons[parameters.sex]; std::vector<SferaMatrix4x4F> pose(skeleton.bone_count); animate(skeleton, object->animation, object->frame, object->animation_secondary, object->frame_secondary, object->interpolation, pose.data(), true);
+    setMaterial(object->scale, detail, {float((color >> 16u) & 255u) / 255.0f, float((color >> 8u) & 255u) / 255.0f, float(color & 255u) / 255.0f}); if (object->scale != 1.0f) device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA);
+    const auto drawComponent = [&](std::int32_t kind, std::uint8_t model, std::int32_t texture = '0', std::uint32_t passes = 3u, bool cull = true) { drawPart(parameters.sex * 0x1a00 + kind * 256 + model, visible, skeleton, pose.data(), cull, object->scale != 1.0f, texture, passes); };
+    const auto& p = parameters.parts; if (p[2] != 0u) { drawComponent(2, p[2]); drawComponent(4, p[2], p[4]); } else { drawComponent(21, p[3]); drawComponent(11, p[3], p[4]); } drawComponent(6, p[6]); drawComponent(19, p[1]); drawComponent(1, p[0]);
+    const std::uint32_t headPasses = handle == g_sfera_world_objects.controlled_object_handle ? 2u : 3u; drawComponent(5, p[7], p[8], headPasses); if (p[11] != 0u) drawComponent(7, p[11], '0', headPasses);
+    if (p[11] == 0u || usesSmallHelm(parameters.sex, p[11]) != 0) { device.checkResult(device.native_device->SetRenderState(D3DRS_ALPHAREF, 128u), "SetRenderState"); drawComponent(p[11] == 0u ? 17 : 16, p[9], p[10], headPasses, false); device.checkResult(device.native_device->SetRenderState(D3DRS_ALPHAREF, 1u), "SetRenderState"); }
+    SceneRenderer::setOpacity(true);
+    for (std::size_t slot = 0; slot < 5u; ++slot) if (object->linked_objects[slot] != 0u && !(slot == 3u && handle == g_sfera_world_objects.controlled_object_handle)) { auto* matrix = g_sfera_scene_array_runtime.character_matrices.element<SferaMatrix4x4F>(slot); if (matrix == nullptr) WorldDiagnostics::fail("Character attachment matrix is missing"); *matrix = characterMultiply(world, pose[skeleton.attachments[slot]].transposed()); SceneRenderer::drawModel(object->linked_objects[slot]); }
+    SceneRenderer::setOpacity(false); setMaterial(1.0f, 1.0f, {1.0f, 1.0f, 1.0f}); if (object->scale != 1.0f) device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE); ShadowMap::drawObject(*object, 1.0f, shadowFade); characterDisableLights(1085u); updateEffectFrames(*object, skeleton, pose, world);
+}
+}
+
+
+namespace SphereRender {
+GameCamera::GameCamera() : tangent_half_fov(static_cast<float>(std::tan(0.5))) {}
+void GameCamera::setViewport(std::uint32_t x, std::uint32_t y, std::uint32_t width, std::uint32_t height, float aspect) {
+    viewport_x = x; viewport_y = y; viewport_width = width; viewport_height = height; aspect_scale = aspect;
+    center_x = static_cast<float>(double(static_cast<float>(width)) * 0.5 + double(x)); center_y = static_cast<float>(double(static_cast<float>(height)) * 0.5 + double(y));
+    pixel_scale_x = static_cast<float>(2.0 / static_cast<float>(width)); pixel_scale_y = static_cast<float>(double(aspect) * (2.0 / static_cast<float>(height)));
+}
+
+void GameCamera::setPerspective(float near_plane, float far_plane, float angle) {
+    if (near_distance == near_plane && far_distance == far_plane && field_of_view == angle) return;
+    near_distance = near_plane; far_distance = far_plane; field_of_view = angle; tangent_half_fov = static_cast<float>(std::tan(double(static_cast<float>(double(angle) * 0.5))));
+    off_axis = false; points_current_ = false; planes_current_ = false;
+}
+
+void GameCamera::setTransform(const SferaMatrix4x4F& matrix) { transform = matrix; points_current_ = false; planes_current_ = false; }
+void GameCamera::transformPoints(std::span<SferaVec3F> destination, std::span<const SferaVec3F> source) const { for (std::size_t index = 0u; index < source.size(); ++index) destination[index] = transform.transformPoint(source[index]); }
+SferaVec3F GameCamera::cameraPoint(const SferaVec3F& world) const { return transform.inverseTransformPoint(world); }
+
+bool GameCamera::project(const SferaVec3F& world, SferaVec3F& screen) const {
+    const auto local = cameraPoint(world);
+    const double depth = local.x;
+    if (near_distance > depth || far_distance < depth) return false;
+    screen.x = static_cast<float>(center_x - double(local.y) / (depth * tangent_half_fov * pixel_scale_x));
+    screen.y = static_cast<float>(center_y - double(local.z) / (depth * tangent_half_fov * pixel_scale_y));
+    screen.z = static_cast<float>(((depth - near_distance) * far_distance / (depth * (double(far_distance) - near_distance))) * (double(maximum_depth) - minimum_depth) + minimum_depth);
+    return true;
+}
+
+void GameCamera::buildPoints() {
+    points_[0] = {transform.m[0][3], transform.m[1][3], transform.m[2][3]};
+    float left, right, top, bottom;
+    if (off_axis) {
+        const float scale = static_cast<float>(double(far_distance) / window_depth);
+        left = static_cast<float>(double(offset_x) * scale); right = static_cast<float>((double(window_width) + offset_x) * scale);
+        top = static_cast<float>(double(scale) * offset_y); bottom = static_cast<float>(double(scale) * (double(window_height) + offset_y));
+    } else {
+        const auto edge = [&](float center, std::int32_t pixel, float scale) { return static_cast<float>(double(static_cast<float>((double(center) - pixel) * tangent_half_fov * scale)) * far_distance); };
+        left = edge(center_x, rectangle_.left, pixel_scale_x); right = edge(center_x, rectangle_.right, pixel_scale_x); top = edge(center_y, rectangle_.top, pixel_scale_y); bottom = edge(center_y, rectangle_.bottom, pixel_scale_y);
+    }
+    points_[1] = {far_distance, left, top}; points_[2] = {far_distance, right, top}; points_[3] = {far_distance, right, bottom}; points_[4] = {far_distance, left, bottom}; points_[5] = {near_distance, 0.0f, 0.0f};
+    transformPoints(std::span(points_).subspan(1u), std::span<const SferaVec3F>(points_).subspan(1u));
+    points_current_ = true;
+}
+
+SferaPlaneF GameCamera::boundaryPlane(const SferaVec3F& a, const SferaVec3F& b, const SferaVec3F& c) {
+    SferaVec3F normal{static_cast<float>((double(a.z) + b.z) * (double(a.y) - b.y) + (double(c.y) - a.y) * (double(a.z) + c.z) + (double(b.y) - c.y) * (double(b.z) + c.z)), static_cast<float>((double(c.z) - a.z) * (double(a.x) + c.x) + (double(a.z) - b.z) * (double(a.x) + b.x) + (double(b.z) - c.z) * (double(b.x) + c.x)), static_cast<float>((double(c.x) - a.x) * (double(c.y) + a.y) + (double(a.x) - b.x) * (double(a.y) + b.y) + (double(b.x) - c.x) * (double(c.y) + b.y))};
+    const float length = static_cast<float>(std::sqrt(double(static_cast<float>(double(normal.y) * normal.y + double(normal.x) * normal.x + double(normal.z) * normal.z))));
+    if (length != 0.0f) normal = {static_cast<float>(double(normal.x) / length), static_cast<float>(double(normal.y) / length), static_cast<float>(double(normal.z) / length)};
+    return {normal, static_cast<float>((-double(normal.x) * a.x - double(normal.y) * a.y) - double(normal.z) * a.z)};
+}
+
+void GameCamera::buildPlanes() {
+    for (std::size_t side = 0u; side < 4u; ++side) planes_.planes[side + 1u] = boundaryPlane(points_[0], points_[(side + 3u) % 4u + 1u], points_[side + 1u]);
+    planes_.planes[5] = boundaryPlane(points_[4], points_[3], points_[2]);
+    const auto& far_normal = planes_.planes[5].normal;
+    planes_.planes[0] = {{-far_normal.x, -far_normal.y, -far_normal.z}, static_cast<float>(double(far_normal.y) * points_[5].y + double(far_normal.x) * points_[5].x + double(far_normal.z) * points_[5].z)};
+    planes_current_ = true;
+}
+
+void GameCamera::volume(const CameraRectangle* rectangle, const SferaFrustumF** planes, const SferaVec3F** points) {
+    if (off_axis && rectangle != nullptr) { if (planes != nullptr) *planes = nullptr; if (points != nullptr) *points = nullptr; return; }
+    const CameraRectangle requested = rectangle == nullptr ? CameraRectangle{static_cast<std::int32_t>(viewport_x), static_cast<std::int32_t>(viewport_y), static_cast<std::int32_t>(viewport_x + viewport_width - 1u), static_cast<std::int32_t>(viewport_y + viewport_height - 1u)} : *rectangle;
+    if (!(requested == rectangle_)) { rectangle_ = requested; points_current_ = false; planes_current_ = false; }
+    if (!points_current_) buildPoints();
+    if (planes != nullptr && !planes_current_) buildPlanes();
+    if (planes_.planes[0].evaluate(points_[0]) > 0.0) for (auto& plane : planes_.planes) { plane.normal = {-plane.normal.x, -plane.normal.y, -plane.normal.z}; plane.distance = -plane.distance; }
+    if (planes != nullptr) *planes = &planes_;
+    if (points != nullptr) *points = points_.data();
+}
+
+bool GameCamera::projectObjectTop(std::uint32_t handle, SferaVec3F& output, float height_factor) const {
+    const auto* object = g_sfera_world_objects.object(handle);
+    if (object == nullptr) { g_sfera_window_runtime.diagnostic_message[0] = 0; WorldDiagnostics::appendScriptContext("Project_TopCharToScreen: wrong handle"); WorldDiagnostics::flushScriptContext(); return false; }
+    const auto* model = g_sfera_world_objects.model(*object);
+    const auto* camera = g_sfera_world_objects.object(1u);
+    if (model == nullptr || camera == nullptr) return false;
+    SferaVec3F top = object->position;
+    top.y = static_cast<float>(double(top.y) + (model->collision_kind == 0u ? model->minimum.y : model->oriented_corners.corners[0].y));
+    auto offset = SferaVec3F{static_cast<float>(double(top.x) - camera->position.x), 0.0f, static_cast<float>(double(top.z) - camera->position.z)};
+    const float squared = static_cast<float>(double(offset.z) * offset.z + double(offset.x) * offset.x);
+    offset = offset * static_cast<float>(0.10000000149011612 / squared);
+    const auto base = object->position - offset;
+    if (top.y < camera->position.y) offset = {-offset.x, -offset.y, -offset.z};
+    top = top + offset;
+    SferaVec3F projected_top{}, projected_base{};
+    const bool top_visible = project(top, projected_top);
+    if (height_factor == 1.0f) { output = projected_top; return top_visible; }
+    const bool base_visible = project(base, projected_base);
+    if (!top_visible || !base_visible) return false;
+    output = projected_base + (projected_top - projected_base) * height_factor;
+    return true;
+}
+
+void GameCamera::cameraAxes(SferaVec3F& forward, SferaVec3F& up) {
+    g_sfera_world_objects.recalculateBasis(1u);
+    const auto* camera = g_sfera_world_objects.extendedObject(1u);
+    if (camera == nullptr) WorldDiagnostics::fail("Camera object is missing");
+    forward = camera->orientation_basis[0]; up = camera->orientation_basis[1];
+}
+
+void GameCamera::rebuildVisibleVolume(std::int32_t left, std::int32_t top, std::int32_t right, std::int32_t bottom) {
+    const CameraRectangle rectangle{left, top, right, bottom};
+    const SferaFrustumF* frustum = nullptr; const SferaVec3F* points = nullptr;
+    g_sfera_camera.volume(&rectangle, &frustum, &points);
+    if (frustum == nullptr || points == nullptr) return;
+    std::memcpy(g_sfera_main_ui_state_runtime.clip_planes, frustum->planes, sizeof(frustum->planes));
+    std::copy_n(points, 5u, g_sfera_view_geometry_runtime.reference_points);
+    SferaVec3F minimum = points[0], maximum = points[0];
+    for (std::size_t index = 1u; index < 5u; ++index) for (std::size_t axis = 0u; axis < 3u; ++axis) { minimum.setComponent(axis, std::min(minimum.component(axis), points[index].component(axis))); maximum.setComponent(axis, std::max(maximum.component(axis), points[index].component(axis))); }
+    const auto fixed = [](float value) { return static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(double(value) * 1024.0))); };
+    g_sfera_view_geometry_runtime.projected_bounds = {fixed(minimum.x), fixed(maximum.x), fixed(minimum.y), fixed(maximum.y), fixed(minimum.z), fixed(maximum.z)};
+    SceneRenderer::collectLights();
+}
+
+void GameCamera::setupViewport(std::uint32_t x, std::uint32_t y, std::uint32_t width, std::uint32_t height) {
+    const auto& settings = g_sfera_view_spatial_runtime.scale;
+    SferaVec3F forward, up; cameraAxes(forward, up);
+    const auto* camera = g_sfera_world_objects.object(1u);
+    const auto target = camera->position + forward;
+    auto& matrices = g_sfera_d3d9_semantic_state;
+    ::D3DXMatrixLookAtRH(reinterpret_cast<D3DXMATRIX*>(&matrices.view_matrix), reinterpret_cast<const D3DXVECTOR3*>(&camera->position), reinterpret_cast<const D3DXVECTOR3*>(&target), reinterpret_cast<const D3DXVECTOR3*>(&up));
+    const float width_value = static_cast<float>(static_cast<std::int32_t>(width)), height_value = static_cast<float>(static_cast<std::int32_t>(height));
+    const float aspect = static_cast<float>(double(width_value) / height_value);
+    const float half_angle = static_cast<float>(double(settings.z.f32) * 0.5);
+    const float tangent = static_cast<float>(std::tan(double(half_angle)));
+    const float vertical_tangent = static_cast<float>(double(tangent) / aspect);
+    const float vertical_angle = static_cast<float>(double(static_cast<float>(std::atan(double(vertical_tangent)))) * 2.0);
+    ::D3DXMatrixPerspectiveFovRH(reinterpret_cast<D3DXMATRIX*>(&matrices.projection_matrix), vertical_angle, aspect, settings.x.f32, settings.y.f32);
+    g_sfera_model_transform_scratch_matrix = SferaMatrix4x4F::fromEuler(camera->position, camera->rotation);
+    g_sfera_camera.setPerspective(settings.x.f32, settings.y.f32, settings.z.f32);
+    g_sfera_camera.setTransform(g_sfera_model_transform_scratch_matrix.multiplied(g_sfera_model_coordinate_matrix));
+    g_sfera_camera.setViewport(x, y, width, height, static_cast<float>(double(height_value) / width_value));
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    const D3DVIEWPORT9 viewport{x, y, width, height, 0.0f, 1.0f};
+    device.native_device->SetViewport(&viewport);
+    const auto identity = SferaMatrix4x4F::identity();
+    device.setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(identity)); device.setTransform(D3DTS_VIEW, reinterpret_cast<const D3DMATRIX&>(matrices.view_matrix)); device.setTransform(D3DTS_PROJECTION, reinterpret_cast<const D3DMATRIX&>(matrices.projection_matrix));
+    rebuildVisibleVolume(static_cast<std::int32_t>(x), static_cast<std::int32_t>(y), static_cast<std::int32_t>(width - 1u), static_cast<std::int32_t>(height - 1u));
+}
+
+void GameCamera::beginFrame(std::uint32_t mode, bool reflection, float water_height) {
+    auto* camera = g_sfera_world_objects.extendedObject(1u);
+    if (camera == nullptr) WorldDiagnostics::fail("Camera object is missing");
+    auto* controlled = g_sfera_world_objects.object(g_sfera_world_objects.controlled_object_handle);
+    if (g_sfera_client_config_runtime.state_27 != 0u && controlled != nullptr) {
+        SferaVec3F neck; ModelPose::neckPosition(neck);
+        const float heading = controlled->rotation.x;
+        camera->position = {controlled->position.x, static_cast<float>(double(neck.y) - 0.10000000149011612), controlled->position.z};
+        g_sfera_world_objects.recalculateBasis(1u);
+        const float lean = static_cast<float>(double(camera->orientation_basis[0].y) * 0.30000001192092896);
+        g_sfera_camera.saved_controlled_position_ = controlled->position;
+        controlled->position.x = static_cast<float>((double(controlled->position.x) - neck.x) + controlled->position.x); controlled->position.z = static_cast<float>((double(controlled->position.z) - neck.z) + controlled->position.z);
+        if (lean > 0.0f) { controlled->position.x = static_cast<float>(double(controlled->position.x) + double(static_cast<float>(std::sin(double(heading)))) * lean); controlled->position.z = static_cast<float>(double(controlled->position.z) - double(static_cast<float>(std::cos(double(heading)))) * lean); }
+        else camera->position.y = static_cast<float>(double(camera->position.y) - double(lean) * 0.20000000298023224);
+    }
+    const auto save_camera = [&] { g_sfera_camera.saved_camera_position_ = camera->position; g_sfera_camera.saved_camera_rotation_ = camera->rotation; };
+    if (reflection) { save_camera(); camera->position.y = static_cast<float>((double(water_height) + water_height) - camera->position.y); g_sfera_world_objects.reflectReferenceOrientation(); }
+    if (mode == 2u || g_sfera_client_config_runtime.state_13 != 0u) { save_camera(); if (controlled != nullptr) camera->position = controlled->position; camera->position.y = static_cast<float>(double(camera->position.y) - 1000.0); camera->rotation = {-4.7123894691467285f, 1.5707964897155762f, -1.5707964897155762f}; g_sfera_world_objects.recalculateBasis(1u); }
+}
+
+void GameCamera::endFrame(std::uint32_t mode, bool reflection) {
+    if (g_sfera_client_config_runtime.state_27 != 0u) if (auto* controlled = g_sfera_world_objects.object(g_sfera_world_objects.controlled_object_handle)) controlled->position = g_sfera_camera.saved_controlled_position_;
+    if (mode != 2u && g_sfera_client_config_runtime.state_13 == 0u && !reflection) return;
+    auto* camera = g_sfera_world_objects.object(1u);
+    if (camera == nullptr) WorldDiagnostics::fail("Camera object is missing");
+    camera->position = g_sfera_camera.saved_camera_position_; camera->rotation = g_sfera_camera.saved_camera_rotation_;
+    g_sfera_world_objects.recalculateBasis(1u);
+}
+}
+
+
+namespace SphereRender {
+namespace {
+CD3D9Device& sceneDevice() { return *g_sfera_graphics_runtime.d3d_runtime; }
+void sceneRenderState(D3DRENDERSTATETYPE state, DWORD value) { auto& device = sceneDevice(); device.checkResult(device.native_device->SetRenderState(state, value), "SetRenderState"); }
+SferaVec3F sceneVector(const SferaVec3Word& value) { return {value.x.f32, value.y.f32, value.z.f32}; }
+bool sceneBoundsOverlap(const SferaVec3F& minimum, const SferaVec3F& maximum, const SferaLightRecord& light) { return !(minimum.x > light.bounds_max.x || minimum.y > light.bounds_max.y || minimum.z > light.bounds_max.z || maximum.x < light.bounds_min.x || maximum.y < light.bounds_min.y || maximum.z < light.bounds_min.z); }
+template<class Value, class Key> void sceneQuickSort(Value* values, std::int32_t first, std::int32_t last, const Key& key) {
+    while (first < last) {
+        auto left = first; auto right = last; const auto pivot = key(values[(first + last) / 2]);
+        do { while (key(values[left]) < pivot) ++left; while (key(values[right]) > pivot) --right; if (left <= right) { std::swap(values[left], values[right]); ++left; --right; } } while (left <= right);
+        if (first < right) sceneQuickSort(values, first, right, key);
+        first = left;
+    }
+}
+}
+void SceneRenderer::initializeRenderLookup() {
+    for (std::uint32_t index = 0; index < 256u; ++index) { auto crc = index; for (int bit = 0; bit < 8; ++bit) crc = (crc >> 1) ^ ((crc & 1u) ? 0xedb88320u : 0u); g_sfera_static_render_lookup_runtime.legacy_crc_low_table[index] = static_cast<std::uint8_t>(crc); }
+}
+void SceneRenderer::waitForGpu() {
+    auto* query = sceneDevice().sync_query;
+    if (query == nullptr || query->Issue(D3DISSUE_END) == D3DERR_DEVICELOST) return;
+    if (query->GetData(nullptr, 0u, D3DGETDATA_FLUSH) != S_FALSE || query->GetData(nullptr, 0u, D3DGETDATA_FLUSH) != S_FALSE) return;
+    do { ::Sleep(0u); } while (query->GetData(nullptr, 0u, D3DGETDATA_FLUSH) == S_FALSE);
+}
+bool SceneRenderer::bindTexture(std::int32_t texture) { auto& device = sceneDevice(); device.checkResult(device.native_device->SetTexture(0u, g_sfera_textures.resource(texture)), "SetTexture"); return g_sfera_textures.hasAlpha(texture); }
+void SceneRenderer::textureSize(std::int32_t texture, std::uint32_t* dimensions) { D3DSURFACE_DESC description{}; static_cast<IDirect3DTexture9*>(g_sfera_textures.resource(texture))->GetLevelDesc(0u, &description); dimensions[0] = description.Width; dimensions[1] = description.Height; }
+void SceneRenderer::setAmbientColor() {
+    const auto color = sceneVector(g_sfera_view_spatial_runtime.basis[2]); const auto red = static_cast<std::uint32_t>(static_cast<std::int64_t>(color.x)); const auto green = static_cast<std::uint32_t>(static_cast<std::int64_t>(color.y)); const auto blue = static_cast<std::uint32_t>(static_cast<std::int64_t>(color.z));
+    sceneRenderState(D3DRS_AMBIENT, 0xff000000u | ((red & 255u) << 16) | ((green & 255u) << 8) | (blue & 255u));
+}
+void SceneRenderer::setMaterialColor(std::int32_t red, std::int32_t green, std::int32_t blue) {
+    D3DMATERIAL9 material{}; material.Diffuse = {static_cast<float>(static_cast<double>(red) / 255.0), static_cast<float>(static_cast<double>(green) / 255.0), static_cast<float>(static_cast<double>(blue) / 255.0), 1.0f}; material.Ambient = material.Diffuse; material.Specular.a = 1.0f;
+    auto& device = sceneDevice(); device.checkResult(device.native_device->SetMaterial(&material), "SetMaterial");
+}
+std::uint32_t SceneRenderer::terrainShade(std::uint32_t shade, float x, float z) {
+    if ((g_sfera_frame_runtime.color_lookup_flags & 1u) == 0u) { g_sfera_frame_runtime.color_lookup_flags |= 1u; g_sfera_frame_runtime.color_lookup_object.reset(); }
+    if (shade == 0u || g_sfera_view_spatial_runtime.alternate_projection == 1u) return 255u;
+    const auto planting = g_sfera_frame_runtime.color_lookup_object.plantingType(x, z); const auto terrain = (0x6496c8ffu >> (planting * 8u)) & 255u; const auto scaled = static_cast<std::int32_t>((255u - terrain) * (255u - shade)); return static_cast<std::uint32_t>(scaled / 256) + terrain;
+}
+void SceneRenderer::setObjectMaterial(WorldObject& object, std::uint32_t shade, const std::array<float, 3>& variation) {
+    if (object.lighting_color == 0u) object.lighting_color = Material::randomColor(variation);
+    const auto intensity = terrainShade(shade, object.position.x, object.position.z); const auto color = object.lighting_color;
+    const auto red = ((color >> 16) & 255u) * intensity; const auto green = ((color >> 8) & 255u) * intensity; const auto blue = (color & 255u) * intensity; const auto packed = ((((red & 0xffffff00u) << 8) | green) & 0xffffff00u) | (blue >> 8);
+    setMaterialColor((packed >> 16) & 255u, (packed >> 8) & 255u, packed & 255u);
+}
+void SceneRenderer::buildColorRemap(double exponent, double floor) {
+    for (int index = 0; index < 256; ++index) { const auto value = static_cast<std::int32_t>((std::pow(static_cast<double>(index) / 255.0, exponent) * (1.0 - floor) + floor) * 255.0); const auto channel = static_cast<std::uint8_t>(std::clamp(value, 0, 255)); g_sfera_static_render_lookup_runtime.color_remap_a[index] = channel; g_sfera_static_render_lookup_runtime.color_remap_b[index] = channel; g_sfera_static_render_lookup_runtime.color_remap_c[index] = channel; }
+}
+void SceneRenderer::modelFade(float distance, float power, float& fade, float& remaining) {
+    if (distance <= 0.20000000298023224) { fade = 0.0f; remaining = 1.0f; return; }
+    if (distance >= static_cast<float>((power > 0.0f ? 1.0 : 0.0) + 0.20000000298023224)) { fade = 1.0f; remaining = 0.0f; return; }
+    const double transition = (static_cast<double>(distance) - 0.20000000298023224) / 0.019999999552965164; fade = static_cast<float>(std::pow(static_cast<float>(transition), power)); remaining = static_cast<float>(1.0 - transition);
+}
+std::uint32_t SceneRenderer::materialVariant(std::uint32_t first, std::uint32_t second, std::uint32_t third) { return 4u * first + 2u * second + third; }
+bool SceneRenderer::hasMaterialVariant(std::uint32_t object, std::int32_t variant) {
+    const auto* model = g_sfera_world_objects.model(*g_sfera_world_objects.object(object));
+    for (std::uint32_t index = 0; model != nullptr && index < model->material_count; ++index) { const auto* material = g_sfera_materials.at(model->material_indices[index]); if (material == nullptr) throw std::out_of_range("Model material index"); if (!SferaSimpleParser::equalsIgnoreCase(material->name.c_str(), "default")) return variant < static_cast<std::int32_t>(material->textures.size()); }
+    return false;
+}
+void SceneRenderer::setMaterialVariant(std::uint32_t object, std::int32_t variant) { auto* instance = g_sfera_world_objects.extendedObject(object); if (instance != nullptr && instance->render_cache_handle >= 0) instance->render_cache_handle = variant; }
+std::uint32_t SceneRenderer::setOpacity(std::uint32_t opacity) { return g_sfera_client_config_runtime.state_03 = opacity & 255u; }
+void SceneRenderer::adaptFog() {
+    if (g_sfera_client_config_runtime.state_25 == 0u) return;
+    const float speed = static_cast<std::int32_t>(g_sfera_recovered_static_runtime.view_transition_counter) > 0 ? 0.019999999552965164f : 0.0010000000474974513f;
+    if (static_cast<std::int32_t>(g_sfera_recovered_static_runtime.view_transition_counter) > 0) --g_sfera_recovered_static_runtime.view_transition_counter;
+    auto& fog = g_sfera_graphics_runtime.saved_fog_distance; const auto interval = g_sfera_input_device_runtime.frame_interval.f32;
+    if (interval < 20.0f) fog = std::max(30.0f, static_cast<float>(static_cast<double>(fog) * (1.0 - speed))); else if (interval > 28.0f) fog = std::min(200.0f, static_cast<float>(static_cast<double>(fog) * (1.0 + speed)));
+}
+void SceneRenderer::raiseDistantObject(std::uint32_t handle) {
+    auto& object = *g_sfera_world_objects.object(handle); const auto delta = object.position - g_sfera_world_objects.object(1u)->position; const float length = static_cast<float>(std::sqrt(static_cast<float>(delta.dot(delta)))); const float amount = std::clamp(static_cast<float>((static_cast<double>(length) - 45.0) / 15.0), 0.0f, 1.0f); object.position.y = static_cast<float>(static_cast<double>(object.position.y) + amount * 1.399999976158142);
+}
+void SceneRenderer::sortObjects(std::int32_t first, std::int32_t last) { sceneQuickSort(g_sfera_scene_array_runtime.object_positions.dataAs<SceneSortEntry>(), first, last, [](const SceneSortEntry& value) { return value.key; }); }
+void SceneRenderer::sortLights(std::int32_t first, std::int32_t last) { sceneQuickSort(g_sfera_light_runtime.visible_handles.dataAs<SferaLightRecord*>(), first, last, [](const SferaLightRecord* value) { float distance; std::memcpy(&distance, &value->reserved, sizeof(distance)); return std::fabs(distance); }); }
+void SceneRenderer::activateObjectLights(std::uint32_t handle) {
+    SphereWorld::ContactQuery::updateBounds(handle); const auto& object = *g_sfera_world_objects.object(handle); const auto& model = *g_sfera_world_objects.model(object); const std::uint32_t maximum = model.animation_count == 0u && model.bone_count > 2u && model.radius > 15.0f ? 30u : 7u;
+    auto& count = g_sfera_client_main_scalar_runtime.counter_03; count = 0u; auto** visible = g_sfera_light_runtime.visible_handles.dataAs<SferaLightRecord*>();
+    for (std::uint32_t index = 0; index < g_sfera_client_main_scalar_runtime.counter_01 && count < maximum; ++index) {
+        const auto& light = *visible[index]; if (!sceneBoundsOverlap(object.bounds_minimum, object.bounds_maximum, light)) continue;
+        g_sfera_collision_scratch_runtime.light_candidates[count] = light; g_sfera_light_runtime.render_candidate_indices[count] = index + 1u; g_sfera_light_runtime.render_candidate_active[count] = 0u; ++count;
+    }
+    if (count > 7u) return;
+    for (std::uint32_t index = 0; index < count; ++index) { g_sfera_light_runtime.render_candidate_active[index] = 1u; g_sfera_light_runtime.setActive(g_sfera_light_runtime.render_candidate_indices[index], true, 14846u); }
+}
+void SceneRenderer::classifyBone(std::uint32_t index) {
+    const auto& model = *SferaAbi::pointer<const Model>(g_sfera_world_render_runtime.active_model); const auto& bone = model.bones[index]; auto& result = g_sfera_render_lookup_runtime.entries[index];
+    if (bone.geometry_kind != 2u) {
+        if (model.bone_count == 2u) { result.resource = g_sfera_client_main_scalar_runtime.mode_01; result.mask = (1u << (g_sfera_client_main_scalar_runtime.counter_03 & 31u)) - 1u; }
+        else {
+            std::array<SferaVec3F, 8> corners; for (std::size_t vertex = 0; vertex < corners.size(); ++vertex) corners[vertex] = g_sfera_character_frame_matrix.transformPoint(bone.bounds.corners.corners[vertex]);
+            result.resource = reinterpret_cast<const SferaFrustumF*>(g_sfera_main_ui_state_runtime.clip_planes)->classifyPoints(corners);
+            if (result.resource != 0u) { result.mask = 0u; std::uint32_t selected = 0u; for (std::uint32_t light = 0; light < g_sfera_client_main_scalar_runtime.counter_03 && selected < 7u; ++light) if (sceneBoundsOverlap(bone.bounds.minimum, bone.bounds.maximum, g_sfera_collision_scratch_runtime.light_candidates[light])) result.mask |= 1u << selected++; }
+        }
+    }
+    for (std::uint32_t child = 0; child < bone.child_count; ++child) classifyBone(model.child_bones[bone.first_child + child]);
+}
+void SceneRenderer::collectLights() {
+    auto& count = g_sfera_client_main_scalar_runtime.counter_01; count = 0u; const auto* frustum = reinterpret_cast<const SferaFrustumF*>(g_sfera_main_ui_state_runtime.clip_planes); const auto& first = frustum->planes[0];
+    if (first.normal.x == 0.0f && first.normal.y == 0.0f && first.normal.z == 0.0f && first.distance == 0.0f) return;
+    const auto camera = g_sfera_world_objects.object(1u)->position; std::uint32_t found = 0u; auto** handles = g_sfera_light_runtime.handles.dataAs<SferaLightRecord*>(); auto** visible = g_sfera_light_runtime.visible_handles.dataAs<SferaLightRecord*>();
+    for (std::uint32_t index = 0; found < g_sfera_recovered_static_runtime.client_state_02; ++index) {
+        auto* light = handles[index]; if (light == nullptr) continue; ++found; const SferaVec3F radius{light->radius, light->radius, light->radius}; light->bounds_min = light->position - radius; light->bounds_max = light->position + radius; const auto corners = SferaBoundsCornersRuntime::fromExtents(light->bounds_min, light->bounds_max);
+        if (frustum->classifyPoints(corners.corners) == 0) continue;
+        visible[count++] = light; const auto delta = camera - light->position; const float distance = static_cast<float>(delta.dot(delta)); std::memcpy(&light->reserved, &distance, sizeof(distance));
+    }
+    if (count > 1u) sortLights(0, count - 1u);
+    count = std::min(count, 30u); auto& device = sceneDevice(); D3DLIGHT9 light{}; light.Type = D3DLIGHT_POINT; light.Diffuse.a = 1.0f; light.Specular = {1.0f, 1.0f, 1.0f, 1.0f}; light.Ambient.a = 1.0f; light.Falloff = 1.0f; light.Attenuation2 = 1.0f;
+    for (std::uint32_t index = 0; index < count; ++index) { const auto& source = *visible[index]; light.Diffuse.r = static_cast<float>(source.color[0] * 0.003921568859368563); light.Diffuse.g = static_cast<float>(source.color[1] * 0.003921568859368563); light.Diffuse.b = static_cast<float>(source.color[2] * 0.003921568859368563); light.Position = {source.position.x, source.position.y, source.position.z}; light.Range = source.radius; device.checkResult(device.native_device->SetLight(index + 1u, &light), "SetLight"); g_sfera_light_runtime.setActive(index + 1u, false, 14800u); }
+}
+}
+namespace {
+std::uint32_t skyChannel(float value) { return static_cast<std::uint32_t>(std::min(static_cast<std::int32_t>(value), 255)) & 255u; }
+float skyLerp(float first, float second, float amount) { return static_cast<float>(static_cast<double>(first) + (static_cast<double>(second) - first) * amount); }
+SferaVec4F skyLerp(const SferaVec4F& first, const SferaVec4F& second, float amount) { return {skyLerp(first.x, second.x, amount), skyLerp(first.y, second.y, amount), skyLerp(first.z, second.z, amount), skyLerp(first.w, second.w, amount)}; }
+template<std::size_t Count> SferaVec4F skyPeriodicSample(const float (&positions)[Count], const SferaVec4F (&colors)[Count], float position) {
+    std::size_t first; std::size_t second; float amount;
+    if (position < positions[0]) { first = Count - 1u; second = 0u; const float tail = static_cast<float>(1.0 - positions[first]); amount = static_cast<float>((static_cast<double>(position) + tail) / (static_cast<double>(positions[0]) + tail)); }
+    else if (position > positions[Count - 1u]) { first = Count - 1u; second = 0u; amount = static_cast<float>((static_cast<double>(position) - positions[first]) / (1.0 + positions[0] - positions[first])); }
+    else { second = 1u; while (positions[second] < position) ++second; first = second - 1u; amount = static_cast<float>((static_cast<double>(position) - positions[first]) / (static_cast<double>(positions[second]) - positions[first])); }
+    return skyLerp(colors[first], colors[second], amount);
+}
+void skySubmit(std::uint32_t count) { auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.checkResult(device.native_device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0u, 120u, count / 3u, g_sfera_sky_runtime.indices, D3DFMT_INDEX16, g_sfera_sky_screen_vertices, sizeof(SferaScreenVertex)), "DrawIndexedPrimitiveUP"); }
+}
+void SceneSky::rotateUv(float x, float y, float angle, float& u, float& v) {
+    const float cosine = static_cast<float>(std::cos(static_cast<double>(angle))); const float sine = static_cast<float>(std::sin(static_cast<double>(angle))); const auto centerX = g_sfera_static_render_lookup_runtime.projection_scale; const auto centerY = g_sfera_main_view_state_runtime.projection_scale;
+    u = static_cast<float>((centerX + (static_cast<double>(x) - centerX) * cosine - (static_cast<double>(y) - centerY) * sine) * 0.00390625 + g_sfera_static_render_lookup_runtime.view_phase);
+    v = static_cast<float>(((static_cast<double>(x) - centerX) * sine + (static_cast<double>(y) - centerY) * cosine + centerY) * 0.00390625 + g_sfera_render_sample_runtime.phase.f32);
+}
+std::uint32_t SceneSky::buildLayerGeometry(const SceneSkyLayer& layer, float opacity) {
+    for (std::size_t index = 0; index < 120u; ++index) {
+        const auto inclination = g_sfera_static_render_lookup_runtime.command_samples[index]; double alpha = inclination < 1.059999942779541f ? 255.0 : inclination > 1.4800000190734863f ? 0.0 : 255.0 - (inclination - 1.059999942779541) / (1.4800000190734863 - 1.059999942779541) * 255.0;
+        const float faded = static_cast<float>(static_cast<float>(alpha) * static_cast<double>(opacity)); g_sfera_main_command_state_runtime.render_samples[index] = static_cast<std::uint32_t>(static_cast<std::int64_t>(std::nearbyint(faded)));
+        const float sine = static_cast<float>(std::sin(static_cast<double>(inclination))); const float projection = static_cast<float>(static_cast<double>(inclination) * layer.projectionWarp); const float cosine = static_cast<float>(std::cos(static_cast<double>(projection))); const float radius = static_cast<float>(static_cast<double>(sine) / cosine * layer.uvScale); const auto azimuth = g_sfera_main_view_state_runtime.projection_samples[index];
+        const float offsetX = layer.trackOffset ? g_sfera_landscape_render_runtime.view_offset_y.f32 : 0.0f; const float offsetY = layer.trackOffset ? g_sfera_landscape_render_runtime.view_offset_x.f32 : 0.0f; auto& vertex = g_sfera_sky_screen_vertices[index]; vertex.u = static_cast<float>(static_cast<float>(std::cos(static_cast<double>(azimuth))) * static_cast<double>(radius) + offsetX + 0.5); vertex.v = static_cast<float>(static_cast<float>(std::sin(static_cast<double>(azimuth))) * static_cast<double>(radius) + offsetY + 0.5);
+    }
+    std::uint32_t count = 0u;
+    for (std::uint16_t row = 0; row < 9; ++row) for (std::uint16_t column = 0; column < 11; ++column) { const auto index = static_cast<std::uint16_t>(row * 12 + column); const auto* visible = g_sfera_static_render_lookup_runtime.sample_flags; auto* indices = g_sfera_sky_runtime.indices; if (static_cast<std::int32_t>(visible[index] + visible[index + 1] + visible[index + 12]) > 0) { indices[count++] = index; indices[count++] = index + 1; indices[count++] = index + 12; } if (static_cast<std::int32_t>(visible[index + 1] + visible[index + 12] + visible[index + 13]) > 0) { indices[count++] = index + 1; indices[count++] = index + 13; indices[count++] = index + 12; } }
+    return count;
+}
+void SceneSky::layerColor(const SceneSkyLayer& layer, SferaVec3F& output) { std::int32_t first; std::int32_t second; float amount; SferaAbi::pointer<const SkyEnvironment>(g_sfera_font_runtime.renderer)->interval(g_sfera_graphics_runtime.environment_factor, first, second, amount); output = {skyLerp(layer.colors[first].x, layer.colors[second].x, amount), skyLerp(layer.colors[first].y, layer.colors[second].y, amount), skyLerp(layer.colors[first].z, layer.colors[second].z, amount)}; }
+void SceneSky::drawColorLayer(const char* texture, const SferaVec3F& color, std::uint32_t indices) {
+    if (*texture == '\0') return;
+    for (std::size_t index = 0; index < 120; ++index) { const float additional = static_cast<float>(g_sfera_render_sample_runtime.samples[index] * 255.0); auto& vertex = g_sfera_sky_screen_vertices[index]; vertex.diffuse = (g_sfera_main_command_state_runtime.render_samples[index] << 24) | (skyChannel(static_cast<float>(static_cast<double>(color.x) + additional)) << 16) | (skyChannel(static_cast<float>(static_cast<double>(color.y) + additional)) << 8) | skyChannel(static_cast<float>(static_cast<double>(color.z) + additional)); vertex.specular = 0u; }
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_ONE); if (std::strcmp(texture, "auto") != 0) SphereRender::SceneRenderer::bindTexture(g_sfera_textures.find(texture)); skySubmit(indices); device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+}
+void SceneSky::drawMaskLayer(const char* texture, std::uint32_t indices) {
+    if (*texture == '\0') return;
+    for (std::size_t index = 0; index < 120; ++index) { const auto color = g_sfera_main_command_state_runtime.render_samples[index] & 255u; g_sfera_sky_screen_vertices[index].diffuse = 0xff000000u | color * 0x010101u; g_sfera_sky_screen_vertices[index].specular = (255u - color) * 0x010101u; }
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.setAlphaBlending(D3DBLEND_ZERO, D3DBLEND_SRCCOLOR); device.checkResult(device.native_device->SetRenderState(D3DRS_SPECULARENABLE, TRUE), "SetRenderState"); SphereRender::SceneRenderer::bindTexture(g_sfera_textures.find(texture)); skySubmit(indices); device.checkResult(device.native_device->SetRenderState(D3DRS_SPECULARENABLE, FALSE), "SetRenderState"); device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+}
+void SceneSky::drawLayers(const SceneSkyLayers& layers) {
+    if (layers.primary.texture[0] == '\0' && layers.secondary.texture[0] == '\0') { g_sfera_startup_command_line_runtime.text[0x148] = 0; g_sfera_view_render_objects_runtime.reset_flag = 0u; return; }
+    const auto& source = layers.primary.texture[0] == '\0' ? layers.secondary : layers.primary; const auto indices = buildLayerGeometry(source, layers.opacity); drawMaskLayer(layers.secondary.texture, indices); if (layers.primary.texture[0] != '\0') { SferaVec3F color; layerColor(layers.primary, color); drawColorLayer(layers.primary.texture, color, indices); }
+}
+void SceneSky::orbit(float& x, float& y, std::uint32_t orbit) { const float angle = static_cast<float>(g_sfera_recovered_static_runtime.animation_phase * 3.1415929794311523 * 2.0 * static_cast<std::int32_t>(orbit + 1u)); x = static_cast<float>(static_cast<double>(x) + static_cast<float>(static_cast<float>(std::cos(static_cast<double>(angle))) * 0.019999999552965164)); y = static_cast<float>(static_cast<double>(y) + static_cast<float>(static_cast<float>(std::sin(static_cast<double>(angle))) * 0.019999999552965164)); }
+float SceneSky::horizonFog(float elevation, float amount) { const float position = elevation < 0.0f ? 0.0f : elevation > 0.4000000059604645 ? 1.0f : static_cast<float>(static_cast<double>(elevation) / 0.4000000059604645); return static_cast<float>(static_cast<double>(position) * amount); }
+void SceneSky::sampleDirection(bool refresh, const SferaVec3F& direction) {
+    if (g_sfera_view_spatial_runtime.alternate_projection == 1u) { g_sfera_client_main_scalar_runtime.state_01 = 0u; g_sfera_main_aux_runtime.color_component = 0u; g_sfera_recovered_static_runtime.animation_result_b = 0u; g_sfera_recovered_static_runtime.render_state_09 = 0u; return; }
+    const float azimuth = static_cast<float>(std::atan2(static_cast<double>(direction.z), direction.x)); const float cosine = static_cast<float>(std::cos(static_cast<double>(-azimuth))); const float sine = static_cast<float>(std::sin(static_cast<double>(-azimuth))); const float horizontal = static_cast<float>(static_cast<double>(cosine) * direction.x - static_cast<double>(sine) * direction.z); const float elevation = static_cast<float>(static_cast<float>(std::atan2(static_cast<double>(direction.y), horizontal)) + 1.5707964897155762); g_sfera_main_ui_state_runtime.scene_scale = azimuth; g_sfera_main_command_state_runtime.sky_blend_factor = elevation; const float latitude = static_cast<float>(elevation * 0.31830985316916194);
+    float longitude = static_cast<float>(static_cast<float>(std::atan2(static_cast<double>(direction.y), direction.x)) - 1.5707964897155762); if (longitude < 0.0f) longitude = static_cast<float>(longitude + 6.283185958862305); longitude = static_cast<float>(longitude * 0.15915492658458097);
+    if (refresh) { SkyState state; const auto environment = SphereWorld::Vegetation::alternatePatterns() ? g_sfera_main_aux_runtime.secondary_world_manager : g_sfera_font_runtime.renderer; SferaAbi::pointer<const SkyEnvironment>(environment)->sample(g_sfera_graphics_runtime.environment_factor, state); std::memcpy(&g_sfera_sky_interpolation_runtime, &state, sizeof(g_sfera_sky_interpolation_runtime)); }
+    const auto& samples = g_sfera_sky_interpolation_runtime; auto color = skyPeriodicSample(samples.primary_key_positions, samples.primary_samples, longitude); const float length = static_cast<float>(std::sqrt(static_cast<float>(direction.dot(direction)))); const float inverse = static_cast<float>(1.0 / length); float reference = static_cast<float>((-0.30000001192092896 * direction.y - 0.9539999961853027 * std::fabs(direction.z)) * inverse); reference = static_cast<float>(static_cast<double>(reference) * reference); color = skyLerp(color, samples.primary_reference, reference);
+    const auto sun = SferaVec3F{g_sfera_view_spatial_runtime.position_offset.x.f32, g_sfera_view_spatial_runtime.position_offset.y.f32, g_sfera_view_spatial_runtime.position_offset.z.f32}; float glow = static_cast<float>(direction.dot(sun) * inverse); if (glow < 0.0f) glow = 0.0f; else for (int square = 0; square < 6; ++square) glow = static_cast<float>(static_cast<double>(glow) * glow); g_sfera_scene_control_runtime.environment_parameter.f32 = glow;
+    const auto overlay = skyPeriodicSample(samples.secondary_key_positions, samples.secondary_samples, latitude); const float amount = static_cast<float>(static_cast<double>(overlay.w) / 255.0); color.x = skyLerp(color.x, overlay.x, amount); color.y = skyLerp(color.y, overlay.y, amount); color.z = skyLerp(color.z, overlay.z, amount);
+    const float fog = horizonFog(latitude, g_sfera_view_spatial_runtime.basis[0].x.f32); color.x = skyLerp(color.x, g_sfera_view_spatial_runtime.basis[1].x.f32, fog); color.y = skyLerp(color.y, g_sfera_view_spatial_runtime.basis[1].y.f32, fog); color.z = skyLerp(color.z, g_sfera_view_spatial_runtime.basis[1].z.f32, fog); const float opacity = static_cast<float>(static_cast<float>(overlay.w + static_cast<double>(color.w)) + fog * 255.0);
+    auto rounded = [](float value) { return static_cast<std::uint32_t>(std::min(static_cast<std::int32_t>(std::nearbyint(value)), 255)); }; const auto red = rounded(color.x); const auto green = rounded(color.y); const auto blue = rounded(color.z); const auto alpha = rounded(opacity); g_sfera_client_main_scalar_runtime.state_01 = red; g_sfera_main_aux_runtime.color_component = green; g_sfera_recovered_static_runtime.animation_result_b = blue; g_sfera_render_lookup_runtime.alpha_component = 255u - alpha; g_sfera_recovered_static_runtime.render_state_09 = ((red & 255u) << 16) | ((green & 255u) << 8) | (blue & 255u);
+}
+namespace {
+SphereRender::GameCamera& skyCamera() { return g_sfera_camera; }
+SferaVec3F skyWordVector(const SferaVec3Word& value) { return {value.x.f32, value.y.f32, value.z.f32}; }
+void skyStoreVector(SferaVec3Word& target, const SferaVec3F& value) { target.x.f32 = value.x; target.y.f32 = value.y; target.z.f32 = value.z; }
+void skyWrap(float& value, float period) { while (value < 0.0f) value = static_cast<float>(static_cast<double>(value) + period); while (value >= period) value = static_cast<float>(static_cast<double>(value) - period); }
+}
+double SceneSky::drawStars() {
+    auto& motion = g_sfera_view_motion_runtime; motion.update_serial |= 7u; const bool secondary = g_sfera_main_render_runtime.secondary_render_pass != 0u; const auto width = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width); const auto height = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height); auto& cellWidth = g_sfera_recovered_static_runtime.ui_cell_width; auto& cellHeight = g_sfera_main_ui_state_runtime.scene_factor; cellWidth = secondary ? 25.600000381469727f : static_cast<float>(static_cast<double>(width) / 10.0); cellHeight = secondary ? 32.0f : static_cast<float>(height * 0.125); g_sfera_static_render_lookup_runtime.projection_scale = static_cast<float>(width * 0.5); g_sfera_main_view_state_runtime.projection_scale = static_cast<float>(height * 0.5);
+    const auto* corners = g_sfera_view_geometry_runtime.reference_points; const auto horizontal = corners[2] - corners[1]; const auto vertical = corners[4] - corners[1];
+    if (!secondary) {
+        const auto halfHorizontal = horizontal * 0.5f; const auto midpoint = corners[1] + (halfHorizontal + vertical * 0.5f); const auto center = corners[0] + (midpoint - corners[0]) * 0.10000000149011612f; const auto offset = center + halfHorizontal * 0.009999999776482582f;
+        SferaVec3F centerScreen{}; SferaVec3F offsetScreen{}; SferaVec3F previousCenter{}; SferaVec3F previousOffset{}; skyCamera().project(center, centerScreen); skyCamera().project(offset, offsetScreen); const bool centerValid = skyCamera().project(skyWordVector(motion.projected_b), previousCenter); const bool offsetValid = skyCamera().project(skyWordVector(motion.projected_a), previousOffset); skyStoreVector(motion.projected_b, center); skyStoreVector(motion.projected_a, offset);
+        if (centerValid && offsetValid) {
+            auto rotation = g_sfera_model_transform_scratch_matrix; rotation.m[0][3] = 0.0f; rotation.m[1][3] = 0.0f; rotation.m[2][3] = 0.0f; const auto translation = rotation.inverseTransformPoint(corners[0] - skyWordVector(motion.reference_point)); skyStoreVector(motion.reference_point, corners[0]); const auto distance = center - corners[0]; const float radius = static_cast<float>(std::sqrt(static_cast<float>(distance.dot(distance)))); const float halfField = static_cast<float>(g_sfera_view_spatial_runtime.scale.z.f32 * 0.5); const float tangent = static_cast<float>(std::tan(static_cast<double>(halfField))); const float span = static_cast<float>(static_cast<double>(tangent) * radius);
+            const float shiftX = static_cast<float>(static_cast<double>(translation.x) / span * g_sfera_static_render_lookup_runtime.projection_scale); const float shiftY = static_cast<float>(static_cast<double>(translation.y) / span * g_sfera_main_view_state_runtime.projection_scale * 1.3333300352096558); const double deltaX = static_cast<double>(previousCenter.x) - centerScreen.x + shiftX; const double deltaY = static_cast<double>(previousCenter.y) - centerScreen.y + shiftY;
+            motion.motion_terms[4].f32 = static_cast<float>(motion.motion_terms[4].f32 + deltaX); motion.motion_terms[3].f32 = static_cast<float>(motion.motion_terms[3].f32 + deltaY); g_sfera_main_input_state_runtime.camera_step = static_cast<float>(g_sfera_main_input_state_runtime.camera_step + deltaX); g_sfera_recovered_static_runtime.cursor_accumulator = static_cast<float>(g_sfera_recovered_static_runtime.cursor_accumulator + deltaY); motion.motion_terms[2].f32 = static_cast<float>(motion.motion_terms[2].f32 + deltaX * 256.0 / static_cast<float>(width)); motion.motion_terms[1].f32 = static_cast<float>(motion.motion_terms[1].f32 - deltaY * 256.0 / static_cast<float>(width));
+            const float uShift = static_cast<float>(deltaX * 0.00390625); const float vShift = static_cast<float>(deltaY * 0.00390625); const float cosine = static_cast<float>(std::cos(static_cast<double>(motion.motion_terms[0].f32))); const float sine = static_cast<float>(std::sin(static_cast<double>(motion.motion_terms[0].f32))); g_sfera_static_render_lookup_runtime.view_phase = static_cast<float>(static_cast<double>(g_sfera_static_render_lookup_runtime.view_phase) - static_cast<float>(static_cast<double>(uShift) * cosine - static_cast<double>(vShift) * sine)); g_sfera_render_sample_runtime.phase.f32 = static_cast<float>(static_cast<double>(g_sfera_render_sample_runtime.phase.f32) - static_cast<float>(static_cast<double>(uShift) * sine + static_cast<double>(vShift) * cosine));
+            const float rotationY = static_cast<float>(static_cast<double>(previousOffset.y) - previousCenter.y); const float rotationX = static_cast<float>(static_cast<double>(previousOffset.x) - previousCenter.x); motion.motion_terms[0].f32 = static_cast<float>(static_cast<double>(motion.motion_terms[0].f32) - static_cast<float>(std::atan2(static_cast<double>(rotationY), rotationX)));
+            skyWrap(motion.motion_terms[4].f32, cellWidth); skyWrap(motion.motion_terms[3].f32, cellHeight); skyWrap(motion.motion_terms[2].f32, 25.600000381469727f); skyWrap(motion.motion_terms[1].f32, 32.0f); skyWrap(g_sfera_static_render_lookup_runtime.view_phase, 1.0f); skyWrap(g_sfera_render_sample_runtime.phase.f32, 1.0f); skyWrap(motion.motion_terms[0].f32, 6.283185958862305f); motion.motion_terms[4].f32 = static_cast<float>(static_cast<double>(motion.motion_terms[4].f32) - cellWidth); motion.motion_terms[3].f32 = static_cast<float>(static_cast<double>(motion.motion_terms[3].f32) - cellHeight); motion.motion_terms[2].f32 = static_cast<float>(motion.motion_terms[2].f32 - 25.600000381469727); motion.motion_terms[1].f32 = static_cast<float>(motion.motion_terms[1].f32 - 32.0);
+        } else { g_sfera_static_render_lookup_runtime.view_phase = static_cast<float>(static_cast<double>(std::rand()) / 32767.0); g_sfera_render_sample_runtime.phase.f32 = static_cast<float>(static_cast<double>(std::rand()) / 32767.0); motion.motion_terms[0].f32 = static_cast<float>(static_cast<double>(std::rand()) / 32767.0); }
+    }
+    const float offsetX = motion.motion_terms[secondary ? 2 : 4].f32; const float offsetY = motion.motion_terms[secondary ? 1 : 3].f32; const float gridX = static_cast<float>(static_cast<double>(offsetX) / cellWidth); const float gridY = static_cast<float>(static_cast<double>(offsetY) / cellHeight);
+    for (int row = 0; row < 10; ++row) for (int column = 0; column < 12; ++column) {
+        const auto index = row * 12 + column; auto& vertex = g_sfera_sky_screen_vertices[index]; vertex.x = static_cast<float>(static_cast<double>(cellWidth) * static_cast<float>(column) + offsetX); vertex.y = static_cast<float>(static_cast<double>(cellHeight) * static_cast<float>(row) + offsetY); vertex.z = 0.0f; vertex.rhw = 1.0f; rotateUv(vertex.x, vertex.y, motion.motion_terms[0].f32, vertex.u, vertex.v);
+        const float columnPosition = static_cast<float>(static_cast<double>(column) + gridX); const auto horizontalPart = (horizontal * columnPosition) * 0.10000000149011612f; const float rowPosition = static_cast<float>(static_cast<double>(row) + gridY); const auto verticalPart = secondary ? vertical * static_cast<float>((static_cast<double>(row) + gridY) * 0.125 * 0.75 + 0.125) : (vertical * rowPosition) * 0.125f; sampleDirection(row == 0 && column == 0, corners[1] + (horizontalPart + verticalPart) - corners[0]);
+        g_sfera_main_view_state_runtime.projection_samples[index] = g_sfera_main_ui_state_runtime.scene_scale; g_sfera_static_render_lookup_runtime.command_samples[index] = g_sfera_main_command_state_runtime.sky_blend_factor; vertex.specular = g_sfera_recovered_static_runtime.render_state_09; vertex.diffuse = 0xff000000u | (g_sfera_render_lookup_runtime.alpha_component & 255u) * 0x010101u; g_sfera_render_sample_runtime.samples[index] = g_sfera_scene_control_runtime.environment_parameter.f32; g_sfera_static_render_lookup_runtime.sample_flags[index] = g_sfera_main_command_state_runtime.sky_blend_factor < 1.5099999904632568f ? 1u : 0u;
+    }
+    std::size_t count = 0u; for (std::uint16_t row = 0; row < 9; ++row) for (std::uint16_t column = 0; column < 11; ++column) { const auto index = static_cast<std::uint16_t>(row * 12 + column); auto* indices = g_sfera_sky_runtime.indices; indices[count++] = index; indices[count++] = index + 1u; indices[count++] = index + 12u; indices[count++] = index + 1u; indices[count++] = index + 13u; indices[count++] = index + 12u; }
+    SphereRender::SceneRenderer::bindTexture(g_sfera_textures.find(secondary ? "black" : "stars")); auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.checkResult(device.native_device->SetRenderState(D3DRS_SPECULARENABLE, TRUE), "SetRenderState"); device.checkResult(device.native_device->SetFVF(0x1c4u), "SetFVF"); device.drawVertices(D3DPT_TRIANGLELIST, 14u, g_sfera_sky_screen_vertices, 120u, g_sfera_sky_runtime.indices, 594u, sizeof(SferaScreenVertex)); device.checkResult(device.native_device->SetRenderState(D3DRS_SPECULARENABLE, FALSE), "SetRenderState"); return motion.motion_terms[0].f32;
+}
+void SceneSky::drawSunMoon(float rotation) {
+    const auto time = g_sfera_graphics_runtime.environment_factor; const bool moon = !(time > 0.1899999976158142f && time < 0.8299999833106995f); const auto* corners = g_sfera_view_geometry_runtime.reference_points; const auto normal = (corners[1] - corners[2]).cross(corners[3] - corners[2]).normalized(1); const SferaPlaneF plane{normal, static_cast<float>(-normal.dot(corners[1]))}; g_sfera_recovered_static_runtime.scene_state_09 = 0u; SferaVec3F intersection{}; const auto direction = skyWordVector(g_sfera_view_spatial_runtime.position_offset);
+    if (plane.intersectLine(corners[0], corners[0] + direction, intersection) != 1) return;
+    intersection = corners[0] + (intersection - corners[0]) * 0.8999999761581421f; SferaVec3F projected{}; if (!skyCamera().project(intersection, projected)) return; skyStoreVector(g_sfera_recovered_static_runtime.flare_clip_vector, intersection); skyStoreVector(g_sfera_flare_projection, projected);
+    const double scale = (moon ? 64.0 : 150.0) / 640.0; const auto width = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width); const auto height = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height); const float size = static_cast<float>(scale * (g_sfera_main_render_runtime.secondary_render_pass != 0u ? 256.0 : width)); const float half = static_cast<float>(size * 0.5); auto& vertices = g_sfera_scene_render_runtime.textured_quad;
+    for (std::size_t index = 0; index < 4; ++index) { auto& vertex = vertices[index]; vertex.x = index == 0u || index == 3u ? -half : half; vertex.y = index < 2u ? -half : half; vertex.u = index == 1u || index == 2u ? 1.0f : 0.0f; vertex.v = index >= 2u ? 1.0f : 0.0f; }
+    float minimumX = vertices[0].x; float maximumX = vertices[0].x; float minimumY = vertices[0].y; float maximumY = vertices[0].y; const float cosine = static_cast<float>(std::cos(static_cast<double>(-rotation))); const float sine = static_cast<float>(std::sin(static_cast<double>(-rotation)));
+    for (std::uint32_t index = 0; index < 4u; ++index) {
+        auto& vertex = vertices[index]; const float x = static_cast<float>(static_cast<double>(vertex.x) * cosine - static_cast<double>(vertex.y) * sine); vertex.y = static_cast<float>(static_cast<double>(vertex.x) * sine + static_cast<double>(vertex.y) * cosine); vertex.x = static_cast<float>(static_cast<double>(x) + projected.x); vertex.y = static_cast<float>(static_cast<double>(vertex.y) + projected.y); minimumX = std::min(minimumX, vertex.x); maximumX = std::max(maximumX, vertex.x); minimumY = std::min(minimumY, vertex.y); maximumY = std::max(maximumY, vertex.y); if (!moon) orbit(vertex.u, vertex.v, index);
+        const float inverseWidth = static_cast<float>(1.0 / width); const float inverseHeight = static_cast<float>(1.0 / height); const auto horizontal = ((corners[2] - corners[1]) * vertex.x) * inverseWidth; const auto vertical = ((corners[4] - corners[1]) * vertex.y) * inverseHeight; sampleDirection(false, corners[1] + (horizontal + vertical) - corners[0]); const float angle = static_cast<float>(std::atan2(static_cast<double>(direction.x), direction.y)); const float absolute = std::fabs(angle); const float elevation = static_cast<float>(1.0 - static_cast<double>(absolute) / 3.1415929794311523); const float fog = static_cast<float>(horizonFog(elevation, g_sfera_view_spatial_runtime.basis[0].x.f32) * 255.0); vertex.specular = 0u; vertex.diffuse = ((UINT32_MAX - static_cast<std::uint32_t>(static_cast<std::int64_t>(fog))) << 24) | 0x00ffffffu; vertex.z = 0.0f; vertex.rhw = 1.0f;
+    }
+    if (!(width > minimumX && maximumX > 0.0f && height > minimumY && maximumY > 0.0f)) return;
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.setAlphaBlending(D3DBLEND_SRCALPHA, moon ? D3DBLEND_INVSRCALPHA : D3DBLEND_ONE); SphereRender::SceneRenderer::bindTexture(g_sfera_textures.find(moon ? "moon" : "sun")); if (!moon) g_sfera_recovered_static_runtime.scene_state_09 = 1u; device.checkResult(device.native_device->SetFVF(0x1c4u), "SetFVF"); device.drawVertices(D3DPT_TRIANGLEFAN, 14u, vertices, 4u, nullptr, 0u, sizeof(SferaScreenVertex)); device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+}
+namespace SphereRender {
+SferaVec3F& SceneRenderer::observerPosition(SferaVec3F& output) { const auto handle = g_sfera_client_config_runtime.state_27 != 0u && g_sfera_world_objects.controlled_object_handle != UINT32_MAX ? g_sfera_world_objects.controlled_object_handle : 1u; output = g_sfera_world_objects.object(handle)->position; return output; }
+void SceneRenderer::setupEnvironment(std::uint32_t mode, bool useDefault, float time, SferaViewSpatialRuntime& output) {
+    for (auto& value : output.basis) value = {}; output.alternate_projection = 0u; std::fill(std::begin(output.reserved_31), std::end(output.reserved_31), 0u); output.position_offset = {}; output.scale = {}; output.world_anchor.x.u32 = 0u;
+    SferaVec3F position{}; observerPosition(position); const bool interior = !useDefault && position.y > 1000.0f && g_sfera_client_config_runtime.state_16 == 0u; output.alternate_projection = interior;
+    if (mode == 2u) output.scale.z.f32 = 0.03490658950558778f; else { const float tangent = static_cast<float>(std::tan(0.6000000238418579)); const float aspect = static_cast<float>(static_cast<double>(static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height)) / static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width)); const float scaled = static_cast<float>(static_cast<double>(tangent) / (aspect / 0.75)); const float angle = static_cast<float>(std::atan(static_cast<double>(scaled))); output.scale.z.f32 = static_cast<float>(angle * 2.0); }
+    output.scale.x.f32 = mode == 2u ? 997.0f : 0.10000000149011612f;
+    if (interior) {
+        output.scale.y.f32 = mode == 2u ? 1005.0f : 80.0f; output.basis[0].y.f32 = static_cast<float>(output.scale.y.f32 - 20.0); output.basis[0].z.f32 = output.scale.y.f32; output.basis[3].x.f32 = 59.0f; output.basis[3].y.f32 = 37.0f; output.basis[3].z.f32 = 12.0f; output.basis[2].x.f32 = 19.0f; output.basis[2].y.f32 = 47.0f; output.basis[2].z.f32 = 71.0f; const float length = static_cast<float>(std::sqrt(14.0)); output.position_offset.x.f32 = static_cast<float>(1.0 / length); output.position_offset.y.f32 = static_cast<float>(-3.0 / length); output.position_offset.z.f32 = static_cast<float>(2.0 / length);
+    } else {
+        const float halfAngle = static_cast<float>(output.scale.z.f32 * 0.5); const float cosine = static_cast<float>(std::cos(static_cast<double>(halfAngle))); output.scale.y.f32 = static_cast<float>(static_cast<double>(cosine) * g_sfera_main_input_state_runtime.motion_y); output.basis[0].y.f32 = 150.0f; output.basis[0].z.f32 = 200.0f;
+        const bool alternate = SphereWorld::Vegetation::alternatePatterns(); const auto& sky = *SferaAbi::pointer<SkyEnvironment>(alternate ? g_sfera_main_aux_runtime.secondary_world_manager : g_sfera_font_runtime.renderer); SferaVec3F direction{}; sky.sunDirection(time, direction); output.position_offset.x.f32 = direction.x; output.position_offset.y.f32 = direction.y; output.position_offset.z.f32 = direction.z;
+        auto& zones = *SferaAbi::pointer<EnvironmentZones>(alternate ? g_sfera_world_render_queue_runtime.entries[0] : g_sfera_recovered_static_runtime.scene_state_08); EnvironmentLighting lighting{}; zones.calculate(useDefault, position.x, position.z, time, sky, lighting); const SferaVec3F* colors[] = {&lighting.fogParameters, &lighting.fogColor, &lighting.ambientColor, &lighting.sunColor}; for (std::size_t index = 0u; index < 4u; ++index) { output.basis[index].x.f32 = colors[index]->x; output.basis[index].y.f32 = colors[index]->y; output.basis[index].z.f32 = colors[index]->z; }
+    }
+    if (g_sfera_client_config_runtime.state_13 != 0u) { output.basis[0].y.f32 = 1040.0f; output.basis[0].z.f32 = 1050.0f; output.scale.x.f32 = 100.0f; output.scale.y.f32 = 1050.0f; output.scale.z.f32 = 0.20000000298023224f; }
+    if (g_sfera_client_config_runtime.state_17 != 0u && mode != 2u) { output.basis[0].y.f32 = 180.0f; output.basis[0].z.f32 = 200.0f; output.scale.y.f32 = 200.0f; }
+    if (output.basis[0].z.f32 > output.scale.y.f32) { output.basis[0].z.f32 = output.scale.y.f32; if (output.basis[0].y.f32 + 20.0 > output.basis[0].z.f32) output.basis[0].y.f32 = std::max(0.0f, static_cast<float>(output.basis[0].z.f32 - 20.0)); }
+}
+namespace {
+std::uint32_t sceneAnimationFrame(Model& model, std::int32_t animation, std::int32_t frame) { if (animation < 0 || animation >= model.animation_count) { animation = 0; frame = 0; } std::uint32_t absolute = 0u; for (std::int32_t index = 0; index < animation; ++index) absolute += model.animation_lengths[index]; if (frame < 0 || frame >= model.animation_lengths[animation]) frame = 0; return absolute + static_cast<std::uint32_t>(frame); }
+}
+void SceneRenderer::drawObjects(bool updateVegetation) {
+    if (g_sfera_client_config_runtime.state_14 != 0u) return;
+    if (g_sfera_shadows && g_sfera_view_spatial_runtime.alternate_projection == 0u) { const auto sun = sceneVector(g_sfera_view_spatial_runtime.position_offset); auto& fade = g_sfera_graphics_runtime.view_scale; fade = 0.0f; if (sun.y < 0.4000000059604645f) fade = static_cast<float>(std::fabs(static_cast<float>(sun.y - 0.4000000059604645)) / 1.399999976158142); const float half = static_cast<float>(fade * 0.5); fade = static_cast<float>(1.0 - half); g_sfera_shadows->setDirection(sun, fade); g_sfera_shadows->save(); }
+    const auto savedGrassMode = g_sfera_main_render_runtime.grass_depth_mode; const auto controlled = g_sfera_world_objects.controlled_object_handle; if (controlled == UINT32_MAX || CharacterModels::checkedExtended(g_sfera_world_objects.object(controlled), "..\\ShareClientSeverCode\\main.cpp", 0x2873u)->position.y > 1000.0f) g_sfera_main_render_runtime.grass_depth_mode = 0u;
+    auto* vegetation = SferaAbi::pointer<SphereWorld::DynamicVegetation>(g_sfera_world_render_runtime.world_spatial_index); if (updateVegetation && g_sfera_main_render_runtime.grass_depth_mode == 2u) { vegetation->acquire(); vegetation->setDepthMode(g_sfera_main_render_runtime.grass_depth_mode != 0u); } if (updateVegetation) g_sfera_vegetation.updateCells();
+    const auto center = g_sfera_world_objects.object(1u)->position; g_sfera_world_spatial.gatherObjects(center, g_sfera_client_config_runtime.state_13 != 0u ? 80.0f : g_sfera_main_input_state_runtime.motion_y); const auto count = g_sfera_landscape_patch_lookup_runtime.active_count; g_sfera_main_command_state_runtime.draw_selection_state = count; auto* entries = g_sfera_scene_array_runtime.object_positions.dataAs<SceneSortEntry>();
+    for (std::uint32_t index = 0u; index < count; ++index) { const auto handle = *g_sfera_character_index_map.element<std::uint32_t>(index); const auto& object = *g_sfera_world_objects.object(handle); const auto delta = object.position - center; entries[index] = {handle, object.model_handle, static_cast<float>(std::sqrt(static_cast<float>(delta.dot(delta))))}; }
+    if (count > 0u) sortObjects(0, static_cast<std::int32_t>(count) - 1); if (updateVegetation && g_sfera_main_render_runtime.grass_depth_mode == 2u) vegetation->collectModels(reinterpret_cast<const std::uint32_t*>(entries), count); sceneDevice().vertices32.position = 30000u; g_sfera_window_runtime.render_state_word = 1u;
+    if (g_sfera_main_render_runtime.secondary_render_pass == 0u || g_sfera_options_dialog_runtime.reflection_quality > 1u) for (std::uint32_t index = 0u; index < count; ++index) {
+        const auto handle = entries[index].object; if (handle == 1u) continue; auto& object = *g_sfera_world_objects.object(handle); if (object.extended_pose_available == 1u && !static_cast<ExtendedWorldObject&>(object).render_enabled) continue; const auto* model = g_sfera_world_objects.model(object); if (model->animation_count != 0u) continue;
+        if (object.model_handle > 5000u) { const auto height = object.position.y; raiseDistantObject(handle); if (updateVegetation) drawModel(handle); object.position.y = height; } else drawModel(handle);
+    }
+    if (updateVegetation && g_sfera_main_render_runtime.grass_depth_mode == 2u) vegetation->update();
+    if (g_sfera_main_render_runtime.secondary_render_pass == 0u || g_sfera_options_dialog_runtime.reflection_quality > 2u) for (std::uint32_t index = 0u; index < count; ++index) {
+        const auto handle = entries[index].object; if (handle == 1u) continue; auto* base = g_sfera_world_objects.object(handle); if (base->extended_pose_available == 0u) continue; auto& object = *CharacterModels::checkedExtended(base, "..\\ShareClientSeverCode\\main.cpp", 0x28cbu); auto& model = *g_sfera_world_objects.model(object); if (model.animation_count == 0u || !object.render_enabled) continue;
+        if (object.render_cache_handle >= 0) { g_sfera_client_main_scalar_runtime.state_06 = sceneAnimationFrame(model, object.animation, object.frame); g_sfera_main_input_state_runtime.input_enabled = 0u; if (object.interpolation > 0.009999999776482582f) { g_sfera_main_input_state_runtime.input_enabled = 1u; g_sfera_sky_runtime.horizon_scale.f32 = object.interpolation; g_sfera_render_sample_runtime.material_base = sceneAnimationFrame(model, object.animation_secondary, object.frame_secondary); } }
+        if (model.trace_distance > 0.0f && updateVegetation && g_sfera_main_render_runtime.grass_depth_mode == 2u) vegetation->addInfluence(object.position.x, object.position.z, model.trace_distance, handle);
+        if (object.render_cache_handle >= 0) drawObject(handle); else { const auto shade = terrainShade(model.landscape_shadow_alpha, object.position.x, object.position.z); SferaAbi::pointer<CharacterModels>(g_sfera_recovered_static_runtime.render_state_08)->draw(handle, (shade << 16) | (shade << 8) | shade); }
+    }
+    g_sfera_main_render_runtime.grass_depth_mode = savedGrassMode;
+}
+namespace {
+std::uint32_t sceneColor(const SferaVec3Word& color) { return ((static_cast<std::uint32_t>(static_cast<std::int64_t>(color.x.f32)) & 255u) << 16) | ((static_cast<std::uint32_t>(static_cast<std::int64_t>(color.y.f32)) & 255u) << 8) | (static_cast<std::uint32_t>(static_cast<std::int64_t>(color.z.f32)) & 255u); }
+void sceneUnderwaterOverlay() {
+    const auto handle = g_sfera_world_objects.controlled_object_handle; std::uint32_t materialIndex = 0u; if (handle == UINT32_MAX || g_sfera_motion.surfaceInteraction(handle, &materialIndex) != 5u) return; const auto width = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width); const auto height = static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height); constexpr double textureScale = 0.20000000298023224; auto& x = g_sfera_main_input_state_runtime.camera_step; auto& y = g_sfera_recovered_static_runtime.cursor_accumulator;
+    if (x < 0.0f) x = static_cast<float>(x + width / textureScale); if (x > width / textureScale) x = static_cast<float>(x - width / textureScale); if (y < 0.0f) y = static_cast<float>(y + height / textureScale); if (y > height / textureScale) y = static_cast<float>(y - height / textureScale); const float u = static_cast<float>(-static_cast<double>(x) / static_cast<float>(width) * textureScale); const float v = static_cast<float>(-static_cast<double>(y) / static_cast<float>(height) * textureScale); const float right = static_cast<float>(u + textureScale); const float bottom = static_cast<float>(v + textureScale); const float uv[] = {u, v, right, v, right, bottom, u, bottom}; const auto& material = g_sfera_graphics_runtime.water_materials.at(materialIndex);
+    char texture[] = "ww1_00"; const auto animation = static_cast<std::int32_t>(g_sfera_landscape_render_runtime.rotation_step) / 2; texture[2] = static_cast<char>(static_cast<std::uint8_t>(material.primary_animation) + '0'); texture[4] = static_cast<char>(animation / 10 + '0'); texture[5] = static_cast<char>(animation % 10 + '0'); const auto heightFactor = std::fabs(g_sfera_view_spatial_runtime.position_offset.y.f32); const auto sun = sceneVector(g_sfera_view_spatial_runtime.basis[3]); const auto ambient = sceneVector(g_sfera_view_spatial_runtime.basis[2]); const auto channel = [heightFactor](float light, float base) { return static_cast<std::uint8_t>(std::min(255, static_cast<std::int32_t>(heightFactor * static_cast<double>(light) + base))); };
+    GameInterface::tintTexture(0, 0, width, height, texture, channel(sun.x, ambient.x), channel(sun.y, ambient.y), channel(sun.z, ambient.z), static_cast<std::uint32_t>(static_cast<std::int32_t>(material.primary_opacity * 255.0)), uv);
+}
+}
+void SceneRenderer::drawPass(std::uint32_t mode) {
+    auto& device = sceneDevice(); const auto width = mode == 1u || mode == 2u ? 256u : g_sfera_graphics_runtime.display_width; const auto height = mode == 1u || mode == 2u ? 256u : g_sfera_graphics_runtime.display_height; GameCamera::setupViewport(0u, 0u, width, height); device.checkResult(device.native_device->Clear(0u, nullptr, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xff000000u, 1.0f, 0u), "Clear");
+    const float fogStart = mode == 2u ? static_cast<float>(g_sfera_view_spatial_runtime.scale.y.f32 - 1.0) : g_sfera_view_spatial_runtime.basis[0].y.f32; const float fogEnd = mode == 2u ? g_sfera_view_spatial_runtime.scale.y.f32 : g_sfera_view_spatial_runtime.basis[0].z.f32; sceneRenderState(D3DRS_FOGSTART, std::bit_cast<std::uint32_t>(fogStart)); sceneRenderState(D3DRS_FOGEND, std::bit_cast<std::uint32_t>(fogEnd)); setAmbientColor(); if (mode == 0u) { SferaNatureManager::updateRain(); SferaNatureManager::updateLightning(); } sceneRenderState(D3DRS_FOGENABLE, FALSE);
+    if ((g_sfera_view_spatial_runtime.alternate_projection == 0u && g_sfera_client_config_runtime.state_19 == 1u) || mode == 1u) { const float rotation = static_cast<float>(SceneSky::drawStars()); SceneSky::drawSunMoon(rotation); if (SphereWorld::Vegetation::alternatePatterns()) SceneSky::drawLayers(*reinterpret_cast<const SceneSkyLayers*>(&g_sfera_view_render_objects_runtime.primary)); SceneSky::drawLayers(*reinterpret_cast<const SceneSkyLayers*>(&g_sfera_view_render_objects_runtime.alternate)); } else GameInterface::drawTexture(0, 0, g_sfera_graphics_runtime.display_width, g_sfera_graphics_runtime.display_height, "black", 255u, 0.0f, nullptr);
+    device.checkResult(device.native_device->Clear(0u, nullptr, D3DCLEAR_ZBUFFER, 0xff000000u, 1.0f, 0u), "Clear"); sceneRenderState(D3DRS_FOGENABLE, TRUE); g_sfera_terrain_renderer.drawLandscape(); sceneRenderState(D3DRS_FOGCOLOR, sceneColor(g_sfera_view_spatial_runtime.basis[1])); drawObjects(mode != 1u); if (mode != 0u) return;
+    setAmbientColor(); g_sfera_light_runtime.setDirectionalLight(sceneVector(g_sfera_view_spatial_runtime.position_offset) * -1.0f, sceneVector(g_sfera_view_spatial_runtime.basis[3])); g_sfera_terrain_renderer.drawWater(); SferaAbi::pointer<SferaBloodEffectRuntime>(g_sfera_blood_effect_instance)->render(); sceneRenderState(D3DRS_FOGENABLE, FALSE); g_sfera_server_wall.generateEffects(); g_sfera_effect_manager.renderParticles(); g_sfera_effect_manager.drawFlare(static_cast<std::int32_t>(g_sfera_flare_projection.x.f32), static_cast<std::int32_t>(g_sfera_flare_projection.y.f32), 220, g_sfera_recovered_static_runtime.scene_state_09 != 0u); sceneUnderwaterOverlay();
+}
+}
+namespace SphereRender {
+namespace {
+class SceneRenderTarget {
+public:
+    explicit SceneRenderTarget(IDirect3DTexture9& texture) : device(*sceneDevice().native_device) { device.GetRenderTarget(0u, &savedColor); device.GetDepthStencilSurface(&savedDepth); texture.GetSurfaceLevel(0u, &surface); }
+    ~SceneRenderTarget() { if (surface) surface->Release(); device.SetRenderTarget(0u, savedColor); device.SetDepthStencilSurface(savedDepth); if (savedColor) savedColor->Release(); if (savedDepth) savedDepth->Release(); }
+    void select() { device.SetRenderTarget(0u, surface); }
+    bool available() const { return surface != nullptr; }
+private:
+    IDirect3DDevice9& device;
+    IDirect3DSurface9* savedColor = nullptr;
+    IDirect3DSurface9* savedDepth = nullptr;
+    IDirect3DSurface9* surface = nullptr;
+};
+}
+void SceneRenderer::drawMinimap() {
+    setupEnvironment(2u, g_sfera_world_render_runtime.feature_toggle == 1u, g_sfera_graphics_runtime.environment_factor, g_sfera_view_spatial_runtime); auto& device = sceneDevice(); if (!device.beginScene()) return; g_sfera_world_render_runtime.scene_active = 1u;
+    { SceneRenderTarget target(*device.minimapTexture().native_texture); if (target.available()) { target.select(); GameCamera::beginFrame(2u, false, 0.0f); drawPass(2u); GameCamera::endFrame(2u, false); } }
+    device.checkResult(device.native_device->EndScene(), "EndScene"); g_sfera_world_render_runtime.scene_active = 0u;
+}
+void SceneRenderer::drawReflection() {
+    if (g_sfera_view_spatial_runtime.alternate_projection != 0u) return; g_sfera_window_runtime.distance_scratch.f32 = 100000.0f; g_sfera_main_input_state_runtime.motion_x = 1000000.0f; g_sfera_terrain_renderer.gatherReflectiveWater(); const float waterHeight = g_sfera_window_runtime.distance_scratch.f32; if (waterHeight > 99999.0f) return;
+    auto& device = sceneDevice(); g_sfera_main_render_runtime.secondary_render_pass = 1u; const float plane[] = {0.0f, -1.0f, 0.0f, waterHeight}; device.native_device->SetClipPlane(0u, plane); sceneRenderState(D3DRS_CLIPPLANEENABLE, 1u);
+    if (device.beginScene()) { { SceneRenderTarget target(*device.reflection_target->native_texture); target.select(); g_sfera_world_render_runtime.scene_active = 1u; GameCamera::beginFrame(1u, true, waterHeight); drawPass(1u); GameCamera::endFrame(1u, true); } device.checkResult(device.native_device->EndScene(), "EndScene"); g_sfera_world_render_runtime.scene_active = 0u; }
+    sceneRenderState(D3DRS_CLIPPLANEENABLE, 0u); g_sfera_main_render_runtime.secondary_render_pass = 0u;
+}
+void SceneRenderer::drawFrame() {
+    if (g_sfera_texture_cache_runtime.cache_enabled == 0u) { if (g_sfera_window_runtime.windowed == 0u) return; ::Sleep(100u); }
+    const auto timestamp = WorldClock::nowTicks(); auto& previous = g_sfera_grass_map_runtime.last_frame_timestamp; g_sfera_main_command_state_runtime.lighting_state = static_cast<std::uint32_t>(timestamp) - previous.low; previous.low = static_cast<std::uint32_t>(timestamp); previous.high = static_cast<std::uint32_t>(timestamp >> 32u); g_sfera_main_input_state_runtime.motion_y = g_sfera_client_config_runtime.state_25 != 0u ? g_sfera_graphics_runtime.saved_fog_distance : g_sfera_graphics_runtime.fog_distance; if (g_sfera_window_runtime.runtime_debug_enabled == 0u) g_sfera_graphics_runtime.environment_factor = g_sfera_graphics_runtime.view_parameter;
+    if (g_sfera_view_spatial_runtime.alternate_projection != 0u) drawMinimap(); setupEnvironment(0u, g_sfera_world_render_runtime.feature_toggle == 1u, g_sfera_graphics_runtime.environment_factor, g_sfera_view_spatial_runtime); if (g_sfera_options_dialog_runtime.reflection_quality > 0u && g_sfera_client_config_runtime.state_13 == 0u) drawReflection();
+    auto& device = sceneDevice(); if (device.beginScene()) {
+        const bool postEffects = device.supports_post_effects == 1u && g_sfera_graphics_runtime.post_effects_enabled == 1u; if (postEffects) { device.post_effects->setEnabled(true); device.post_effects->beginCapture(); } g_sfera_world_render_runtime.scene_active = 1u; GameCamera::beginFrame(0u, false, 0.0f); drawPass(0u); GameInterface::setRenderState(); sceneRenderState(D3DRS_ZENABLE, TRUE); sceneRenderState(D3DRS_ZWRITEENABLE, TRUE); GameInterface::drawAll(); sceneRenderState(D3DRS_ZENABLE, FALSE); sceneRenderState(D3DRS_ZWRITEENABLE, FALSE); if (postEffects) device.post_effects->compose(); WorldDebugDraw::draw(); GameInterface::drawFullscreenOverlay(); GameInterface::drawFrame(); GameCamera::endFrame(0u, false); device.checkResult(device.native_device->EndScene(), "EndScene"); waitForGpu(); g_sfera_world_render_runtime.scene_active = 0u; device.checkResult(device.native_device->Present(nullptr, nullptr, nullptr, nullptr), "Present");
+    }
+    SferaAbi::pointer<CharacterModels>(g_sfera_recovered_static_runtime.render_state_08)->updateLodDistance();
+}
+}
+namespace SphereRender {
+namespace {
+struct SceneModelVertex { SferaVec3F position; SferaVec3F normal; float u; float v; };
+void sceneWorldTransform(const SferaMatrix4x4F& world) { const auto transform = world.transposed(); sceneDevice().setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(transform)); }
+std::uint32_t sceneClassifyModel(const Model& model, const SferaMatrix4x4F& world) { std::array<SferaVec3F, 8> corners; for (std::size_t index = 0u; index < corners.size(); ++index) corners[index] = world.transformPoint(model.collision_corners.corners[index]); return reinterpret_cast<const SferaFrustumF*>(g_sfera_main_ui_state_runtime.clip_planes)->classifyPoints(corners); }
+void sceneSetFrame(const SferaMatrix4x4F& world) { g_sfera_character_frame_matrix = world; g_sfera_character_rotation_matrix = world; g_sfera_character_rotation_matrix.m[0][3] = 0.0f; g_sfera_character_rotation_matrix.m[1][3] = 0.0f; g_sfera_character_rotation_matrix.m[2][3] = 0.0f; }
+float sceneDistance(const SferaVec3F& first, const SferaVec3F& second) { const auto difference = first - second; return static_cast<float>(std::sqrt(static_cast<float>(difference.dot(difference)))); }
+float sceneUpdateFade(WorldObject& object, bool animated) { if (object.render_fade == -1.0f) object.render_fade = 1.0f; else { const double speed = animated && object.render_fade < 0.009999999776482582 ? 7.999999797903001e-05 : 0.0007999999797903001; const float amount = static_cast<float>(static_cast<std::int32_t>(g_sfera_main_command_state_runtime.lighting_state) * speed); object.render_fade = amount < 1.0f ? static_cast<float>(amount * (1.0 - object.render_fade) + object.render_fade) : 1.0f; } return object.render_fade; }
+void sceneScaleSun(float amount) { auto& sun = g_sfera_view_spatial_runtime.basis[3]; sun.x.f32 = static_cast<float>(static_cast<double>(sun.x.f32) * amount); sun.y.f32 = static_cast<float>(static_cast<double>(sun.y.f32) * amount); sun.z.f32 = static_cast<float>(static_cast<double>(sun.z.f32) * amount); }
+void sceneDirectionalLight() { g_sfera_light_runtime.setDirectionalLight(sceneVector(g_sfera_view_spatial_runtime.position_offset) * -1.0f, sceneVector(g_sfera_view_spatial_runtime.basis[3])); }
+void sceneDisableLights(std::uint32_t sourceLine) { for (std::uint32_t index = 0u; index < g_sfera_client_main_scalar_runtime.counter_03; ++index) if (g_sfera_light_runtime.render_candidate_active[index] == 1u) g_sfera_light_runtime.setActive(g_sfera_light_runtime.render_candidate_indices[index], false, sourceLine); }
+void sceneSelectLights(std::uint32_t mask) { for (std::uint32_t index = 0u, bit = 1u; index < g_sfera_client_main_scalar_runtime.counter_03; ++index, bit <<= 1u) { const bool enabled = (mask & bit) != 0u; auto& active = g_sfera_light_runtime.render_candidate_active[index]; if (enabled && active == 0u) { active = 1u; g_sfera_light_runtime.setActive(g_sfera_light_runtime.render_candidate_indices[index], true, 0x26aeu); } else if (!enabled && active == 1u) { active = 0u; g_sfera_light_runtime.setActive(g_sfera_light_runtime.render_candidate_indices[index], false, 0x26aeu); } } }
+void sceneMaterialAmbient(const Material& material) { const auto& ambient = g_sfera_view_spatial_runtime.basis[2]; const auto channel = [](float material, float ambient) { return static_cast<std::uint32_t>(std::min(255, static_cast<std::int32_t>(static_cast<double>(material) + ambient))) & 255u; }; sceneRenderState(D3DRS_AMBIENT, 0xff000000u | (channel(material.color[0], ambient.x.f32) << 16) | (channel(material.color[1], ambient.y.f32) << 8) | channel(material.color[2], ambient.z.f32)); }
+bool sceneModelVertices(const Model& model, const Submesh& part, const SferaVec3F* pulledCamera, bool vegetation) {
+    auto& device = sceneDevice(); auto* vertices = reinterpret_cast<SceneModelVertex*>(device.vertices32.lock(part.vertex_count)); if (!vertices) return false;
+    for (std::uint32_t index = 0u; index < part.vertex_count; ++index) { const auto absolute = part.first_vertex + index; const auto& source = model.vertices[absolute]; auto& vertex = vertices[index]; vertex = {source.position, source.normal, source.u, source.v}; if (vegetation && model.cached_vegetation_vertices) { const auto& cached = model.cached_vegetation_vertices[absolute]; vertex.position = cached.position; if (model.vegetation_kind == VegetationKind::Grass) vertex.normal = cached.normal; } else if (pulledCamera) vertex.position = vertex.position + (*pulledCamera - vertex.position) * 0.009999999776482582f; }
+    device.checkResult(device.vertices32.buffer->native_buffer->Unlock(), "VertexBuffer::Unlock"); return true;
+}
+void sceneDrawSubmesh(const Model& model, const Submesh& part, DynamicIndexStream& indices, std::uint32_t flags) {
+    auto& device = sceneDevice(); const auto count = static_cast<std::uint32_t>(part.face_count) * 3u; if (count > 3000u) WorldDiagnostics::fail("MNO_INDICES_IN_PRIMITIVE exceed"); auto* output = static_cast<std::uint16_t*>(indices.lock(count)); for (std::uint32_t face = 0u; face < part.face_count; ++face) std::copy(std::begin(model.faces[part.first_face + face].vertices), std::end(model.faces[part.first_face + face].vertices), output + face * 3u); device.checkResult(indices.buffer->native_buffer->Unlock(), "IndexBuffer::Unlock"); device.drawBuffer(device.vertices32.buffer->native_buffer, D3DPT_TRIANGLELIST, flags, device.vertices32.position, part.vertex_count, indices.buffer->native_buffer, count, indices.position, sizeof(SceneModelVertex)); indices.position += count; device.vertices32.position += part.vertex_count;
+}
+}
+void SceneRenderer::drawModel(std::uint32_t handle) {
+    if (g_sfera_recovered_static_runtime.scene_state_09 != 0u) g_sfera_recovered_static_runtime.scene_state_09 = SphereWorld::ContactQuery::lineOfSight(handle); auto& object = *g_sfera_world_objects.object(handle); auto& model = *g_sfera_world_objects.model(object); g_sfera_world_render_runtime.active_model = SferaAbi::address(&model); if (object.extended_pose_available == 1u && !static_cast<ExtendedWorldObject&>(object).render_enabled) return; const bool linked = object.extended_pose_available != 0u && static_cast<ExtendedWorldObject&>(object).parent_object_handle != 0u;
+    sceneSetFrame(linked ? *g_sfera_scene_array_runtime.character_matrices.element<SferaMatrix4x4F>(static_cast<ExtendedWorldObject&>(object).parent_link_slot) : SferaMatrix4x4F::fromEuler(object.position, object.rotation)); g_sfera_client_main_scalar_runtime.mode_01 = sceneClassifyModel(model, g_sfera_character_frame_matrix); if (g_sfera_client_main_scalar_runtime.mode_01 == 0u) return; const auto camera = g_sfera_character_frame_matrix.inverseTransformPoint(g_sfera_world_objects.object(1u)->position); WorldDebugDraw::drawBounds(handle); const auto savedSun = g_sfera_view_spatial_runtime.basis[3];
+    if (!linked) { sceneScaleSun(sceneUpdateFade(object, false)); sceneDirectionalLight(); activateObjectLights(handle); for (std::uint32_t index = 0u; index < g_sfera_client_main_scalar_runtime.counter_03; ++index) { auto& light = g_sfera_collision_scratch_runtime.light_candidates[index]; light.position = g_sfera_character_frame_matrix.inverseTransformPoint(light.position); const SferaVec3F radius{light.radius, light.radius, light.radius}; light.bounds_min = light.position - radius; light.bounds_max = light.position + radius; } }
+    classifyBone(model.render_flags); sceneWorldTransform(g_sfera_character_frame_matrix); const auto distance = sceneDistance(object.position, g_sfera_view_geometry_runtime.reference_points[0]); float fade = 0.0f, remaining = 0.0f; modelFade(static_cast<float>(static_cast<double>(model.radius) / distance * model.lod_distance), model.lod_power, fade, remaining); if (object.lighting_color == 0u) object.lighting_color = Material::randomColor(model.color_variation) | (terrainShade(model.landscape_shadow_alpha, object.position.x, object.position.z) << 24); std::uint32_t lastTexture = 0u;
+    for (std::uint32_t index = 0u; index < model.submesh_count; ++index) {
+        const auto& part = model.submeshes[index]; const auto& visible = g_sfera_render_lookup_runtime.entries[part.boneIndex()]; if (visible.resource == 0u) continue; const float opacity = (part.bone_and_flags & 0x80u) != 0u ? remaining : fade; const bool fading = opacity > 9.99999993922529e-09 && 1.0 - opacity > 9.99999993922529e-09; if (opacity < 9.99999993922529e-09) continue;
+        if (g_sfera_client_config_runtime.state_03 != 0u) g_sfera_shadows->projectModel(model, index, &g_sfera_character_frame_matrix); const auto& bone = model.bones[part.boneIndex()]; const bool pulled = bone.name[0] == '_' && bone.name[1] == 'z'; const bool alphaTest = bone.name[0] == '_' && (bone.name[1] == 's' || bone.name[1] == 'u' || bone.name[1] == 'c'); const auto* material = g_sfera_materials.at(part.material_index); if (!material) throw std::out_of_range("Model material index"); sceneMaterialAmbient(*material);
+        const auto shade = object.lighting_color >> 24; if (material->hasColorVariation || object.model_handle > 5000u) setMaterialColor(((object.lighting_color >> 16) & 255u) * shade >> 8u, ((object.lighting_color >> 8) & 255u) * shade >> 8u, (object.lighting_color & 255u) * shade >> 8u); else setMaterialColor(shade, shade, shade); sceneSelectLights(visible.mask); const auto texture = static_cast<std::uint32_t>(material->textures.at(0u)); if (texture != lastTexture) { bindTexture(texture); lastTexture = texture; }
+        if (!sceneModelVertices(model, part, pulled ? &camera : nullptr, true)) return; g_sfera_texture_cache_runtime.upload_serial = part.vertex_count; std::uint32_t flags = 0x10u | (g_sfera_main_render_runtime.secondary_render_pass == 0u && visible.resource == 2u ? 1u : 0u) | (alphaTest ? 4u : 0u); if (fading) sceneRenderState(D3DRS_ALPHAREF, static_cast<std::uint32_t>(static_cast<std::int64_t>((1.0 - opacity) * 127.0)) + 128u); else if (alphaTest) sceneRenderState(D3DRS_ALPHAREF, 128u); sceneDrawSubmesh(model, part, sceneDevice().indices_primary, flags); if (fading || alphaTest) sceneRenderState(D3DRS_ALPHAREF, 1u);
+    }
+    setMaterialColor(255, 255, 255); if (!linked) { g_sfera_view_spatial_runtime.basis[3] = savedSun; sceneDisableLights(0x2719u); }
+}
+}
+namespace SphereRender {
+void SceneRenderer::drawObject(std::uint32_t handle) {
+    if (g_sfera_recovered_static_runtime.scene_state_09 != 0u && handle != g_sfera_world_objects.controlled_object_handle) g_sfera_recovered_static_runtime.scene_state_09 = SphereWorld::ContactQuery::lineOfSight(handle); auto& object = *CharacterModels::checkedExtended(g_sfera_world_objects.object(handle), "..\\ShareClientSeverCode\\main.cpp", 0x273cu); auto& model = *g_sfera_world_objects.model(object); g_sfera_world_render_runtime.active_model = SferaAbi::address(&model); if (!object.render_enabled) return;
+    sceneSetFrame(SferaMatrix4x4F::fromEuler(object.position, object.rotation)); g_sfera_client_main_scalar_runtime.mode_01 = sceneClassifyModel(model, g_sfera_character_frame_matrix); if (g_sfera_client_main_scalar_runtime.mode_01 == 0u) return; WorldDebugDraw::drawBounds(handle); const auto distance = sceneDistance(object.position, g_sfera_view_geometry_runtime.reference_points[0]); g_sfera_main_command_state_runtime.lighting_enabled = static_cast<double>(model.radius) / distance * model.lod_distance < 0.20000000298023224;
+    const auto savedSun = g_sfera_view_spatial_runtime.basis[3]; const auto savedDirection = g_sfera_view_spatial_runtime.position_offset; const float fade = sceneUpdateFade(object, true); sceneScaleSun(fade); if (fade < 0.009999999776482582) { auto& direction = g_sfera_view_spatial_runtime.position_offset; direction.x.f32 = 1.0f; direction.y.f32 = 0.0f; direction.z.f32 = 0.0f; SferaVec3F::rotatePair(direction.x.f32, direction.z.f32, static_cast<float>(object.rotation.x + 1.1693706972350526)); const float fallback = static_cast<float>(45.0 - fade * 4500.0); auto& color = g_sfera_view_spatial_runtime.basis[3]; color.x.f32 = fallback; color.y.f32 = fallback; color.z.f32 = fallback; }
+    sceneDirectionalLight(); activateObjectLights(handle); const bool shadow = handle != g_sfera_world_objects.controlled_object_handle && g_sfera_shadows->quality < 4u && object.scale == 1.0f; if (shadow) g_sfera_shadows->selectObjectLight(object); ModelPose::updateBone(g_sfera_character_frame_matrix, model.render_flags); object.effect_frame_position_a = sceneVector(g_sfera_scene_vector_runtime.transform_scratch); object.effect_frame_position_b = sceneVector(g_sfera_scene_vector_runtime.frame_101_position);
+    float extension = 0.0f; const float originalShadowScale = model.shadow_scale;
+    if (shadow) { const auto shadowDistance = sceneDistance(g_sfera_world_objects.object(1u)->position, object.position); const bool distant = shadowDistance > 15.0f; const float opacity = distant ? std::max(0.0f, static_cast<float>(1.0 - static_cast<float>(shadowDistance - 15.0) / 30.0)) : 1.0f; SphereWorld::ContactQuery::updateBounds(handle); extension = g_sfera_shadows->projectionExtension(object); model.shadow_scale = static_cast<float>(1.4900000095367432 / (static_cast<double>(originalShadowScale) + extension)); g_sfera_shadows->prepareModel(object, nullptr, opacity, distant ? 1u : 0u); }
+    auto& device = sceneDevice(); if (object.scale != 1.0f) { device.setWhiteMaterial(object.scale); device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA); } setObjectMaterial(object, model.landscape_shadow_alpha, model.color_variation); std::uint32_t lastTexture = 0u;
+    for (std::uint32_t index = 0u; index < model.submesh_count; ++index) {
+        const auto& part = model.submeshes[index]; const auto bone = part.boneIndex(); if ((part.bone_and_flags >> 7u) != static_cast<std::uint8_t>(g_sfera_main_command_state_runtime.lighting_enabled)) continue; const auto slot = model.bones[bone].animation.attachment_slot; if (handle == g_sfera_world_objects.controlled_object_handle && (slot == 102u || slot == 103u)) continue;
+        sceneWorldTransform(*g_sfera_scene_array_runtime.model_matrices.element<SferaMatrix4x4F>(bone)); g_sfera_shadows->projectModel(model, index); const auto* material = g_sfera_materials.at(part.material_index); if (!material) throw std::out_of_range("Model material index"); sceneMaterialAmbient(*material); const auto texture = static_cast<std::uint32_t>(material->textures.at(object.render_cache_handle)); if (texture != lastTexture) { bindTexture(texture); lastTexture = texture; } if (!sceneModelVertices(model, part, nullptr, false)) return; const auto flags = 0x10u | (g_sfera_main_render_runtime.secondary_render_pass == 0u && g_sfera_client_main_scalar_runtime.mode_01 == 2u ? 1u : 0u); sceneDrawSubmesh(model, part, device.indices_secondary, flags);
+    }
+    setMaterialColor(255, 255, 255); if (object.scale != 1.0f) { D3DMATERIAL9 reset{}; reset.Diffuse = {1.0f, 1.0f, 1.0f, 1.0f}; reset.Ambient = {1.0f, 1.0f, 1.0f, 0.0f}; device.checkResult(device.native_device->SetMaterial(&reset), "SetMaterial"); device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE); }
+    setOpacity(1u); for (const auto linked : object.linked_objects) if (linked != 0u) drawModel(linked); g_sfera_view_spatial_runtime.basis[3] = savedSun; g_sfera_view_spatial_runtime.position_offset = savedDirection; setOpacity(0u); if (shadow) { ShadowMap::drawObject(object, originalShadowScale, extension); model.shadow_scale = originalShadowScale; } sceneDisableLights(0x2826u);
+}
+}
+
+
+namespace EffectRendering {
+    int ambientBrightness() {
+        const auto& light = g_sfera_view_spatial_runtime.basis[2];
+        return static_cast<int>(static_cast<double>(light.y.f32) * 0.44999998807907104 + static_cast<double>(light.x.f32) * 0.3100000023841858 + static_cast<double>(light.z.f32) * 0.23999999463558197);
+    }
+    void renderState(CD3D9Device& device, D3DRENDERSTATETYPE state, DWORD value) { device.checkResult(device.native_device->SetRenderState(state, value), "SetRenderState"); }
+    void samplerState(CD3D9Device& device, D3DSAMPLERSTATETYPE state, DWORD value) { device.checkResult(device.native_device->SetSamplerState(0u, state, value), "SetSamplerState"); }
+    void identityWorld(CD3D9Device& device) { const auto identity = SferaMatrix4x4F::identity(); device.setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(identity)); }
+    int visibilityAlpha(const SferaVec3F& position) {
+        const auto& view = g_sfera_model_transform_scratch_matrix;
+        const float dx = static_cast<float>(static_cast<double>(position.x) - view.m[0][3]);
+        const float dy = static_cast<float>(static_cast<double>(position.y) - view.m[1][3]);
+        const float dz = static_cast<float>(static_cast<double>(position.z) - view.m[2][3]);
+        const float distance = static_cast<float>(static_cast<double>(dx) * view.m[0][2] + static_cast<double>(dy) * view.m[1][2] + static_cast<double>(dz) * view.m[2][2]);
+        const auto& limits = g_sfera_view_spatial_runtime.basis[0];
+        if (distance < limits.y.f32) return 255;
+        if (distance > limits.z.f32) return 0;
+        return static_cast<int>((static_cast<double>(limits.z.f32) - distance) * 255.0 / (static_cast<double>(limits.z.f32) - limits.y.f32));
+    }
+    struct ParticleBatch { std::uint32_t first_index; std::uint32_t index_count; std::uint32_t additive; std::int32_t texture; };
+}
+void SferaEffectManager::sortRenderSlots() {
+    if (render_slots.data == 0u) { render_order.clear(); return; }
+    render_order.resize(render_slot_count);
+    for (std::uint32_t index = 0u; index < render_slot_count; ++index) render_order[index] = static_cast<std::uint16_t>(index);
+    const auto* slots = render_slots.dataAs<SferaEffectRenderSlot>();
+    std::sort(render_order.begin(), render_order.end(), [&](std::uint16_t left, std::uint16_t right) { const auto& a = slots[left]; const auto& b = slots[right]; const auto af = a.primitive_kind & 1u; const auto bf = b.primitive_kind & 1u; return af != bf ? af < bf : a.resource_id < b.resource_id; });
+}
+std::uint32_t SferaEffectManager::listenerKey(std::uint32_t handle) const { return static_cast<std::int32_t>(handle) < 1 ? 0u : SferaAbi::pointer<const SferaActiveEffect>(handle)->listener_key; }
+void SferaEffectManager::removeActiveEffect(std::uint32_t handle) { if (handle != 0u && handle != UINT32_MAX) removeActiveEffect(*SferaAbi::pointer<SferaActiveEffect>(handle)); }
+void SferaEffectManager::renderParticles() {
+    using namespace EffectRendering;
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    if (device.vertices28.buffer->native_buffer == nullptr || device.indices_secondary.buffer->native_buffer == nullptr) return;
+    ++generation;
+    if (render_slot_count == 0u) return;
+    auto* slots = render_slots.dataAs<SferaEffectRenderSlot>();
+    const int ambient = ambientBrightness() + 20;
+    std::vector<std::uint16_t> indices;
+    std::vector<ParticleBatch> batches;
+    indices.reserve(30000u);
+    batches.reserve(render_slot_count);
+    auto* vertices = reinterpret_cast<SferaBloodVertex*>(device.vertices28.lock(device.vertices28.capacity == 0 ? 30000 : device.vertices28.capacity));
+    std::uint32_t vertex_count = 0u;
+    int bound_texture = -1;
+    std::uint32_t active_blend = UINT32_MAX;
+    identityWorld(device);
+    renderState(device, D3DRS_ZWRITEENABLE, FALSE);
+    const auto flush = [&] {
+        device.checkResult(device.vertices28.buffer->native_buffer->Unlock(), "VertexBuffer::Unlock");
+        const auto vertex_start = device.vertices28.position;
+        device.vertices28.position += device.vertices28.capacity;
+        for (const auto& batch : batches) {
+            if (active_blend != batch.additive) { active_blend = batch.additive; device.setAlphaBlending(D3DBLEND_SRCALPHA, batch.additive == 0u ? D3DBLEND_INVSRCALPHA : D3DBLEND_ONE); }
+            if (bound_texture != batch.texture) { bound_texture = batch.texture; if (bound_texture != -1) SphereRender::SceneRenderer::bindTexture(bound_texture); }
+            if (batch.index_count == 0u) continue;
+            std::memcpy(device.indices_secondary.lock(batch.index_count), indices.data() + batch.first_index, batch.index_count * sizeof(std::uint16_t));
+            device.checkResult(device.indices_secondary.buffer->native_buffer->Unlock(), "IndexBuffer::Unlock");
+            device.drawBuffer(device.vertices28.buffer->native_buffer, D3DPT_TRIANGLELIST, 6u, vertex_start, vertex_count, device.indices_secondary.buffer->native_buffer, batch.index_count, device.indices_secondary.position, sizeof(SferaBloodVertex));
+            device.indices_secondary.position += batch.index_count;
+        }
+        vertex_count = 0u;
+        indices.clear();
+        batches.clear();
+    };
+    for (std::uint32_t slot_index = 0u; slot_index < render_slot_count; ++slot_index) {
+        auto& slot = slots[render_order[slot_index]];
+        const auto additive = slot.primitive_kind & 1u;
+        if (batches.empty() || batches.back().texture != slot.resource_id || batches.back().additive != additive) batches.push_back({static_cast<std::uint32_t>(indices.size()), 0u, additive, slot.resource_id});
+        const auto brightness = std::min(static_cast<std::int32_t>(slot.blend_mode + ambient), 255);
+        if ((slot.primitive_kind & 2u) == 0u) { slot.uv[0][0] = 0.0f; slot.uv[0][1] = 0.0f; slot.uv[1][0] = 1.0f; slot.uv[1][1] = 0.0f; slot.uv[2][0] = 1.0f; slot.uv[2][1] = 1.0f; slot.uv[3][0] = 0.0f; slot.uv[3][1] = 1.0f; }
+        for (std::size_t vertex = 0u; vertex < 4u; ++vertex) {
+            const auto scale = [&](std::size_t channel, int factor) { return static_cast<std::uint32_t>(static_cast<std::int32_t>(slot.color[channel][vertex] * factor) / 255); };
+            auto& output = vertices[vertex_count + vertex];
+            output.position = slot.position[vertex];
+            output.diffuse_color = (scale(3u, visibilityAlpha(output.position)) << 24u) | ((scale(0u, brightness) & 255u) << 16u) | ((scale(1u, brightness) & 255u) << 8u) | (scale(2u, brightness) & 255u);
+            output.specular_color = 0u;
+            output.u = slot.uv[vertex][0];
+            output.v = slot.uv[vertex][1];
+        }
+        for (std::uint16_t corner : {0u, 1u, 2u, 2u, 3u, 0u}) indices.push_back(static_cast<std::uint16_t>(vertex_count + corner));
+        batches.back().index_count += 6u;
+        vertex_count += 4u;
+        if (static_cast<std::int32_t>(vertex_count) > device.vertices28.capacity - 8 || indices.size() > 29994u) { flush(); vertices = reinterpret_cast<SferaBloodVertex*>(device.vertices28.lock(device.vertices28.capacity)); }
+    }
+    flush();
+    device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    renderState(device, D3DRS_ZWRITEENABLE, TRUE);
+}
+void SferaBloodEffectRuntime::render() {
+    using namespace EffectRendering;
+    if (active_count == 0u) { phase = 0.0f; return; }
+    for (auto& spot : spots) if (spot.life != 0.0f) { spot.life = static_cast<float>(static_cast<double>(spot.life) - phase); if (spot.life < 0.0f) { spot.life = 0.0f; spot.vertex_count = 0u; --active_count; } }
+    phase = 0.0f;
+    const int brightness = ambientBrightness() + 100;
+    const auto red = static_cast<std::uint32_t>(brightness * 155 / 255) & 255u;
+    const auto other = static_cast<std::uint32_t>(brightness * 20 / 255) & 255u;
+    if (active_count == 0u) return;
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    SphereRender::SceneRenderer::bindTexture(texture_id);
+    identityWorld(device);
+    renderState(device, D3DRS_RANGEFOGENABLE, FALSE);
+    renderState(device, D3DRS_ZWRITEENABLE, FALSE);
+    device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA);
+    samplerState(device, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+    samplerState(device, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+    auto* output = reinterpret_cast<SferaBloodVertex*>(device.vertices28.lock(3000));
+    std::uint32_t vertex_count = 0u;
+    for (const auto& spot : spots) if (spot.life != 0.0f) {
+        if (vertex_count + spot.vertex_count > 3000u) { vertex_count = 3000u; break; }
+        const auto color = (static_cast<std::uint32_t>(static_cast<std::int64_t>(static_cast<double>(spot.life) * 255.0)) << 24u) | (red << 16u) | (other << 8u) | other;
+        for (std::uint32_t vertex = 0u; vertex < spot.vertex_count; ++vertex) { output[vertex_count] = spot.vertices[vertex]; output[vertex_count].diffuse_color = color; output[vertex_count].specular_color = 0u; ++vertex_count; }
+    }
+    device.checkResult(device.vertices28.buffer->native_buffer->Unlock(), "VertexBuffer::Unlock");
+    device.drawBuffer(device.vertices28.buffer->native_buffer, D3DPT_TRIANGLELIST, 0u, device.vertices28.position, vertex_count, nullptr, 0u, 0u, sizeof(SferaBloodVertex));
+    device.vertices28.position += 3000u;
+    renderState(device, D3DRS_RANGEFOGENABLE, TRUE);
+    renderState(device, D3DRS_ZWRITEENABLE, TRUE);
+    samplerState(device, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP);
+}
+void SferaEffectManager::drawFlare(int x, int y, int size, bool enabled) {
+    if (flare_enabled != static_cast<std::uint32_t>(enabled)) { flare_enabled = enabled; flare_transition = enabled ? 2u : 1u; }
+    if (!enabled && flare_alpha == 0u) return;
+    const auto texture = g_sfera_textures.find("fx_flare");
+    const int width = static_cast<int>(static_cast<double>(size * 640) / static_cast<std::int32_t>(g_sfera_graphics_runtime.display_width));
+    const int height = static_cast<int>(static_cast<double>(size * 480) / static_cast<std::int32_t>(g_sfera_graphics_runtime.display_height));
+    const int left = x - (width >> 1);
+    const int top = y - (height >> 1);
+    const float environment = g_sfera_graphics_runtime.environment_factor;
+    std::uint32_t intensity = 0u;
+    if (environment < 0.3499999940395355f) intensity = std::min(static_cast<std::uint32_t>((0.3499999940395355 - environment) * 2550.0), 255u);
+    if (environment > 0.699999988079071f) intensity = std::min(static_cast<std::uint32_t>((static_cast<double>(environment) - 0.699999988079071) * 2550.0), 255u);
+    if (environment < 0.1899999976158142f || environment > 0.8299999833106995f) intensity = 0u;
+    const std::uint32_t alpha = flare_alpha * intensity >> 8u;
+    if (alpha == 0u) return;
+    const float uv[8]{0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f};
+    SphereUI::InterfaceRenderer::setSpriteRenderMode(2u);
+    GameInterface::drawSpriteTexture((alpha << 24u) | 0xFF640Fu, texture, static_cast<float>(left), static_cast<float>(top), static_cast<float>(left + width), static_cast<float>(top + height), uv, true);
+    SphereUI::InterfaceRenderer::setSpriteRenderMode(0u);
+}
+
+
+void ShadowRasterizer::flushSpans(int height, const D3DLOCKED_RECT& surface, bool displaced) {
+    auto* destination = static_cast<std::uint8_t*>(surface.pBits);
+    const auto stride = ((static_cast<std::uint32_t>(surface.Pitch) >> 1u) & 0xFFFFu) * 2u;
+    for (int y = 0; y < height; ++y, destination += stride) {
+        auto& span = displaced ? rows[y].displaced : rows[y].active;
+        if (span.left >= span.right) continue;
+        std::fill_n(reinterpret_cast<std::uint16_t*>(destination) + span.left, span.right - span.left + 1, static_cast<std::uint16_t>(span.color));
+        span.left = INT32_MAX;
+        span.right = INT32_MIN;
+    }
+}
+void ShadowRasterizer::flush(int height, const D3DLOCKED_RECT& surface) { flushSpans(height, surface, false); pending = false; }
+void ShadowRasterizer::polygon(std::uint32_t color, std::span<const ShadowPoint> points, int width, int height, const D3DLOCKED_RECT& surface) {
+    if (points.empty()) return;
+    int lowest = 0;
+    for (int index = 1; index < static_cast<int>(points.size()); ++index) if (points[index].y < points[lowest].y) lowest = index;
+    int row = std::max(static_cast<int>(points[lowest].y), 0);
+    int left_vertex = lowest;
+    int right_vertex = lowest;
+    int remaining = static_cast<int>(points.size());
+    int left_end = row - 1;
+    int right_end = row - 1;
+    float left_slope = 0.0f;
+    float right_slope = 0.0f;
+    float left_x = 0.0f;
+    float right_x = 0.0f;
+    bool displaced = false;
+    const auto advance = [&](int step, int& vertex, int& end, float& slope, float& x) {
+        const int previous = vertex;
+        vertex = (vertex + step + static_cast<int>(points.size())) % static_cast<int>(points.size());
+        end = std::min(static_cast<int>(points[vertex].y), height);
+        --remaining;
+        slope = static_cast<float>((static_cast<double>(points[vertex].x) - points[previous].x) / (static_cast<double>(points[vertex].y) - points[previous].y + 6.018531076210112e-36));
+        x = static_cast<float>((static_cast<double>(row) + 0.5 - points[previous].y) * slope + points[previous].x);
+    };
+    do {
+        while (left_end <= row && remaining > 0) advance(-1, left_vertex, left_end, left_slope, left_x);
+        while (right_end <= row && remaining > 0) advance(1, right_vertex, right_end, right_slope, right_x);
+        while (row < left_end && row < right_end) {
+            const int left = std::max(static_cast<int>(left_x), 0);
+            const int right = std::min(static_cast<int>(right_x), width - 1);
+            left_x = static_cast<float>(static_cast<double>(left_x) + left_slope);
+            right_x = static_cast<float>(static_cast<double>(right_x) + right_slope);
+            auto& spans = rows[row++];
+            if (left > right) continue;
+            auto& active = spans.active;
+            if (active.left == INT32_MAX) { active = {left, right, color}; pending = true; continue; }
+            if (active.color != color || right < active.left || left > active.right) { spans.displaced = active; active = {left, right, color}; displaced = true; continue; }
+            active.left = std::min(active.left, left);
+            active.right = std::max(active.right, right);
+        }
+    } while (remaining > 0);
+    if (displaced) flushSpans(height, surface, true);
+}
+
+
+ShadowMap::~ShadowMap() { for (auto*& texture : textures) if (texture != nullptr) { texture->Release(); texture = nullptr; } }
+void ShadowMap::createTextures() {
+    for (std::size_t index = 0u; index < textures.size(); ++index) {
+        auto*& texture = textures[index];
+        if (texture != nullptr) { texture->Release(); texture = nullptr; }
+        auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+        device.checkResult(D3DXCreateTexture(device.native_device, 256u >> index, 256u >> index, 1u, 0u, D3DFMT_R5G6B5, D3DPOOL_MANAGED, &texture), "D3DXCreateTexture");
+    }
+    spot_texture = g_sfera_textures.find("shadspot");
+    for (auto* texture : textures) if (texture != nullptr) { D3DSURFACE_DESC description{}; D3DLOCKED_RECT rectangle{}; texture->LockRect(0u, &rectangle, nullptr, D3DLOCK_DISCARD); texture->GetLevelDesc(0u, &description); std::memset(rectangle.pBits, 255, description.Width * description.Height * 2u); texture->UnlockRect(0u); }
+}
+void ShadowMap::initialize(std::uint32_t default_quality) {
+    std::uint32_t value = default_quality;
+    SphereUI::InterfaceConfiguration::open("config.cfg");
+    SphereUI::InterfaceConfiguration::readInteger("SHAD", value);
+    if (g_sfera_shadows == nullptr) { g_sfera_shadows = std::make_unique<ShadowMap>(); g_sfera_shadows->createTextures(); g_sfera_shadows->quality = static_cast<std::uint8_t>(value); }
+}
+void ShadowMap::shutdown() { g_sfera_shadows.reset(); }
+void ShadowMap::setDirection(const SferaVec3F& value, float opacity) {
+    fade = std::clamp(opacity, 0.0f, 1.0f);
+    light_basis = SferaMatrix4x4F::identity();
+    if (quality == 3u) { light_basis.m[1][1] = 0.0f; light_basis.m[2][1] = -1.0f; light_basis.m[1][2] = -1.0f; light_basis.m[2][2] = 0.0f; direction = {0.0f, -1.0f, 0.0f}; return; }
+    direction = value;
+    direction.y = std::min(direction.y, -0.10000000149011612f);
+    const float squared = static_cast<float>(static_cast<double>(direction.x) * direction.x + static_cast<double>(direction.y) * direction.y + static_cast<double>(direction.z) * direction.z);
+    const float length = static_cast<float>(std::sqrt(static_cast<double>(squared)));
+    const float yaw = -static_cast<float>(std::atan2(static_cast<double>(direction.x), static_cast<double>(direction.z)));
+    const float ratio = length == 0.0f ? 0.0f : static_cast<float>(static_cast<double>(direction.y) / length);
+    const float pitch = std::min(length == 0.0f ? 0.0f : static_cast<float>(std::asin(static_cast<double>(ratio))), -0.7853982448577881f);
+    const float sy = static_cast<float>(std::sin(static_cast<double>(yaw)));
+    const float cy = static_cast<float>(std::cos(static_cast<double>(yaw)));
+    const float sp = static_cast<float>(std::sin(static_cast<double>(pitch)));
+    const float cp = static_cast<float>(std::cos(static_cast<double>(pitch)));
+    light_basis.m[0][0] = cy;
+    light_basis.m[1][0] = static_cast<float>(static_cast<double>(sp) * sy);
+    light_basis.m[2][0] = static_cast<float>(-static_cast<double>(sy) * cp);
+    light_basis.m[1][1] = cp;
+    light_basis.m[2][1] = sp;
+    light_basis.m[0][2] = sy;
+    light_basis.m[1][2] = static_cast<float>(-static_cast<double>(sp) * cy);
+    light_basis.m[2][2] = static_cast<float>(static_cast<double>(cy) * cp);
+}
+bool ShadowMap::prepareModel(WorldObject& object, const SferaVec3F* position, float opacity, std::uint8_t detail) { const auto* model = g_sfera_world_objects.model(object); return prepareGeometry(object, position, opacity, detail, model->shadow_scale, model->shadow_spread); }
+bool ShadowMap::prepareGeometry(WorldObject& object, const SferaVec3F* position, float opacity, std::uint8_t detail, float scale, float spot_scale) {
+    SferaVec3F center = position == nullptr ? object.position : *position;
+    if (position == nullptr) center.y = static_cast<float>(static_cast<double>(center.y) - 0.800000011920929);
+    valid = false;
+    origin = direction + center;
+    if (quality == 4u) return true;
+    const auto shade = static_cast<std::uint32_t>(static_cast<std::int64_t>(((1.0 - opacity) * (1.0 - fade) + fade) * 255.0));
+    if (shade >= 255u) return true;
+    raster_color = 0xFF000000u | ((shade & 255u) * 0x10101u);
+    spot_color = 0xFF000000u | ((~shade & 255u) * 0x10101u);
+    if (quality == 3u) {
+        if (spot_texture == -1) return false;
+        projection = {};
+        const float factor = static_cast<float>(1.0 / spot_scale);
+        projection.m[0][0] = factor;
+        projection.m[1][2] = -factor;
+        projection.m[2][1] = -factor;
+        projection.m[3][3] = 1.0f;
+        projection.m[0][3] = static_cast<float>(-static_cast<double>(center.x) * factor);
+        projection.m[1][3] = static_cast<float>(-static_cast<double>(center.z) * -factor);
+        projection.m[2][3] = static_cast<float>(-static_cast<double>(center.y) * -factor);
+    } else {
+        level = std::min(static_cast<std::uint8_t>(quality + detail), static_cast<std::uint8_t>(2u));
+        auto* texture = textures[level];
+        if (texture == nullptr) return false;
+        texture->LockRect(0u, &locked, nullptr, D3DLOCK_DISCARD);
+        texture->GetLevelDesc(0u, &surface);
+        if (locked.pBits == nullptr) return false;
+        std::memset(locked.pBits, 255, surface.Width * surface.Height * 2u);
+        projection = light_basis;
+        projection.scaleAxes({scale, scale, scale});
+        for (std::size_t row = 0u; row < 4u; ++row) projection.m[row][3] = static_cast<float>(static_cast<double>(projection.m[row][0]) * -center.x + static_cast<double>(projection.m[row][1]) * -center.y + static_cast<double>(projection.m[row][2]) * -center.z + projection.m[row][3]);
+    }
+    valid = true;
+    return true;
+}
+void ShadowMap::projectVertices(const void* vertices, std::uint32_t vertex_count, const std::uint16_t* indices, std::uint32_t index_count, std::uint32_t stride) {
+    if (quality >= 3u || !valid || textures[level] == nullptr) return;
+    const auto world = reinterpret_cast<const SferaMatrix4x4F&>(g_sfera_graphics_runtime.d3d_runtime->world_transform).transposed();
+    const auto transform = projection.multiplied(world);
+    projected_points.resize(vertex_count);
+    for (std::uint32_t index = 0u; index < vertex_count; ++index) {
+        const auto& point = *reinterpret_cast<const SferaVec3F*>(static_cast<const std::uint8_t*>(vertices) + index * stride);
+        const auto coordinate = [&](std::size_t row, std::uint32_t extent) { return static_cast<float>((static_cast<double>(transform.m[row][0]) * point.x + static_cast<double>(transform.m[row][1]) * point.y + static_cast<double>(transform.m[row][2]) * point.z + transform.m[row][3] + 0.5) * extent); };
+        projected_points[index] = {coordinate(0u, surface.Width), coordinate(1u, surface.Height)};
+    }
+    const auto color = ((raster_color >> 8u) & 0xF800u) | ((raster_color >> 5u) & 0x07E0u) | ((raster_color >> 3u) & 0x001Fu);
+    for (std::uint32_t face = 0u; face < index_count; face += 3u) {
+        std::array<ShadowPoint, 3> points{};
+        for (std::size_t corner = 0u; corner < 3u; ++corner) { const auto& point = projected_points[indices[face + corner]]; points[corner] = {static_cast<float>(static_cast<int>(point.x)), static_cast<float>(static_cast<int>(point.y))}; }
+        if ((static_cast<double>(points[1].x) - points[0].x) * (static_cast<double>(points[2].y) - points[0].y) < (static_cast<double>(points[2].x) - points[0].x) * (static_cast<double>(points[1].y) - points[0].y)) continue;
+        rasterizer.polygon(color, points, surface.Width, surface.Height, locked);
+    }
+}
+void ShadowMap::projectModel(const SphereRender::Model& model, std::uint32_t index, const SferaMatrix4x4F* world) {
+    if (quality >= 3u || !valid || textures[level] == nullptr) return;
+    if (world != nullptr) { const auto transposed = world->transposed(); g_sfera_graphics_runtime.d3d_runtime->setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(transposed)); }
+    const auto& submesh = model.submeshes[index];
+    const auto face_count = std::min(static_cast<std::uint32_t>(submesh.face_count), 334u);
+    for (std::uint32_t face = 0u; face < face_count; ++face) { const auto& source = model.faces[submesh.first_face + face]; face_indices[face * 3u] = source.vertices[0]; face_indices[face * 3u + 1u] = source.vertices[2]; face_indices[face * 3u + 2u] = source.vertices[1]; }
+    projectVertices(model.vertices + submesh.first_vertex, submesh.vertex_count, face_indices.data(), face_count * 3u, sizeof(SphereRender::ModelVertex));
+}
+void ShadowMap::save() { saved_fade = fade; saved_direction = direction; saved_basis = light_basis; }
+void ShadowMap::restore() { fade = saved_fade; direction = saved_direction; light_basis = saved_basis; }
+void ShadowMap::draw(const SferaVec3F* vertices, std::uint32_t triangle_count) {
+    using namespace EffectRendering;
+    if (!valid) return;
+    if (quality < 3u) {
+        if (textures[level] == nullptr) return;
+        if (rasterizer.pending) rasterizer.flush(surface.Height, locked);
+        auto* bytes = static_cast<std::uint8_t*>(locked.pBits);
+        std::fill_n(reinterpret_cast<std::uint16_t*>(bytes), surface.Width, 0xFFFFu);
+        std::fill_n(reinterpret_cast<std::uint16_t*>(bytes + (surface.Height - 1u) * locked.Pitch), surface.Width, 0xFFFFu);
+        for (std::uint32_t row = 0u; row < surface.Height; ++row) { auto* line = reinterpret_cast<std::uint16_t*>(bytes + row * locked.Pitch); line[0] = 0xFFFFu; line[surface.Width - 1u] = 0xFFFFu; }
+        textures[level]->UnlockRect(0u);
+    }
+    if (triangle_count == 0u) return;
+    valid = false;
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    samplerState(device, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+    samplerState(device, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+    identityWorld(device);
+    device.setAlphaBlending(D3DBLEND_ZERO, D3DBLEND_SRCCOLOR);
+    renderState(device, D3DRS_FOGENABLE, FALSE);
+    renderState(device, D3DRS_ZWRITEENABLE, FALSE);
+    if (quality == 3u) {
+        SphereRender::SceneRenderer::bindTexture(spot_texture);
+        renderState(device, D3DRS_DESTBLEND, D3DBLEND_INVSRCCOLOR);
+        const auto count = std::min(triangle_count * 3u, 501u);
+        for (std::uint32_t index = 0u; index < count; ++index) { const auto point = projection.transformPoint(vertices[index]); spot_vertices[index] = {vertices[index], spot_color, 0u, static_cast<float>(static_cast<double>(point.x) + 0.5), static_cast<float>(static_cast<double>(point.y) + 0.5)}; }
+        renderState(device, D3DRS_CULLMODE, D3DCULL_NONE);
+        device.checkResult(device.native_device->SetFVF(D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1), "SetFVF");
+        device.drawVertices(D3DPT_TRIANGLELIST, 0u, spot_vertices.data(), count, nullptr, 0u, sizeof(SferaBloodVertex));
+    } else {
+        device.checkResult(device.native_device->SetTexture(0u, textures[level]), "SetTexture");
+        struct Vertex { SferaVec3F position; SferaVec3F normal; float u; float v; };
+        const auto count = triangle_count * 3u;
+        auto* output = reinterpret_cast<Vertex*>(device.vertices32.lock(count));
+        if (output == nullptr) return;
+        for (std::uint32_t index = 0u; index < count; ++index) { const auto point = projection.transformPoint(vertices[index]); output[index].position = vertices[index]; output[index].u = static_cast<float>(static_cast<double>(point.x) + 0.5); output[index].v = static_cast<float>(static_cast<double>(point.y) + 0.5); }
+        device.checkResult(device.vertices32.buffer->native_buffer->Unlock(), "VertexBuffer::Unlock");
+        device.drawBuffer(device.vertices32.buffer->native_buffer, D3DPT_TRIANGLELIST, 0u, device.vertices32.position, count, nullptr, 0u, 0u, sizeof(Vertex));
+        device.vertices32.position += count;
+    }
+    samplerState(device, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP);
+    samplerState(device, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP);
+    device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    renderState(device, D3DRS_FOGENABLE, TRUE);
+    renderState(device, D3DRS_ZWRITEENABLE, TRUE);
+}
+namespace {
+    float shadowDistance(const SferaVec3F& value) { const float squared = static_cast<float>(static_cast<double>(value.x) * value.x + static_cast<double>(value.y) * value.y + static_cast<double>(value.z) * value.z); return static_cast<float>(std::sqrt(static_cast<double>(squared))); }
+}
+void ShadowMap::selectObjectLight(const WorldObject& object) {
+    float closest_distance = 50.0f;
+    const SferaLightRecord* closest = nullptr;
+    SferaVec3F closest_direction{};
+    for (std::uint32_t index = 0u; index < g_sfera_client_main_scalar_runtime.counter_03; ++index) {
+        const auto& light = g_sfera_collision_scratch_runtime.light_candidates[index];
+        if (g_sfera_light_runtime.render_candidate_active[index] == 0u || object.position.y < light.position.y) continue;
+        const auto difference = light.position - object.position;
+        const float distance = shadowDistance(difference);
+        if (distance != 0.0f && distance < 15.0f && distance < closest_distance) { closest_distance = distance; closest = &light; closest_direction = difference; }
+    }
+    if (closest != nullptr) {
+        const float inverse = static_cast<float>(1.0 / closest_distance);
+        closest_direction = closest_direction * inverse;
+        float opacity = static_cast<float>(static_cast<double>(closest_distance) / 15.0 + 0.20000000298023224);
+        const float environment = g_sfera_graphics_runtime.environment_factor;
+        if (g_sfera_view_spatial_runtime.alternate_projection == 0u && environment >= 0.25f && environment <= 0.8299999833106995f) opacity = std::max(opacity, g_sfera_graphics_runtime.view_scale);
+        setDirection(closest_direction, opacity);
+    } else if (g_sfera_view_spatial_runtime.alternate_projection != 0u) setDirection({0.0f, 1.0f, 0.0f}, 1.0f);
+}
+float ShadowMap::projectionExtension(const WorldObject& object) const {
+    const float angle = static_cast<float>(std::acos(static_cast<double>(std::max(std::fabs(direction.y), 0.699999988079071f))));
+    const float tangent = static_cast<float>(std::tan(static_cast<double>(angle)));
+    return static_cast<float>(static_cast<double>(tangent) * (static_cast<double>(object.bounds_maximum.y) - object.bounds_minimum.y));
+}
+void ShadowMap::prepareObject(std::uint32_t handle, ExtendedWorldObject& object, float width, float spot_scale, float& extension) {
+    auto& shadows = *g_sfera_shadows;
+    if (shadows.quality >= 4u || object.scale < 0.9900000095367432f) return;
+    shadows.selectObjectLight(object);
+    const float distance = shadowDistance(g_sfera_world_objects.object(1u)->position - object.position);
+    const float opacity = std::clamp(static_cast<float>(1.0 - (static_cast<double>(distance) - 15.0) / 10.0), 0.0f, 1.0f);
+    const auto detail = distance > 7.0f ? 2u : distance > 5.0f ? 1u : 0u;
+    SphereWorld::ContactQuery::updateBounds(handle);
+    extension = shadows.projectionExtension(object);
+    const float scale = static_cast<float>(1.4900000095367432 / (static_cast<double>(extension) + width));
+    shadows.prepareGeometry(object, nullptr, opacity, detail, scale, spot_scale);
+}
+void ShadowMap::drawObject(ExtendedWorldObject& object, float width, float extension) {
+    auto& shadows = *g_sfera_shadows;
+    if (shadows.quality >= 4u || object.scale < 0.9900000095367432f) return;
+    const auto offset = SferaVec3F{object.position.x - shadows.origin.x, 0.0f, object.position.z - shadows.origin.z}.normalized() * extension;
+    const auto center = object.position + offset * 0.5f;
+    const float radius = static_cast<float>((static_cast<double>(extension) + width) * 0.800000011920929);
+    const SferaVec3F radius_vector{radius, radius, radius};
+    const SphereWorld::Bounds bounds{center - radius_vector, center + radius_vector};
+    g_sfera_world_spatial.gatherShadowTriangles(bounds, center, radius, shadows.origin, shadows.direction);
+    const auto& vertices = g_sfera_world_spatial.shadowVertices();
+    shadows.draw(vertices.data(), static_cast<std::uint32_t>(vertices.size() / 3u));
+    shadows.restore();
+}
+
+
+SoundEffectRegistry::SoundEffectRegistry(std::int32_t initialCapacity, std::uint32_t growthCount) : definitions(nullptr), capacity(initialCapacity > 0 ? static_cast<std::uint32_t>(initialCapacity) : 0u), count(0u), growth(growthCount) { if (capacity != 0u) definitions = new CSoundEffect*[capacity]{}; }
+SoundEffectRegistry::~SoundEffectRegistry() { clear(); }
+void SoundEffectRegistry::clear() { if (definitions != nullptr) { for (std::uint32_t index = 0; index < capacity; ++index) if (definitions[index] != nullptr) { definitions[index]->destroy(); delete definitions[index]; } delete[] definitions; } definitions = nullptr; capacity = count = 0u; }
+CSoundEffect* SoundEffectRegistry::add() {
+    if (count >= capacity) {
+        if (growth == 0u) return nullptr;
+        auto* expanded = new CSoundEffect*[capacity + growth]{};
+        std::copy_n(definitions, count, expanded);
+        delete[] definitions;
+        definitions = expanded;
+        capacity += growth;
+    }
+    auto*& slot = definitions[count++];
+    if (slot != nullptr) { slot->destroy(); delete slot; }
+    slot = new CSoundEffect;
+    slot->initialize();
+    return slot;
+}
+CSoundEffect* SoundEffectRegistry::find(std::uint32_t id) const { if (definitions == nullptr || count == 0u) return nullptr; auto* found = std::lower_bound(definitions, definitions + count, id, [](const CSoundEffect* effect, std::uint32_t number) { return effect->effect_number < number; }); return found != definitions + count && (*found)->effect_number == id ? *found : nullptr; }
+void SoundEffectRegistry::sort(std::int32_t begin, std::int32_t end) { while (begin < end) { std::int32_t left = begin, right = end; const auto pivot = definitions[(left + right) / 2]->effect_number; do { while (definitions[left]->effect_number < pivot) ++left; while (definitions[right]->effect_number > pivot) --right; if (left <= right) { std::swap(definitions[left], definitions[right]); ++left; --right; } } while (left <= right); if (begin < right) sort(begin, right); begin = left; } }
+bool SoundEffectRegistry::load() {
+    WIN32_FIND_DATAA found{};
+    HANDLE search = ::FindFirstFileA("Sounds\\*.def", &found);
+    if (search != INVALID_HANDLE_VALUE) {
+        do {
+            if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0u) continue;
+            SferaSimpleParser parser;
+            parser.initialize();
+            parser.load((std::string("Sounds\\") + found.cFileName).c_str());
+            parser.setBlockRange(nullptr);
+            SferaParserRange range{};
+            while (parser.nextBlock("soundeffect", &range)) {
+                SferaParserRange continuation{};
+                parser.getBlockRange(&continuation);
+                auto* effect = add();
+                if (effect != nullptr && !effect->loadDefinition(parser, range)) --count;
+                parser.setBlockRange(&continuation);
+            }
+            parser.release();
+        } while (::FindNextFileA(search, &found));
+        ::FindClose(search);
+    }
+    if (count > 1u) sort(0, static_cast<std::int32_t>(count) - 1);
+    return true;
+}
+void SferaSoundRuntime::loadDefinitions() { if (effect_manager == 0u) { auto* registry = new SoundEffectRegistry; effect_manager = SferaAbi::address(registry); registry->load(); } }
+void SferaSoundRuntime::clearDefinitions() { delete SferaAbi::pointer<SoundEffectRegistry>(effect_manager); effect_manager = 0u; }
+namespace {
+    float environmentBlend(float first, float second, float fraction) { return static_cast<float>((static_cast<double>(second) - first) * fraction + first); }
+    SferaVec3F environmentBlend(const SferaVec3F& first, const SferaVec3F& second, float fraction) { return {environmentBlend(first.x, second.x, fraction), environmentBlend(first.y, second.y, fraction), environmentBlend(first.z, second.z, fraction)}; }
+    SferaVec4F environmentBlend(const SferaVec4F& first, const SferaVec4F& second, float fraction) { return {environmentBlend(first.x, second.x, fraction), environmentBlend(first.y, second.y, fraction), environmentBlend(first.z, second.z, fraction), environmentBlend(first.w, second.w, fraction)}; }
+    void skyConfigurationError(const std::string& section) { CSphereError error; error.write(("Illegal format of Sky.txt, line: " + section).c_str()); }
+}
+SkyEnvironment* SkyEnvironment::load(const char* filename) {
+    SphereRender::ModelParameters parameters;
+    parameters.load(filename);
+    auto integer = [&](const std::string& section, const char* key) { const auto value = parameters.intValue(section.c_str(), key); if (!value) skyConfigurationError(section); return value.value_or(0); };
+    auto scalar = [&](const std::string& section, const char* key) { const auto value = parameters.floatValue(section.c_str(), key); if (!value) skyConfigurationError(section); return value.value_or(0.0f); };
+    auto color = [&](const std::string& section) { return SferaVec4F{static_cast<float>(integer(section, "r")), static_cast<float>(integer(section, "g")), static_cast<float>(integer(section, "b")), static_cast<float>(integer(section, "a"))}; };
+    for (std::size_t index = 0; index < 11; ++index) {
+        const char digit = static_cast<char>(index < 10 ? '0' + index : 'a' + index - 10);
+        const std::string suffix(1, digit);
+        if (!parameters.hasModel(("c" + suffix).c_str())) continue;
+        if (!parameters.contains(("c" + suffix).c_str(), "r")) skyConfigurationError("c" + suffix);
+        auto& state = states[index];
+        auto samples = [&](const char* prefix, auto& colors, auto& positions) { for (std::size_t sample = 0; sample < std::size(colors); ++sample) { const std::string section = std::string(prefix) + suffix + static_cast<char>('0' + sample); colors[sample] = color(section); positions[sample] = scalar(section, "p"); } };
+        samples("a", state.primaryColors, state.primaryPositions);
+        samples("b", state.secondaryColors, state.secondaryPositions);
+        state.reference = color("c" + suffix);
+        const std::string section = "d" + suffix;
+        state.time = scalar(section, "time");
+        state.sunPhase = scalar(section, "sun");
+        state.sunColor = {static_cast<float>(integer(section, "sr")), static_cast<float>(integer(section, "sg")), static_cast<float>(integer(section, "sb"))};
+        state.ambientColor = {static_cast<float>(integer(section, "ar")), static_cast<float>(integer(section, "ag")), static_cast<float>(integer(section, "ab"))};
+    }
+    sunsetState = integer("SunsetStateN", "n");
+    sunriseState = integer("SunriseStateN", "n");
+    return this;
+}
+void SkyEnvironment::interval(float time, std::int32_t& first, std::int32_t& second, float& fraction) const { second = 1; while (states[second].time < time) ++second; first = second - 1; fraction = static_cast<float>((static_cast<double>(time) - states[first].time) / (static_cast<double>(states[second].time) - states[first].time)); }
+void SkyEnvironment::sample(float time, SkyState& output) const {
+    std::int32_t first, second;
+    float fraction;
+    interval(time, first, second, fraction);
+    const auto& start = states[first];
+    const auto& finish = states[second];
+    auto samples = [&](auto& colors, auto& positions, const auto& firstColors, const auto& firstPositions, const auto& secondColors, const auto& secondPositions) { for (std::size_t index = 0; index < std::size(colors); ++index) { colors[index] = environmentBlend(firstColors[index], secondColors[index], fraction); positions[index] = environmentBlend(firstPositions[index], secondPositions[index], fraction); } };
+    samples(output.primaryColors, output.primaryPositions, start.primaryColors, start.primaryPositions, finish.primaryColors, finish.primaryPositions);
+    output.reference = environmentBlend(start.reference, finish.reference, fraction);
+    samples(output.secondaryColors, output.secondaryPositions, start.secondaryColors, start.secondaryPositions, finish.secondaryColors, finish.secondaryPositions);
+    output.sunPhase = environmentBlend(start.sunPhase, finish.sunPhase, fraction);
+    output.sunColor = environmentBlend(start.sunColor, finish.sunColor, fraction);
+    output.ambientColor = environmentBlend(start.ambientColor, finish.ambientColor, fraction);
+    if (second >= 11) { CSphereError error; error.write("n2 >= SKY_STATES_NUM"); }
+}
+void SkyEnvironment::sunDirection(float time, SferaVec3F& output) const {
+    std::int32_t first, second;
+    float fraction;
+    interval(time, first, second, fraction);
+    float phase = environmentBlend(states[first].sunPhase, states[second].sunPhase, fraction);
+    const float sunrise = states[sunriseState].sunPhase;
+    const float sunset = states[sunsetState].sunPhase;
+    if (!(phase > sunrise && phase < sunset)) { float relative = phase - sunset; if (relative < 0.0f) relative += 1.0f; phase = static_cast<float>(static_cast<double>(relative) * (static_cast<double>(sunset) - sunrise) / (1.0 + sunrise - sunset) + sunrise); }
+    const float angle = static_cast<float>(static_cast<double>(phase) * 3.1415929794311523 * 2.0);
+    output = {-static_cast<float>(std::sin(static_cast<double>(angle))), static_cast<float>(std::cos(static_cast<double>(angle))), 0.0f};
+}
+void SkyEnvironment::lighting(float time, SferaVec3F& sun, SferaVec3F& ambient) const { std::int32_t first, second; float fraction; interval(time, first, second, fraction); sun = environmentBlend(states[first].sunColor, states[second].sunColor, fraction); ambient = environmentBlend(states[first].ambientColor, states[second].ambientColor, fraction); }
+namespace {
+    void updateNatureWeather(float value, std::uint32_t& enabled, void (SferaNatureManager::*start)(), void (SferaNatureManager::*stop)(), void (SferaNatureManager::*apply)(float)) { auto* nature = sfera_nature_manager(); if (value > 0.0010000000474974513f && g_sfera_view_spatial_runtime.alternate_projection == 0u) { if (enabled == 0u) { if (nature != nullptr) (nature->*start)(); enabled = 1u; } if (nature != nullptr) (nature->*apply)(value); } else if (enabled == 1u) { if (nature != nullptr) (nature->*stop)(); enabled = 0u; } }
+}
+void SferaNatureManager::updateRain() { updateNatureWeather(g_sfera_recovered_static_runtime.primary_frame_interval, g_sfera_frame_runtime.primary_toggle, &SferaNatureManager::startRain, &SferaNatureManager::stopRain, &SferaNatureManager::setRainIntensity); }
+void SferaNatureManager::updateLightning() { updateNatureWeather(g_sfera_recovered_static_runtime.secondary_frame_interval, g_sfera_frame_runtime.secondary_toggle, &SferaNatureManager::startLighting, &SferaNatureManager::stopLighting, &SferaNatureManager::setLightingLevel); }
+
+
+
+
+
+
+// Sound and environment implementation.
+std::uint32_t SferaSoundPlaybackState::nextEvent() noexcept {
+    auto& state = *this;
+    for (;;) {
+        SferaSoundEventList* list = state.current_list;
+        if (!list || !list->event_groups || !list->group_sizes || list->group_index >= list->group_count) {
+        return UINT32_MAX;
+    }
+        if (list->item_index >= list->group_sizes[list->group_index]) {
+        return UINT32_MAX;
+    }
+        const std::uint32_t* events = list->event_groups[list->group_index];
+        if (!events) {
+        return UINT32_MAX;
+    }
+        const std::uint32_t event = events[list->item_index++];
+        if (event == UINT32_MAX) {
+        return UINT32_MAX;
+    }
+        const auto type = static_cast<SoundEventType>(event & 0xFFFF0000u);
+        if (type != SoundEventType::playlist) {
+        return event;
+    }
+        const std::uint32_t playlist_index = (event & 0xFFFFu) - 1u;
+        if (playlist_index >= state.playlist_count || !state.playlists) {
+        return 0u;
+    }
+        state.current_list = &state.playlists[playlist_index];
+        if (state.current_list->group_count == 0u) {
+        return UINT32_MAX;
+    }
+        state.current_list->item_index = 0u;
+        state.current_list->group_index = static_cast<std::uint32_t>(std::rand()) % state.current_list->group_count;
+    }
+}
+
+void SferaSoundEventList::clear() { if (event_groups != nullptr) { for (std::uint32_t index = 0; index < group_count; ++index) delete[] event_groups[index]; delete[] event_groups; } delete[] group_sizes; event_groups = nullptr; group_sizes = nullptr; item_index = group_index = group_count = 0u; }
+void SferaSoundEventList::resize(std::uint32_t count) { clear(); if (count != 0u) { event_groups = new std::uint32_t*[count]{}; group_sizes = new std::uint32_t[count]{}; group_count = count; } }
+void SferaSoundEventList::resizeGroup(std::uint32_t group, std::uint32_t count) { delete[] event_groups[group]; event_groups[group] = count == 0u ? nullptr : new std::uint32_t[count]{}; group_sizes[group] = count; }
+void SferaSoundEventList::parseGroup(std::uint32_t group, const char* text) {
+    if (text == nullptr || *text == '\0') return;
+    const std::string_view line(text);
+    resizeGroup(group, static_cast<std::uint32_t>(std::count(line.begin(), line.end(), ',') + 1));
+    std::size_t begin = 0;
+    for (std::uint32_t index = 0; index < group_sizes[group]; ++index) {
+        const auto end = line.find(',', begin);
+        const std::string token(line.substr(begin, end == std::string_view::npos ? end : end - begin));
+        std::uint32_t code = UINT32_MAX;
+        if (SferaSimpleParser::equalsIgnoreCase(token.c_str(), "STP")) code = 0x40000u;
+        else if (!token.empty()) { const auto argument = static_cast<std::uint32_t>(std::atoi(token.c_str() + 1)); if (token[0] == 'p') code = argument | 0x10000u; else if (token[0] == 's') code = argument | 0x20000u; else if (token[0] == 'j') code = argument | 0x80000u; }
+        event_groups[group][index] = code;
+        begin = end == std::string_view::npos ? line.size() : end + 1;
+    }
+}
+SferaSoundPlaybackState::SferaSoundPlaybackState() : event_queue(new SoundEventQueue{static_cast<SoundEventRecord*>(std::malloc(30u * sizeof(SoundEventRecord))), 30u, 0u, 30u}), timings(nullptr), timing_count(0u), playing(0u), pending_track(0u), reserved_14(0u), timer_low(UINT32_MAX), timer_high(UINT32_MAX), play_signal(0.0f), playlists(nullptr), playlist_count(0u), current_list(nullptr), playlist_index(0u), stream(nullptr), source(nullptr), finished(0u), stopped(1u), volume_scale(1u), force_stop(0u), reserved_4c(0u) {}
+SferaSoundPlaybackState::~SferaSoundPlaybackState() { clear(); }
+void SferaSoundPlaybackState::resizeTimings(std::uint32_t count) { delete[] timings; timings = count == 0u ? nullptr : new SferaSoundTiming[count]{}; timing_count = count; }
+void SferaSoundPlaybackState::resizePatterns(std::uint32_t count) { if (playlists != nullptr) { for (std::uint32_t index = 0; index < playlist_count; ++index) playlists[index].clear(); delete[] playlists; } playlists = count == 0u ? nullptr : new SferaSoundEventList[count]{}; playlist_count = count; }
+float SferaSoundPlaybackState::parseTime(const char* text) { if (text == nullptr) return 0.0f; const std::string_view token(text); const auto colon = token.find(':'); const auto prefixSize = std::min<std::size_t>(15, colon == std::string_view::npos ? token.size() : colon); if (prefixSize >= token.size()) return 0.0f; return static_cast<float>(std::atoi(std::string(token.substr(0, prefixSize)).c_str()) * 60.0 + std::atof(text + prefixSize + 1)); }
+bool SferaSoundPlaybackState::load(const char* filename) {
+    SferaSimpleParser parser;
+    parser.initialize();
+    struct Release { SferaSimpleParser& parser; ~Release() { parser.release(); } } release{parser};
+    parser.load(filename);
+    SferaParserRange track{}, block{};
+    char text[1024]{};
+    if (!parser.findBlock("soundtrack", &track, nullptr, 1) || !parser.findValue("audio_file", &track) || parser.readQuotedString(0u, text) == nullptr) return false;
+    auto* filenameCopy = new char[std::strlen(text) + 1];
+    std::copy_n(text, std::strlen(text) + 1, filenameCopy);
+    source = filenameCopy;
+    if (parser.findValue("volume", &track)) volume_scale = static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(parser.readFloat(0u))));
+    if (parser.findValue("flags", &track)) for (std::uint32_t index = 0; index < parser.tokenCount(); index += 2) if (parser.readString(index, text) != nullptr && SferaSimpleParser::equalsIgnoreCase(text, "ST_AUTOFREE")) reserved_4c |= 1u;
+    auto countRecords = [&](const char* name) { parser.setScanRange(&block); std::uint32_t count = 0; while (parser.nextValue(name)) ++count; return count; };
+    if (!parser.findBlock("samples", &block, &track, 1)) return false;
+    const auto sampleCount = countRecords("sample");
+    if (sampleCount == 0u) return false;
+    resizeTimings(sampleCount);
+    parser.setScanRange(&block);
+    while (parser.nextValue("sample")) { const auto index = parser.readInt(0u); if (index <= 0 || static_cast<std::uint32_t>(index) > timing_count) return false; char start[128]{}, end[128]{}; parser.readString(1u, start); parser.readString(2u, end); timings[index - 1] = {parseTime(start), parseTime(end)}; }
+    parser.clearScanRange();
+    if (!parser.findBlock("patterns", &block, &track, 1)) return false;
+    const auto patternCount = countRecords("pattern");
+    if (patternCount == 0u) return false;
+    resizePatterns(patternCount);
+    parser.setScanRange(&block);
+    while (parser.nextValue("pattern")) {
+        const auto tokenCount = parser.tokenCount();
+        if (tokenCount == 0u) continue;
+        const auto index = parser.readInt(0u);
+        if (index <= 0 || static_cast<std::uint32_t>(index) > playlist_count) return false;
+        auto& pattern = playlists[index - 1];
+        pattern.resize(tokenCount > 2u ? (tokenCount - 1u) / 2u + 1u : 1u);
+        std::uint32_t group = 0u;
+        for (std::uint32_t token = 1u; token < tokenCount; token += 2u) if (parser.readString(token, text) != nullptr) pattern.parseGroup(group++, text);
+    }
+    parser.clearScanRange();
+    playlist_index = parser.findValue("start_pattern", &block) ? static_cast<std::uint32_t>(parser.readInt(0u)) - 1u : 0u;
+    return playlist_index < playlist_count;
+}
+bool SferaSoundPlaybackState::start() {
+    if (playlists == nullptr || playlist_index >= playlist_count || source == nullptr) { current_list = nullptr; return false; }
+    current_list = nullptr;
+    if (stream == nullptr) stream = SferaAbi::pointer<CSoundStream>(SI_StreamCreateFile(static_cast<const char*>(source), 1u));
+    if (stream == nullptr) return false;
+    stream->decode_callback = &sfera_sound_decode_callback;
+    stream->decode_state = this;
+    stream->play_callback = &sfera_sound_play_callback;
+    stream->play_state = this;
+    stream->stream_gain = static_cast<float>(static_cast<std::int32_t>(volume_scale));
+    playing = 0u;
+    current_list = &playlists[playlist_index];
+    current_list->item_index = 0u;
+    current_list->group_index = static_cast<std::uint32_t>(std::rand()) % current_list->group_count;
+    event_queue->count = 0u;
+    stopped = 0u;
+    return true;
+}
+void SferaSoundPlaybackState::stop() { if (stream != nullptr) { if (stream->IsStreamPlaying()) stream->Stop(); stream->decode_event_position = stream->play_event_position = UINT32_MAX; stopped = 1u; } }
+void SferaSoundPlaybackState::clear() { if (stream != nullptr) SI_StreamFree(SferaAbi::address(stream)); stream = nullptr; delete[] static_cast<char*>(source); source = nullptr; resizePatterns(0u); resizeTimings(0u); if (event_queue != nullptr) { std::free(event_queue->records); delete event_queue; event_queue = nullptr; } finished = playing = pending_track = 0u; current_list = nullptr; stopped = 1u; playlist_index = UINT32_MAX; }
+void SferaSoundPlaybackState::update() {
+    if (playing != 0u || stream == nullptr || stream->decoder_state != 0u || stopped != 0u) return;
+    if (finished != 0u || force_stop != 0u) { stop(); return; }
+    if (pending_track != 0u) { const auto now = WorldClock::nowTicks(); if (timer_low == UINT32_MAX && timer_high == UINT32_MAX) { timer_low = static_cast<std::uint32_t>(now); timer_high = static_cast<std::uint32_t>(now >> 32u); return; } const auto begin = static_cast<std::uint64_t>(timer_low) | (static_cast<std::uint64_t>(timer_high) << 32u); if (static_cast<std::int32_t>(static_cast<std::int64_t>(now - begin) / 10000) >= static_cast<std::int32_t>(pending_track)) pending_track = 0u; return; }
+    const auto event = nextEvent();
+    if (event == UINT32_MAX) { stop(); return; }
+    const auto type = event & 0xFFFF0000u;
+    const auto index = event & 0xFFFFu;
+    if (type == 0x10000u) { if (stream->IsStreamPlaying()) stream->Stop(); const auto& timing = timings[index - 1]; play_signal = timing.signal; stream->SetDecodeSignal(timing.signal); stream->SetPlaySignal(play_signal); stream->PlayEx(timing.seek_time, 0); playing = 1u; }
+    else if (type == 0x20000u) { if (stream->IsStreamPlaying()) stream->Stop(); stream->decode_event_position = stream->play_event_position = UINT32_MAX; pending_track = index; timer_low = timer_high = UINT32_MAX; }
+    else if (type == 0x40000u) stop();
+}
+SferaSoundPlaybackState* SferaSoundRuntime::loadTrack(const char* filename) { if (!interfaceAvailable()) return nullptr; auto track = std::make_unique<SferaSoundPlaybackState>(); if (!track->load(filename)) return nullptr; auto* result = track.get(); tracks.push_back(std::move(track)); return result; }
+bool SferaSoundRuntime::deleteTrack(SferaSoundPlaybackState* track) { if (track == nullptr) return false; if (track->stopped == 0u) track->stop(); const auto found = std::find_if(tracks.begin(), tracks.end(), [track](const auto& item) { return item.get() == track; }); if (found != tracks.end()) tracks.erase(found); return true; }
+void SferaSoundRuntime::clearTracks() { for (auto& track : tracks) if (track->stopped == 0u) track->stop(); tracks.clear(); g_sfera_music_runtime.current_stream = 0u; }
+bool SferaSoundRuntime::updateTracks() { if (!interfaceAvailable()) return false; for (auto& track : tracks) track->update(); auto* current = SferaAbi::pointer<SferaSoundPlaybackState>(g_sfera_music_runtime.current_stream); if (current != nullptr && current->stopped != 0u) { deleteTrack(current); g_sfera_music_runtime.current_stream = 0u; if (g_sfera_music_runtime.requested_path[0] != 0u) { current = loadTrack(reinterpret_cast<const char*>(g_sfera_music_runtime.requested_path)); g_sfera_music_runtime.current_stream = SferaAbi::address(current); if (current != nullptr) current->start(); g_sfera_music_runtime.requested_path[0] = 0u; } } return true; }
+void SferaSoundRuntime::requestTrack(const char* filename) { auto* current = SferaAbi::pointer<SferaSoundPlaybackState>(g_sfera_music_runtime.current_stream); if (filename == nullptr) { g_sfera_music_runtime.requested_path[0] = 0u; if (current != nullptr && current->stopped == 0u) current->force_stop = 1u; return; } const std::string path = std::string("Sounds\\Music\\") + filename + ".sst"; const auto length = std::min(path.size(), std::size(g_sfera_music_runtime.requested_path) - 1); std::copy_n(path.begin(), length, g_sfera_music_runtime.requested_path); g_sfera_music_runtime.requested_path[length] = 0u; if (current != nullptr && current->stopped == 0u) { current->force_stop = 1u; return; } current = loadTrack(reinterpret_cast<const char*>(g_sfera_music_runtime.requested_path)); g_sfera_music_runtime.current_stream = SferaAbi::address(current); if (current != nullptr) current->start(); }
+
+void CSoundManager::detach(CSound& sound) { if (count != 0u) --count; if (sound.cache_previous == nullptr && sound.cache_next == nullptr) { first = last = nullptr; return; } if (last == &sound) { last = sound.cache_previous; last->cache_next = nullptr; } else if (first == &sound) { first = sound.cache_next; first->cache_previous = nullptr; } else { sound.cache_previous->cache_next = sound.cache_next; sound.cache_next->cache_previous = sound.cache_previous; } }
+void CSoundManager::setVolume(std::int32_t percent) { volume = static_cast<float>(std::clamp(percent, 0, 100) / 100.0); for (auto* sound = first; sound != nullptr; sound = sound->cache_next) sound->SetVolume(volume); for (auto& entry : semantic_sound_cache()) if (entry.sound != nullptr) entry.sound->SetVolume(volume); }
+void CSoundManager::update() {
+    for (auto* sound = first; sound != nullptr;) {
+        auto* next = sound->cache_next;
+        if (!sound->IsSoundPlaying()) sound->playback_finished = 1u;
+        if (sound->playback_finished != 0u && sound->cache_available != 0u && sound->cache_lifetime_seconds >= 0) {
+            bool expired = sound->cache_lifetime_seconds == 0;
+            if (!expired) { const auto now = WorldClock::nowTicks(); if (sound->cache_idle_since_low == UINT32_MAX && sound->cache_idle_since_high == UINT32_MAX) { sound->cache_idle_since_low = static_cast<std::uint32_t>(now); sound->cache_idle_since_high = static_cast<std::uint32_t>(now >> 32u); } else { const auto since = static_cast<std::uint64_t>(sound->cache_idle_since_low) | (static_cast<std::uint64_t>(sound->cache_idle_since_high) << 32u); expired = static_cast<std::int32_t>(static_cast<std::int64_t>(now - since) / 10000) >= sound->cache_lifetime_seconds; } }
+            if (expired) { detach(*sound); sound->~CSound(); WorldMemory::release(sound); }
+        }
+        sound = next;
+    }
+    service_semantic_sound_cache();
+    if (auto* Interface = SI_GetInterface()) Interface->UpdateSettings();
+}
+void CSoundManager::clear() { for (auto* sound = first; sound != nullptr;) { auto* next = sound->cache_next; sound->~CSound(); WorldMemory::release(sound); sound = next; } first = last = nullptr; for (auto& entry : semantic_sound_cache()) destroy_semantic_sound(entry.sound); semantic_sound_cache().clear(); }
+CSoundManager* SferaSoundRuntime::ensureManager() { if (sound_manager != nullptr) return sound_manager; if (!interfaceAvailable()) return nullptr; sound_manager = new (WorldMemory::allocate(sizeof(CSoundManager))) CSoundManager{nullptr, nullptr, 1.0f, 0u, 0u}; return sound_manager; }
+void SferaSoundRuntime::update() {
+    auto* Interface = SI_GetInterface();
+    if (Interface == nullptr) return;
+    auto* listener = Interface->listener;
+    g_sfera_world_objects.recalculateBasis(1u);
+    const auto* camera = static_cast<const ExtendedWorldObject*>(g_sfera_world_objects.object(1u));
+    const SferaVec3F position = camera->position;
+    const SferaVec3F velocity{position.x - listener->position.x, position.y - listener->position.y, position.z - listener->position.z};
+    D3DVECTOR forward{}, up{};
+    listener->GetOrientation(&forward, &up);
+    const D3DVECTOR nextForward{camera->orientation_basis[0].x, camera->orientation_basis[0].y, camera->orientation_basis[0].z};
+    const D3DVECTOR nextUp{-camera->orientation_basis[1].x, -camera->orientation_basis[1].y, -camera->orientation_basis[1].z};
+    if (std::bit_cast<std::uint32_t>(velocity.x) != 0u || std::bit_cast<std::uint32_t>(velocity.y) != 0u || std::bit_cast<std::uint32_t>(velocity.z) != 0u) { listener->SetPosition(position.x, position.y, position.z, 0); listener->SetVelocity(velocity.x, velocity.y, velocity.z, 0); }
+    if (std::memcmp(&forward, &nextForward, sizeof(forward)) != 0 || std::memcmp(&up, &nextUp, sizeof(up)) != 0) listener->SetOrientation(nextForward, nextUp, 0);
+    updateTracks();
+    if (sound_manager != nullptr) sound_manager->update();
+}
+void SferaSoundRuntime::shutdown() { clearDefinitions(); if (sound_manager != nullptr) { sound_manager->clear(); sound_manager->~CSoundManager(); WorldMemory::release(sound_manager); sound_manager = nullptr; } clearTracks(); SI_Close(); }
+
+float EnvironmentZone::weight(float x, float z) const { const float left = static_cast<float>(static_cast<double>(x) - (static_cast<double>(originX) + minimumX)); if (left < 0.0f) return 0.0f; const float top = static_cast<float>(static_cast<double>(z) - (static_cast<double>(originZ) + minimumZ)); if (top < 0.0f) return 0.0f; const float right = static_cast<float>(static_cast<double>(originX) + maximumX - x); if (right < 0.0f) return 0.0f; const float bottom = static_cast<float>(static_cast<double>(originZ) + maximumZ - z); if (bottom < 0.0f) return 0.0f; const float distance = std::min(std::min(left, top), std::min(right, bottom)); return borderFade <= distance ? 1.0f : distance / borderFade; }
+void EnvironmentZones::interval(float time, std::int32_t& first, std::int32_t& second, float& fraction) { constexpr float positions[]{0.0f, 0.19f, 0.27f, 0.34f, 0.50f, 0.66f, 0.73f, 0.81f, 1.0f}; first = second = 0; fraction = 0.0f; for (std::int32_t index = 0; index < 8; ++index) if (positions[index] <= time && positions[index + 1] >= time) { first = index; second = (index + 1) % 8; fraction = static_cast<float>((static_cast<double>(time) - positions[index]) / (static_cast<double>(positions[index + 1]) - positions[index])); return; } }
+void EnvironmentZone::sample(std::int32_t first, std::int32_t second, float fraction, EnvironmentLighting& output) const { output.fogParameters = fogParameters; output.fogColor = environmentBlend(fogColors[first], fogColors[second], fraction); output.ambientColor = environmentBlend(ambientColors[first], ambientColors[second], fraction); output.sunColor = environmentBlend(sunColors[first], sunColors[second], fraction); }
+void EnvironmentZones::setDefaultLighting(const SferaVec3F& sun, const SferaVec3F& ambient) { std::fill(std::begin(zones.back().sunColors), std::end(zones.back().sunColors), sun); std::fill(std::begin(zones.back().ambientColors), std::end(zones.back().ambientColors), ambient); }
+void EnvironmentZones::calculate(bool useDefault, float x, float z, float time, const SkyEnvironment& sky, EnvironmentLighting& output) {
+    if (zones.empty()) { CSphereError error; error.write("Error in ZoningMgr::calc_params() : zonesParams is Empty"); return; }
+    std::int32_t first, second;
+    float fraction;
+    interval(time, first, second, fraction);
+    SferaVec3F sun{}, ambient{};
+    sky.lighting(time, sun, ambient);
+    setDefaultLighting(sun, ambient);
+    std::vector<std::pair<std::size_t, float>> influences;
+    if (!useDefault) for (std::size_t index = 0; index < zones.size(); ++index) { const auto amount = zones[index].weight(x, z); if (amount >= 0.009999999776482582f) { influences.emplace_back(index, amount); if (amount > 0.9900000095367432f) break; } }
+    if (influences.empty()) { zones.back().sample(first, second, fraction, output); return; }
+    zones[influences.back().first].sample(first, second, fraction, output);
+    for (std::size_t index = influences.size() - 1; index > 0; --index) { EnvironmentLighting foreground{}; const auto [zone, amount] = influences[index - 1]; zones[zone].sample(first, second, fraction, foreground); output.fogParameters = environmentBlend(output.fogParameters, foreground.fogParameters, amount); output.fogColor = environmentBlend(output.fogColor, foreground.fogColor, amount); output.ambientColor = environmentBlend(output.ambientColor, foreground.ambientColor, amount); output.sunColor = environmentBlend(output.sunColor, foreground.sunColor, amount); }
+}
+void EnvironmentZones::load(const char* filename) {
+    SphereRender::ConfigDocument::setStorageMode(SphereRender::ConfigDocument::StorageMode::Plain);
+    const auto document = SphereRender::ConfigDocument::open(filename);
+    const auto count = document.arraySize("zonesParams").value_or(0);
+    auto fail = [](std::size_t zone, const std::string& field) { CSphereError error; error.write(("Wrong format of \"Landscape\\zoning.cfg\" : zonesParams[" + std::to_string(zone) + "] : " + field).c_str()); };
+    for (std::size_t index = 0; index < count; ++index) {
+        auto* configuration = document.objectAt("zonesParams", index);
+        if (configuration == nullptr) { fail(index, "zoneParamsCfg is NULL"); continue; }
+        EnvironmentZone zone{};
+        auto scalar = [&](const char* name) { const auto value = configuration->real(name); if (!value) fail(index, name); return value.value_or(0.0f); };
+        zone.originX = scalar("xPatchMin"); zone.originZ = scalar("zPatchMin"); zone.minimumX = scalar("xMin"); zone.maximumX = scalar("xMax"); zone.minimumZ = scalar("zMin"); zone.maximumZ = scalar("zMax"); zone.borderFade = scalar("borderFadeDist");
+        zone.fogParameters = {scalar("skyFogAlpha"), scalar("fogNear"), scalar("fogFar")};
+        if (configuration->arraySize("dayColors").value_or(0) != 8) fail(index, "wrong size of dayColors");
+        for (std::size_t day = 0; day < 8; ++day) {
+            auto* colors = configuration->objectAt("dayColors", day);
+            if (colors == nullptr) { fail(index, "dayColorCfg is NULL"); continue; }
+            auto color = [&](const char* name) { auto component = [&](std::size_t axis) { const auto value = colors->realAt(name, axis); if (!value) fail(index, std::string(name) + "[" + std::to_string(day) + "]"); return value.value_or(0.0f); }; return SferaVec3F{component(0), component(1), component(2)}; };
+            zone.fogColors[day] = color("fogColor"); zone.ambientColors[day] = color("ambientColor"); zone.sunColors[day] = color("sunColor");
+        }
+        zones.push_back(zone);
+    }
+}
+
+SnowField::SnowField(const char* filename) : particles(7000), vertices(28000), indices(42000) {
+    for (auto& particle : particles) { auto coordinate = [] { return static_cast<float>(std::rand() * 10.0 / 32767.0 - 5.0); }; particle.position = {coordinate(), coordinate(), coordinate()}; particle.phase = std::rand() * 7000 / 32767; }
+    const float u[]{0.0f, 1.0f, 1.0f, 0.0f};
+    const float v[]{0.0f, 0.0f, 1.0f, 1.0f};
+    for (std::size_t index = 0; index < vertices.size(); ++index) { auto& vertex = vertices[index]; vertex.z = 0.0f; vertex.reciprocalW = 1.0f; vertex.specular = 0u; vertex.u = u[index % 4]; vertex.v = v[index % 4]; }
+    for (std::size_t index = 0; index < particles.size(); ++index) { const auto first = static_cast<std::uint16_t>(index * 4); const std::uint16_t quad[]{first, static_cast<std::uint16_t>(first + 1), static_cast<std::uint16_t>(first + 2), first, static_cast<std::uint16_t>(first + 2), static_cast<std::uint16_t>(first + 3)}; std::copy(std::begin(quad), std::end(quad), indices.begin() + index * 6); }
+    const auto byteCount = g_sfera_files.fileSize(filename);
+    if (byteCount < 0) return;
+    path.resize(static_cast<std::size_t>(byteCount) / sizeof(PathPoint));
+    const auto descriptor = g_sfera_files.open(filename, 0);
+    if (descriptor < 0) return;
+    g_sfera_files.read(descriptor, path.data(), static_cast<std::uint32_t>(path.size() * sizeof(PathPoint)));
+    g_sfera_files.close(descriptor);
+}
+
+
+namespace {
+    std::string weatherIndex(char prefix, std::size_t index, std::size_t digits = 2u) {
+        const auto number = std::to_string(index);
+        return std::string(1u, prefix) + std::string(number.size() < digits ? digits - number.size() : 0u, '0') + number;
+    }
+    [[noreturn]] void weatherFormatError(std::string_view model, std::string_view parameter) { WorldDiagnostics::fail((std::string("wrong format of weather.txt\n") + std::string(model) + ", " + std::string(parameter)).c_str()); }
+    template<std::size_t N> void weatherName(char (&output)[N], std::string_view name) {
+        if (name.size() >= N) weatherFormatError(name, "texture name too long");
+        std::copy(name.begin(), name.end(), output);
+        output[name.size()] = '\0';
+    }
+}
+
+WeatherScenarios* WeatherScenarios::load(const char* filename) {
+    *this = {};
+    SphereRender::ModelParameters parameters;
+    parameters.load(filename);
+    const auto number = [&](std::string_view model, std::string_view key) { const auto value = parameters.floatValue(model, key); if (!value) weatherFormatError(model, key); return *value; };
+    const auto integer = [&](std::string_view model, std::string_view key) { const auto value = parameters.intValue(model, key); if (!value) weatherFormatError(model, key); return *value; };
+    const auto text = [&](std::string_view model, std::string_view key) { const auto value = parameters.stringValue(model, key); if (!value) weatherFormatError(model, key); return *value; };
+    const auto skyNames = [&](std::string_view model, WeatherSkyPair& sky) { for (auto [key, destination] : {std::pair{"nsky1", &sky.primary}, std::pair{"nsky2", &sky.secondary}}) { const auto value = text(model, key); weatherName(*destination, value); if (SferaSimpleParser::equalsIgnoreCase(*destination, "none")) (*destination)[0] = '\0'; } };
+    constexpr std::string_view durationJitter = "05185514038799035566164306887187530785282430311941";
+    while (scenarioCount < scenarios.size()) {
+        const auto model = weatherIndex('s', scenarioCount);
+        auto& scenario = scenarios[scenarioCount];
+        scenario.duration = (parameters.hasModel(model) ? integer(model, "stime") : 0) + durationJitter[scenarioCount % durationJitter.size()] - '0';
+        if (!parameters.hasModel(model)) break;
+        skyNames(model, scenario.sky);
+        scenario.skyStart = number(model, "tsky1");
+        scenario.skyEnd = number(model, "tsky2");
+        while (scenario.keyframeCount < scenario.keyframes.size()) {
+            const auto key = model + "_" + std::to_string(scenario.keyframeCount);
+            if (!parameters.hasModel(key)) break;
+            auto& frame = scenario.keyframes[scenario.keyframeCount];
+            frame.time = static_cast<std::int32_t>(std::trunc((static_cast<double>(scenario.duration) - 0.009999999776482582) * number(key, "t")));
+            frame.properties = {number(key, "r"), number(key, "fl1"), number(key, "fl2"), number(key, "cs")};
+            ++scenario.keyframeCount;
+        }
+        ++scenarioCount;
+    }
+    while (textureCount < textures.size()) {
+        const auto model = weatherIndex('t', textureCount);
+        if (!parameters.hasModel(model)) break;
+        auto& texture = textures[textureCount];
+        weatherName(texture.texture, text(model, "ntex"));
+        texture.projectionWarp = number(model, "sc1");
+        texture.uvScale = number(model, "sc2");
+        texture.trackOffset = static_cast<std::uint32_t>(integer(model, "scrll"));
+        texture.minimumTime = number(model, "time1");
+        texture.maximumTime = number(model, "time2");
+        for (std::size_t index = 0; index < 11; ++index) texture.colors[index] = {number(model + "c", weatherIndex('r', index)), number(model + "c", weatherIndex('g', index)), number(model + "c", weatherIndex('b', index))};
+        ++textureCount;
+    }
+    while (sequenceCount < sequence.size()) {
+        const auto model = weatherIndex('q', sequenceCount, 3u);
+        if (!parameters.hasModel(model)) break;
+        const auto index = integer(model, "s");
+        if (index < 0 || static_cast<std::size_t>(index) >= scenarios.size()) weatherFormatError(model, "s");
+        sequence[sequenceCount++] = static_cast<std::uint16_t>(index);
+        totalDuration += scenarios[index].duration;
+    }
+    while (pairCount < pairs.size()) {
+        const auto model = weatherIndex('c', pairCount);
+        if (!parameters.hasModel(model)) break;
+        skyNames(model, pairs[pairCount++]);
+    }
+    for (std::uint32_t index = 0u; index < 4u; ++index) g_sfera_weather_runtime.interpolation_offsets[index] = (index + 1u) * sizeof(float);
+    return this;
+}
+
+const WeatherScenario& WeatherScenarios::at(std::uint32_t sequenceIndex) const {
+    if (sequenceIndex >= sequenceCount || sequence[sequenceIndex] >= scenarioCount) WorldDiagnostics::fail("wScenarioArr[curSN] >= wScenariosNum");
+    return scenarios[sequence[sequenceIndex]];
+}
+
+void WeatherScenarios::locate(std::int32_t time, std::uint32_t& sequenceIndex, std::int32_t& startTime, std::int32_t& localTime) const {
+    if (totalDuration == 0) WorldDiagnostics::fail("Weather sequence has zero duration");
+    const auto cyclicTime = time % totalDuration;
+    std::int32_t end = 0;
+    for (std::uint32_t index = 0u; index < sequenceCount; ++index) {
+        const auto& scenario = at(index);
+        end += scenario.duration;
+        if (cyclicTime < end) { sequenceIndex = index; localTime = scenario.duration - end + cyclicTime; startTime = time - localTime; return; }
+    }
+}
+
+std::int32_t WeatherScenarios::advance(std::uint32_t& sequenceIndex, std::uint32_t& keyframe) const {
+    const auto& scenario = at(sequenceIndex);
+    const auto time = scenario.keyframes[keyframe].time;
+    if (++keyframe != scenario.keyframeCount) return scenario.keyframes[keyframe].time - time;
+    keyframe = 0u;
+    if (++sequenceIndex == sequenceCount) sequenceIndex = 0u;
+    return scenario.duration - time + at(sequenceIndex).keyframes.front().time;
+}
+
+std::int32_t WeatherScenarios::retreat(std::uint32_t& sequenceIndex, std::uint32_t& keyframe) const {
+    const auto time = at(sequenceIndex).keyframes[keyframe].time;
+    if (keyframe != 0u) return time - at(sequenceIndex).keyframes[--keyframe].time;
+    sequenceIndex = sequenceIndex == 0u ? sequenceCount - 1u : sequenceIndex - 1u;
+    const auto& scenario = at(sequenceIndex);
+    keyframe = scenario.keyframeCount - 1u;
+    return scenario.duration - scenario.keyframes[keyframe].time + time;
+}
+
+double WeatherScenarios::nextValue(std::uint32_t sequenceIndex, std::int32_t time, Property property, std::int32_t& distance) const {
+    const auto& scenario = at(sequenceIndex);
+    std::uint32_t keyframe = 0u;
+    while (keyframe < scenario.keyframeCount && scenario.keyframes[keyframe].time < time) ++keyframe;
+    if (keyframe == scenario.keyframeCount) { distance = scenario.duration - time; if (++sequenceIndex == sequenceCount) sequenceIndex = 0u; keyframe = 0u; distance += at(sequenceIndex).keyframes.front().time; }
+    else distance = scenario.keyframes[keyframe].time - time;
+    const auto initialSequence = sequenceIndex, initialFrame = keyframe;
+    for (;;) {
+        const auto value = at(sequenceIndex).keyframes[keyframe].properties[static_cast<std::size_t>(property)];
+        if (value >= 0.0f) return value;
+        distance += advance(sequenceIndex, keyframe);
+        if (sequenceIndex == initialSequence && keyframe == initialFrame) WorldDiagnostics::fail("Weather property has no keyframe value");
+    }
+}
+
+double WeatherScenarios::previousValue(std::uint32_t sequenceIndex, std::int32_t time, Property property, std::int32_t& distance) const {
+    const auto& scenario = at(sequenceIndex);
+    std::int32_t frame = static_cast<std::int32_t>(scenario.keyframeCount) - 1;
+    while (frame >= 0 && scenario.keyframes[frame].time > time) --frame;
+    if (frame < 0) { sequenceIndex = sequenceIndex == 0u ? sequenceCount - 1u : sequenceIndex - 1u; frame = static_cast<std::int32_t>(at(sequenceIndex).keyframeCount) - 1; distance = time + at(sequenceIndex).duration - at(sequenceIndex).keyframes[frame].time; }
+    else distance = time - scenario.keyframes[frame].time;
+    auto keyframe = static_cast<std::uint32_t>(frame);
+    const auto initialSequence = sequenceIndex, initialFrame = keyframe;
+    for (;;) {
+        const auto value = at(sequenceIndex).keyframes[keyframe].properties[static_cast<std::size_t>(property)];
+        if (value >= 0.0f) return value;
+        distance += retreat(sequenceIndex, keyframe);
+        if (sequenceIndex == initialSequence && keyframe == initialFrame) WorldDiagnostics::fail("Weather property has no keyframe value");
+    }
+}
+
+void WeatherScenarios::copyTexture(const char* name, SceneSkyLayer& output) const {
+    if (name[0] == '\0') { output = {}; return; }
+    for (std::uint32_t index = 0u; index < textureCount; ++index) if (SferaSimpleParser::equalsIgnoreCase(textures[index].texture, name)) { output = textures[index]; return; }
+    WorldDiagnostics::warning((std::string("Sky texture name absent in params. ") + name).c_str());
+}
+
+void WeatherScenarios::selectSky(std::int32_t time, float dayTime, char* primary, char* secondary) const {
+    std::uint32_t index = 0u;
+    std::int32_t start = 0, local = 0;
+    locate(time, index, start, local);
+    const auto& scenario = at(index);
+    const auto fraction = static_cast<float>(static_cast<double>(local) / scenario.duration);
+    if (fraction >= 1.0f) WorldDiagnostics::fail("internal error 98742756");
+    const WeatherSkyPair* selected = nullptr;
+    if ((scenario.sky.primary[0] != '\0' || scenario.sky.secondary[0] != '\0') && scenario.skyStart <= fraction && scenario.skyEnd >= fraction) selected = &scenario.sky;
+    else {
+        std::vector<const WeatherSkyPair*> available;
+        for (std::uint32_t pair = 0u; pair < pairCount; ++pair) {
+            const auto& sky = pairs[pair];
+            const char* name = sky.primary[0] != '\0' ? sky.primary : sky.secondary;
+            if (name[0] == '\0') { available.push_back(&sky); continue; }
+            const SceneSkyLayer* layer = nullptr;
+            for (std::uint32_t texture = 0u; texture < textureCount; ++texture) if (SferaSimpleParser::equalsIgnoreCase(textures[texture].texture, name)) { layer = &textures[texture]; break; }
+            if (layer == nullptr) { WorldDiagnostics::warning((std::string("Sky texture name present in para, but absent in params. ") + name).c_str()); continue; }
+            if (layer->minimumTime <= dayTime && layer->maximumTime >= dayTime) available.push_back(&sky);
+        }
+        if (!available.empty()) selected = available[static_cast<std::uint32_t>(start % static_cast<std::int32_t>(available.size()))];
+    }
+    if (selected == nullptr) { primary[0] = secondary[0] = '\0'; return; }
+    std::copy_n(selected->primary, std::strlen(selected->primary) + 1u, primary);
+    std::copy_n(selected->secondary, std::strlen(selected->secondary) + 1u, secondary);
+}
+
+void WeatherScenarios::windDirection(bool refresh, std::int32_t seed, float& x, float& z) {
+    auto& state = g_sfera_weather_runtime;
+    if (refresh || (state.direction_sin_component == 0.0f && state.direction_cos_component == 0.0f)) {
+        const auto direction = (seed >> 1) & 7;
+        const auto intensity = ((seed >> 4) & 3) + 1;
+        const auto angle = static_cast<float>(static_cast<double>(direction) * 0.7853982448577881);
+        const auto speed = static_cast<float>((static_cast<double>(intensity) * 0.25) * 0.00019999999494757503);
+        state.direction_sin_component = static_cast<float>(static_cast<float>(std::cos(static_cast<double>(angle))) * static_cast<double>(speed));
+        state.direction_cos_component = static_cast<float>(static_cast<float>(std::sin(static_cast<double>(angle))) * static_cast<double>(speed));
+    }
+    x = state.direction_sin_component;
+    z = state.direction_cos_component;
+}
+
+
+namespace {
+    bool chatRussianVowelOrSign(std::uint8_t value) {
+        switch (value) { case 0xF3: case 0xE5: case 0xFB: case 0xE0: case 0xEE: case 0xFD: case 0xFF: case 0xE8: case 0xFE: case 0xFC: case 0xFA: return true; default: return false; }
+    }
+
+    bool chatKeyboardAmbiguous(std::uint8_t value) {
+        switch (value) { case 0xE5: case 'e': case 0xF3: case 'y': case 0xEA: case 'k': case 0xE3: case 'r': case 0xE7: case '3': case 0xF5: case 'x': case 0xE8: case 'u': case 0xEE: case '0': case 'o': case 0xF0: case 'p': case 0xF1: case 'c': case 0xE0: case 'a': case 0xF2: case 'm': case 'E': case 0xC5: case 0xD3: case 'Y': case 'K': case 0xCA: case 0xC7: case 'X': case 0xD5: case 'O': case 0xCE: case 0xD0: case 'P': case 'C': case 0xD1: case 'A': case 0xC0: return true; default: return false; }
+    }
+
+    const std::array<std::array<std::uint8_t, 256>, 2>& chatCharacterMaps() {
+        static const auto maps = [] {
+            std::array<std::array<std::uint8_t, 256>, 2> result{};
+            for (std::size_t character = 0; character < 256; ++character) {
+                auto value = static_cast<std::uint8_t>(character);
+                if (value >= 'A' && value <= 'Z') value += 32u;
+                else if (value >= 0xC0u && value <= 0xDFu) value += 32u;
+                else if (value == 0xA8u) value = 0xB8u;
+                else if (!((value >= 'a' && value <= 'z') || value >= 0xE0u || value == 0xB8u)) value = ' ';
+                result[0][character] = result[1][character] = value;
+            }
+            for (auto character : {'0', '3', '6'}) result[0][character] = static_cast<std::uint8_t>(character);
+            const auto aliases = [&](std::size_t alphabet, std::string_view group) { for (std::size_t alias = 1; alias < group.size(); ++alias) for (auto& value : result[alphabet]) if (value == static_cast<std::uint8_t>(group[alias])) value = static_cast<std::uint8_t>(group.front()); };
+            for (auto group : {"\345\270e", "\344g", "\3416b", "\363y", "\352k", "\343r", "\3473", "\365x", "\350\351u", "\3560o", "\360p", "\361c", "\340a", "\354m", "\355h"}) aliases(0u, group);
+            for (auto group : {"\350\351i", "\363u", "\352k", "\345e\270", "\366c", "\355n", "\343g", "\347z", "\365h", "\344d", "\353l", "\356o", "\360r", "\357p", "\340a", "\342v", "\364f", "\361s", "\354m", "\362t", "\341b"}) aliases(1u, group);
+            return result;
+        }();
+        return maps;
+    }
+
+    struct HyperTextArgument { SphereUI::UiString& value; ~HyperTextArgument() { value.release(); } };
+
+    class ParsedChatText {
+    public:
+        SphereUI::UiDeque<HyperTextElement*> elements{};
+        SphereUI::UiString plain{};
+        explicit ParsedChatText(const SphereUI::UiString& text) { SphereUI::HyperTextParser::parseElements(text, elements, plain); }
+        ~ParsedChatText() { SphereUI::HyperTextParser::releaseElements(elements); plain.release(); }
+        void serialize(SphereUI::UiString* raw, SphereUI::UiString* visible) const {
+            SphereUI::UiString ignored_raw{}, ignored_visible{};
+            try { SphereUI::detail::serializeHyperTextElements(elements, raw != nullptr ? *raw : ignored_raw, visible != nullptr ? *visible : ignored_visible); }
+            catch (...) { ignored_raw.release(); ignored_visible.release(); throw; }
+            ignored_raw.release();
+            ignored_visible.release();
+        }
+        bool hasPlayerPrefix() const {
+            if (elements.count < 2u) return false;
+            const auto* first = elements.at(0u);
+            const auto* second = elements.at(1u);
+            return first != nullptr && second != nullptr && first->type == 5u && second->type == 4u && static_cast<const HyperTextElement_Link*>(first)->link_kind == 2u && std::string_view(second->text.data(), second->text.length).starts_with(": ");
+        }
+        void retain(std::uint32_t first, std::uint32_t last) {
+            SphereUI::UiDeque<HyperTextElement*> selected{};
+            try { selected.initialize(); for (std::uint32_t index = first; index < last; ++index) hyperAppendElement(selected, elements.at(index)->clone()); }
+            catch (...) { SphereUI::HyperTextParser::releaseElements(selected); throw; }
+            hyperTakeElements(elements, selected);
+        }
+    };
+}
+
+SphereUI::ChatFilter::ChatFilter() {
+    SphereRender::ConfigDocument::setStorageMode(SphereRender::ConfigDocument::StorageMode::Encoded);
+    const std::string filename = std::string("xadd\\matbase") + g_sfera_font_runtime.language_suffix + ".dat";
+    g_sfera_files.setErrorReporting(false);
+    const auto size = g_sfera_files.fileSize(filename.c_str());
+    g_sfera_files.setErrorReporting(true);
+    if (size == -1) return;
+    auto configuration = SphereRender::ConfigDocument::open(filename.c_str());
+    const auto count = configuration.arraySize("words");
+    if (!count) { WorldDiagnostics::fail("CMatFilter::CMatFilter: array words absent in matbase.dat"); return; }
+    rules.reserve(*count);
+    for (std::size_t index = 0u; index < *count; ++index) {
+        const auto* item = configuration.objectAt("words", index);
+        const char* word = item != nullptr ? item->text("w") : nullptr;
+        if (word == nullptr) { WorldDiagnostics::fail("CMatFilter::CMatFilter: field 'w' absent in one of array's elements"); continue; }
+        const auto kind = item->integer("t");
+        if (!kind) { WorldDiagnostics::fail("CMatFilter::CMatFilter: field 't' absent in one of array's elements"); continue; }
+        Rule rule{word, static_cast<std::uint32_t>(*kind)};
+        for (std::size_t exception = 0u; exception < item->arraySize("e").value_or(0u); ++exception) {
+            if (const auto* value = item->textAt("e", exception)) rule.exceptions.emplace_back(value);
+            else WorldDiagnostics::fail("CMatFilter::CMatFilter: error reading exceptions");
+        }
+        rules.push_back(std::move(rule));
+    }
+}
+
+SphereUI::ChatFilter::ChatFilter(std::vector<Rule> entries) : rules(std::move(entries)) {}
+
+std::string SphereUI::ChatFilter::normalize(std::string_view text, std::size_t alphabet) {
+    std::string result(text);
+    const auto& map = chatCharacterMaps()[alphabet != 0u];
+    for (auto& value : result) value = static_cast<char>(map[static_cast<std::uint8_t>(value)]);
+    return result;
+}
+
+bool SphereUI::ChatFilter::matchesWord(std::string_view word, std::size_t alphabet) const {
+    for (const auto& rule : rules) {
+        const auto pattern = normalize(rule.word, alphabet);
+        const auto position = word.find(pattern);
+        if (position == std::string_view::npos) continue;
+        switch (rule.kind) {
+            case 0u: if (word != pattern) continue; break;
+            case 1u: break;
+            case 2u: if (position != 0u) continue; break;
+            case 3u: if (position != 0u && !chatRussianVowelOrSign(static_cast<std::uint8_t>(word[position - 1u]))) continue; break;
+            case 4u: if (position != 0u || (word.size() != pattern.size() && !chatRussianVowelOrSign(static_cast<std::uint8_t>(word[pattern.size()])))) continue; break;
+            default: continue;
+        }
+        bool excepted = false;
+        for (const auto& exception : rule.exceptions) {
+            if (exception.empty()) continue;
+            const auto text = normalize(std::string_view(exception).substr(1u), alphabet);
+            if (exception.front() == '0' && position >= text.size()) excepted = word.substr(position - text.size(), text.size()) == text;
+            else if (exception.front() == '1') excepted = word.substr(position + pattern.size()).starts_with(text);
+            if (excepted) break;
+        }
+        if (!excepted) return true;
+    }
+    return false;
+}
+
+bool SphereUI::ChatFilter::matchesMessage(std::string_view message, std::size_t alphabet) const {
+    auto text = normalize(message, alphabet);
+    text.erase(std::unique(text.begin(), text.end()), text.end());
+    std::vector<std::string_view> words;
+    for (std::size_t first = 0u; first < text.size();) {
+        first = text.find_first_not_of(' ', first);
+        if (first == std::string::npos) break;
+        auto last = text.find(' ', first);
+        if (last == std::string::npos) last = text.size();
+        words.emplace_back(text.data() + first, last - first);
+        first = last;
+    }
+    for (std::size_t first = 0u; first < words.size(); ++first) {
+        if (matchesWord(words[first], alphabet)) return true;
+        if (words[first].size() > 3u) continue;
+        std::string joined(words[first]);
+        for (auto next = first + 1u; next < words.size() && words[next].size() <= 3u; ++next) {
+            joined += words[next];
+            if (matchesWord(joined, alphabet)) return true;
+        }
+    }
+    return false;
+}
+
+bool SphereUI::ChatFilter::rejects(std::string_view message) const {
+    if (rules.empty()) return false;
+    std::string visible(message);
+    bool tag = false;
+    for (auto& character : visible) {
+        const char value = character;
+        if (value == '<') tag = true;
+        if (tag) character = ' ';
+        if (value == '>') tag = false;
+    }
+    return matchesMessage(visible, 0u) || matchesMessage(visible, 1u);
+}
+
+bool SphereUI::ChatFilter::invalidIdentifier(std::string_view name) {
+    std::uint32_t alphabet = 0u;
+    for (std::uint8_t character : name) {
+        std::uint32_t current = 0u;
+        if (character == '-' || character == ' ' || character == '_' || (character >= '0' && character <= '9')) current = 0u;
+        else if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z')) current = 1u;
+        else if (character >= 0xC0u || character == 0xB8u || character == 0xA8u) current = 2u;
+        else return true;
+        if (alphabet == 0u) alphabet = current;
+        else if (alphabet != current && chatKeyboardAmbiguous(character)) return true;
+    }
+    return false;
+}
+
+SphereUI::UiString* SphereUI::HyperTextParser::plainText(UiString& output, const UiString& input) {
+    std::construct_at(&output);
+    ParsedChatText parsed(input);
+    output.assign(parsed.plain.data());
+    return &output;
+}
+
+SphereUI::UiString* SphereUI::HyperTextParser::buildLink(UiString& output, UiString& scheme, UiString& target, UiString& caption) {
+    HyperTextArgument owned_scheme{scheme}, owned_target{target}, owned_caption{caption};
+    UiString escaped{};
+    HyperTextArgument owned_escaped{escaped};
+    detail::escapeHyperText(escaped, target);
+    const std::string result = std::string("<l=\"") + scheme.data() + "://" + escaped.data() + "\">" + caption.data() + "</l>";
+    std::construct_at(&output);
+    output.assign(result.c_str());
+    return &output;
+}
+
+bool SphereUI::HyperTextParser::extractPlayerPrefix(UiString& input, UiString* output, UiString* plain) {
+    HyperTextArgument owned_input{input};
+    ParsedChatText parsed(input);
+    if (!parsed.hasPlayerPrefix()) return false;
+    parsed.retain(0u, 1u);
+    parsed.serialize(output, plain);
+    return true;
+}
+
+bool SphereUI::HyperTextParser::removePlayerPrefix(UiString& input, UiString* output, UiString* plain) {
+    HyperTextArgument owned_input{input};
+    ParsedChatText parsed(input);
+    if (parsed.elements.count == 0u) return false;
+    if (parsed.hasPlayerPrefix()) {
+        auto* text = parsed.elements.at(1u);
+        const std::string remainder(text->text.data() + 2u, text->text.length - 2u);
+        text->text.assign(remainder.c_str());
+        parsed.retain(remainder.empty() ? 2u : 1u, parsed.elements.count);
+    }
+    parsed.serialize(output, plain);
+    return true;
+}
+
+bool SphereUI::HyperTextParser::eraseRange(UiString& input, std::uint32_t first, std::uint32_t last, UiString* output, UiString* plain) {
+    HyperTextArgument owned_input{input};
+    ParsedChatText parsed(input);
+    if (parsed.elements.count == 0u) return false;
+    const std::uint64_t end = static_cast<std::uint64_t>(last) + 1u;
+    std::uint64_t offset = 0u;
+    UiDeque<HyperTextElement*> selected{};
+    try {
+        selected.initialize();
+        for (std::uint32_t index = 0u; index < parsed.elements.count; ++index) {
+            const auto* element = parsed.elements.at(index);
+            const std::uint64_t next = offset + element->text.length;
+            const bool overlap = first <= last && offset < end && next > first;
+            if (!overlap || offset < first || next > end || (first >= offset && last < next)) {
+                auto* copy = element->clone();
+                if (overlap) {
+                    auto text = std::string(element->text.data(), element->text.length);
+                    const auto begin = static_cast<std::size_t>(first > offset ? first - offset : 0u);
+                    const auto count = static_cast<std::size_t>(std::min(next, end) - offset - begin);
+                    try { text.erase(begin, count); copy->text.assign(text.c_str()); }
+                    catch (...) { copy->release(); throw; }
+                }
+                hyperAppendElement(selected, copy);
+            }
+            offset = next;
+        }
+    } catch (...) { releaseElements(selected); throw; }
+    if (first <= last && first < offset) hyperTakeElements(parsed.elements, selected);
+    releaseElements(selected);
+    parsed.serialize(output, plain);
+    return true;
+}
+
+void SphereUI::InterfaceManager::loadAllWindowTemplates() {
+    std::vector<std::filesystem::path> files;
+    std::error_code error;
+    for (std::filesystem::directory_iterator entry("Effects", error), end; !error && entry != end; entry.increment(error)) if (!entry->is_directory(error) && SferaSimpleParser::equalsIgnoreCase(entry->path().extension().string().c_str(), ".ui")) files.push_back(entry->path());
+    float completed = 0.0f;
+    const float fraction = files.empty() ? 0.0f : static_cast<float>(1.0 / static_cast<double>(files.size()));
+    for (const auto& file : files) {
+        if (SferaSimpleParser::equalsIgnoreCase(file.filename().string().c_str(), "loadscreen.ui")) continue;
+        loadWindowTemplates(file.string().c_str());
+        completed += fraction;
+        GameInterface::updateLoadingProgress(static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<double>(completed) * 30.0 + 30.0)));
+    }
+}
+
+bool SphereUI::InterfaceManager::initializeResources() {
+    if (!prepareResources()) return false;
+    GameInterface::updateLoadingProgress(15u);
+    loadHyperTexts();
+    GameInterface::updateLoadingProgress(30u);
+    loadAllWindowTemplates();
+    finishInitialization();
+    return true;
+}
+
+void SphereUI::InterfaceManager::showOptions(bool visible) {
+    auto* window = findWindow("options");
+    if (visible && window == nullptr) { window = openWindow("options", 0, 0, 0u); if (window != nullptr) bindEventHandler(window, WindowEventHandler::options); }
+    else if (!visible && window != nullptr) closeWindow(window, true);
+}
+
+
+namespace {
+    bool interfaceDepth(float depth, float& z, float& reciprocal) {
+        z = 0.0f;
+        reciprocal = 1.0f;
+        if (!(depth > 0.001f)) return true;
+        const double nearPlane = g_sfera_view_spatial_runtime.scale.x.f32, farPlane = g_sfera_view_spatial_runtime.scale.y.f32;
+        if (depth < nearPlane || depth > farPlane) return false;
+        z = static_cast<float>((farPlane - nearPlane * farPlane / depth) / (farPlane - nearPlane));
+        reciprocal = static_cast<float>(1.0 / depth);
+        return true;
+    }
+
+    void interfaceQuad(SferaScreenVertex* vertices, float left, float top, float right, float bottom, std::uint32_t color, const float* uv, float z, float reciprocal, bool clearSpecular) {
+        for (std::size_t corner = 0; corner < 4; ++corner) {
+            const bool onRight = corner == 1 || corner == 2, onBottom = corner >= 2;
+            auto& vertex = vertices[corner];
+            vertex = {onRight ? right : left, onBottom ? bottom : top, z, reciprocal, color, clearSpecular ? 0u : vertex.specular, uv ? uv[corner * 2] : (onRight ? 1.0f : 0.0f), uv ? uv[corner * 2 + 1] : (onBottom ? 1.0f : 0.0f)};
+        }
+    }
+
+    void interfaceNamedQuad(std::int32_t left, std::int32_t top, std::int32_t width, std::int32_t height, const char* name, std::uint32_t color, std::uint32_t alpha, float depth, const float* uv, bool worldSpace) {
+        if (width == 0 || height == 0) return;
+        auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+        const auto texture = g_sfera_textures.find(name);
+        device.checkResult(device.native_device->SetTexture(0, g_sfera_textures.resource(texture)), "SetTexture");
+        if (alpha != 255 || g_sfera_textures.hasAlpha(texture)) device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA);
+        float z, reciprocal;
+        if (!interfaceDepth(depth, z, reciprocal)) return;
+        auto* vertices = g_sfera_scene_render_runtime.textured_quad;
+        const float x = static_cast<float>(left) - 0.5f, y = static_cast<float>(top) - 0.5f;
+        interfaceQuad(vertices, x, y, x + width, y + height, color, uv, z, reciprocal, true);
+        device.checkResult(device.native_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE), "SetRenderState");
+        device.checkResult(device.native_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1), "SetFVF");
+        if (worldSpace) device.drawVertices(D3DPT_TRIANGLEFAN, 14, vertices, 4, nullptr, 0, sizeof(SferaScreenVertex));
+        else device.checkResult(device.native_device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, 2, vertices, sizeof(SferaScreenVertex)), "DrawPrimitiveUP");
+        device.last_hresult = device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    }
+}
+
+std::uint32_t GameInterface::drawSpriteQuad(std::uint32_t color, const float* uv, float left, float top, float right, float bottom) {
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    auto* vertices = g_sfera_scene_render_runtime.interface_quad;
+    interfaceQuad(vertices, left - 0.5f, top - 0.5f, right - 0.5f, bottom - 0.5f, color, uv, 0.0f, 1.0f, false);
+    return device.checkResult(device.native_device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, 2, vertices, sizeof(SferaScreenVertex)), "DrawPrimitiveUP");
+}
+
+std::uint32_t GameInterface::drawSpriteTexture(std::uint32_t color, std::int32_t texture, float left, float top, float right, float bottom, const float* uv, bool) {
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    if (texture <= 0) device.checkResult(device.native_device->SetTexture(0, nullptr), "SetTexture");
+    else SphereRender::SceneRenderer::bindTexture(texture);
+    return drawSpriteQuad(color, uv, left, top, right, bottom);
+}
+
+void GameInterface::drawTexture(std::int32_t left, std::int32_t top, std::int32_t width, std::int32_t height, const char* name, std::uint32_t alpha, float depth, const float* uv) {
+    interfaceNamedQuad(left, top, width, height, name, (alpha << 24) | 0xFFFFFFu, alpha, depth, uv, true);
+}
+
+void GameInterface::tintTexture(std::int32_t left, std::int32_t top, std::int32_t width, std::int32_t height, const char* name, std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint32_t alpha, const float* uv) {
+    interfaceNamedQuad(left, top, width, height, name, (alpha << 24) | (std::uint32_t(red) << 16) | (std::uint32_t(green) << 8) | blue, alpha, 0.0f, uv, false);
+}
+
+void GameInterface::drawFullscreenOverlay() {
+    const auto alpha = g_sfera_main_ui_state_runtime.ui_state_02;
+    if (alpha == 0) return;
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    auto* vertices = g_sfera_scene_render_runtime.textured_quad;
+    interfaceQuad(vertices, 0.0f, 0.0f, static_cast<float>(g_sfera_graphics_runtime.display_width), static_cast<float>(g_sfera_graphics_runtime.display_height), (alpha << 24) | 0xFFFFFFu, nullptr, 0.0f, 1.0f, true);
+    device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA);
+    device.checkResult(device.native_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1), "SetFVF");
+    device.drawVertices(D3DPT_TRIANGLEFAN, 14, vertices, 4, nullptr, 0, sizeof(SferaScreenVertex));
+    device.last_hresult = device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+}
+
+void GameInterface::releaseFontAtlas() {
+    for (std::size_t font = 0; font < std::size(g_sfera_font_atlas_layout_runtime.resource_count); ++font) {
+        for (std::uint32_t index = 0; index < g_sfera_font_atlas_layout_runtime.resource_count[font]; ++index) {
+            auto*& texture = g_sfera_static_render_lookup_runtime.atlas_textures[index][font];
+            if (texture) { texture->Release(); texture = nullptr; }
+        }
+    }
+}
+
+std::uint32_t GameInterface::fontHeight(std::uint32_t font, std::uint32_t scale) { return g_sfera_font_atlas_layout_runtime.span[font] * scale; }
+std::uint32_t GameInterface::glyphWidth(std::uint32_t character, std::uint32_t font) { return g_sfera_static_render_lookup_runtime.glyph_metrics[character][font] + g_sfera_font_atlas_layout_runtime.code_base[font]; }
+std::uint32_t GameInterface::textHeight(std::uint32_t font, std::uint32_t scale, std::uint32_t lines) { return ((lines - 1) * g_sfera_font_atlas_layout_runtime.cell_step[font] + g_sfera_font_atlas_layout_runtime.span[font]) * scale; }
+std::uint32_t GameInterface::lineOffset(std::uint32_t font, std::uint32_t scale, std::uint32_t line) { return g_sfera_font_atlas_layout_runtime.cell_step[font] * scale * line; }
+
+void GameInterface::setRenderState() {
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    device.checkResult(device.native_device->SetVertexShader(nullptr), "SetVertexShader");
+    device.checkResult(device.native_device->SetPixelShader(nullptr), "SetPixelShader");
+    device.checkResult(device.native_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE), "SetRenderState");
+    for (auto state : {D3DRS_ZENABLE, D3DRS_ZWRITEENABLE, D3DRS_LIGHTING, D3DRS_FOGENABLE}) device.checkResult(device.native_device->SetRenderState(state, FALSE), "SetRenderState");
+    device.checkResult(device.native_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1), "SetFVF");
+    device.setColorOperation(0, D3DTOP_MODULATE, D3DTA_TEXTURE, D3DTA_DIFFUSE);
+    device.setAlphaOperation(0, D3DTOP_MODULATE, D3DTA_TEXTURE, D3DTA_DIFFUSE);
+    for (auto state : {D3DSAMP_ADDRESSU, D3DSAMP_ADDRESSV}) device.checkResult(device.native_device->SetSamplerState(0, state, D3DTADDRESS_CLAMP), "SetSamplerState");
+}
+
+void GameInterface::restoreRenderState() {
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    for (auto state : {D3DSAMP_ADDRESSU, D3DSAMP_ADDRESSV}) device.checkResult(device.native_device->SetSamplerState(0, state, D3DTADDRESS_WRAP), "SetSamplerState");
+    for (auto state : {D3DRS_LIGHTING, D3DRS_FOGENABLE, D3DRS_ZWRITEENABLE, D3DRS_ZENABLE}) device.checkResult(device.native_device->SetRenderState(state, TRUE), "SetRenderState");
+    device.checkResult(device.native_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW), "SetRenderState");
+}
+
+void GameInterface::drawFrameRate() {
+    auto& frame = g_sfera_frame_runtime;
+    const auto elapsed = static_cast<std::int32_t>(static_cast<std::uint32_t>(WorldClock::nowTicks()) - g_sfera_client_main_scalar_runtime.counter_04);
+    ++frame.fps_sample_count;
+    if (elapsed > 10000) {
+        frame.fps = static_cast<float>(static_cast<double>(static_cast<std::int32_t>(frame.fps_sample_count)) * 10000.0 / elapsed);
+        frame.fps_sample_count = 0;
+        const auto now = WorldClock::nowTicks();
+        g_sfera_client_main_scalar_runtime.counter_04 = static_cast<std::uint32_t>(now);
+        frame.fps_anchor.high = static_cast<std::uint32_t>(now >> 32);
+    }
+    if (!g_sfera_landscape_map_runtime.show_fps) return;
+    g_sfera_screen_clip_runtime = {0, 0, g_sfera_graphics_runtime.display_width - 1, g_sfera_graphics_runtime.display_height - 1};
+    char text[108];
+    std::snprintf(text, sizeof(text), "FPS: %4.1f", static_cast<double>(frame.fps));
+    drawAtlasText(text, 0, 0, 0xFFFFFFFFu, 1, 0, 0.0f);
+}
+
+void GameInterface::drawFrame() {
+    setRenderState();
+    g_sfera_interface.draw();
+    if (auto* contours = SferaAbi::pointer<Contours>(g_sfera_client_process_runtime.client_object)) {
+        std::int32_t x = 0, y = 0;
+        const auto window = contours->editorWindowId();
+        if (window >= 0) {
+            const auto* slot = g_sfera_interface_runtime.windows.element<std::uint32_t>(window);
+            if (!slot || !*slot) throw std::out_of_range("Contours: invalid editor window");
+            x = static_cast<std::int32_t>(*SferaAbi::pointer<const float>(*slot + 0x34));
+            y = static_cast<std::int32_t>(*SferaAbi::pointer<const float>(*slot + 0x38));
+        }
+        contours->drawEditor(x, y);
+    }
+    drawFrameRate();
+    auto& frame = g_sfera_frame_runtime;
+    const auto elapsed = static_cast<std::int32_t>(static_cast<std::uint32_t>(WorldClock::nowTicks()) - frame.frame_anchor.low);
+    ++frame.frame_sample_count;
+    if (elapsed > 1000) {
+        g_sfera_input_device_runtime.frame_interval.f32 = static_cast<float>(static_cast<double>(static_cast<std::int32_t>(frame.frame_sample_count)) * 10000.0 / elapsed);
+        frame.frame_sample_count = 0;
+        const auto now = WorldClock::nowTicks();
+        frame.frame_anchor.low = static_cast<std::uint32_t>(now);
+        frame.frame_anchor.high = static_cast<std::uint32_t>(now >> 32);
+    }
+    restoreRenderState();
+}
+
+void GameInterface::finishLoading() {
+    g_sfera_interface.showLoadingScreen(false, g_sfera_graphics_runtime.display_width, g_sfera_graphics_runtime.display_height, false);
+    ::_chmod("loadcount.bin", _S_IREAD | _S_IWRITE);
+    const auto file = g_sfera_files.create("loadcount.bin");
+    const auto work = static_cast<std::uint32_t>(g_sfera_main_view_state_runtime.view_accumulator);
+    g_sfera_files.write(file, &work, sizeof(work));
+    g_sfera_files.close(file);
+}
+
+void GameInterface::updateLoadingProgress(std::uint32_t increment) {
+    auto& work = g_sfera_main_view_state_runtime.view_accumulator;
+    work = static_cast<std::uint32_t>(work) + static_cast<std::uint64_t>(increment);
+    const auto total = std::max(static_cast<std::int32_t>(g_sfera_world_load_runtime.loading_work_total - 80), 1);
+    const auto progress = std::min(static_cast<std::int32_t>(static_cast<std::uint32_t>(work) * 100u) / total, 100);
+    if (static_cast<std::uint32_t>(progress) == g_sfera_graphics_runtime.rebuild_percent) return;
+    g_sfera_graphics_runtime.rebuild_percent = progress;
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    if (!device.beginScene()) return;
+    g_sfera_world_render_runtime.scene_active = 1;
+    g_sfera_interface.setLoadingProgress(progress);
+    g_sfera_interface.update(0, 0, 0, 0);
+    drawAll();
+    device.checkResult(device.native_device->EndScene(), "EndScene");
+    SphereRender::SceneRenderer::waitForGpu();
+    g_sfera_world_render_runtime.scene_active = 0;
+    device.checkResult(device.native_device->Present(nullptr, nullptr, nullptr, nullptr), "Present");
+}
+
+void GameInterface::drawAtlasText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, std::int32_t scale, std::uint32_t font, float depth) {
+    const auto& clip = g_sfera_screen_clip_runtime;
+    uiDrawAtlasText(text, x, y, color, font, scale, {static_cast<std::int32_t>(clip.left), static_cast<std::int32_t>(clip.top), static_cast<std::int32_t>(clip.right), static_cast<std::int32_t>(clip.bottom)}, depth, true);
+}
+
+namespace {
+    GameUiWindow* interfaceWindow(std::int32_t handle) {
+        if (handle < 0) return nullptr;
+        const auto* entry = g_sfera_interface_runtime.windows.element<std::uint32_t>(handle);
+        return entry ? SferaAbi::pointer<GameUiWindow>(*entry) : nullptr;
+    }
+
+    void interfaceWindowBorder(const GameUiWindow& window) {
+        const auto width = window.contentRight - window.contentLeft + 1, height = window.contentBottom - window.contentTop + 1;
+        const float u = static_cast<float>(width) / 256.0f, v = static_cast<float>(height) / 256.0f;
+        const float background[] = {0, 0, u, 0, u, v, 0, v};
+        GameInterface::drawTexture(window.contentLeft, window.contentTop, width, height, "winfon", window.opacity, 0, background);
+        const float cornerUv[] = {0, 6.0f / 256, 6.0f / 256, 6.0f / 256, 6.0f / 256, 12.0f / 256, 0, 12.0f / 256};
+        for (std::size_t corner = 0; corner < 4; ++corner) {
+            float uv[8];
+            for (std::size_t vertex = 0; vertex < 4; ++vertex) {
+                const auto source = (vertex + 4 - corner) % 4;
+                uv[vertex * 2] = cornerUv[source * 2];
+                uv[vertex * 2 + 1] = cornerUv[source * 2 + 1];
+            }
+            const bool right = corner == 1 || corner == 2, bottom = corner >= 2;
+            GameInterface::drawTexture(right ? window.contentRight + 1 : window.left, bottom ? window.contentBottom + 1 : window.top, right ? window.right - window.contentRight : window.contentLeft - window.left, bottom ? window.bottom - window.contentBottom : window.contentTop - window.top, "wf_bord", window.opacity, 0, uv);
+        }
+        const float horizontal[] = {0, 0, u, 0, u, 6.0f / 256, 0, 6.0f / 256};
+        GameInterface::drawTexture(window.contentLeft, window.top, width, window.contentTop - window.top, "wf_bord", window.opacity, 0, horizontal);
+        GameInterface::drawTexture(window.contentLeft, window.contentBottom + 1, width, window.bottom - window.contentBottom, "wf_bord", window.opacity, 0, horizontal);
+        const float vertical[] = {0, 6.0f / 256, 0, 0, v, 0, v, 6.0f / 256};
+        GameInterface::drawTexture(window.left, window.contentTop, window.contentLeft - window.left, height, "wf_bord", window.opacity, 0, vertical);
+        GameInterface::drawTexture(window.contentRight + 1, window.contentTop, window.right - window.contentRight, height, "wf_bord", window.opacity, 0, vertical);
+    }
+
+    void interfaceElement(const GameUiElement& element, std::int32_t scrollX, std::int32_t scrollY) {
+        std::int32_t x = 0, y = 0;
+        auto alpha = element.alpha;
+        float depth = 0;
+        if (element.objectHandle != UINT32_MAX) {
+            SferaVec3F projected;
+            if (!g_sfera_camera.projectObjectTop(element.objectHandle, projected, element.opacity)) return;
+            x = static_cast<std::int32_t>(projected.x);
+            y = static_cast<std::int32_t>(projected.y);
+            const auto& object = *g_sfera_world_objects.object(element.objectHandle);
+            const auto& reference = *g_sfera_world_objects.object(1);
+            const auto delta = reference.position - object.position;
+            const auto squaredDistance = static_cast<float>(static_cast<double>(delta.x) * delta.x + static_cast<double>(delta.y) * delta.y + static_cast<double>(delta.z) * delta.z);
+            const auto distance = static_cast<float>(std::sqrt(static_cast<double>(squaredDistance)));
+            if (distance > 100.0f) return;
+            alpha = 255u - static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<double>(distance) / 100.0 * 255.0));
+            depth = static_cast<float>(static_cast<double>(g_sfera_model_transform_scratch_matrix.inverseTransformPoint(object.position).z) - 2.0);
+            if (g_sfera_view_spatial_runtime.scale.x.f32 > depth) depth = static_cast<float>(static_cast<double>(g_sfera_view_spatial_runtime.scale.x.f32) + static_cast<double>(0.01f));
+        }
+        if (element.kind == 1) {
+            const auto opacity = static_cast<std::int32_t>(element.alpha * alpha) / 255;
+            GameInterface::drawTexture(element.spriteLeft - scrollX + x, element.spriteTop - scrollY + y, element.spriteWidth, element.spriteHeight, element.texture, opacity, depth, nullptr);
+        } else if (element.kind == 0) {
+            const auto opacity = static_cast<std::int32_t>((element.color >> 24) * alpha) / 255;
+            const auto color = (static_cast<std::uint32_t>(opacity) << 24) | (element.color & 0xFFFFFFu);
+            for (std::uint32_t line = 0; line < element.lineCount; ++line) GameInterface::drawAtlasText(element.lines[line], element.lineX[line] - scrollX + x, element.lineY[line] - scrollY + y, color, element.fontScale, element.font, depth);
+        }
+    }
+}
+
+void GameInterface::drawWindow(std::int32_t handle) {
+    auto* window = interfaceWindow(handle);
+    if (!window) {
+        g_sfera_window_runtime.diagnostic_message[0] = 0;
+        WorldDiagnostics::appendScriptContext("draw_window: wrong handle");
+        WorldDiagnostics::flushScriptContext();
+        return;
+    }
+    if (handle != 0 && window->opacity != 0) interfaceWindowBorder(*window);
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    const D3DVIEWPORT9 viewport{static_cast<DWORD>(window->contentLeft), static_cast<DWORD>(window->contentTop), static_cast<DWORD>(window->contentRight - window->contentLeft + 1), static_cast<DWORD>(window->contentBottom - window->contentTop + 1), 0, 1};
+    device.last_hresult = device.native_device->SetViewport(&viewport);
+    g_sfera_screen_clip_runtime = {static_cast<std::uint32_t>(window->contentLeft), static_cast<std::uint32_t>(window->contentTop), static_cast<std::uint32_t>(window->contentRight), static_cast<std::uint32_t>(window->contentBottom)};
+    const auto scrollX = static_cast<std::int32_t>(window->scrollX), scrollY = static_cast<std::int32_t>(window->scrollY);
+    std::uint32_t count = 0;
+    for (auto control : window->controls) {
+        if (count >= window->controlCount) break;
+        if (control == UINT32_MAX) continue;
+        auto* value = WorldGuiControls::control(control);
+        if (!value) WorldDiagnostics::fail("internal error 37185837");
+        interfaceElement(*static_cast<const GameUiElement*>(value), scrollX, scrollY);
+        ++count;
+    }
+    const D3DVIEWPORT9 fullViewport{0, 0, g_sfera_graphics_runtime.display_width, g_sfera_graphics_runtime.display_height, 0, 1};
+    device.last_hresult = device.native_device->SetViewport(&fullViewport);
+}
+
+namespace {
+    struct InterfaceWindowOrder { std::int32_t window, order; };
+    void interfaceSortWindows(std::span<InterfaceWindowOrder> windows) {
+        const auto sort = [&](auto&& self, std::int32_t first, std::int32_t last) -> void {
+        while (first < last) {
+            const auto pivot = windows[(first + last) / 2].order;
+            auto left = first, right = last;
+            do {
+                while (windows[left].order < pivot) ++left;
+                while (windows[right].order > pivot) --right;
+                if (left <= right) { std::swap(windows[left++], windows[right--]); }
+            } while (left <= right);
+            if (first < right) self(self, first, right);
+            first = left;
+        }
+    };
+        if (!windows.empty()) sort(sort, 0, static_cast<std::int32_t>(windows.size()) - 1);
+    }
+}
+
+void GameInterface::drawAll() {
+    std::vector<InterfaceWindowOrder> windows;
+    const auto count = g_sfera_main_command_state_runtime.window_count;
+    for (std::uint32_t handle = 0; handle < g_sfera_interface_runtime.windows.capacity && windows.size() < count; ++handle) {
+        if (const auto* window = interfaceWindow(handle)) windows.push_back({static_cast<std::int32_t>(handle), static_cast<std::int32_t>(window->layer * 1000u + window->order)});
+    }
+    interfaceSortWindows(windows);
+    for (const auto& entry : windows) drawWindow(entry.window);
+}
+
+void GameInterface::sortWindows(std::int32_t first, std::int32_t last) {
+    if (first >= last) return;
+    std::vector<InterfaceWindowOrder> windows;
+    for (auto index = first; index <= last; ++index) windows.push_back({static_cast<std::int32_t>(g_sfera_spatial_index_runtime.ui_sort_indices[index]), static_cast<std::int32_t>(g_sfera_main_view_state_runtime.ui_sort_keys[index])});
+    interfaceSortWindows(windows);
+    for (const auto& entry : windows) {
+        g_sfera_spatial_index_runtime.ui_sort_indices[first] = entry.window;
+        g_sfera_main_view_state_runtime.ui_sort_keys[first++] = entry.order;
+    }
+}
+
+
+namespace {
+    template<std::size_t Size> void appendDiagnosticText(char (&destination)[Size], std::string_view text) {
+        const auto end = std::find(destination, destination + Size, '\0');
+        const auto used = static_cast<std::size_t>(end - destination);
+        if (used >= Size) { destination[Size - 1] = '\0'; return; }
+        const auto copied = text.copy(destination + used, Size - used - 1);
+        destination[used + copied] = '\0';
+    }
+
+    struct ScriptProgramDiagnostic { char name[128]; std::uint32_t entry; std::uint8_t callDepth; std::uint8_t reserved[31]; };
+
+    const ScriptProgramDiagnostic& scriptProgram(std::uint32_t table, std::uint32_t index) {
+        return SferaAbi::pointer<const ScriptProgramDiagnostic>(table)[index];
+    }
+}
+
+void WorldDiagnostics::appendScriptContext(const char* text) {
+    if (text) appendDiagnosticText(g_sfera_window_runtime.diagnostic_message, text);
+}
+
+void WorldDiagnostics::flushScriptContext() {
+    if (const auto* context = scriptContext()) {
+        appendScriptContext("\n");
+        appendScriptContext(context);
+    }
+    warning(g_sfera_window_runtime.diagnostic_message);
+    appendScriptContext("\n\n");
+}
+
+std::uint32_t WorldDiagnostics::inspectInstruction(std::uint16_t& module, std::uint32_t& offset, std::uint8_t* bytes, std::uint32_t& count) {
+    module = 0x7FFF;
+    offset = 0;
+    const auto& vm = *g_sfera_mbc_runtime;
+    if (vm.process_index > 65535) return 1;
+    const auto& process = vm.processes[vm.process_index];
+    const std::uint32_t mismatch = vm.bytecode_base != process.bytecode_base ? 0x80 : 0;
+    const auto relative = vm.current_instruction_address - process.bytecode_base;
+    if (bytes) {
+        const auto available = static_cast<std::int32_t>(process.bytecode_size - relative);
+        count = available <= 0 ? 0 : static_cast<std::uint32_t>(std::min(static_cast<std::int32_t>(count), available));
+        if (count) std::memcpy(bytes, SferaAbi::pointer<const void>(vm.current_instruction_address), count);
+    }
+    const auto ranges = static_cast<std::int16_t>(process.code_range_count);
+    for (std::int32_t index = 0; index < ranges; ++index) {
+        const auto begin = process.code_range_begin[index];
+        const auto end = begin + process.code_range_size[index];
+        if (static_cast<std::int32_t>(relative) >= static_cast<std::int32_t>(begin) && static_cast<std::int32_t>(relative) < static_cast<std::int32_t>(end)) {
+            module = process.code_range_ids[index];
+            offset = relative - begin;
+            return mismatch;
+        }
+    }
+    return mismatch + (process.code_range_count == 8 ? 2 : 3);
+}
+
+void WorldDiagnostics::describeScript(bool includeTime) {
+    auto& vm = *g_sfera_mbc_runtime;
+    auto& output = vm.diagnostic_context;
+    output[0] = '\0';
+    if (includeTime) {
+        const auto now = std::time(nullptr);
+        std::tm local{};
+#ifdef _WIN32
+        localtime_s(&local, &now);
+#else
+        localtime_r(&now, &local);
+#endif
+        std::strftime(output, sizeof(output), "%H:%M:%S ", &local);
+    }
+    std::uint16_t module;
+    std::uint32_t offset, count = 16;
+    std::uint8_t bytes[16];
+    const auto status = inspectInstruction(module, offset, bytes, count);
+    if ((status & ~0x80u) == 1) { appendDiagnosticText(output, "PrcName,CodeOffs: unknown. (wrong pos)"); return; }
+    if ((status & ~0x80u) == 2) { appendDiagnosticText(output, "PrcName,CodeOffs: unknown. (modulesNum == MAX_MODULES_IN_PRC)"); return; }
+    if ((status & ~0x80u) == 3) { appendDiagnosticText(output, "PrcName,CodeOffs: unknown. (Offset not found)"); return; }
+    char text[256];
+    if (status & 0x80) std::snprintf(text, sizeof(text), "Warn!!! pos = %d, sBaseCodePtr = %d, Prc[pos].baseCodePtr = %d. ", static_cast<std::int32_t>(vm.process_index), static_cast<std::int32_t>(vm.bytecode_base), static_cast<std::int32_t>(vm.processes[vm.process_index].bytecode_base));
+    else std::snprintf(text, sizeof(text), "module:%d, code:%d. ", module, static_cast<std::int32_t>(offset));
+    appendDiagnosticText(output, text);
+    for (std::uint32_t index = 0; index < count; ++index) {
+        std::snprintf(text, sizeof(text), "%x ", bytes[index]);
+        appendDiagnosticText(output, text);
+    }
+    appendDiagnosticText(output, "\n");
+}
+
+void WorldDiagnostics::appendCallStack(char* output) {
+    const auto& vm = *g_sfera_mbc_runtime;
+    std::string text;
+    for (auto index = static_cast<std::int32_t>(vm.execution_context_depth) - 1; index >= 0; --index) {
+        const auto& context = vm.execution_context_stack[index];
+        if (static_cast<std::int32_t>(context.process_index) < 0) { text += "\nCall from C++\n"; continue; }
+        const auto& process = vm.processes[context.process_index];
+        if (context.process_id != process.process_id) { text += "\nError in prc call stack\n"; break; }
+        const auto& program = scriptProgram(context.program_table_base, context.program_index);
+        text += "\nPrevious prc: "; text += process.name; text += "\nProgram: "; text += program.name; text += '\n';
+    }
+    if (output == vm.diagnostic_context) appendDiagnosticText(g_sfera_mbc_runtime->diagnostic_context, text);
+    else std::memcpy(output + std::strlen(output), text.c_str(), text.size() + 1);
+}
+
+const char* WorldDiagnostics::scriptContext() {
+    if (static_cast<std::int32_t>(g_sfera_network_runtime.active_slot) < 0) return nullptr;
+    auto& vm = *g_sfera_mbc_runtime;
+    describeScript(true);
+    const auto& program = scriptProgram(vm.program_table_base, vm.program_index);
+    char message[1024];
+    std::snprintf(message, sizeof(message), "MBC-file: %s\nProgram: %s\nCall's depth: %d\nAddress: 0x%08X\n", vm.processes[vm.process_index].name, program.name, program.callDepth, vm.current_instruction_address - vm.bytecode_base + 32);
+    appendDiagnosticText(vm.diagnostic_context, message);
+    appendCallStack(vm.diagnostic_context);
+    return vm.diagnostic_context;
+}
+
