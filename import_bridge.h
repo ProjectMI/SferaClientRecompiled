@@ -155,6 +155,10 @@ CSoundInterface* SI_GetInterface();
 void SI_Close();
 void SI_SetLogFile(const char*);
 void SI_SetStreamVolume(int);
-unsigned long SI_StreamCreateFile(const char*, unsigned long);
-void SI_StreamFree(unsigned long);
+CSoundStream* SI_StreamCreateFile(const char*, unsigned long);
+void SI_StreamFree(CSoundStream*);
+#if defined(_MSC_VER) && defined(_M_IX86)
+#pragma comment(linker, "/alternatename:?SI_StreamCreateFile@@YAPAVCSoundStream@@PBDK@Z=?SI_StreamCreateFile@@YAKPBDK@Z")
+#pragma comment(linker, "/alternatename:?SI_StreamFree@@YAXPAVCSoundStream@@@Z=?SI_StreamFree@@YAXK@Z")
+#endif
 bool SI_GetHardwareMixing();

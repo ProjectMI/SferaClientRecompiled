@@ -10,10 +10,10 @@ __declspec(noinline) void sfera_sub_004974B0(LiftCpu* cpu, uint32_t stop_address
     if (*(uint32_t*)(cpu->esi + 0x10u) == cpu->ebx) goto label_000974D8;
     cpu->edx = cpu->ebx + 0x48u;
     cpu->ecx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\ItemArray.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4974C9u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x4974C9u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     cpu->eax = *(uint32_t*)(cpu->esi + 0x10u);
     lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4974D2u)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x4974D2u));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->ebx;
     label_000974D8:
@@ -26,15 +26,15 @@ __declspec(noinline) void sfera_sub_004974B0(LiftCpu* cpu, uint32_t stop_address
     label_000974F0:
     cpu->edx = 0x4Fu;
     cpu->ecx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\ItemArray.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4974FFu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x4974FFu));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     cpu->ecx = *(uint32_t*)(cpu->esi);
     cpu->eax = *(uint32_t*)(cpu->ecx + (cpu->ebx * 4u));
     if (cpu->eax == 0u) goto label_00097528;
     cpu->edx = *(uint32_t*)(cpu->eax + 0xFFFFFFFCu);
     cpu->edi = cpu->eax + 0xFFFFFFFCu;
-    { uint32_t current = cpu->eax + 0xC0u * cpu->edx; uint32_t count = cpu->edx; while (count-- != 0u) { current -= 0xC0u; cpu->ecx = current; SferaAbi::pointer<CSoundEffect>(cpu->ecx)->destroy(); } }
+    { uint32_t current = cpu->eax + 0xC0u * cpu->edx; uint32_t count = cpu->edx; while (count-- != 0u) { current -= 0xC0u; cpu->ecx = current; reinterpret_cast<CSoundEffect*>(cpu->ecx)->destroy(); } }
     lift_push32(cpu, cpu->edi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x497525u)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x497525u));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     label_00097528:
     ++cpu->ebx;
@@ -621,7 +621,7 @@ __declspec(noinline) void sfera_sub_0049B4D0(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = (cpu->edx & 0xFFFFFF00u) | ((uint32_t)(UINT8_C(0x00)) & 0xFFu);
     cpu->ebx += 0x44Cu;
     *(uint8_t*)(cpu->ebx) = cpu->edx & 0xFFu;
-    cpu->eax = SferaAbi::address(WorldDiagnostics::scriptContext());
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldDiagnostics::scriptContext()));
     cpu->esi = cpu->eax;
     if (cpu->esi == 0u) goto label_0009B739;
     if (cpu->ebp < 0xAu) goto label_0009B6D4;

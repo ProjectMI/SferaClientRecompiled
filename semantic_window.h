@@ -405,7 +405,7 @@ namespace SphereUI {
         SferaWindowChildNode* reference_sentinel;
         std::uint32_t reference_count;
         std::uint32_t reference_storage_context;
-        std::uint32_t modal_owner;
+        Window* modal_owner;
         UiContainerProxy* event_proxy;
         WindowEvent** event_slots;
         std::uint32_t event_capacity;

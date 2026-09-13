@@ -41,14 +41,14 @@ __declspec(noinline) void sfera_sub_004BC130(LiftCpu* cpu, uint32_t stop_address
     if (*(uint32_t*)(cpu->esi + 0x1Cu) < 0x10u) goto label_000BC164;
     cpu->eax = *(uint32_t*)(cpu->esi + 8u);
     lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4BC161u)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x4BC161u));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     label_000BC164:
     *(uint32_t*)(cpu->esi + 0x1Cu) = 0xFu;
     *(uint32_t*)(cpu->esi + 0x18u) = cpu->ebx;
     lift_push32(cpu, cpu->esi);
     *(uint8_t*)(cpu->esi + 8u) = cpu->ebx & 0xFFu;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4BC177u)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x4BC177u));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     cpu->esi = cpu->ebp;
     if (cpu->ebp != *(uint32_t*)(cpu->edi)) goto label_000BC150;

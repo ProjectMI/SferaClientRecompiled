@@ -10,36 +10,6 @@ static int sfera_ascii_iequals(uint32_t address, const char* literal) { for (;;)
 static int sfera_process_name_is_ignored(uint32_t address) { switch (sfera_ascii_hash_ci(address)) { case 0xCB320621u: return sfera_ascii_iequals(address, "[System Process]"); case 0xC301CF93u: return sfera_ascii_iequals(address, "idle"); case 0xF84B2A97u: return sfera_ascii_iequals(address, "csrss.exe"); case 0xDE6F2DFEu: return sfera_ascii_iequals(address, "winlogon.exe"); case 0x86049695u: return sfera_ascii_iequals(address, "smss.exe"); case 0x28FDCADBu: return sfera_ascii_iequals(address, "services.exe"); case 0x523B71BAu: return sfera_ascii_iequals(address, "service.exe"); case 0x6105AD4Fu: return sfera_ascii_iequals(address, "lsass.exe"); case 0x82611D84u: return sfera_ascii_iequals(address, "taskmgr.exe"); case 0x491E0A9Cu: return sfera_ascii_iequals(address, "system"); case 0x2453F3B9u: return sfera_ascii_iequals(address, "svchost.exe"); case 0xC979C6AEu: return sfera_ascii_iequals(address, "cdantsrv.exe"); case 0x6369D323u: return sfera_ascii_iequals(address, "spoolsv.exe"); case 0xA162EC55u: return sfera_ascii_iequals(address, "mdm.exe"); case 0x48545BE6u: return sfera_ascii_iequals(address, "nvsvc32.exe"); case 0x708EA5E0u: return sfera_ascii_iequals(address, "far.exe"); case 0x130CD4F6u: return sfera_ascii_iequals(address, "regsvc32.exe"); case 0xA11E0AEu: return sfera_ascii_iequals(address, "mstask.exe"); case 0xABDAFF7Eu: return sfera_ascii_iequals(address, "winmgmt.exe"); case 0x8AE4CC97u: return sfera_ascii_iequals(address, "stisvc.exe"); case 0xDB3A61B5u: return sfera_ascii_iequals(address, "rundll32.exe"); case 0xE566D06Eu: return sfera_ascii_iequals(address, "wcescoomm.exe"); case 0xA062BD36u: return sfera_ascii_iequals(address, "internat.exe"); case 0x5037C1B7u: return sfera_ascii_iequals(address, "winword.exe"); case 0x399460A4u: return sfera_ascii_iequals(address, "explorer.exe"); case 0xB884A32Cu: return sfera_ascii_iequals(address, "notepad.exe"); case 0x82407190u: return sfera_ascii_iequals(address, "ctfmon.exe"); case 0xFFB78D72u: return sfera_ascii_iequals(address, "icq.exe"); case 0x3BC05E55u: return sfera_ascii_iequals(address, "iexplore.exe"); case 0x8C6DE00Au: return sfera_ascii_iequals(address, "srvany.exe"); case 0x47785D4Cu: return sfera_ascii_iequals(address, "spidernt.exe"); case 0xF7D48DE3u: return sfera_ascii_iequals(address, "winamp.exe"); case 0xD391162Bu: return sfera_ascii_iequals(address, "kav.exe"); case 0x83888858u: return sfera_ascii_iequals(address, "winrar.exe"); case 0x4FB24653u: return sfera_ascii_iequals(address, "kavsvc.exe"); case 0x73D09132u: return sfera_ascii_iequals(address, "ati2evxx.exe"); case 0x796F943u: return sfera_ascii_iequals(address, "regsvc.exe"); case 0x51E34A6Eu: return sfera_ascii_iequals(address, "mspmspsv.exe"); case 0x94FF76ADu: return sfera_ascii_iequals(address, "resetservice.exe"); case 0x17B4BBA5u: return sfera_ascii_iequals(address, "directcd.exe"); case 0x5AB899A3u: return sfera_ascii_iequals(address, "qttask.exe"); case 0x91BFD53Cu: return sfera_ascii_iequals(address, "atiptaxx.exe"); case 0x681423EEu: return sfera_ascii_iequals(address, "SOUNDMAN.EXE"); case 0x4DF48812u: return sfera_ascii_iequals(address, "wuauclt.exe"); case 0x5ECB2F2Cu: return sfera_ascii_iequals(address, "miranda32.exe"); case 0xB7110726u: return sfera_ascii_iequals(address, "sphere.exe"); case 0xBB309AE5u: return sfera_ascii_iequals(address, "cmd.exe"); case 0xEDFBE74Au: return sfera_ascii_iequals(address, "calc.exe"); case 0x5D2A3611u: return sfera_ascii_iequals(address, "thebat.exe"); default: return 0; } }
 
 
-__declspec(noinline) void sfera_sub_00429A30(LiftCpu* cpu, uint32_t stop_address) {
-    lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
-    cpu->edi = cpu->ecx;
-    cpu->eax = *(uint32_t*)(cpu->edi + 4u);
-    cpu->ebx = *(uint32_t*)(cpu->eax + 4u);
-    cpu->esi = cpu->ebx;
-    if (*(uint8_t*)(cpu->ebx + 0x15u) != 0u) goto label_00029A61;
-    label_00029A43:
-    cpu->ecx = *(uint32_t*)(cpu->esi + 8u);
-    lift_push32(cpu, cpu->ecx);
-    cpu->ecx = cpu->edi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x429A4Eu)); sfera_sub_004044D0(cpu, LIFT_CODE_TOKEN_VA(0x429A4Eu));
-    cpu->esi = *(uint32_t*)(cpu->esi);
-    lift_push32(cpu, cpu->ebx);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x429A56u)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x429A56u));
-    cpu->esp += 4u;
-    cpu->ebx = cpu->esi;
-    if (*(uint8_t*)(cpu->esi + 0x15u) == 0u) goto label_00029A43;
-    label_00029A61:
-    cpu->eax = *(uint32_t*)(cpu->edi + 4u);
-    *(uint32_t*)(cpu->eax + 4u) = cpu->eax;
-    cpu->eax = *(uint32_t*)(cpu->edi + 4u);
-    *(uint32_t*)(cpu->eax) = cpu->eax;
-    cpu->eax = *(uint32_t*)(cpu->edi + 4u);
-    *(uint32_t*)(cpu->eax + 8u) = cpu->eax;
-    *(uint32_t*)(cpu->edi + 8u) = 0u;
-    cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
-}
-
-
 __declspec(noinline) void sfera_sub_0042A290(LiftCpu* cpu, uint32_t stop_address) {
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
     cpu->esi = cpu->ecx;
@@ -47,10 +17,10 @@ __declspec(noinline) void sfera_sub_0042A290(LiftCpu* cpu, uint32_t stop_address
     if (*(uint32_t*)(cpu->esi + 0x10u) == cpu->edi) goto label_0002A2B8;
     cpu->edx = cpu->edi + 0x48u;
     cpu->ecx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\ItemArray.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42A2A9u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42A2A9u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     cpu->eax = *(uint32_t*)(cpu->esi + 0x10u);
     lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42A2B2u)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x42A2B2u));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     *(uint32_t*)(cpu->esi + 0x10u) = cpu->edi;
     label_0002A2B8:
@@ -62,11 +32,11 @@ __declspec(noinline) void sfera_sub_0042A290(LiftCpu* cpu, uint32_t stop_address
     label_0002A2D0:
     cpu->edx = 0x4Fu;
     cpu->ecx = (uintptr_t)"h:\\work\\sphere\\sphere1_main_update\\~src\\spheresources\\shareclientsevercode\\ItemArray.h";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42A2DFu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42A2DFu));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     cpu->ecx = *(uint32_t*)(cpu->esi);
     cpu->edx = *(uint32_t*)(cpu->ecx + (cpu->edi * 4u));
     lift_push32(cpu, cpu->edx);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42A2EAu)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x42A2EAu));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     ++cpu->edi;
     cpu->esp += 4u;
     if ((int32_t)cpu->edi < (int32_t)cpu->ebx) goto label_0002A2D0;
@@ -86,44 +56,7 @@ __declspec(noinline) void sfera_sub_0042A290(LiftCpu* cpu, uint32_t stop_address
     label_0002A31A:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu); cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-__declspec(noinline) void sfera_sub_0042A320(LiftCpu* cpu, uint32_t stop_address) {
-    cpu->esp -= 0xCu;
-    lift_push32(cpu, cpu->esi); lift_push32(cpu, 0x18u);
-    cpu->esi = cpu->ecx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42A32Du)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x42A32Du));
-    cpu->edx = 0u;
-    cpu->esp += 4u;
-    if (cpu->eax == cpu->edx) goto label_0002A367;
-    cpu->ecx = *(uint32_t*)(cpu->esi + 4u);
-    *(uint32_t*)(cpu->eax) = cpu->ecx;
-    cpu->ecx = *(uint32_t*)(cpu->esi + 4u);
-    *(uint32_t*)(cpu->eax + 4u) = cpu->ecx;
-    cpu->ecx = *(uint32_t*)(cpu->esi + 4u);
-    *(uint32_t*)(cpu->eax + 8u) = cpu->ecx;
-    cpu->ecx = cpu->eax + 0xCu;
-    *(uint16_t*)(cpu->eax + 0x14u) = cpu->edx & 0xFFFFu;
-    if (cpu->ecx == cpu->edx) goto label_0002A360;
-    cpu->edx = *(uint32_t*)(cpu->esp + 0x14u);
-    cpu->esi = *(uint32_t*)(cpu->edx);
-    *(uint32_t*)(cpu->ecx) = cpu->esi;
-    cpu->edx = *(uint32_t*)(cpu->edx + 4u);
-    *(uint32_t*)(cpu->ecx + 4u) = cpu->edx;
-    label_0002A360:
-    cpu->esi = lift_pop32(cpu);
-    cpu->esp += 0xCu;
-    cpu->esp += 8u; cpu->eip = stop_address; return;
-    label_0002A367:
-    cpu->eax = cpu->esp + 0x14u;
-    lift_push32(cpu, cpu->eax);
-    cpu->ecx = cpu->esp + 8u;
-    *(uint32_t*)(cpu->esp + 0x18u) = cpu->edx;
-    cpu->esp += 4u;
-    lift_push32(cpu, 0u);
-    cpu->ecx = cpu->esp + 8u;
-    lift_push32(cpu, cpu->ecx);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42A391u)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_VA(0x42A391u));
-    cpu->eip = 0x42A391u; ::DebugBreak(); return;
-}
+
 
 __declspec(noinline) void sfera_sub_0042B7D0(LiftCpu* cpu, uint32_t stop_address) {
     cpu->esp += 4u; cpu->eip = stop_address; return;
@@ -182,7 +115,7 @@ __declspec(noinline) void sfera_sub_0042E080(LiftCpu* cpu, uint32_t stop_address
 __declspec(noinline) void sfera_sub_0042E210(LiftCpu* cpu, uint32_t stop_address) {
     auto* self = reinterpret_cast<COutputLogDevice*>(cpu->ecx);
     std::construct_at(self);
-    cpu->eax = SferaAbi::address(self);
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(self));
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 __declspec(noinline) void sfera_sub_0042E250(LiftCpu* cpu, uint32_t stop_address) {
@@ -192,13 +125,13 @@ __declspec(noinline) void sfera_sub_0042E250(LiftCpu* cpu, uint32_t stop_address
 }
 __declspec(noinline) void sfera_sub_0042E2F0(LiftCpu* cpu, uint32_t stop_address) {
     auto* self = reinterpret_cast<COutputLogDevice*>(cpu->ecx);
-    self->setFilename(SferaAbi::pointer<const char>(*(uint32_t*)(cpu->esp + 4u)));
+    self->setFilename(reinterpret_cast<const char*>(*(uint32_t*)(cpu->esp + 4u)));
     cpu->esp += 8u; cpu->eip = stop_address; return;
 }
 __declspec(noinline) void sfera_sub_0042E440(LiftCpu* cpu, uint32_t stop_address) {
     auto* self = reinterpret_cast<CSphereError*>(cpu->ecx);
     std::construct_at(self);
-    cpu->eax = SferaAbi::address(self);
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(self));
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
 __declspec(noinline) void sfera_sub_0042E540(LiftCpu* cpu, uint32_t stop_address) {
@@ -214,9 +147,9 @@ __declspec(noinline) void sfera_sub_0042E540(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax != 0u) goto label_0002E5B8;
     cpu->edx = 0xE9u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\ErrorLog.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E588u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42E588u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     lift_push32(cpu, 8u);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E58Fu)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x42E58Fu));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esp += 4u;
     *(uint32_t*)(cpu->esp + 0x18u) = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x10u) = 0u;
@@ -235,9 +168,9 @@ __declspec(noinline) void sfera_sub_0042E540(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax != 0u) goto label_0002E610;
     cpu->edx = 0xF1u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\ErrorLog.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E5D1u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42E5D1u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     lift_push32(cpu, 0xCu);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E5D8u)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x42E5D8u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esp += 4u;
     *(uint32_t*)(cpu->esp + 0x18u) = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x10u) = 1u;
@@ -430,9 +363,9 @@ __declspec(noinline) void sfera_sub_0042E920(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi);
     cpu->edx = 0x12Cu;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\FastCrashReport.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E939u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42E939u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     lift_push32(cpu, 1u);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42E940u)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x42E940u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esi = cpu->eax;
     cpu->esp += 4u;
     if (cpu->esi == 0u) goto label_0002E979;
@@ -499,13 +432,13 @@ __declspec(noinline) void sfera_sub_0042EB70(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi);
     cpu->edx = 0x136u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\FastCrashReport.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42EB89u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x42EB89u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     cpu->ecx = g_sfera_file_runtime.crash_report_instance;
     cpu->esi = cpu->ecx;
     if (cpu->ecx == 0u) goto label_0002EBA3;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42EB9Au)); sfera_sub_0042E850(cpu, LIFT_CODE_TOKEN_VA(0x42EB9Au));
     lift_push32(cpu, cpu->esi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42EBA0u)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x42EBA0u));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     label_0002EBA3:
     g_sfera_file_runtime.crash_report_instance = 0u;

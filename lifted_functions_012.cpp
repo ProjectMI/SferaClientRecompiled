@@ -17,7 +17,7 @@ __declspec(noinline) void sfera_sub_0047AB30(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->edx);
     cpu->edx = g_sfera_graphics_runtime.display_width;
     cpu->ecx = (cpu->ecx & 0xFFFFFF00u) | (1u & 0xFFu);
-    g_sfera_interface.showLoadingScreen((cpu->ecx & 255u) != 0u, static_cast<std::int32_t>(cpu->edx), static_cast<std::int32_t>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), (*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u) & 255u) != 0u); cpu->esp += 8u;
+    g_sfera_interface.showLoadingScreen((cpu->ecx & 255u) != 0u, static_cast<std::int32_t>(cpu->edx), static_cast<std::int32_t>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)), (*reinterpret_cast<const std::uint32_t*>(cpu->esp + 4u) & 255u) != 0u); cpu->esp += 8u;
     cpu->esi = native_function_address32(&::Sleep);
 
     reinterpret_cast<void (__stdcall*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::Sleep)))(0x32u);
@@ -36,7 +36,7 @@ __declspec(noinline) void sfera_sub_0047AB30(LiftCpu* cpu, uint32_t stop_address
 
     reinterpret_cast<void (__stdcall*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::Sleep)))(0x32u);
     cpu->ecx = (uintptr_t)"models\\materls.mtr";
-    g_sfera_materials.load(SferaAbi::pointer<const char>(cpu->ecx));
+    g_sfera_materials.load(reinterpret_cast<const char*>(cpu->ecx));
 
     reinterpret_cast<void (__stdcall*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::Sleep)))(0x32u);
     TerrainAssets::loadMap();
@@ -44,42 +44,42 @@ __declspec(noinline) void sfera_sub_0047AB30(LiftCpu* cpu, uint32_t stop_address
     reinterpret_cast<void (__stdcall*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::Sleep)))(0x32u);
     cpu->edx = 0x42C7u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47ABF9u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x47ABF9u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     lift_push32(cpu, 0x1030u);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AC03u)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x47AC03u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esp += 4u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x420u) = 0u;
     if (cpu->eax == 0u) goto label_0007AC27;
     lift_push32(cpu, (uintptr_t)"sky.txt");
     cpu->ecx = cpu->eax;
-    cpu->eax = SferaAbi::address(SferaAbi::pointer<SkyEnvironment>(cpu->ecx)->load(SferaAbi::pointer<const char>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp))));  cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(reinterpret_cast<SkyEnvironment*>(cpu->ecx)->load(reinterpret_cast<const char*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)))));  cpu->esp += 4u;
     goto label_0007AC29;
     label_0007AC27:
     cpu->eax = 0u;
     label_0007AC29:
     sub_pred[0] = (uint32_t)(*(uint32_t*)(void*)&g_sfera_client_config_runtime.state_20) == 0u;
     *(uint32_t*)(cpu->esp + 0x420u) = cpu->edi;
-    g_sfera_primary_sky_environment = cpu->eax;
+    g_sfera_primary_sky_environment = reinterpret_cast<decltype(g_sfera_primary_sky_environment)>(cpu->eax);
     if (sub_pred[0]) goto label_0007AC89;
     cpu->edx = 0x42C9u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AC4Du)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x47AC4Du));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     lift_push32(cpu, 0x1030u);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AC57u)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x47AC57u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esp += 4u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x420u) = 1u;
     if (cpu->eax == 0u) goto label_0007AC7B;
     lift_push32(cpu, (uintptr_t)"landscape_hr\\sky_hr.txt");
     cpu->ecx = cpu->eax;
-    cpu->eax = SferaAbi::address(SferaAbi::pointer<SkyEnvironment>(cpu->ecx)->load(SferaAbi::pointer<const char>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp))));  cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(reinterpret_cast<SkyEnvironment*>(cpu->ecx)->load(reinterpret_cast<const char*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)))));  cpu->esp += 4u;
     goto label_0007AC7D;
     label_0007AC7B:
     cpu->eax = 0u;
     label_0007AC7D:
     *(uint32_t*)(cpu->esp + 0x420u) = cpu->edi;
-    g_sfera_main_aux_runtime.secondary_world_manager = cpu->eax;
+    g_sfera_main_aux_runtime.secondary_world_manager = reinterpret_cast<decltype(g_sfera_main_aux_runtime.secondary_world_manager)>(cpu->eax);
     label_0007AC89:
 
     reinterpret_cast<void (__stdcall*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::Sleep)))(0x32u);
@@ -87,23 +87,23 @@ __declspec(noinline) void sfera_sub_0047AB30(LiftCpu* cpu, uint32_t stop_address
     g_sfera_models.addFolder("models\\");
     if (*(uint32_t*)(void*)&g_sfera_client_config_runtime.state_20 == 0u) goto label_0007ACF8;
     lift_push32(cpu, (uintptr_t)"models_hr\\");
-    g_sfera_models.addFolder(SferaAbi::pointer<const char>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    g_sfera_models.addFolder(reinterpret_cast<const char*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     label_0007ACF8:
     if (*(uint32_t*)(void*)&g_sfera_client_config_runtime.state_21 == 0u) goto label_0007AD11;
     lift_push32(cpu, (uintptr_t)"models_ph\\");
-    g_sfera_models.addFolder(SferaAbi::pointer<const char>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    g_sfera_models.addFolder(reinterpret_cast<const char*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     label_0007AD11:
     if (*(uint32_t*)(void*)&g_sfera_client_config_runtime.state_22 == 0u) goto label_0007AD2A;
     lift_push32(cpu, (uintptr_t)"models_rd\\");
-    g_sfera_models.addFolder(SferaAbi::pointer<const char>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    g_sfera_models.addFolder(reinterpret_cast<const char*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     label_0007AD2A:
     g_sfera_models.finishRegistration();
     cpu->edx = 0x42DCu;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
     *(uint32_t*)(cpu->esp + 0x10u) = (uintptr_t)"xadd\\";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AD4Cu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x47AD4Cu));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     lift_push32(cpu, 0x7540u);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AD56u)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x47AD56u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esp += 4u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x420u) = 3u;
@@ -112,7 +112,7 @@ __declspec(noinline) void sfera_sub_0047AB30(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = cpu->esp + 0x14u;
     lift_push32(cpu, cpu->ecx);
     cpu->ecx = cpu->eax;
-    cpu->eax = SferaAbi::address(SferaAbi::pointer<SphereRender::CharacterModels>(cpu->ecx)->load(SferaAbi::pointer<const char* const>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u)));  cpu->esp += 8u;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(reinterpret_cast<SphereRender::CharacterModels*>(cpu->ecx)->load(reinterpret_cast<const char* const*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)), *reinterpret_cast<const std::uint32_t*>(cpu->esp + 4u))));  cpu->esp += 8u;
     goto label_0007AD7E;
     label_0007AD7C:
     cpu->eax = 0u;
@@ -124,60 +124,60 @@ __declspec(noinline) void sfera_sub_0047AB30(LiftCpu* cpu, uint32_t stop_address
     x87_p0 = (double)*(float*)((uintptr_t)&g_sfera_input_device_runtime.lod_distance.f32);
     *(uint32_t*)(cpu->esp + 0x428u) = cpu->edi;
     *(float*)(cpu->esp) = x87_p0; 
-    g_sfera_recovered_static_runtime.render_state_08 = cpu->eax;
-    SferaAbi::pointer<SphereRender::CharacterModels>(cpu->ecx)->setDistances(*SferaAbi::pointer<const float>(cpu->esp), *SferaAbi::pointer<const float>(cpu->esp + 4u));  cpu->esp += 8u;
+    g_sfera_recovered_static_runtime.render_state_08 = reinterpret_cast<decltype(g_sfera_recovered_static_runtime.render_state_08)>(cpu->eax);
+    reinterpret_cast<SphereRender::CharacterModels*>(cpu->ecx)->setDistances(*reinterpret_cast<const float*>(cpu->esp), *reinterpret_cast<const float*>(cpu->esp + 4u));  cpu->esp += 8u;
 
     reinterpret_cast<void (__stdcall*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::Sleep)))(0x32u);
     cpu->edx = 0x42E3u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47ADBAu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x47ADBAu));
-    cpu->eax = SferaAbi::address(new Contours(2000, 2999));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(new Contours(2000, 2999)));
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     label_0007ADEF:
     cpu->ecx = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x420u) = cpu->edi;
-    g_sfera_client_process_runtime.client_object = cpu->eax;
-    SferaAbi::pointer<Contours>(cpu->ecx)->load();
+    g_sfera_client_process_runtime.client_object = reinterpret_cast<decltype(g_sfera_client_process_runtime.client_object)>(cpu->eax);
+    reinterpret_cast<Contours*>(cpu->ecx)->load();
 
     reinterpret_cast<void (__stdcall*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::Sleep)))(0x32u);
     cpu->edx = 0x42F3u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AE15u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x47AE15u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     lift_push32(cpu, sizeof(WeatherScenarios));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AE1Fu)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x47AE1Fu));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esp += 4u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x420u) = 5u;
     if (cpu->eax == 0u) goto label_0007AE43;
     lift_push32(cpu, (uintptr_t)"landscape\\weather.txt");
     cpu->ecx = cpu->eax;
-    cpu->eax = SferaAbi::address(std::construct_at(SferaAbi::pointer<WeatherScenarios>(cpu->ecx))->load(SferaAbi::pointer<const char>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp))));  cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(std::construct_at(reinterpret_cast<WeatherScenarios*>(cpu->ecx))->load(reinterpret_cast<const char*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)))));  cpu->esp += 4u;
     goto label_0007AE45;
     label_0007AE43:
     cpu->eax = 0u;
     label_0007AE45:
     sub_pred[1] = (uint32_t)(*(uint32_t*)(void*)&g_sfera_client_config_runtime.state_20) == 0u;
     *(uint32_t*)(cpu->esp + 0x420u) = cpu->edi;
-    g_sfera_weather_runtime.standard = SferaAbi::pointer<WeatherScenarios>(cpu->eax);
+    g_sfera_weather_runtime.standard = reinterpret_cast<WeatherScenarios*>(cpu->eax);
     if (sub_pred[1]) goto label_0007AEA5;
     cpu->edx = 0x42F5u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AE69u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x47AE69u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     lift_push32(cpu, sizeof(WeatherScenarios));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AE73u)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x47AE73u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esp += 4u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x420u) = 6u;
     if (cpu->eax == 0u) goto label_0007AE97;
     lift_push32(cpu, (uintptr_t)"landscape_hr\\weather_hr.txt");
     cpu->ecx = cpu->eax;
-    cpu->eax = SferaAbi::address(std::construct_at(SferaAbi::pointer<WeatherScenarios>(cpu->ecx))->load(SferaAbi::pointer<const char>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp))));  cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(std::construct_at(reinterpret_cast<WeatherScenarios*>(cpu->ecx))->load(reinterpret_cast<const char*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)))));  cpu->esp += 4u;
     goto label_0007AE99;
     label_0007AE97:
     cpu->eax = 0u;
     label_0007AE99:
     *(uint32_t*)(cpu->esp + 0x420u) = cpu->edi;
-    g_sfera_weather_runtime.highres = SferaAbi::pointer<WeatherScenarios>(cpu->eax);
+    g_sfera_weather_runtime.highres = reinterpret_cast<WeatherScenarios*>(cpu->eax);
     if (g_sfera_weather_runtime.highres == nullptr) g_sfera_weather_runtime.highres = g_sfera_weather_runtime.standard;
     label_0007AEA5:
 
@@ -186,13 +186,13 @@ __declspec(noinline) void sfera_sub_0047AB30(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, 1u); lift_push32(cpu, 0u);
     cpu->edx = 0u;
     cpu->ecx = (uintptr_t)"cam_cube";
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_world_objects.create(SferaAbi::pointer<const char>(cpu->ecx), cpu->edx, *SferaAbi::pointer<const std::uint32_t>(cpu->esp), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u) != 0u));  cpu->esp += 8u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_world_objects.create(reinterpret_cast<const char*>(cpu->ecx), reinterpret_cast<SferaMbcProcessRecord*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp), *reinterpret_cast<const std::uint32_t*>(cpu->esp + 4u) != 0u));  cpu->esp += 8u;
     if ((int32_t)g_sfera_world_objects.object_handles.capacity > (int32_t)0u) goto label_0007AED3;
     cpu->edx = 0u;
     cpu->ecx = (uintptr_t)&g_sfera_world_objects.object_handles.debug_file[0];
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x7AED3u)); sfera_sub_00401120(cpu, LIFT_CODE_TOKEN_RVA(0x7AED3u));
     label_0007AED3:
-    cpu->edx = g_sfera_world_objects.object_handles.data;
+    cpu->edx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_world_objects.object_handles.data));
     cpu->eax = *(uint32_t*)(cpu->edx);
     if (cpu->eax != 0u) goto label_0007AF34;
     label_0007AEDF:
@@ -200,27 +200,27 @@ __declspec(noinline) void sfera_sub_0047AB30(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = 0u;
     cpu->ecx = (uintptr_t)"cam_cube";
     *(uint8_t*)(cpu->eax + 0x141u) = 0u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_world_objects.create(SferaAbi::pointer<const char>(cpu->ecx), cpu->edx, *SferaAbi::pointer<const std::uint32_t>(cpu->esp), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u) != 0u));  cpu->esp += 8u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_world_objects.create(reinterpret_cast<const char*>(cpu->ecx), reinterpret_cast<SferaMbcProcessRecord*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp), *reinterpret_cast<const std::uint32_t*>(cpu->esp + 4u) != 0u));  cpu->esp += 8u;
     g_sfera_vegetation.initialize();
 
     reinterpret_cast<void (__stdcall*)(uint32_t)>(static_cast<uintptr_t>(native_function_address32(&::Sleep)))(0x32u);
     cpu->edx = 0x4304u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AF0Eu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x47AF0Eu));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     lift_push32(cpu, sizeof(SphereUI::ChatFilter));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47AF15u)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x47AF15u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esp += 4u;
     *(uint32_t*)(cpu->esp + 0xCu) = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x420u) = 7u;
     if (cpu->eax == 0u) goto label_0007AF7C;
     cpu->ecx = cpu->eax;
-    cpu->eax = SferaAbi::address(std::construct_at(SferaAbi::pointer<SphereUI::ChatFilter>(cpu->ecx)));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(std::construct_at(reinterpret_cast<SphereUI::ChatFilter*>(cpu->ecx))));
     goto label_0007AF7E;
     label_0007AF34:
     if (*(uint8_t*)(cpu->eax + 0x138u) != 0u) goto label_0007AEDF;
     cpu->eax = *(uint32_t*)(cpu->eax + 4u);
     lift_push32(cpu, cpu->eax);
-    cpu->eax = SferaAbi::address((*SferaAbi::pointer<const std::uint32_t>(cpu->esp) > 5000u && *SferaAbi::pointer<const std::uint32_t>(cpu->esp) != UINT32_MAX) ? SferaAbi::pointer<SphereRender::Model>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)) : g_sfera_models.model(*SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>((*reinterpret_cast<const std::uint32_t*>(cpu->esp) > 5000u && *reinterpret_cast<const std::uint32_t*>(cpu->esp) != UINT32_MAX) ? reinterpret_cast<SphereRender::Model*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)) : g_sfera_models.model(*reinterpret_cast<const std::uint32_t*>(cpu->esp)))); cpu->esp += 4u;
     if (cpu->eax != 0u) goto label_0007AF55;
     cpu->eax = (uintptr_t)"<none>";
     label_0007AF55:
@@ -365,7 +365,7 @@ __declspec(noinline) void sfera_sub_0047D040(LiftCpu* cpu, uint32_t stop_address
     cpu->edx = g_sfera_world_load_runtime.active_tool_context;
     lift_push32(cpu, cpu->eax); lift_push32(cpu, cpu->ecx);
     cpu->ecx = g_sfera_scene_control_runtime.active_context;
-    g_sfera_interface.update(static_cast<std::uint8_t>(cpu->ecx), static_cast<std::uint8_t>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp), static_cast<std::int32_t>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u))); cpu->esp += 8u;
+    g_sfera_interface.update(static_cast<std::uint8_t>(cpu->ecx), static_cast<std::uint8_t>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp), static_cast<std::int32_t>(*reinterpret_cast<const std::uint32_t*>(cpu->esp + 4u))); cpu->esp += 8u;
     if (*(uint32_t*)(void*)&g_sfera_main_ui_state_runtime.ui_state_08 != cpu->esi) goto label_0007D2CF;
     if (g_sfera_recovered_static_runtime.interaction_enabled != cpu->ebx) goto label_0007D2CF;
     if (g_sfera_recovered_static_runtime.render_gate != cpu->ebx) goto label_0007D2CF;
@@ -376,7 +376,7 @@ __declspec(noinline) void sfera_sub_0047D040(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x7D27Du)); sfera_sub_00401120(cpu, LIFT_CODE_TOKEN_RVA(0x7D27Du));
     label_0007D27D:
     x87_v0 = (double)(((int32_t)((*(uint32_t*)(void*)&g_sfera_main_input_state_runtime.mouse.dx))));
-    cpu->edx = g_sfera_world_objects.object_handles.data;
+    cpu->edx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_world_objects.object_handles.data));
     cpu->eax = *(uint32_t*)(cpu->edx);
     x87_v0 = (x87_v0) * (0.5);
     x87_v0 = (x87_v0) + (((double)*(float*)(cpu->eax + 8u)));
@@ -386,7 +386,7 @@ __declspec(noinline) void sfera_sub_0047D040(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)&g_sfera_world_objects.object_handles.debug_file[0];
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x7D2ABu)); sfera_sub_00401120(cpu, LIFT_CODE_TOKEN_RVA(0x7D2ABu));
     label_0007D2AB:
-    cpu->eax = g_sfera_world_objects.object_handles.data;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_world_objects.object_handles.data));
     cpu->eax = *(uint32_t*)(cpu->eax);
     x87_v0 = (double)*(float*)(cpu->eax + 0x10u);
     x87_v1 = (double)(((int32_t)((*(uint32_t*)(void*)&g_sfera_main_input_state_runtime.mouse.dy))));
@@ -412,7 +412,7 @@ __declspec(noinline) void sfera_sub_0047D040(LiftCpu* cpu, uint32_t stop_address
     *(float*)((uintptr_t)&g_sfera_landscape_patch_lookup_runtime.primary_vector.z.f32) = x87_v0;
     *(float*)((uintptr_t)&g_sfera_landscape_patch_lookup_runtime.primary_vector.y.f32) = x87_v0;
     *(float*)((uintptr_t)&g_sfera_landscape_patch_lookup_runtime.primary_vector.x.f32) = x87_v0; 
-    *SferaAbi::pointer<SferaMouseInputState>(cpu->ecx) = g_sfera_direct_input_runtime.pollMouse();
+    *reinterpret_cast<SferaMouseInputState*>(cpu->ecx) = g_sfera_direct_input_runtime.pollMouse();
     label_0007D322:
     cpu->ecx = cpu->esi;
     g_sfera_profiler_runtime.begin(cpu->ecx);
@@ -426,7 +426,7 @@ __declspec(noinline) void sfera_sub_0047D040(LiftCpu* cpu, uint32_t stop_address
     x87_v0 = (double)0.0052083334885537624f;
     lift_push32(cpu, cpu->ecx);
     *(float*)(cpu->esp) = x87_v0; 
-    g_sfera_motion.updateControlled(*SferaAbi::pointer<const float>(cpu->esp));  cpu->esp += 4u;
+    g_sfera_motion.updateControlled(*reinterpret_cast<const float*>(cpu->esp));  cpu->esp += 4u;
     label_0007D358:
     cpu->ecx = 2u;
     g_sfera_profiler_runtime.end(cpu->ecx);
@@ -440,7 +440,7 @@ __declspec(noinline) void sfera_sub_0047D040(LiftCpu* cpu, uint32_t stop_address
     x87_v0 = (double)0.02083333395421505f;
     lift_push32(cpu, cpu->ecx);
     *(float*)(cpu->esp) = x87_v0; 
-    g_sfera_motion.updateObjects(*SferaAbi::pointer<const float>(cpu->esp));  cpu->esp += 4u;
+    g_sfera_motion.updateObjects(*reinterpret_cast<const float*>(cpu->esp));  cpu->esp += 4u;
     cpu->ecx = 3u;
     g_sfera_profiler_runtime.end(cpu->ecx);
     label_0007D396:
@@ -554,18 +554,18 @@ __declspec(noinline) void sfera_sub_0047D040(LiftCpu* cpu, uint32_t stop_address
     x87_v0 = 1.0;
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ecx);
     *(float*)(cpu->esp) = x87_v0; 
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
+    cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_graphics_runtime.d3d_runtime.get()));
     lift_push32(cpu, 0xFF000000u); lift_push32(cpu, 3u); lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebx);
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->checkResult(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->Clear(*SferaAbi::pointer<const std::uint32_t>(cpu->esp), SferaAbi::pointer<const D3DRECT>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u)), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 8u), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 12u), *SferaAbi::pointer<const float>(cpu->esp + 16u), *SferaAbi::pointer<const std::uint32_t>(cpu->esp + 20u)), "Clear")); cpu->esp += 24u;
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    cpu->eax = (cpu->eax & 0xFFFFFF00u) | static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->beginScene());
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<CD3D9Device*>(cpu->ecx)->checkResult(reinterpret_cast<CD3D9Device*>(cpu->ecx)->native_device->Clear(*reinterpret_cast<const std::uint32_t*>(cpu->esp), reinterpret_cast<const D3DRECT*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp + 4u)), *reinterpret_cast<const std::uint32_t*>(cpu->esp + 8u), *reinterpret_cast<const std::uint32_t*>(cpu->esp + 12u), *reinterpret_cast<const float*>(cpu->esp + 16u), *reinterpret_cast<const std::uint32_t*>(cpu->esp + 20u)), "Clear")); cpu->esp += 24u;
+    cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_graphics_runtime.d3d_runtime.get()));
+    cpu->eax = (cpu->eax & 0xFFFFFF00u) | static_cast<std::uint32_t>(reinterpret_cast<CD3D9Device*>(cpu->ecx)->beginScene());
     if ((cpu->eax & 0xFFu) == 0u) goto label_0007D635;
     GameInterface::drawFrame();
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->checkResult(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->EndScene(), "EndScene"));
-    cpu->ecx = SferaAbi::address(g_sfera_graphics_runtime.d3d_runtime.get());
+    cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_graphics_runtime.d3d_runtime.get()));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<CD3D9Device*>(cpu->ecx)->checkResult(reinterpret_cast<CD3D9Device*>(cpu->ecx)->native_device->EndScene(), "EndScene"));
+    cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_graphics_runtime.d3d_runtime.get()));
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebx);
-    cpu->eax = static_cast<std::uint32_t>(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->checkResult(SferaAbi::pointer<CD3D9Device>(cpu->ecx)->native_device->Present(SferaAbi::pointer<const RECT>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)), SferaAbi::pointer<const RECT>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 4u)), SferaAbi::pointer<HWND__>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 8u)), SferaAbi::pointer<const RGNDATA>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp + 12u))), "Present")); cpu->esp += 16u;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<CD3D9Device*>(cpu->ecx)->checkResult(reinterpret_cast<CD3D9Device*>(cpu->ecx)->native_device->Present(reinterpret_cast<const RECT*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)), reinterpret_cast<const RECT*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp + 4u)), reinterpret_cast<HWND__*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp + 8u)), reinterpret_cast<const RGNDATA*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp + 12u))), "Present")); cpu->esp += 16u;
     label_0007D635:
     cpu->ecx = 7u;
     g_sfera_profiler_runtime.end(cpu->ecx);
@@ -759,7 +759,7 @@ __declspec(noinline) void sfera_sub_0047D770(LiftCpu* cpu, uint32_t stop_address
     *(double*)(cpu->esp + 8u) = x87_p0;
     x87_p0 = 1.0;
     *(double*)(cpu->esp) = x87_p0;
-    SphereRender::SceneRenderer::buildColorRemap(*SferaAbi::pointer<const double>(cpu->esp), *SferaAbi::pointer<const double>(cpu->esp + 8u));  cpu->esp += 16u;
+    SphereRender::SceneRenderer::buildColorRemap(*reinterpret_cast<const double*>(cpu->esp), *reinterpret_cast<const double*>(cpu->esp + 8u));  cpu->esp += 16u;
     cpu->eax = *(uint32_t*)(cpu->esp + 0x18u);
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x24u);
     (*(uint32_t*)(void*)&g_sfera_main_ui_state_runtime.active_ui_object) = cpu->eax;
@@ -810,79 +810,79 @@ __declspec(noinline) void sfera_sub_0047D9C0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi + 0x64u) = cpu->ecx;
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x18u);
     *(uint32_t*)(cpu->esi + 0x60u) = cpu->eax;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.create(SferaAbi::pointer<const char>(cpu->ecx)));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.create(reinterpret_cast<const char*>(cpu->ecx)));
     lift_push32(cpu, 2u);
     cpu->edx = cpu->esp + 0x14u;
     cpu->ecx = cpu->eax;
     *(uint32_t*)(cpu->esi + 0x58u) = cpu->eax;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     cpu->ebx = 0u;
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->ebx;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
     *(uint32_t*)(cpu->esp + 0x20u) = 0x36u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
     *(uint32_t*)(cpu->esp + 0x20u) = 0x28u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->edi;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->ebp;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 2u);
     cpu->edx = cpu->esp + 0x20u;
     *(uint32_t*)(cpu->esp + 0x20u) = 1u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 2u);
     cpu->edx = cpu->esp + 0x20u;
     *(uint32_t*)(cpu->esp + 0x20u) = 0x18u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->ebx;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
     *(uint32_t*)(cpu->esp + 0x20u) = 0xB12u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
     *(uint32_t*)(cpu->esp + 0x20u) = cpu->ebx;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esi + 0x58u);
     lift_push32(cpu, 4u);
     cpu->edx = cpu->esp + 0x20u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<const void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.write(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<const void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu); cpu->ebp = lift_pop32(cpu); cpu->ebx = lift_pop32(cpu); cpu->ecx = lift_pop32(cpu); cpu->esp += 0x10u; cpu->eip = stop_address; return;
 }
 __declspec(noinline) void sfera_sub_0047DB30(LiftCpu* cpu, uint32_t stop_address) {
@@ -891,7 +891,7 @@ __declspec(noinline) void sfera_sub_0047DB30(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, 0x4Eu);
     cpu->edx = (uintptr_t)"MapGenerator.cpp";
     cpu->ecx = 0xC0000u;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47DB44u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x47DB44u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(cpu->ecx, reinterpret_cast<const char*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp), false))); cpu->esp += 4u;
     lift_push32(cpu, 0x2000u);
     *(uint32_t*)(cpu->esi + 0x54u) = cpu->eax;
     cpu->eax = *(uint32_t*)(cpu->esp + 0xCu);
@@ -1205,9 +1205,9 @@ __declspec(noinline) void sfera_sub_004801E0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->eax != 0u) goto label_00080217;
     cpu->edx = cpu->eax + 0x1Eu;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\NetworkConnectionChecker.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4801F6u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x4801F6u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     lift_push32(cpu, 4u);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4801FDu)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x4801FDu));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esp += 4u;
     if (cpu->eax == 0u) goto label_00080210;
     *(uint32_t*)(cpu->eax) = 0u;
@@ -1237,12 +1237,12 @@ __declspec(noinline) void sfera_sub_00480280(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi) = cpu->eax;
     if (cpu->eax != 0u) goto label_000802ED;
     cpu->ecx = (uintptr_t)"CClNetworkConnectionChecker::Start(): CreateThread error: ";
-    g_sfera_log_runtime.files[0].write(SferaAbi::pointer<const char>(cpu->ecx));
+    g_sfera_log_runtime.files[0].write(reinterpret_cast<const char*>(cpu->ecx));
     lift_native_call(cpu, native_function_address32(&::GetLastError), LIFT_CODE_TOKEN_VA(0x4802D6u));
     cpu->ecx = cpu->eax;
     g_sfera_log_runtime.files[0].write(static_cast<std::int32_t>(cpu->ecx));
     cpu->ecx = (uintptr_t)"\n";
-    g_sfera_log_runtime.files[0].write(SferaAbi::pointer<const char>(cpu->ecx));
+    g_sfera_log_runtime.files[0].write(reinterpret_cast<const char*>(cpu->ecx));
     label_000802ED:
     cpu->esi = lift_pop32(cpu);
     cpu->esp += 8u;
@@ -1252,7 +1252,7 @@ __declspec(noinline) void sfera_sub_00480300(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->ecx); lift_push32(cpu, cpu->esi);
     cpu->edx = 0x26u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\NetworkConnectionChecker.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x480311u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x480311u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     cpu->eax = g_sfera_network_connection_checker.instance;
     cpu->esi = cpu->eax;
     if (cpu->eax == 0u) goto label_00080367;
@@ -1273,7 +1273,7 @@ __declspec(noinline) void sfera_sub_00480300(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi) = 0u;
     label_0008035E:
     lift_push32(cpu, cpu->esi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x480364u)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x480364u));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     label_00080367:
     g_sfera_network_connection_checker.instance = 0u;

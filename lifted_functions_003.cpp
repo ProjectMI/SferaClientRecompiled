@@ -993,7 +993,7 @@ __declspec(noinline) void sfera_sub_00422000(LiftCpu* cpu, uint32_t stop_address
     *(uint8_t*)(cpu->eax + 4u) = cpu->ecx & 0xFFu;
     g_sfera_files.setErrorReporting(false);
     cpu->ecx = cpu->esp + 0x24u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.fileSize(SferaAbi::pointer<const char>(cpu->ecx)));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.fileSize(reinterpret_cast<const char*>(cpu->ecx)));
     cpu->esi = cpu->eax;
     g_sfera_files.setErrorReporting(true);
     if ((int32_t)cpu->esi <= 0) goto label_00022105;
@@ -1013,12 +1013,12 @@ __declspec(noinline) void sfera_sub_00422000(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, 0x6Fu);
     cpu->ecx = cpu->eax * 8u;
     cpu->edx = (uintptr_t)"..\\ShareClientSeverCode\\DebugScriptArrays.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x42213Du)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x42213Du));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(cpu->ecx, reinterpret_cast<const char*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp), false))); cpu->esp += 4u;
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
     lift_push32(cpu, 0x70u);
     cpu->edx = (uintptr_t)"..\\ShareClientSeverCode\\DebugScriptArrays.cpp";
     *(uint32_t*)(cpu->ebp + 0x4000u) = cpu->eax;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x422153u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x422153u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(cpu->ecx, reinterpret_cast<const char*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp), false))); cpu->esp += 4u;
     cpu->edx = (uintptr_t)&g_sfera_mbc_interpreter_storage.module_records[0];
     *(uint32_t*)(cpu->ebp + 0x4004u) = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x14u) = cpu->ebx;
@@ -1057,7 +1057,7 @@ __declspec(noinline) void sfera_sub_00422000(LiftCpu* cpu, uint32_t stop_address
     *(uint8_t*)(cpu->eax + 4u) = cpu->edx & 0xFFu;
     g_sfera_files.setErrorReporting(false);
     cpu->ecx = cpu->esp + 0x24u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.fileSize(SferaAbi::pointer<const char>(cpu->ecx)));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.fileSize(reinterpret_cast<const char*>(cpu->ecx)));
     cpu->esi = cpu->eax;
     g_sfera_files.setErrorReporting(true);
     if ((cpu->esi==0u) || (((cpu->esi)&0x80000000u)!=0u)) goto label_00022237;
@@ -1071,7 +1071,7 @@ __declspec(noinline) void sfera_sub_00422000(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->ebx + cpu->eax + 4u) = cpu->edx;
     cpu->edx = 0u;
     cpu->ecx = cpu->esp + 0x24u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.open(SferaAbi::pointer<const char>(cpu->ecx), static_cast<std::int32_t>(cpu->edx)));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.open(reinterpret_cast<const char*>(cpu->ecx), static_cast<std::int32_t>(cpu->edx)));
     cpu->ecx = *(uint32_t*)(cpu->ebp + 0x4000u);
     cpu->edx = *(uint32_t*)(cpu->ebx + cpu->ecx + 4u);
     cpu->edi = cpu->eax;
@@ -1079,7 +1079,7 @@ __declspec(noinline) void sfera_sub_00422000(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, cpu->esi);
     cpu->edx = cpu->eax + (cpu->edx * 4u);
     cpu->ecx = cpu->edi;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.read(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.read(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = cpu->edi;
     cpu->eax = static_cast<std::uint32_t>(g_sfera_files.close(static_cast<std::int32_t>(cpu->ecx)));
     *(uint32_t*)(cpu->esp + 0x14u) = (uint64_t)(*(uint32_t*)(cpu->esp + 0x14u)) + (uint64_t)(cpu->esi) + (uint64_t)(0u);
@@ -1393,7 +1393,7 @@ __declspec(noinline) void sfera_sub_004226C0(LiftCpu* cpu, uint32_t stop_address
     *(uint8_t*)(cpu->eax + 4u) = cpu->ecx & 0xFFu;
     g_sfera_files.setErrorReporting(false);
     cpu->ecx = cpu->esp + 0x20u;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.fileSize(SferaAbi::pointer<const char>(cpu->ecx)));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.fileSize(reinterpret_cast<const char*>(cpu->ecx)));
     cpu->esi = cpu->eax;
     g_sfera_files.setErrorReporting(true);
     if ((cpu->esi!=0u) && (((cpu->esi)&0x80000000u)==0u)) goto label_0002278F;
@@ -1415,16 +1415,16 @@ __declspec(noinline) void sfera_sub_004226C0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, 0x19Au);
     cpu->edx = (uintptr_t)"..\\ShareClientSeverCode\\DebugScriptArrays.cpp";
     cpu->ecx = cpu->esi;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4227C1u)); sfera_sub_004EBE60(cpu, LIFT_CODE_TOKEN_VA(0x4227C1u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(cpu->ecx, reinterpret_cast<const char*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp), false))); cpu->esp += 4u;
     cpu->edx = 0u;
     cpu->ecx = cpu->esp + 0x20u;
     cpu->ebx = cpu->eax;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.open(SferaAbi::pointer<const char>(cpu->ecx), static_cast<std::int32_t>(cpu->edx)));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.open(reinterpret_cast<const char*>(cpu->ecx), static_cast<std::int32_t>(cpu->edx)));
     cpu->edi = cpu->eax;
     lift_push32(cpu, cpu->esi);
     cpu->edx = cpu->ebx;
     cpu->ecx = cpu->edi;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.read(static_cast<std::int32_t>(cpu->ecx), SferaAbi::pointer<void>(cpu->edx), *SferaAbi::pointer<const std::uint32_t>(cpu->esp))); cpu->esp += 4u;
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.read(static_cast<std::int32_t>(cpu->ecx), reinterpret_cast<void*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp))); cpu->esp += 4u;
     cpu->ecx = cpu->edi;
     cpu->eax = static_cast<std::uint32_t>(g_sfera_files.close(static_cast<std::int32_t>(cpu->ecx)));
     cpu->edx = *(uint32_t*)(cpu->esp + 0x10u);
@@ -1482,7 +1482,7 @@ __declspec(noinline) void sfera_sub_004226C0(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, 0x1A1u);
     cpu->edx = (uintptr_t)"..\\ShareClientSeverCode\\DebugScriptArrays.cpp";
     cpu->ecx = cpu->ebx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4228C8u)); sfera_sub_004EB520(cpu, LIFT_CODE_TOKEN_VA(0x4228C8u));
+    WorldMemory::release(reinterpret_cast<void*>(cpu->ecx), reinterpret_cast<const char*>(cpu->edx), *reinterpret_cast<const std::uint32_t*>(cpu->esp)); cpu->esp += 4u;
     cpu->ebx = *(uint32_t*)(cpu->esp + 0x10u);
     label_000228CC:
     cpu->edx = *(uint32_t*)(cpu->esp + 0x14u);

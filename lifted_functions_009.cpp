@@ -31,19 +31,19 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime.object[0];
     g_sfera_view_motion_runtime.mode_value = cpu->ebx;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45965Eu)); sfera_sub_0049B470(cpu, LIFT_CODE_TOKEN_VA(0x45965Eu));
-    if (g_sfera_world_render_runtime.world_spatial_index == cpu->edi) goto label_00059695;
+    if (static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_world_render_runtime.world_spatial_index)) == cpu->edi) goto label_00059695;
     cpu->edx = 0x44Bu;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x459675u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x459675u));
-    cpu->ecx = g_sfera_world_render_runtime.world_spatial_index;
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
+    cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_world_render_runtime.world_spatial_index));
     cpu->esi = cpu->ecx;
     if (cpu->ecx == cpu->edi) goto label_0005968F;
-    std::destroy_at(SferaAbi::pointer<SphereWorld::DynamicVegetation>(cpu->ecx));
+    std::destroy_at(reinterpret_cast<SphereWorld::DynamicVegetation*>(cpu->ecx));
     lift_push32(cpu, cpu->esi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45968Cu)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x45968Cu));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     label_0005968F:
-    g_sfera_world_render_runtime.world_spatial_index = cpu->edi;
+    g_sfera_world_render_runtime.world_spatial_index = reinterpret_cast<decltype(g_sfera_world_render_runtime.world_spatial_index)>(cpu->edi);
     label_00059695:
     if (*(uint8_t*)(void*)&g_sfera_client_config_runtime.flag_01 == 0u) goto label_000596AB;
     cpu->ecx = 0u;
@@ -56,51 +56,51 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     if (g_sfera_input_device_runtime.shared_object == cpu->edi) goto label_000596F1;
     cpu->edx = 0x457u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4596D1u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x4596D1u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     cpu->ecx = g_sfera_input_device_runtime.shared_object;
     cpu->esi = cpu->ecx;
     if (cpu->ecx == cpu->edi) goto label_000596EB;
-    std::destroy_at(SferaAbi::pointer<SphereUI::ChatFilter>(cpu->ecx));
+    std::destroy_at(reinterpret_cast<SphereUI::ChatFilter*>(cpu->ecx));
     lift_push32(cpu, cpu->esi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4596E8u)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x4596E8u));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     label_000596EB:
     g_sfera_input_device_runtime.shared_object = cpu->edi;
     label_000596F1:
-    if (g_sfera_client_process_runtime.client_object == cpu->edi) goto label_00059728;
+    if (static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_client_process_runtime.client_object)) == cpu->edi) goto label_00059728;
     cpu->edx = 0x458u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x459708u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x459708u));
-    cpu->ecx = g_sfera_client_process_runtime.client_object;
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
+    cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_client_process_runtime.client_object));
     cpu->esi = cpu->ecx;
     if (cpu->ecx == cpu->edi) goto label_00059722;
-    delete SferaAbi::pointer<Contours>(cpu->ecx);
+    delete reinterpret_cast<Contours*>(cpu->ecx);
     label_00059722:
-    g_sfera_client_process_runtime.client_object = cpu->edi;
+    g_sfera_client_process_runtime.client_object = reinterpret_cast<decltype(g_sfera_client_process_runtime.client_object)>(cpu->edi);
     label_00059728:
-    if (g_sfera_primary_sky_environment == cpu->edi) goto label_00059757;
+    if (static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_primary_sky_environment)) == cpu->edi) goto label_00059757;
     cpu->edx = 0x459u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45973Fu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x45973Fu));
-    cpu->eax = g_sfera_primary_sky_environment;
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_primary_sky_environment));
     if (cpu->eax == cpu->edi) goto label_00059751;
     lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45974Eu)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x45974Eu));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     label_00059751:
-    g_sfera_primary_sky_environment = cpu->edi;
+    g_sfera_primary_sky_environment = reinterpret_cast<decltype(g_sfera_primary_sky_environment)>(cpu->edi);
     label_00059757:
-    if (g_sfera_main_aux_runtime.secondary_world_manager == cpu->edi) goto label_00059786;
+    if (static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_main_aux_runtime.secondary_world_manager)) == cpu->edi) goto label_00059786;
     cpu->edx = 0x45Au;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45976Eu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x45976Eu));
-    cpu->eax = g_sfera_main_aux_runtime.secondary_world_manager;
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_main_aux_runtime.secondary_world_manager));
     if (cpu->eax == cpu->edi) goto label_00059780;
     lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45977Du)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x45977Du));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     label_00059780:
-    g_sfera_main_aux_runtime.secondary_world_manager = cpu->edi;
+    g_sfera_main_aux_runtime.secondary_world_manager = reinterpret_cast<decltype(g_sfera_main_aux_runtime.secondary_world_manager)>(cpu->edi);
     label_00059786:
     if (auto* zones = g_sfera_window_runtime.path_zones) { zones->~PathZones(); WorldMemory::release(zones); g_sfera_window_runtime.path_zones = nullptr; }
     label_000597BD:
@@ -116,26 +116,26 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     g_sfera_player_lists.resetItem();
     g_sfera_models.clear();
     label_00059818:
-    if (g_sfera_recovered_static_runtime.render_state_08 == cpu->edi) goto label_0005984F;
+    if (static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_recovered_static_runtime.render_state_08)) == cpu->edi) goto label_0005984F;
     cpu->edx = 0x46Cu;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45982Fu)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x45982Fu));
-    cpu->ecx = g_sfera_recovered_static_runtime.render_state_08;
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
+    cpu->ecx = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_recovered_static_runtime.render_state_08));
     cpu->esi = cpu->ecx;
     if (cpu->ecx == cpu->edi) goto label_00059849;
-    SferaAbi::pointer<SphereRender::CharacterModels>(cpu->ecx)->clear();
+    reinterpret_cast<SphereRender::CharacterModels*>(cpu->ecx)->clear();
     lift_push32(cpu, cpu->esi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x459846u)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x459846u));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     label_00059849:
-    g_sfera_recovered_static_runtime.render_state_08 = cpu->edi;
+    g_sfera_recovered_static_runtime.render_state_08 = reinterpret_cast<decltype(g_sfera_recovered_static_runtime.render_state_08)>(cpu->edi);
     label_0005984F:
     g_sfera_direct_input_runtime.release();
     g_sfera_font_runtime.clear();
     if (*(uint32_t*)(void*)&g_sfera_main_view_state_runtime.view_state == cpu->edi) goto label_00059888;
     cpu->edx = 0x473u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x459870u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x459870u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     cpu->ecx = *(uint32_t*)(void*)&g_sfera_main_view_state_runtime.view_state;
     if (cpu->ecx == cpu->edi) goto label_00059882;
     cpu->edx = *(uint32_t*)(cpu->ecx);
@@ -166,7 +166,7 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     (void)cpu;
     label_000598E0:
     if (*(uint32_t*)(cpu->esi + 0xFFFFFFFCu) != cpu->edi) goto label_00059A56;
-    cpu->eax = SferaAbi::address(g_sfera_log_runtime.files[cpu->ecx].open());
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_log_runtime.files[cpu->ecx].open()));
     cpu->edi = cpu->eax;
     if (cpu->edi == 0u) goto label_0005990F;
     lift_push32(cpu, cpu->edi); lift_push32(cpu, (uintptr_t)"**** Quit: ");
@@ -190,7 +190,7 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     lift_native_call(cpu, native_function_address32(&::strftime), LIFT_CODE_TOKEN_VA(0x459935u));
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x28u);
     cpu->esp += 0x18u;
-    cpu->eax = SferaAbi::address(g_sfera_log_runtime.files[cpu->ecx].open());
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_log_runtime.files[cpu->ecx].open()));
     cpu->edi = cpu->eax;
     if (cpu->edi == 0u) goto label_00059968;
     cpu->edx = cpu->esp + 0x1Cu;
@@ -204,7 +204,7 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi) = 1u;
     label_00059968:
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x10u);
-    cpu->eax = SferaAbi::address(g_sfera_log_runtime.files[cpu->ecx].open());
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_log_runtime.files[cpu->ecx].open()));
     cpu->edi = cpu->eax;
     if (cpu->edi == 0u) goto label_00059992;
     lift_push32(cpu, cpu->edi); lift_push32(cpu, (uintptr_t)"  ");
@@ -221,7 +221,7 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     lift_native_call(cpu, native_function_address32(&::_strtime), LIFT_CODE_TOKEN_VA(0x459997u));
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x14u);
     cpu->esp += 4u;
-    cpu->eax = SferaAbi::address(g_sfera_log_runtime.files[cpu->ecx].open());
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_log_runtime.files[cpu->ecx].open()));
     cpu->edi = cpu->eax;
     if (cpu->edi == 0u) goto label_000599CA;
     cpu->ecx = cpu->esp + 0x1Cu;
@@ -235,7 +235,7 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->esi) = 1u;
     label_000599CA:
     cpu->ecx = *(uint32_t*)(cpu->esp + 0x10u);
-    cpu->eax = SferaAbi::address(g_sfera_log_runtime.files[cpu->ecx].open());
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_log_runtime.files[cpu->ecx].open()));
     cpu->edi = cpu->eax;
     if (cpu->edi == 0u) goto label_000599F4;
     lift_push32(cpu, cpu->edi); lift_push32(cpu, (uintptr_t)"\n\n");
@@ -268,7 +268,7 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     *(uint32_t*)(cpu->eax) = cpu->ecx;
     cpu->ecx = cpu->esp + 0x1Cu;
     *(uint8_t*)(cpu->eax + 4u) = cpu->edx & 0xFFu;
-    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.fileSize(SferaAbi::pointer<const char>(cpu->ecx)));
+    cpu->eax = static_cast<std::uint32_t>(g_sfera_files.fileSize(reinterpret_cast<const char*>(cpu->ecx)));
     if ((int32_t)cpu->eax <= (int32_t)cpu->edi) goto label_00059A54;
     cpu->edx = cpu->edi;
     cpu->ecx = cpu->esp + 0x1Cu;
@@ -301,13 +301,13 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     if (*(uint32_t*)(void*)&g_sfera_client_config_runtime.state_24 == cpu->edi) goto label_00059AF1;
     cpu->edx = 0x4B4u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x459AD7u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x459AD7u));
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
     cpu->ecx = *(uint32_t*)(void*)&g_sfera_client_config_runtime.state_24;
     cpu->esi = cpu->ecx;
     if (cpu->ecx == cpu->edi) goto label_00059AF1;
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x459AE8u)); sfera_sub_00418D50(cpu, LIFT_CODE_TOKEN_VA(0x459AE8u));
     lift_push32(cpu, cpu->esi);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x459AEEu)); sfera_memory_deallocate(cpu, LIFT_CODE_TOKEN_VA(0x459AEEu));
+    WorldMemory::release(reinterpret_cast<void*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));
     cpu->esp += 4u;
     label_00059AF1:
     cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
@@ -359,7 +359,7 @@ __declspec(noinline) void sfera_sub_00459B10(LiftCpu* cpu, uint32_t stop_address
     std::memmove((void*)cpu->edi,(void*)cpu->esi,cpu->eax); cpu->esi += cpu->eax; cpu->edi += cpu->eax;
     cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime.object[0];
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x459BB2u)); sfera_sub_0049B470(cpu, LIFT_CODE_TOKEN_VA(0x459BB2u));
-    cpu->eax = SferaAbi::address(WorldDiagnostics::scriptContext());
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldDiagnostics::scriptContext()));
     if (cpu->eax == 0u) goto label_00059BFC;
     cpu->edi = (uintptr_t)&g_sfera_error_message_scratch_runtime.fatal_message[0];
     --cpu->edi;
@@ -385,7 +385,7 @@ __declspec(noinline) void sfera_sub_00459B10(LiftCpu* cpu, uint32_t stop_address
     std::memmove((void*)cpu->edi,(void*)cpu->esi,cpu->eax);
     label_00059BFC:
     cpu->ecx = 0u;
-    cpu->eax = SferaAbi::address(g_sfera_log_runtime.files[cpu->ecx].open());
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_log_runtime.files[cpu->ecx].open()));
     cpu->edi = native_function_address32(&::fputs);
     cpu->ebx = native_function_address32(&::fflush);
     cpu->ebp = native_function_address32(&::fclose);
@@ -401,7 +401,7 @@ __declspec(noinline) void sfera_sub_00459B10(LiftCpu* cpu, uint32_t stop_address
     g_sfera_log_runtime.files[0].has_written = 1u;
     label_00059C36:
     cpu->ecx = 0u;
-    cpu->eax = SferaAbi::address(g_sfera_log_runtime.files[cpu->ecx].open());
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_log_runtime.files[cpu->ecx].open()));
     cpu->esi = cpu->eax;
     if (cpu->esi == 0u) goto label_00059C5E;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, (uintptr_t)"\n");
@@ -513,7 +513,7 @@ __declspec(noinline) void sfera_sub_0045BC60(LiftCpu* cpu, uint32_t stop_address
     g_sfera_world_objects.destroyAll();
     g_sfera_sound_runtime.initialize();
     cpu->ecx = 1u;
-    ShadowMap::initialize(cpu->ecx); cpu->eax = SferaAbi::address(g_sfera_shadows.get());
+    ShadowMap::initialize(cpu->ecx); cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_shadows.get()));
     WorldGuiControls::destroyAllText();
     WorldDebugDraw::clear();
     x87_v0 = 0.0;
@@ -550,24 +550,24 @@ __declspec(noinline) void sfera_sub_0045BC60(LiftCpu* cpu, uint32_t stop_address
     if ((int32_t)(cpu->eax) < (int32_t)((uint32_t)((uintptr_t)&g_sfera_texture_cache_runtime.entries[kTextureCacheEntryCount] + offsetof(SferaTextureCacheEntry, use_count)))) goto label_0005BD96;
     cpu->edx = 0x15C2u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45BDB4u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x45BDB4u));
-    cpu->eax = SferaAbi::address(new EnvironmentZones);
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(new EnvironmentZones));
     label_0005BDD5:
     lift_push32(cpu, (uintptr_t)"Landscape\\zoning.cfg");
     cpu->ecx = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->edi;
-    g_sfera_recovered_static_runtime.scene_state_08 = cpu->eax;
-    SferaAbi::pointer<EnvironmentZones>(cpu->ecx)->load(SferaAbi::pointer<const char>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)));  cpu->esp += 4u;
+    g_sfera_recovered_static_runtime.scene_state_08 = reinterpret_cast<decltype(g_sfera_recovered_static_runtime.scene_state_08)>(cpu->eax);
+    reinterpret_cast<EnvironmentZones*>(cpu->ecx)->load(reinterpret_cast<const char*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));  cpu->esp += 4u;
     cpu->edx = 0x15C4u;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45BDF9u)); sfera_sub_004EB1C0(cpu, LIFT_CODE_TOKEN_VA(0x45BDF9u));
-    cpu->eax = SferaAbi::address(new EnvironmentZones);
+    g_sfera_memory_runtime.allocation_source_name = reinterpret_cast<const char*>(cpu->ecx); g_sfera_memory_runtime.allocation_source_line = cpu->edx;
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(new EnvironmentZones));
     label_0005BE1E:
     lift_push32(cpu, (uintptr_t)"Landscape\\zoningHaron.cfg");
     cpu->ecx = cpu->eax;
     *(uint32_t*)(cpu->esp + 0x1Cu) = cpu->edi;
-    g_sfera_alternate_environment_zones = cpu->eax;
-    SferaAbi::pointer<EnvironmentZones>(cpu->ecx)->load(SferaAbi::pointer<const char>(*SferaAbi::pointer<const std::uint32_t>(cpu->esp)));  cpu->esp += 4u;
+    g_sfera_alternate_environment_zones = reinterpret_cast<decltype(g_sfera_alternate_environment_zones)>(cpu->eax);
+    reinterpret_cast<EnvironmentZones*>(cpu->ecx)->load(reinterpret_cast<const char*>(*reinterpret_cast<const std::uint32_t*>(cpu->esp)));  cpu->esp += 4u;
     cpu->ecx = lift_pop32(cpu); cpu->edi = lift_pop32(cpu); cpu->esi = lift_pop32(cpu);
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;

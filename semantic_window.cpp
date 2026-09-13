@@ -1504,7 +1504,6 @@ namespace {
             if (storage == nullptr) return;
             try {
                 sound = ::new (storage) CSound();
-                std::construct_at(reinterpret_cast<CSoundFX*>(sound));
                 sound->cache_idle_since_low = sound->cache_idle_since_high = noSoundIdleTimestamp;
                 sound->cache_lifetime_seconds = 0;
                 sound->cache_next = sound->cache_previous = nullptr;
@@ -1966,17 +1965,7 @@ namespace {
 
 
 
-namespace SphereUI {
 
-
-    struct OptionsLodSettings {
-        float maximum_distance;
-        float minimum_distance;
-        std::uint8_t reserved[29996];
-        float near_threshold;
-        float far_threshold;
-    };
-}
 
 namespace SphereUI::Runtime {
     void invokeEventHandler(WindowEventHandler handler, Window* window, const WindowEvent& event);
@@ -2243,7 +2232,6 @@ namespace {
 
 namespace {
     using OptionsDisplayMode = SphereUI::DisplayMode;
-    using SphereUI::OptionsLodSettings;
 
 
 
@@ -2500,14 +2488,8 @@ namespace {
         if (event.message == UiMessage::leftClick) {
             if (event.control_id == 1u) {
                 std::copy_n(state.graphics_snapshot, 7u, values);
-                auto* lod = g_sfera_recovered_static_runtime.lod_settings;
-                if (lod != nullptr) {
-                    const double minimum = g_sfera_input_device_runtime.lod_distance.f32, distance = g_sfera_input_device_runtime.minimum_lod_distance.f32;
-                    lod->minimum_distance = static_cast<float>(minimum);
-                    lod->maximum_distance = static_cast<float>(minimum + distance);
-                    lod->far_threshold = static_cast<float>(minimum + distance * 0.5);
-                    lod->near_threshold = static_cast<float>(lod->far_threshold * 0.699999988079071);
-                }
+                auto* lod = g_sfera_recovered_static_runtime.render_state_08;
+                if (lod != nullptr) lod->setDistances(g_sfera_input_device_runtime.lod_distance.f32, g_sfera_input_device_runtime.minimum_lod_distance.f32);
                 setGraphicsOptionsVisible(false);
             } else if (event.control_id == 2u) {
                 setGraphicsOptionsVisible(false);
@@ -3197,17 +3179,17 @@ std::uint32_t SphereUI::Window::handleMessage(std::uint32_t message, std::uint32
                 break;
             }
         case UiMessage::getModal:
-            storeValue(first, modal_owner != 0u);
+            storeValue(first, modal_owner != nullptr);
             break;
         case UiMessage::endModal:
-            if (modal_owner != 0u) {
-                modal_owner = 0u;
+            if (modal_owner != nullptr) {
+                modal_owner = nullptr;
                 handleMessage(UiMessage::animateVisibility, 0u, 0u);
             }
             break;
         case UiMessage::beginModal:
-            if (modal_owner == 0u) {
-                modal_owner = first;
+            if (modal_owner == nullptr) {
+                modal_owner = reinterpret_cast<Window*>(static_cast<std::uintptr_t>(first));
                 handleMessage(UiMessage::animateVisibility, 1u, 0u);
             }
             break;

@@ -41,12 +41,6 @@ enum class UpdateDownloadState : std::uint32_t {
     acknowledge = 6u
 };
 
-enum class SoundEventType : std::uint32_t {
-    seek = 1u << 16u,
-    wait = 2u << 16u,
-    stop = 4u << 16u,
-    playlist = 8u << 16u
-};
 
 struct SferaTcpConnectionContext {
     std::uint8_t receive_buffer[kTcpReceiveBufferCapacity];

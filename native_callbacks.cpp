@@ -36,8 +36,6 @@ constexpr ULONG_PTR kMsvcCppExceptionMagic19930521 = 0x19930521u;
 constexpr ULONG_PTR kMsvcCppExceptionMagic19930522 = 0x19930522u;
 constexpr ULONG_PTR kMsvcCppExceptionMagicPure = 0x01994000u;
 
-constexpr std::uint32_t kSoundEventTypeMask = static_cast<std::uint32_t>(UINT16_MAX) << 16u;
-constexpr std::uint32_t kSoundEventIndexMask = UINT16_MAX;
 
 constexpr DWORD kDirectPlayConnectComplete = 0xFFFF0005u;
 constexpr DWORD kDirectPlayCreatePlayer = 0xFFFF0007u;
@@ -632,7 +630,7 @@ static void dispatch_tcp_receive_packets(SferaTcpConnectionContext& context) noe
     }
 }
 
-static bool append_sound_event(SoundEventQueue* queue, std::uint32_t code, float signal, std::uint32_t position) noexcept {
+static bool append_sound_event(SoundEventQueue* queue, const SoundEventRecord& event, float signal, std::uint32_t position) noexcept {
     if (!queue) {
         return false;
     }
@@ -648,7 +646,7 @@ static bool append_sound_event(SoundEventQueue* queue, std::uint32_t code, float
         queue->records = static_cast<SoundEventRecord*>(memory);
         queue->capacity = next_capacity;
     }
-    queue->records[queue->count++] = SoundEventRecord{code, signal, position};
+    queue->records[queue->count++] = SoundEventRecord{event.type, event.argument, signal, position};
     return true;
 }
 
@@ -664,7 +662,7 @@ static bool pop_sound_event(SoundEventQueue* queue, SoundEventRecord& record) no
     return true;
 }
 
-static std::uint32_t next_sound_event(SferaSoundPlaybackState& state) noexcept { return state.nextEvent(); }
+static SoundEventRecord next_sound_event(SferaSoundPlaybackState& state) noexcept { return state.nextEvent(); }
 
 static std::int32_t run_network_probe() noexcept {
     std::array<char, kPathBufferCapacity> system_directory{};
@@ -1252,8 +1250,8 @@ std::uint32_t __fastcall sfera_sound_decode_callback(CSoundStream* sound_stream,
     if (!playback) {
         return 0u;
     }
-    const std::uint32_t event = next_sound_event(*playback);
-    if (event == UINT32_MAX) {
+    const auto event = next_sound_event(*playback);
+    if (event.type == SoundEventType::end) {
         if (sound_stream) {
             sound_stream->Stop();
         }
@@ -1261,8 +1259,8 @@ std::uint32_t __fastcall sfera_sound_decode_callback(CSoundStream* sound_stream,
         playback->playing = 0u;
         return 0u;
     }
-    const auto type = static_cast<SoundEventType>(event & kSoundEventTypeMask);
-    const std::uint32_t index = event & kSoundEventIndexMask;
+    const auto type = event.type;
+    const std::uint32_t index = event.argument;
     if (playback->force_stop) {
         append_sound_event(playback->event_queue, event, -1.0f, UINT32_MAX);
         if (sound_stream) {
@@ -1320,12 +1318,12 @@ std::uint32_t __fastcall sfera_sound_play_callback(CSoundStream* sound_stream, v
     } else if (sound_stream) {
         sound_stream->play_event_position = UINT32_MAX;
     }
-    const auto type = static_cast<SoundEventType>(record.code & kSoundEventTypeMask);
+    const auto type = record.type;
     if (type == SoundEventType::wait && !playback->force_stop) {
         if (sound_stream) {
             sound_stream->Stop();
         }
-        playback->pending_track = record.code & kSoundEventIndexMask;
+        playback->pending_track = record.argument;
         playback->timer_low = UINT32_MAX;
         playback->timer_high = UINT32_MAX;
         playback->playing = 0u;

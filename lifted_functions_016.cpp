@@ -15,7 +15,7 @@ __declspec(noinline) void sfera_sub_0049F1D0(LiftCpu* cpu, uint32_t stop_address
     if (cpu->ecx > 0x3FFFFFFFu) goto label_0009F1F9;
     cpu->eax = cpu->ecx * 4u;
     lift_push32(cpu, cpu->eax);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x49F1F2u)); sfera_memory_allocate_zeroed(cpu, LIFT_CODE_TOKEN_VA(0x49F1F2u));
+    cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldMemory::allocate(*reinterpret_cast<const std::uint32_t*>(cpu->esp))));
     cpu->esp += 4u;
     if (cpu->eax != 0u) goto label_0009F227;
     label_0009F1F9:

@@ -7,6 +7,7 @@
 #include <intrin.h>
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cwchar>
 #include <cstring>
 #include <limits>
@@ -335,6 +336,7 @@ int NativeRuntime::execute() {
     DiagnosticRunScope run_scope(&state);
     DiagnosticExecutionScope execution_scope(state.eip, LIFT_RETURN_SENTINEL, state.esp);
     diagnostic_note("entering generated entry function");
+    if (std::atexit(&SferaCrtStartupRuntime::releaseContainers) != 0) throw std::runtime_error("Could not register native container finalization");
     g_runtime = this;
     try {
         DiagnosticPhaseScope native_phase(RuntimePhase::native_c);
@@ -349,6 +351,7 @@ int NativeRuntime::execute() {
             lift_push32(&finalizer_state, LIFT_RETURN_SENTINEL);
             function(&finalizer_state, LIFT_RETURN_SENTINEL);
         }
+        g_sfera_crt_startup_runtime.releaseContainers();
         g_runtime = nullptr;
         return result;
     } catch (const std::exception& error) {
