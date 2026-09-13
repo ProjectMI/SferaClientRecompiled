@@ -6,6 +6,11 @@
 #include <array>
 #include <bit>
 #include <charconv>
+#include <climits>
+#include <fcntl.h>
+#include <float.h>
+#include <mbctype.h>
+#include <cerrno>
 #include <cctype>
 #include <chrono>
 #include <cmath>
@@ -2301,8 +2306,6 @@ bool LightingListener::onEffectDetached(IEffect&, SferaActiveEffect&) {
 void LightingListener::onEffectChanged(std::uint32_t, IEffect& effect, SferaActiveEffect& item) {
     if (auto* manager = sfera_nature_manager()) manager->onLightingEffectChanged(effect, item);
 }
-
-
 
 CHardwareCursor::CHardwareCursor() { set_system_cursor_visibility(false); }
 CHardwareCursor::~CHardwareCursor() { if (clip_enabled != 0u) ::ClipCursor(nullptr); if (cursor_handle != nullptr) ::DestroyCursor(cursor_handle); }
@@ -6252,7 +6255,7 @@ namespace {
 
     std::string_view uiConfigText() {
         const auto& config = g_sfera_config_text_runtime;
-        return config.text_buffer == nullptr ? std::string_view{} : std::string_view(config.text_buffer, std::min<std::size_t>(config.text_length, sizeof(config.owned_text) - 1u));
+        return config.text_buffer == nullptr ? std::string_view{} : std::string_view(config.text_buffer, std::min<std::size_t>(config.text_length, sizeof(config.text_storage) - 1u));
     }
 
     std::size_t uiConfigValueOffset(std::string_view text, std::string_view key) {
@@ -6272,9 +6275,9 @@ namespace {
 
     void uiStoreConfigText(std::string_view text) {
         auto& config = g_sfera_config_text_runtime;
-        if (text.size() >= sizeof(config.owned_text)) throw std::length_error("UI configuration too large");
-        if (!text.empty()) std::memmove(config.owned_text, text.data(), text.size());
-        config.owned_text[text.size()] = 0u;
+        if (text.size() >= sizeof(config.text_storage)) throw std::length_error("UI configuration too large");
+        if (!text.empty()) std::memmove(config.text_storage, text.data(), text.size());
+        config.text_storage[text.size()] = 0u;
         config.text_buffer = config.text_storage;
         config.text_length = static_cast<std::uint32_t>(text.size());
     }
@@ -6294,14 +6297,14 @@ void SphereUI::InterfaceConfiguration::open(const char* filename) {
     uiStoreConfigText("");
     std::ifstream stream(config.parser_path, std::ios::binary);
     if (!stream) return;
-    stream.read(config.text_storage, sizeof(config.owned_text) - 1u);
+    stream.read(config.text_storage, sizeof(config.text_storage) - 1u);
     config.text_length = static_cast<std::uint32_t>(stream.gcount());
-    config.owned_text[config.text_length] = 0u;
-    if (config.text_length < 14u || std::memcmp(config.owned_text, "SPHR", 4u) != 0) return;
+    config.text_storage[config.text_length] = 0u;
+    if (config.text_length < 14u || std::memcmp(config.text_storage, "SPHR", 4u) != 0) return;
     try {
-        const auto key = config.owned_text[8];
-        for (const auto offset : {9u, 17u, 20u}) if (offset < config.text_length) config.owned_text[offset] ^= key;
-        const auto decoded = uiInflateConfig(std::span<const std::uint8_t>(config.owned_text + 8u, config.text_length - 8u), sizeof(config.owned_text) - 1u);
+        const auto key = config.text_storage[8];
+        for (const auto offset : {9u, 17u, 20u}) if (offset < config.text_length) config.text_storage[offset] ^= key;
+        const auto decoded = uiInflateConfig(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(config.text_storage + 8u), config.text_length - 8u), sizeof(config.text_storage) - 1u);
         uiStoreConfigText(std::string_view(reinterpret_cast<const char*>(decoded.data()), decoded.size()));
     } catch (const std::runtime_error&) {
         uiStoreConfigText("");
@@ -9067,8 +9070,6 @@ void WorldDiagnostics::warning(const char* message) {
     ::MessageBeep(UINT32_MAX);
 #endif
 }
-
-
 
 WorldObject* WorldObjects::object(std::uint32_t handle, const char* operation) const {
     auto* result = handle < object_handles.capacity && object_handles.data != nullptr ? object_handles.data[handle] : nullptr;
@@ -13266,11 +13267,6 @@ namespace {
 void SferaNatureManager::updateRain() { updateNatureWeather(g_sfera_weather_runtime.current.rain, g_sfera_frame_runtime.primary_toggle, &SferaNatureManager::startRain, &SferaNatureManager::stopRain, &SferaNatureManager::setRainIntensity); }
 void SferaNatureManager::updateLightning() { updateNatureWeather(g_sfera_weather_runtime.current.lightning, g_sfera_frame_runtime.secondary_toggle, &SferaNatureManager::startLighting, &SferaNatureManager::stopLighting, &SferaNatureManager::setLightingLevel); }
 
-
-
-
-
-
 // Sound and environment implementation.
 SoundEventRecord SferaSoundPlaybackState::nextEvent() noexcept {
     for (;;) {
@@ -14098,8 +14094,6 @@ void GameInterface::drawFullscreenOverlay() {
     device.last_hresult = device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
 }
 
-
-
 std::uint32_t GameInterface::fontHeight(std::uint32_t font, std::uint32_t scale) { return g_sfera_font_runtime.layout.span[font] * scale; }
 std::uint32_t GameInterface::glyphWidth(std::uint32_t character, std::uint32_t font) { return g_sfera_font_runtime.metrics[character][font] + g_sfera_font_runtime.layout.code_base[font]; }
 std::uint32_t GameInterface::textHeight(std::uint32_t font, std::uint32_t scale, std::uint32_t lines) { return ((lines - 1) * g_sfera_font_runtime.layout.cell_step[font] + g_sfera_font_runtime.layout.span[font]) * scale; }
@@ -14315,8 +14309,6 @@ void GameInterface::drawAll() {
     for (const auto& entry : windows) drawWindow(entry.window);
 }
 
-
-
 namespace {
     template<std::size_t Size> void appendDiagnosticText(char (&destination)[Size], std::string_view text) {
         const auto end = std::find(destination, destination + Size, '\0');
@@ -14325,8 +14317,6 @@ namespace {
         const auto copied = text.copy(destination + used, Size - used - 1);
         destination[used + copied] = '\0';
     }
-
-
 
 }
 
@@ -14420,9 +14410,6 @@ const char* WorldDiagnostics::scriptContext() {
     appendCallStack(vm.diagnostic_context);
     return vm.diagnostic_context;
 }
-
-
-
 
 GameUiWindow* GameInterface::window(std::uint32_t handle, const char* operation) {
     const auto* slot = g_sfera_interface_runtime.windows.element(handle);
@@ -15044,6 +15031,15 @@ void GameInterface::createNativeWindow() {
 }
 
 void SferaCrtStartupRuntime::releaseContainers() {
+    if (!g_sfera_crt_startup_runtime.initialized) return;
+    g_sfera_crt_startup_runtime.initialized = false;
+    g_sfera_execution_monitor_runtime.clear();
+    g_sfera_crash_report_runtime.clear();
+    g_sfera_options_dialog_runtime.edited_chat_fonts.release();
+    g_sfera_options_dialog_runtime.saved_chat_fonts.release();
+    g_sfera_sound_effect_items.clear();
+    g_sfera_effect_items.clear();
+    g_sfera_scene_array_runtime.render_pass_slots.clear();
     g_sfera_collision_runtime.near_result_handles.clear();
     g_sfera_scene_array_runtime.clip_points.clear();
     g_sfera_scene_array_runtime.clip_indices.clear();
@@ -15073,6 +15069,7 @@ void SferaCrtStartupRuntime::releaseContainers() {
     g_sfera_log_errors_object.close();
     g_sfera_log_warnings_object.close();
     g_sfera_log_memory_object.close();
+    g_sfera_error_log_runtime.clear();
 }
 
 void SferaAntifloodQueueRuntime::initialize(std::size_t capacity, bool enabled) {
@@ -15959,31 +15956,144 @@ bool SferaMbcRuntime::executeBuiltin(std::uint8_t function) {
             else if (!execution_failed) { if (builtin == Builtin::Rotate) g_sfera_world_objects.rotate(handle, value); else g_sfera_world_objects.moveLocal(handle, value); }
             break;
         }
+        case Builtin::ContainerCommand: {
+            auto* container = reinterpret_cast<SferaScriptContainer*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(nextInteger())));
+            if (container == nullptr || container->header.signature != SferaDataContainerHeader::Signature) pushInteger(UINT32_MAX);
+            else if (container->header.kind >= SferaDataContainerHeader::Kind::List && container->header.kind <= SferaDataContainerHeader::Kind::HashMap) container->execute(*this);
+            break;
+        }
+        case Builtin::ContainerManagement: {
+            using Kind = SferaScriptContainer::Kind;
+            using ValueType = SferaScriptContainer::ValueType;
+            using Lifecycle = SferaScriptContainer::Lifecycle;
+            const auto command = static_cast<Lifecycle>(nextInteger());
+            if (command == Lifecycle::Create) {
+                const auto kind = static_cast<Kind>(nextInteger());
+                if (kind < Kind::List || kind > Kind::HashMap) { pushInteger(0); break; }
+                const auto keyType = kind == Kind::Map || kind == Kind::HashMap ? static_cast<ValueType>(nextInteger()) : ValueType::Integer;
+                const auto valueType = static_cast<ValueType>(nextInteger());
+                auto* container = SferaScriptContainer::create(kind, valueType, keyType);
+                const auto handle = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(container));
+                if (container != nullptr) active_process->registerResource(handle, 9);
+                pushInteger(handle);
+                break;
+            }
+            if (command < Lifecycle::Destroy || command > Lifecycle::KeyType) { pushInteger(UINT32_MAX); break; }
+            const auto handle = static_cast<std::uint32_t>(nextInteger());
+            if (command == Lifecycle::Destroy) active_process->unregisterResource(handle, 9);
+            auto* container = reinterpret_cast<SferaScriptContainer*>(static_cast<std::uintptr_t>(handle));
+            if (container == nullptr || container->header.signature != SferaDataContainerHeader::Signature) { pushInteger(UINT32_MAX); break; }
+            const auto kind = container->header.kind;
+            switch (command) {
+                case Lifecycle::Destroy:
+                    if (kind >= Kind::List && kind <= Kind::HashMap) { container->destroy(); pushInteger(0); }
+                    else pushInteger(UINT32_MAX);
+                    break;
+                case Lifecycle::Kind: pushInteger(static_cast<std::uint32_t>(kind)); break;
+                case Lifecycle::ValueType: pushInteger(kind == Kind::List || kind == Kind::Vector || kind == Kind::Map || kind == Kind::HashMap ? static_cast<std::uint32_t>(container->value_type) : UINT32_MAX); break;
+                case Lifecycle::KeyType: pushInteger(kind == Kind::Set ? static_cast<std::uint32_t>(container->value_type) : kind == Kind::Map || kind == Kind::HashMap ? static_cast<std::uint32_t>(container->key_type) : UINT32_MAX); break;
+                default: break;
+            }
+            break;
+        }
         default: return false;
     }
     return true;
 }
 
-void SferaDataContainerHeader::initialize() {
-    signature = Signature;
-    iteration_active = 0;
+template<class C, bool Hashed>
+SferaScriptContainer::Content<C, Hashed>::Content() {
+    if constexpr (Hashed) buckets.assign(8, {values.end(), values.end()});
 }
 
-void SferaDataContainerHeader::invalidate() {
-    signature = 0;
+template<class C, bool Hashed>
+template<class K>
+std::size_t SferaScriptContainer::Content<C, Hashed>::bucketIndex(const K& key) const requires Hashed {
+    std::uint32_t hash;
+    if constexpr (std::is_integral_v<K>) {
+        // The script container uses the Park-Miller reduction, including signed keys.
+        constexpr std::int32_t quotient = 127773, multiplier = 16807, remainder = 2836, modulus = 2147483647;
+        const auto reduced = (key % quotient) * multiplier - (key / quotient) * remainder;
+        hash = static_cast<std::uint32_t>(reduced < 0 ? reduced + modulus : reduced);
+    } else {
+        // Its byte hash is FNV-1 with signed octets; FNV-1a changes script iteration order.
+        constexpr std::uint32_t offsetBasis = 2166136261u, prime = 16777619u;
+        hash = offsetBasis;
+        const std::size_t step = std::is_same_v<K, std::string> ? key.size() / 10 + 1 : 1;
+        for (std::size_t index = 0; index < key.size(); index += step) hash = (hash * prime) ^ static_cast<std::uint32_t>(static_cast<std::int8_t>(key[index]));
+    }
+    return hash % buckets.size();
+}
+
+template<class C, bool Hashed>
+template<class K>
+typename C::iterator SferaScriptContainer::Content<C, Hashed>::find(const K& key) requires Hashed {
+    const auto& [first, last] = buckets[bucketIndex(key)];
+    if (first == values.end()) return values.end();
+    const auto end = std::next(last);
+    const auto found = std::find_if(first, end, [&](const Value& value) { return value.first == key; });
+    return found == end ? values.end() : found;
+}
+
+template<class C, bool Hashed>
+void SferaScriptContainer::Content<C, Hashed>::rehash(std::size_t count) requires Hashed {
+    decltype(buckets) replacement(count, {values.end(), values.end()});
+    C pending;
+    buckets.swap(replacement);
+    pending.splice(pending.end(), values);
+    while (!pending.empty()) {
+        const auto node = pending.begin();
+        auto& [first, last] = buckets[bucketIndex(node->first)];
+        if (first == values.end()) last = node;
+        values.splice(first, pending, node);
+        first = node;
+    }
+}
+
+template<class C, bool Hashed>
+template<class K, class V>
+void SferaScriptContainer::Content<C, Hashed>::assign(K&& key, V&& value) requires Hashed {
+    const auto found = find(key);
+    if (found != values.end()) { found->second = std::forward<V>(value); return; }
+    auto& [first, last] = buckets[bucketIndex(key)];
+    const auto node = values.emplace(first, std::forward<K>(key), std::forward<V>(value));
+    if (first == values.end()) last = node;
+    first = node;
+    if (static_cast<float>(static_cast<double>(values.size()) / buckets.size()) <= 1.0f) return;
+    auto count = buckets.size();
+    for (unsigned step = 0; step < 3; ++step) {
+        if (count > buckets.max_size() / 2) throw std::length_error("Script hash container is too large");
+        count *= 2;
+    }
+    rehash(count);
+}
+
+template<class C, bool Hashed>
+void SferaScriptContainer::Content<C, Hashed>::erase(typename C::iterator position) requires Hashed {
+    auto& [first, last] = buckets[bucketIndex(position->first)];
+    if (first == last) first = last = values.end();
+    else if (position == first) first = std::next(position);
+    else if (position == last) last = std::prev(position);
+    values.erase(position);
 }
 
 SferaScriptContainer* SferaScriptContainer::create(Kind kind, ValueType type, ValueType keyType) {
-    const auto construct = [&]<class C>() -> SferaScriptContainer* {
+    const auto construct = [&]<class C, bool Hashed = false>() -> SferaScriptContainer* {
         void* storage = WorldMemory::allocate(sizeof(SferaScriptContainer), __FILE__, __LINE__, false);
         if (storage == nullptr) throw std::bad_alloc();
-        try { return std::construct_at(static_cast<SferaScriptContainer*>(storage), kind, type, std::in_place_type<C>, keyType); }
+        try { return std::construct_at(static_cast<SferaScriptContainer*>(storage), kind, type, std::in_place_type<Content<C, Hashed>>, keyType); }
         catch (...) { WorldMemory::release(storage, __FILE__, __LINE__); throw; }
     };
     const auto select = [&]<class T>() -> SferaScriptContainer* {
         if constexpr (!std::is_same_v<T, std::uint8_t>) if (kind == Kind::Map) {
             if (keyType == ValueType::Integer) return construct.template operator()<std::map<std::int32_t, T>>();
             if (keyType == ValueType::String) return construct.template operator()<std::map<std::string, T>>();
+            return nullptr;
+        }
+        if constexpr (!std::is_same_v<T, std::uint8_t>) if (kind == Kind::HashMap) {
+            if (keyType == ValueType::Integer) return construct.template operator()<std::list<std::pair<const std::int32_t, T>>, true>();
+            if (keyType == ValueType::String) return construct.template operator()<std::list<std::pair<const std::string, T>>, true>();
+            if (keyType == ValueType::Binary) return construct.template operator()<std::list<std::pair<const Binary, T>>, true>();
             return nullptr;
         }
         if constexpr (!std::is_same_v<T, std::uint8_t>) if (kind == Kind::List) return construct.template operator()<std::list<T>>();
@@ -16002,7 +16112,7 @@ SferaScriptContainer* SferaScriptContainer::create(Kind kind, ValueType type, Va
 }
 
 void SferaScriptContainer::destroy() {
-    header.invalidate();
+    header.signature = 0;
     std::destroy_at(this);
     WorldMemory::release(this, __FILE__, __LINE__);
 }
@@ -16041,8 +16151,8 @@ void SferaScriptContainer::execute(SferaMbcRuntime& runtime) {
             else runtime.exportSlice(destination, value.data(), static_cast<std::uint32_t>(value.size() + (std::is_same_v<T, std::string> ? 1 : 0)));
         };
         if constexpr (State::Mapped) {
-            using Key = typename std::remove_reference_t<decltype(values)>::key_type;
-            using Mapped = typename std::remove_reference_t<decltype(values)>::mapped_type;
+            using Key = std::remove_const_t<typename Value::first_type>;
+            using Mapped = typename Value::second_type;
             if (command == Command::IteratorState) { runtime.pushInteger(header.iteration_active == 0); return; }
             if (command == Command::First || command == Command::Next) {
                 auto& keyDestination = runtime.nextSliceReference();
@@ -16056,23 +16166,25 @@ void SferaScriptContainer::execute(SferaMbcRuntime& runtime) {
                 runtime.pushInteger(0);
                 return;
             }
-            if (command == Command::Clear) { values.clear(); state.cursor = values.end(); header.iteration_active = 0; runtime.pushInteger(0); return; }
+            if (command == Command::Clear) { values.clear(); if constexpr (State::Hashed) state.buckets.assign(8, {values.end(), values.end()}); state.cursor = values.end(); header.iteration_active = 0; runtime.pushInteger(0); return; }
             if (command >= Command::Write && command <= Command::Read) {
                 auto key = read.template operator()<Key>();
                 if (command == Command::Write) {
                     auto value = read.template operator()<Mapped>();
                     if (runtime.execution_failed) return;
-                    values.insert_or_assign(std::move(key), std::move(value));
+                    if constexpr (State::Hashed) state.assign(std::move(key), std::move(value));
+                    else values.insert_or_assign(std::move(key), std::move(value));
                 } else if (command == Command::Erase) {
                     if (runtime.execution_failed) return;
                     // The script API cancels iteration even when the erased key is absent.
                     header.iteration_active = 0;
-                    values.erase(key);
+                    if constexpr (State::Hashed) { const auto found = state.find(key); if (found != values.end()) state.erase(found); }
+                    else values.erase(key);
                     state.cursor = values.end();
                 } else {
                     auto& destination = runtime.nextSliceReference();
                     if (runtime.execution_failed) return;
-                    const auto found = values.find(key);
+                    const auto found = [&] { if constexpr (State::Hashed) return state.find(key); else return values.find(key); }();
                     if (found == values.end()) { runtime.pushInteger(UINT32_MAX); return; }
                     write(destination, found->second);
                 }
@@ -16189,4 +16301,669 @@ void SferaMbcProcessRecord::unregisterResource(std::uint32_t handle, std::uint32
     if (found == end) return;
     std::move(found + 1, end, found);
     --cleanup_entry_count;
+}
+
+std::uint32_t SferaConfigTextRuntime::copyText(const char* source, std::uint32_t length, char* path) {
+    text_length = std::min(length, static_cast<std::uint32_t>(sizeof(text_storage) - 1u));
+    text_buffer = text_storage;
+    if (text_length != 0u) std::memmove(text_buffer, source, text_length);
+    text_buffer[text_length] = '\0';
+    path[0] = '\0';
+    return text_length;
+}
+
+void SferaConfigTextRuntime::useText(char* source, char* path) {
+    text_buffer = source;
+    text_length = source == nullptr ? 0u : static_cast<std::uint32_t>(std::strlen(source));
+    path[0] = '\0';
+}
+
+void SferaConfigTextRuntime::clear(char* path, const char* filename) {
+    text_buffer = text_storage;
+    text_length = 0u;
+    text_storage[0] = '\0';
+    std::memmove(path, filename, std::strlen(filename) + 1u);
+}
+
+char* SferaConfigTextRuntime::find(const char* key) const {
+    if (text_buffer == nullptr || key == nullptr) return nullptr;
+    std::size_t keyLength = 0u;
+    while (keyLength < 4096u && key[keyLength] != '\0') ++keyLength;
+    if (keyLength == 4096u) return nullptr;
+    const auto limit = std::min<std::size_t>(text_length, text_capacity - 1u) + 1u;
+    for (std::size_t line = 0u; line < limit;) {
+        auto end = line;
+        while (end < limit && text_buffer[end] != ' ' && text_buffer[end] != '\t' && text_buffer[end] != '\r' && text_buffer[end] != '\0') ++end;
+        if (end - line == keyLength && std::memcmp(text_buffer + line, key, keyLength) == 0) {
+            while (end < limit && (text_buffer[end] == ' ' || text_buffer[end] == '\t')) ++end;
+            return end < limit ? text_buffer + end : nullptr;
+        }
+        while (line < limit && text_buffer[line] != '\n' && text_buffer[line] != '\0') ++line;
+        if (line == limit || text_buffer[line] == '\0') break;
+        ++line;
+    }
+    return nullptr;
+}
+
+bool SferaConfigTextRuntime::readInteger(const char* key, std::int32_t& value) const {
+    const auto* text = find(key);
+    if (text == nullptr) return false;
+    ::sscanf_s(text, "%d", &value);
+    return true;
+}
+
+bool SferaConfigTextRuntime::readFloat(const char* key, float& value) const {
+    const auto* text = find(key);
+    if (text == nullptr) return false;
+    ::sscanf_s(text, "%f", &value);
+    return true;
+}
+
+bool SferaConfigTextRuntime::readString(const char* key, char* destination, std::uint32_t capacity) const {
+    const auto* text = find(key);
+    if (text == nullptr || *text++ != '"' || capacity == 0u) return false;
+    for (std::uint32_t index = 0u; index < capacity; ++index) {
+        const auto value = *text++;
+        if (value == '"' || value == '\0') { destination[index] = '\0'; return true; }
+        if (value != '\n') destination[index] = value == '\r' ? ' ' : value;
+    }
+    return false;
+}
+
+void SferaConfigTextRuntime::copyBits(std::uint8_t* destination, std::int32_t* destinationBit, const std::uint8_t* source, std::int32_t* sourceBit, std::int32_t count, std::int32_t capacity) {
+    const auto outputStart = destinationBit == nullptr ? 0 : *destinationBit;
+    const auto inputStart = sourceBit == nullptr ? 0 : *sourceBit;
+    if (capacity > 0 && static_cast<std::int64_t>(outputStart) + count > static_cast<std::int64_t>(capacity) * CHAR_BIT) WorldDiagnostics::fail("putbitstream: destination buffer overflow");
+    if (count > 0 && (outputStart < 0 || inputStart < 0 || destination == nullptr || source == nullptr)) WorldDiagnostics::fail("putbitstream: invalid bit range");
+    for (std::int64_t index = 0; index < count; ++index) {
+        const auto input = static_cast<std::uint64_t>(inputStart + index);
+        const auto output = static_cast<std::uint64_t>(outputStart + index);
+        const auto mask = static_cast<std::uint8_t>(1u << (output % CHAR_BIT));
+        auto& byte = destination[output / CHAR_BIT];
+        if ((source[input / CHAR_BIT] & (1u << (input % CHAR_BIT))) != 0u) byte |= mask;
+        else byte &= static_cast<std::uint8_t>(~mask);
+    }
+    if (destinationBit != nullptr) *destinationBit = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(*destinationBit) + static_cast<std::uint32_t>(count));
+    if (sourceBit != nullptr) *sourceBit = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(*sourceBit) + static_cast<std::uint32_t>(count));
+}
+
+bool SferaConfigTextRuntime::readBinary(const char* key, std::uint8_t* destination, std::uint32_t capacity) const {
+    const auto* text = find(key);
+    if (text == nullptr) return false;
+    std::int32_t outputBit = 0;
+    const auto limit = static_cast<std::uint64_t>(capacity) * CHAR_BIT;
+    while (*text != '\0' && *text != '#') {
+        if (static_cast<std::uint64_t>(outputBit) + 6u > limit) return false;
+        const auto value = static_cast<std::uint8_t>(static_cast<unsigned char>(*text++) - '0');
+        copyBits(destination, &outputBit, &value, nullptr, 6, 0);
+    }
+    if (*text == '#') {
+        const auto count = static_cast<std::int32_t>(static_cast<signed char>(text[1])) - '0';
+        if (count > 0) {
+            if (count > CHAR_BIT || static_cast<std::uint64_t>(outputBit) + count > limit) return false;
+            const auto value = static_cast<std::uint8_t>(static_cast<unsigned char>(text[2]) - '0');
+            copyBits(destination, &outputBit, &value, nullptr, count, 0);
+        }
+    }
+    return true;
+}
+
+std::uint32_t SferaConfigTextRuntime::copyTo(char* destination, std::uint32_t capacity) const {
+    const auto length = std::min(capacity, text_length);
+    if (length != 0u) std::memmove(destination, text_buffer, length);
+    return length;
+}
+
+bool SferaConfigTextRuntime::writeFile(const char* path, const void* data, std::uint32_t size) {
+    ::_chmod(path, _S_IREAD | _S_IWRITE);
+    int file = -1;
+    if (::_sopen_s(&file, path, _O_BINARY | _O_RDWR | _O_CREAT | _O_TRUNC, _SH_DENYNO, _S_IREAD | _S_IWRITE) != 0) return false;
+    ::_write(file, data, size);
+    ::_close(file);
+    return true;
+}
+
+void SferaErrorLogRuntime::initialize(IOutputDevice* error, IOutputDevice* log) {
+    clear();
+    if (error == nullptr) {
+        auto* memory = static_cast<CSphereError*>(WorldMemory::allocate(sizeof(CSphereError), __FILE__, __LINE__));
+        if (memory == nullptr) throw std::bad_alloc();
+        try { owned_error = std::construct_at(memory); } catch (...) { WorldMemory::release(memory); throw; }
+        error = owned_error;
+    }
+    outputs[0] = error;
+    if (log == nullptr) {
+        auto* memory = static_cast<COutputLogDevice*>(WorldMemory::allocate(sizeof(COutputLogDevice), __FILE__, __LINE__));
+        if (memory == nullptr) throw std::bad_alloc();
+        try { owned_log = std::construct_at(memory); } catch (...) { WorldMemory::release(memory); throw; }
+        owned_log->setFilename("sphere.log");
+        log = owned_log;
+    }
+    outputs[1] = log;
+    enabled = true;
+}
+
+void SferaErrorLogRuntime::clear() {
+    outputs[0] = outputs[1] = nullptr;
+    enabled = false;
+    if (owned_log != nullptr) { std::destroy_at(owned_log); WorldMemory::release(owned_log); owned_log = nullptr; }
+    if (owned_error != nullptr) { std::destroy_at(owned_error); WorldMemory::release(owned_error); owned_error = nullptr; }
+}
+
+void SferaExecutionMonitorRuntime::initialize() {
+    if (initialized) return;
+    ::InitializeCriticalSection(&critical_section);
+    initialized = true;
+    constexpr char path[] = "logs\\CurrentExecuting.log";
+    std::copy_n(path, sizeof(path), log_path);
+    ::SymSetOptions(SYMOPT_DEFERRED_LOADS);
+    ::SymInitialize(::GetCurrentProcess(), nullptr, TRUE);
+}
+
+void SferaExecutionMonitorRuntime::setCurrent(std::uint32_t first, std::uint32_t second) {
+    if (!enabled || !initialized) return;
+    ::EnterCriticalSection(&critical_section);
+    current_value_a = first;
+    current_value_b = second;
+    ::LeaveCriticalSection(&critical_section);
+}
+
+void SferaExecutionMonitorRuntime::clear() {
+    if (!initialized) return;
+    enabled = false;
+    if (thread_handle != nullptr) {
+        stop_requested = true;
+        if (::WaitForSingleObject(thread_handle, 100u) == WAIT_TIMEOUT) ::TerminateThread(thread_handle, 0u);
+        ::CloseHandle(thread_handle);
+        thread_handle = nullptr;
+    }
+    ::DeleteCriticalSection(&critical_section);
+    initialized = false;
+}
+
+void SferaCrashReportRuntime::initialize() {
+    if (installed) return;
+    previous_exception_filter = ::SetUnhandledExceptionFilter(&sfera_unhandled_exception_filter);
+    installed = true;
+    const auto length = ::GetModuleFileNameA(nullptr, error_log_path, static_cast<DWORD>(sizeof(error_log_path)));
+    if (length == 0u || length >= sizeof(error_log_path)) error_log_path[0] = '\0';
+    char* filename = std::strrchr(error_log_path, '\\');
+    filename = filename == nullptr ? error_log_path : filename + 1;
+    constexpr char reportName[] = "ERRORLOG.TXT";
+    if (sizeof(reportName) > sizeof(error_log_path) - static_cast<std::size_t>(filename - error_log_path)) filename = error_log_path;
+    std::copy_n(reportName, sizeof(reportName), filename);
+    process_handle = ::GetCurrentProcess();
+}
+
+void SferaCrashReportRuntime::clear() {
+    if (!installed) return;
+    ::SetUnhandledExceptionFilter(previous_exception_filter);
+    previous_exception_filter = nullptr;
+    installed = false;
+}
+
+void SferaFileManager::keepTail(const char* filename, std::uint32_t size) {
+    const auto length = fileSize(filename);
+    if (length < 0 || static_cast<std::uint32_t>(length) <= size) return;
+    std::vector<std::uint8_t> tail(size);
+    const auto descriptor = open(filename, _O_RDWR);
+    if (descriptor < 0) return;
+    if (seek(descriptor, -static_cast<std::int32_t>(size), SEEK_END) < 0 || read(descriptor, tail.data(), size) != static_cast<int>(size)) { close(descriptor); return; }
+    if (seek(descriptor, 0, SEEK_SET) >= 0 && write(descriptor, tail.data(), size) == static_cast<int>(size)) ::_chsize_s(descriptor, size);
+    close(descriptor);
+}
+
+void SferaWarningLogRuntime::initialize() {
+    records = {};
+    for (std::uint32_t server = 0; server < 20u; ++server) {
+        char path[32];
+        std::snprintf(path, sizeof(path), "Warnings%02u.log", server);
+        g_sfera_files.keepTail(path, 1000000u);
+    }
+}
+
+void SferaWarningLogRuntime::writeRecord(std::size_t index) const {
+    const auto& record = records.at(index);
+    char path[] = "Warnings00.log";
+    const auto server = static_cast<std::int32_t>(g_sfera_recovered_static_runtime.server_number);
+    path[8] = static_cast<char>('0' + server / 10);
+    path[9] = static_cast<char>('0' + server % 10);
+    std::FILE* file = nullptr;
+    if (::fopen_s(&file, path, "at") != 0 || file == nullptr) return;
+    if (record.repetitions == 1u) std::fprintf(file, "%s %s\n%s\n%s\n\n", record.date.c_str(), record.time.c_str(), record.message.c_str(), record.context.c_str());
+    else std::fprintf(file, "%s %s\n(%d) %s\n%s\n\n", record.date.c_str(), record.time.c_str(), static_cast<std::int32_t>(record.repetitions), record.message.c_str(), record.context.c_str());
+    if (record.immediate) std::fflush(file);
+    std::fclose(file);
+}
+
+void SferaWarningLogRuntime::flush() {
+    for (std::size_t index = 0; index < records.size(); ++index) {
+        if (records[index].timestamp == 0u) continue;
+        writeRecord(index);
+        records[index].timestamp = 0u;
+    }
+}
+
+void SferaWarningLogRuntime::append(const char* message, bool immediate) {
+    if (message == nullptr) message = "";
+    for (auto& record : records) {
+        if (record.timestamp == 0u || ::_stricmp(record.message.c_str(), message) != 0) continue;
+        ++record.repetitions;
+        record.timestamp = WorldClock::nowTicks();
+        return;
+    }
+    // The script-visible warning history always evicts the oldest slot, including an inactive slot.
+    writeRecord(0u);
+    std::move(records.begin() + 1, records.end(), records.begin());
+    auto& record = records.back();
+    record = {};
+    record.timestamp = WorldClock::nowTicks() + 1u;
+    record.repetitions = 1u;
+    record.immediate = immediate;
+    record.message = message;
+    if (record.message.size() >= 1024u) WorldDiagnostics::fail("Warning message is too long");
+    if (const auto* context = WorldDiagnostics::scriptContext()) record.context = context;
+    if (record.context.size() >= 1024u) WorldDiagnostics::fail("Warning script context is too long");
+    const auto now = std::time(nullptr);
+    std::tm local{};
+    if (::localtime_s(&local, &now) == 0) {
+        char date[32]{};
+        char time[32]{};
+        std::strftime(date, sizeof(date), "%A, %d %B %Y", &local);
+        std::strftime(time, sizeof(time), "%H:%M:%S", &local);
+        record.date = date;
+        record.time = time;
+    }
+}
+
+void SferaWarningLogRuntime::appendFormatted(bool immediate, const char* format, std::va_list arguments) {
+    char message[1024]{};
+    const auto length = std::vsnprintf(message, sizeof(message), format, arguments);
+    if (length < 0 || static_cast<std::size_t>(length) >= sizeof(message)) WorldDiagnostics::fail("Formatted warning message is too long");
+    append(message, immediate);
+    if (immediate) flush();
+}
+
+void SferaDebugScriptArrays::initialize() {
+    module_indices.fill(-1);
+    modules = nullptr;
+    ranges = nullptr;
+    current_process = -1;
+    current_code_range = current_array = 0u;
+}
+
+const char* SferaCrtStartupRuntime::commandLineArguments(const char* commandLine) {
+    if (commandLine == nullptr) return "";
+    bool quoted = false;
+    auto* cursor = reinterpret_cast<const unsigned char*>(commandLine);
+    while (*cursor != '\0' && (*cursor > ' ' || quoted)) {
+        if (*cursor == '"') quoted = !quoted;
+        if (::_ismbblead(*cursor) && cursor[1] != '\0') ++cursor;
+        ++cursor;
+    }
+    while (*cursor != '\0' && *cursor <= ' ') ++cursor;
+    return reinterpret_cast<const char*>(cursor);
+}
+
+void SferaCrtStartupRuntime::initialize() {
+    if (g_sfera_crt_startup_runtime.initialized) return;
+    unsigned int control = 0u;
+    if (::_controlfp_s(&control, _PC_53, _MCW_PC) != 0) throw std::runtime_error("Cannot initialize floating-point precision");
+    ::HeapSetInformation(nullptr, HeapEnableTerminationOnCorruption, nullptr, 0u);
+    ::SetUnhandledExceptionFilter(&sfera_cpp_exception_filter);
+    g_sfera_crt_startup_runtime.initialized = true;
+    g_sfera_execution_monitor_runtime.initialize();
+    g_sfera_effect_manager.clearListeners();
+    g_sfera_error_log_runtime.initialize();
+    g_sfera_recovered_static_runtime.debug_script_arrays.initialize();
+    g_sfera_config_text_runtime.parser_path[0] = '\0';
+    g_sfera_recovered_static_runtime.inverse_40 = 1.0f / 40.0f;
+    g_sfera_camera = SphereRender::GameCamera{};
+    g_sfera_warning_log_runtime.initialize();
+    g_sfera_effect_manager.render_slots.initialize(10000u, "..\\ShareClientSeverCode\\EffectManager.cpp", 125u);
+    g_sfera_recovered_static_runtime.legacy_light_arrays[2].initialize(126u, "..\\ShareClientSeverCode\\light.cpp", 934u);
+    g_sfera_recovered_static_runtime.legacy_light_arrays[1].initialize(126u, "..\\ShareClientSeverCode\\light.cpp", 935u);
+    g_sfera_recovered_static_runtime.legacy_light_arrays[0].initialize(126u, "..\\ShareClientSeverCode\\light.cpp", 936u);
+    g_sfera_landscape_runtime.file_records.initialize(300u, "..\\ShareClientSeverCode\\main.cpp", 369u);
+    g_sfera_interface_runtime.window_handle_table.initialize(7000u, "..\\ShareClientSeverCode\\main.cpp", 403u);
+    g_sfera_world_objects.object_handles.initialize(500000u, "..\\ShareClientSeverCode\\main.cpp", 418u);
+    g_sfera_world_objects.extended_object_handles.initialize(30000u, "..\\ShareClientSeverCode\\main.cpp", 421u);
+    g_sfera_interface_runtime.windows.initialize(100u, "..\\ShareClientSeverCode\\main.cpp", 425u);
+    g_sfera_character_index_map.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 447u);
+    g_sfera_scene_array_runtime.object_visibility_indices.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 448u);
+    g_sfera_scene_array_runtime.object_sort_keys.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 451u);
+    g_sfera_scene_array_runtime.object_sort_indices.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 452u);
+    g_sfera_scene_array_runtime.object_draw_indices.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 453u);
+    g_sfera_collision_runtime.candidate_handles.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 454u);
+    g_sfera_scene_array_runtime.scene_points.initialize(900u, "..\\ShareClientSeverCode\\main.cpp", 828u);
+    g_sfera_light_runtime.handles.initialize(1000u, "..\\ShareClientSeverCode\\main.cpp", 4734u);
+    g_sfera_light_runtime.visible_handles.initialize(500u, "..\\ShareClientSeverCode\\main.cpp", 4736u);
+    g_sfera_light_runtime.active_handles.initialize(31u, "..\\ShareClientSeverCode\\main.cpp", 4738u);
+    g_sfera_scene_array_runtime.model_matrices.initialize(256u, "..\\ShareClientSeverCode\\main.cpp", 9451u);
+    g_sfera_scene_array_runtime.character_matrices.initialize(5u, "..\\ShareClientSeverCode\\main.cpp", 9457u);
+    g_sfera_scene_array_runtime.object_positions.initialize(10000u, "..\\ShareClientSeverCode\\main.cpp", 9529u);
+    g_sfera_scene_array_runtime.clip_vectors.initialize(200u, "..\\ShareClientSeverCode\\main.cpp", 10865u);
+    g_sfera_scene_array_runtime.clip_indices.initialize(200u, "..\\ShareClientSeverCode\\main.cpp", 10871u);
+    g_sfera_scene_array_runtime.clip_points.initialize(40u, "..\\ShareClientSeverCode\\main.cpp", 10884u);
+    g_sfera_collision_runtime.near_result_handles.initialize(20u, "..\\ShareClientSeverCode\\main.cpp", 10886u);
+    g_sfera_scene_array_runtime.render_pass_slots.initialize(12u, __FILE__, __LINE__);
+    g_sfera_crash_report_runtime.initialize();
+    g_sfera_log_memory_object.initialize("LogMemory.log", "$d $t ", SferaDiagnosticLogObjectRuntime::ImmediateFlush | SferaDiagnosticLogObjectRuntime::SuppressRepeats, 1000000u, false, 512u);
+    g_sfera_log_warnings_object.initialize("Warnings.log", "$d $t $u", 0u, 1000000u, true, 2112u);
+    g_sfera_log_errors_object.initialize("Errors.log", "$d $t $u", SferaDiagnosticLogObjectRuntime::SessionMarkers | SferaDiagnosticLogObjectRuntime::ImmediateFlush | SferaDiagnosticLogObjectRuntime::SuppressRepeats, 1000000u, true, 2112u);
+}
+
+void SferaCrc32Runtime::initialize() {
+    // CRC-32 generator: x^32 + x^26 + x^23 + x^22 + x^16 + x^12 + x^11 + x^10 + x^8 + x^7 + x^5 + x^4 + x^2 + x + 1.
+    constexpr std::array<unsigned, 14> exponents{26, 23, 22, 16, 12, 11, 10, 8, 7, 5, 4, 2, 1, 0};
+    std::uint32_t reflectedPolynomial = 0u;
+    for (const auto exponent : exponents) reflectedPolynomial |= 1u << (31u - exponent);
+    for (std::uint32_t index = 0u; index < std::size(table); ++index) {
+        auto value = index;
+        for (unsigned bit = 0u; bit < CHAR_BIT; ++bit) value = (value >> 1u) ^ ((value & 1u) != 0u ? reflectedPolynomial : 0u);
+        table[index] = value;
+    }
+}
+
+std::uint32_t SferaCrc32Runtime::calculate(const void* data, std::size_t size, std::uint32_t seed, bool signedShift) const {
+    const auto* bytes = static_cast<const std::uint8_t*>(data);
+    for (std::size_t index = 0u; index < size; ++index) {
+        const auto slot = static_cast<std::uint8_t>(seed ^ bytes[index]);
+        seed = (signedShift ? static_cast<std::uint32_t>(static_cast<std::int32_t>(seed) >> CHAR_BIT) : seed >> CHAR_BIT) ^ table[slot];
+    }
+    return seed;
+}
+
+SferaCheckFilesContext::SferaCheckFilesContext() { crc.initialize(); }
+SferaCheckFilesContext::~SferaCheckFilesContext() { stop(); }
+
+void SferaCheckFilesContext::stop() {
+    stop_requested.store(1);
+    if (thread == nullptr) return;
+    ::WaitForSingleObject(thread, INFINITE);
+    ::CloseHandle(thread);
+    thread = nullptr;
+}
+
+int SferaCheckFilesContext::reset() {
+    stop();
+    crc.current = 0u;
+    record_count = throttle = 0;
+    state = 1;
+    stop_requested.store(-1);
+    running = false;
+    return 0;
+}
+
+int SferaCheckFilesContext::add(const char* directory, const char* masks) {
+    if (record_count < 0 || static_cast<std::size_t>(record_count) >= records.size() || directory == nullptr || masks == nullptr) return -1;
+    auto& record = records[record_count];
+    if (std::strlen(directory) >= sizeof(record.directory) || std::strlen(masks) >= sizeof(record.masks)) return -1;
+    std::copy_n(directory, std::strlen(directory) + 1u, record.directory);
+    std::copy_n(masks, std::strlen(masks) + 1u, record.masks);
+    ++record_count;
+    return 0;
+}
+
+std::uint32_t SferaCheckFilesContext::fileChecksum(const char* path, std::uint32_t limit, bool signedShift) {
+    if (!signedShift) crc.current = 0u;
+    std::FILE* file = nullptr;
+    if (::fopen_s(&file, path, "rb") != 0 || file == nullptr) return 0u;
+    const std::unique_ptr<std::FILE, decltype(&std::fclose)> input(file, &std::fclose);
+    std::vector<std::uint8_t> bytes(limit);
+    const auto size = std::fread(bytes.data(), 1u, bytes.size(), input.get());
+    const bool failed = std::ferror(file) != 0;
+    if (failed) return 0u;
+    const auto value = crc.calculate(bytes.data(), size, 0u, signedShift);
+    if (!signedShift) crc.current = value;
+    return value;
+}
+
+void SferaCheckFilesContext::collect(const char* directory, const char* mask, std::vector<CheckFileRecord>& files, std::uint32_t& throttleCount, bool updateRunning) {
+    if (stop_requested.load() > 0 || mask == nullptr || *mask == '\0') return;
+    const std::string prefix = directory == nullptr ? "" : directory;
+    const auto search = prefix + mask;
+    _finddata64i32_t data{};
+    const auto handle = ::_findfirst64i32(search.c_str(), &data);
+    if (updateRunning) running = true;
+    if (handle == -1) return;
+    if (updateRunning) throttleCount = 0u;
+    try {
+        do {
+            if ((data.attrib & _A_SUBDIR) != 0u || ::_stricmp(data.name, "filelist.dat") == 0) continue;
+            const auto path = prefix + data.name;
+            const bool model = path.size() > 4u && ::_stricmp(path.c_str() + path.size() - 4u, ".mdl") == 0;
+            files.push_back(CheckFileRecord{data.name, fileChecksum(path.c_str(), model ? 1024u : 65536u), static_cast<std::uint32_t>(data.size)});
+            if (throttle > 0 && ++throttleCount >= static_cast<std::uint32_t>(throttle)) { ::Sleep(1000u); throttleCount = 0u; }
+        } while (stop_requested.load() <= 0 && ::_findnext64i32(handle, &data) == 0);
+    } catch (...) { ::_findclose(handle); throw; }
+    ::_findclose(handle);
+}
+
+std::uint32_t SferaCheckFilesContext::directoryChecksum(const char* directory, const char* mask) {
+    const std::string prefix = directory == nullptr ? "" : directory;
+    const auto search = prefix + (mask == nullptr ? "" : mask);
+    _finddata64i32_t data{};
+    const auto handle = ::_findfirst64i32(search.c_str(), &data);
+    if (handle == -1) return 0u;
+    std::uint32_t result = 0u;
+    try {
+        do {
+            if ((data.attrib & _A_SUBDIR) == 0u && ::_stricmp(data.name, "filelist.dat") != 0) result += fileChecksum((prefix + data.name).c_str(), 65536u, true);
+        } while (::_findnext64i32(handle, &data) == 0);
+    } catch (...) { ::_findclose(handle); throw; }
+    ::_findclose(handle);
+    return result;
+}
+
+std::uint32_t SferaCheckFilesContext::calculateRecord(SferaCheckFileSpec& spec, bool synchronous) {
+    if (stop_requested.load() > 0) return crc.current;
+    std::vector<CheckFileRecord> files;
+    std::uint32_t throttleCount = 0u;
+    if (std::strncmp(spec.directory, "xupdate", 7u) == 0) {
+        spec.directory[0] = '\0';
+        collect(spec.directory, "sphere.exe", files, throttleCount, synchronous);
+        collect(spec.directory, "sphereclient.exe", files, throttleCount, synchronous);
+    } else {
+        std::string_view masks(spec.masks);
+        while (!masks.empty() && stop_requested.load() <= 0) {
+            const auto end = masks.find(';');
+            const std::string mask(masks.substr(0u, end));
+            collect(spec.directory, mask.c_str(), files, throttleCount, synchronous);
+            if (end == std::string_view::npos) break;
+            masks.remove_prefix(end + 1u);
+            if (synchronous) std::memmove(spec.masks, masks.data(), masks.size() + 1u);
+            if (synchronous) masks = spec.masks;
+        }
+    }
+    std::stable_sort(files.begin(), files.end(), [](const CheckFileRecord& first, const CheckFileRecord& second) { return ::_stricmp(first.name.c_str(), second.name.c_str()) < 0; });
+    crc.current = 0u;
+    for (const auto& file : files) {
+        std::string name = synchronous ? file.name.substr(0u, 254u) : file.name;
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+        crc.current = crc.calculate(name.c_str(), name.size() + 1u, crc.current);
+        crc.current = crc.calculate(&file.crc, sizeof(file.crc), crc.current);
+        crc.current = crc.calculate(&file.size, sizeof(file.size), crc.current);
+        if (stop_requested.load() > 0) break;
+    }
+    return crc.current;
+}
+
+int SferaCheckFilesContext::threadStatus() const {
+    if (thread == nullptr) return -1;
+    DWORD exitCode = STILL_ACTIVE;
+    if (!::GetExitCodeThread(thread, &exitCode)) return -1;
+    return exitCode == STILL_ACTIVE ? 0 : 1;
+}
+
+int SferaCheckFilesContext::readResults(std::uint32_t* destination, std::int32_t* capacity) {
+    if (state < 0 || thread == nullptr || capacity == nullptr) return -1;
+    const auto status = threadStatus();
+    if (status <= 0) return status;
+    const auto count = record_count;
+    record_count = std::min(record_count, *capacity);
+    *capacity = count;
+    for (std::int32_t index = 0; index < record_count; ++index) destination[index] = records[index].crc;
+    return 1;
+}
+
+int SferaCheckFilesContext::calculateResults(std::uint32_t* destination, std::int32_t* capacity) {
+    if (state < 0 || capacity == nullptr) return -1;
+    throttle = 0;
+    const auto count = record_count;
+    record_count = std::min(record_count, *capacity);
+    *capacity = count;
+    for (std::int32_t index = 0; index < record_count; ++index) destination[index] = calculateRecord(records[index], true);
+    return 0;
+}
+
+int SferaCheckFilesContext::start() {
+    if (thread != nullptr) {
+        if (threadStatus() == 0) return 0;
+        ::CloseHandle(thread);
+        thread = nullptr;
+    }
+    thread = ::CreateThread(nullptr, 0u, &sfera_check_files_thread, this, 0u, nullptr);
+    if (thread == nullptr) return 2;
+    ::SetThreadPriority(thread, THREAD_PRIORITY_BELOW_NORMAL);
+    return 0;
+}
+
+void SferaCheckFilesContext::run() {
+    const auto count = std::min<std::size_t>(std::max(record_count, 0), records.size());
+    for (std::size_t index = 0u; index < count && stop_requested.load() <= 0; ++index) {
+        records[index].crc = calculateRecord(records[index], false);
+        if (!running) break;
+    }
+}
+
+void SferaLogRuntime::writeScript(const char* path, const char* text, bool primary) {
+    std::FILE* file = nullptr;
+    if (::fopen_s(&file, path, script_first_write ? "wt" : "at") != 0 || file == nullptr) return;
+    if (primary) script_first_write = false;
+    std::fputs(text, file);
+    std::fclose(file);
+}
+
+void SferaLogRuntime::writeScript(const char* path, float value, bool primary) {
+    char text[128];
+    std::snprintf(text, sizeof(text), "%f", static_cast<double>(value));
+    writeScript(path, text, primary);
+}
+
+void SferaLogRuntime::datedPath(char* destination, const char* path) {
+    const std::string name(path);
+    const auto dot = name.rfind('.');
+    const auto split = dot == std::string::npos ? name.size() : dot;
+    SYSTEMTIME time{};
+    ::GetLocalTime(&time);
+    char date[40];
+    std::snprintf(date, sizeof(date), "_%02d.%02d.%02d", static_cast<int>(time.wYear) - 2000, static_cast<int>(time.wMonth), static_cast<int>(time.wDay));
+    const auto result = name.substr(0u, split) + date + name.substr(split);
+    std::copy_n(result.c_str(), result.size() + 1u, destination);
+}
+
+void SferaLogRuntime::writeScript(const char* path, std::int32_t value, bool primary) {
+    char text[32];
+    std::snprintf(text, sizeof(text), "%d", static_cast<int>(value));
+    writeScript(path, text, primary);
+}
+
+void SferaLogRuntime::writeTemporary(const char* text) {
+    SYSTEMTIME date{};
+    ::GetLocalTime(&date);
+    char path[80];
+    std::snprintf(path, sizeof(path), "logs\\tmp_cl_%02d%02d%02d.log", static_cast<int>(date.wYear) - 2000, static_cast<int>(date.wMonth), static_cast<int>(date.wDay));
+    std::FILE* file = nullptr;
+    if (::fopen_s(&file, path, "at") != 0 || file == nullptr) return;
+    const auto now = std::time(nullptr);
+    std::tm time{};
+    ::localtime_s(&time, &now);
+    std::fprintf(file, "%02i:%02i:%02i %s", time.tm_hour, time.tm_min, time.tm_sec, text);
+    std::fclose(file);
+}
+
+void SferaFileRuntime::appendCrashLog(std::FILE* output, const char* path, std::size_t limit, bool tail) {
+    std::vector<char> data(limit);
+    std::FILE* file = nullptr;
+    if (::fopen_s(&file, path, "r") != 0 || file == nullptr) {
+        std::fprintf(output, "\n%s not found!\n", path);
+        return;
+    }
+    if (tail) std::fseek(file, -static_cast<long>(limit), SEEK_END);
+    const auto length = std::fread(data.data(), 1u, data.size(), file);
+    std::fclose(file);
+    std::fprintf(output, "\n%s\n->\n", path);
+    std::fwrite(data.data(), 1u, length, output);
+}
+
+void SferaFileRuntime::collectCrashLogs() {
+    std::FILE* marker = nullptr;
+    if (::fopen_s(&marker, "app-is-Run.1", "r") != 0 || marker == nullptr) return;
+    std::fclose(marker);
+    std::FILE* report = nullptr;
+    if (::fopen_s(&report, "client-Crash.1", "w") == 0 && report != nullptr) {
+        const std::unique_ptr<std::FILE, decltype(&std::fclose)> output(report, &std::fclose);
+        appendCrashLog(output.get(), "ERRORLOG.TXT", 1000u, false);
+        std::remove("ERRORLOG.TXT");
+        appendCrashLog(output.get(), "Error.log", 600u, true);
+        std::remove("Error.log");
+        appendCrashLog(output.get(), "Warnings00.log", 200u, true);
+        std::remove("Warnings00.log");
+        appendCrashLog(output.get(), "error-Cause.1", 50u, false);
+        std::remove("error-Cause.1");
+    }
+    std::remove("error-Cause.1");
+    std::remove("app-is-Run.1");
+}
+
+void SferaFileRuntime::beginCrashReport() {
+    if (crash_report_active) return;
+    collectCrashLogs();
+    std::FILE* marker = nullptr;
+    if (::fopen_s(&marker, "app-is-Run.1", "w") == 0 && marker != nullptr) std::fclose(marker);
+    crash_report_active = true;
+}
+
+void SferaFileRuntime::endCrashReport() {
+    if (!crash_report_active) return;
+    if (::_access("app-is-Run.1", 0) != -1 && std::remove("app-is-Run.1") != 0) {
+        const int error = errno;
+        std::FILE* output = nullptr;
+        if (::fopen_s(&output, "error-Cause.1", "w") == 0 && output != nullptr) {
+            char message[256];
+            ::strerror_s(message, sizeof(message), error);
+            std::fprintf(output, "File %s not deleted (~), error cause: %s\n", "app-is-Run.1", message);
+            std::fclose(output);
+        }
+    }
+    crash_report_active = false;
+}
+
+void SferaProfilerRuntime::writeReport() {
+    if (frame_count == 0u || frame_time_total == 0u) return;
+    std::FILE* file = nullptr;
+    if (::fopen_s(&file, "logs\\profile.txt", "a") != 0 || file == nullptr) return;
+    const std::unique_ptr<std::FILE, decltype(&std::fclose)> output(file, &std::fclose);
+    std::fputs("\n\nProfile results:\n", file);
+    const float average = static_cast<float>(static_cast<double>(frame_time_total) / static_cast<std::int32_t>(frame_count));
+    const auto snapshot = WorldClock::microseconds();
+    report_clock_snapshot.low = static_cast<std::uint32_t>(snapshot);
+    report_clock_snapshot.high = static_cast<std::uint32_t>(snapshot >> 32u);
+    const auto integralAverage = static_cast<std::uint32_t>(static_cast<std::int64_t>(std::trunc(average)));
+    const auto fps = integralAverage != 0u ? report_clock_snapshot.low / integralAverage : 0u;
+    std::fprintf(file, "Average frame time = %d  (fps = %d)\n\n", static_cast<int>(integralAverage), static_cast<int>(fps));
+    const float frames = static_cast<float>(static_cast<std::int32_t>(frame_count));
+    for (std::size_t index = 0u; index < kProfileSlotCount; ++index) {
+        if (call_count[index] == 0u) continue;
+        if (call_count[index] == std::numeric_limits<std::uint32_t>::max()) {
+            std::fprintf(file, "N=%d,  ERROR\n", static_cast<int>(index));
+            continue;
+        }
+        const auto ticks = static_cast<std::int64_t>((static_cast<std::uint64_t>(accumulated_ticks[index].high) << 32u) | accumulated_ticks[index].low);
+        const float time = static_cast<float>(static_cast<double>(ticks) / frames);
+        const float percent = static_cast<float>(static_cast<double>(time) / average * 100.0);
+        const float calls = static_cast<float>(static_cast<double>(static_cast<std::int32_t>(call_count[index])) / frames);
+        std::fprintf(file, "N=%d,  ANoC = %5.2f,  AT = %7.1f,  AP = %5.2f\n", static_cast<int>(index), static_cast<double>(calls), static_cast<double>(time), static_cast<double>(percent));
+    }
 }

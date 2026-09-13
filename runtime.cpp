@@ -30,7 +30,7 @@ namespace {
 
 constexpr wchar_t kClientRootEnvironment[] = L"SFERA_CLIENT_ROOT";
 thread_local std::uint32_t g_lifted_exception_list = 0xFFFFFFFFu;
-std::vector<LiftFunction> g_lifted_finalizers;
+
 
 std::uint32_t native_stack_top(void* memory, std::size_t size) noexcept { const std::uintptr_t value = reinterpret_cast<std::uintptr_t>(static_cast<std::uint8_t*>(memory) + size - 64u); return static_cast<std::uint32_t>(value & ~std::uintptr_t{0xFu}); }
 
@@ -120,8 +120,6 @@ std::string narrow_path(const std::wstring& value) {
     return result;
 }
 
-
-
 template <class T>
 T memory_read(std::uint32_t address) {
     T value{};
@@ -136,17 +134,7 @@ void memory_write(std::uint32_t address, T value) {
     g_process_memory->write(address, &value, sizeof(T));
 }
 
-
-
-
 } // namespace
-
-
-bool register_lifted_finalizer(LiftFunction function) {
-    if (!function) { return false; }
-    try { g_lifted_finalizers.push_back(function); return true; } catch (...) { return false; }
-}
-
 
 void lift_push32(LiftCpu* cpu, std::uint32_t value) {
     cpu->esp -= 4u;
@@ -158,8 +146,6 @@ std::uint32_t lift_pop32(LiftCpu* cpu) {
     cpu->esp += 4u;
     return value;
 }
-
-
 
 const std::wstring& client_root_directory() {
     static const std::wstring root = [] {
@@ -331,36 +317,34 @@ int NativeRuntime::execute() {
     void* stack_memory = _alloca(kStackReserve + 64u);
     LiftCpu state{};
     state.esp = native_stack_top(stack_memory, kStackReserve + 64u);
-    state.eip = LIFT_CODE_TOKEN_RVA(0x000EF142u);
-    lift_push32(&state, LIFT_RETURN_SENTINEL);
+    state.eip = LIFT_CODE_TOKEN_VA(0x0047D770u);
     DiagnosticRunScope run_scope(&state);
     DiagnosticExecutionScope execution_scope(state.eip, LIFT_RETURN_SENTINEL, state.esp);
-    diagnostic_note("entering generated entry function");
-    if (std::atexit(&SferaCrtStartupRuntime::releaseContainers) != 0) throw std::runtime_error("Could not register native container finalization");
+    if (std::atexit(&SferaCrtStartupRuntime::releaseContainers) != 0) throw std::runtime_error("Could not register native finalization");
     g_runtime = this;
     try {
         DiagnosticPhaseScope native_phase(RuntimePhase::native_c);
-        sfera_sub_004EF142(&state, LIFT_RETURN_SENTINEL);
+        SferaCrtStartupRuntime::initialize();
+        STARTUPINFOW startup{};
+        startup.cb = sizeof(startup);
+        ::GetStartupInfoW(&startup);
+        const auto show = (startup.dwFlags & STARTF_USESHOWWINDOW) != 0u ? startup.wShowWindow : SW_SHOWDEFAULT;
+        const auto* arguments = SferaCrtStartupRuntime::commandLineArguments(::GetCommandLineA());
+        lift_push32(&state, static_cast<std::uint32_t>(show));
+        lift_push32(&state, static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(arguments)));
+        lift_push32(&state, 0u);
+        lift_push32(&state, static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(::GetModuleHandleW(nullptr))));
+        lift_push32(&state, LIFT_RETURN_SENTINEL);
+        sfera_sub_0047D770(&state, LIFT_RETURN_SENTINEL);
         const int result = static_cast<int>(state.eax);
-        const std::uint32_t finalizer_stack_top = native_stack_top(stack_memory, kStackReserve + 64u);
-        while (!g_lifted_finalizers.empty()) {
-            const LiftFunction function = g_lifted_finalizers.back();
-            g_lifted_finalizers.pop_back();
-            LiftCpu finalizer_state{};
-            finalizer_state.esp = finalizer_stack_top;
-            lift_push32(&finalizer_state, LIFT_RETURN_SENTINEL);
-            function(&finalizer_state, LIFT_RETURN_SENTINEL);
-        }
-        g_sfera_crt_startup_runtime.releaseContainers();
+        SferaCrtStartupRuntime::releaseContainers();
         g_runtime = nullptr;
         return result;
     } catch (const std::exception& error) {
-        g_lifted_finalizers.clear();
         diagnostic_failure(state, error.what());
         g_runtime = nullptr;
         throw;
     } catch (...) {
-        g_lifted_finalizers.clear();
         diagnostic_failure(state, "Unknown failure in generated code");
         g_runtime = nullptr;
         throw;

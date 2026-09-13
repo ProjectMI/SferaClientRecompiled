@@ -17,8 +17,7 @@ struct SferaDpnBufferDescRuntime;
 class CSoundStream;
 
 inline constexpr std::size_t kTcpReceiveBufferCapacity = 60000u;
-inline constexpr std::size_t kCheckFileRecordCount = 100u;
-inline constexpr std::size_t kCheckFileTextCapacity = 64u;
+
 inline constexpr std::size_t kUpdateRequestCapacity = 512u;
 
 enum class TcpMessage : std::uint16_t {
@@ -106,31 +105,6 @@ struct SferaDirectPlayConnectResult {
     HRESULT result;
     const void* reply_data;
     DWORD reply_size;
-};
-
-struct SferaCheckFileSpec {
-    char directory[kCheckFileTextCapacity];
-    char masks[kCheckFileTextCapacity];
-    std::uint32_t crc;
-};
-
-struct SferaCheckFilesContext {
-    std::uint32_t crc_table[256];
-    std::uint32_t result_crc;
-    std::uint32_t reserved_header[4];
-    SferaCheckFileSpec records[kCheckFileRecordCount];
-    std::int32_t record_count;
-    std::int32_t throttle;
-    std::uint32_t reserved_control[2];
-    std::int32_t stop_requested;
-    std::uint8_t running;
-    std::uint8_t reserved_running[3];
-};
-
-struct CheckFileRecord {
-    std::string name;
-    std::uint32_t crc;
-    std::uint32_t size;
 };
 
 #pragma pack(push, 1)

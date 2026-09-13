@@ -3,6 +3,8 @@
 #include <winsock2.h>
 #include <d3d9.h>
 #include <cstdio>
+#include <cstdarg>
+#include <atomic>
 #include <iosfwd>
 #include <chrono>
 #include <filesystem>
@@ -1274,6 +1276,7 @@ public:
     int close(int descriptor);
     std::int32_t fileSize(const char* filename);
     std::vector<std::uint8_t> readAll(const char* filename);
+    void keepTail(const char* filename, std::uint32_t size);
     void addSearchPath(const char* directory);
     std::vector<std::string> candidatePaths(const char* filename, bool search_nested_paths = false) const;
 private:
@@ -2160,6 +2163,12 @@ struct SferaLogFileRuntime {
 };
 struct SferaLogRuntime {
     SferaLogFileRuntime files[3];
+    bool script_first_write = true;
+    void writeScript(const char* path, const char* text, bool primary = false);
+    void writeScript(const char* path, float value, bool primary = false);
+    void writeScript(const char* path, std::int32_t value, bool primary = false);
+    void writeTemporary(const char* text);
+    static void datedPath(char* destination, const char* path);
 };
 
 
@@ -2210,31 +2219,153 @@ struct SferaAllocationHashRuntime {
 };
 
 
-struct SferaCrtStartupRuntime {
-    static void releaseContainers();
-    uint32_t managed_app;
-    uint32_t environment;
-    uint32_t main_return_code;
-    uint32_t has_cctor;
-    uint32_t reserved_dynamic_tls_dtors;
-    uint32_t startup_state;
-    uint32_t processor_feature_10;
-    uint32_t reserved_dynamic_tls_init;
-    uint32_t encoded_onexit_begin;
-    uint32_t encoded_onexit_end;
-    uint32_t argc;
-    uint32_t argv;
-    uint32_t envp;
-    uint32_t mainargs_result;
-    uint32_t new_mode;
-    uint32_t environment_mode;
-    uint32_t commode;
-    uint32_t fmode;
-    uint32_t startup_lock;
-    uint32_t tls_cleanup_object;
-    uint32_t heap_compatibility_flag;
+struct SferaConfigTextRuntime {
+    static constexpr std::size_t text_capacity = 2458176u;
+    char text_storage[text_capacity];
+    char* text_buffer;
+    std::uint32_t text_length;
+    char format_scratch[512];
+    char parser_path[1024];
+    std::uint32_t copyText(const char* source, std::uint32_t length, char* path);
+    void useText(char* source, char* path);
+    void clear(char* path, const char* filename);
+    char* find(const char* key) const;
+    bool readInteger(const char* key, std::int32_t& value) const;
+    bool readFloat(const char* key, float& value) const;
+    bool readString(const char* key, char* destination, std::uint32_t capacity) const;
+    bool readBinary(const char* key, std::uint8_t* destination, std::uint32_t capacity) const;
+    std::uint32_t copyTo(char* destination, std::uint32_t capacity) const;
+    static bool writeFile(const char* path, const void* data, std::uint32_t size);
+    static void copyBits(std::uint8_t* destination, std::int32_t* destinationBit, const std::uint8_t* source, std::int32_t* sourceBit, std::int32_t count, std::int32_t capacity);
 };
 
+struct SferaErrorLogRuntime {
+    IOutputDevice* outputs[2]{};
+    CSphereError* owned_error = nullptr;
+    COutputLogDevice* owned_log = nullptr;
+    bool enabled = false;
+    std::uint8_t index_table[128]{};
+    void initialize(IOutputDevice* error = nullptr, IOutputDevice* log = nullptr);
+    void clear();
+};
+
+struct SferaExecutionMonitorRuntime {
+    HANDLE thread_handle = nullptr;
+    bool stop_requested = false;
+    bool enabled = false;
+    bool initialized = false;
+    char log_path[54]{};
+    CRITICAL_SECTION critical_section{};
+    std::uint32_t current_value_a = 0;
+    std::uint32_t current_value_b = 0;
+    void initialize();
+    void setCurrent(std::uint32_t first, std::uint32_t second);
+    void clear();
+};
+
+struct SferaCrashReportRuntime {
+    char report_text[8192]{};
+    std::uint32_t report_length = 0;
+    char error_log_path[MAX_PATH]{};
+    LPTOP_LEVEL_EXCEPTION_FILTER previous_exception_filter = nullptr;
+    HANDLE process_handle = nullptr;
+    HANDLE error_log_handle = nullptr;
+    bool installed = false;
+    void initialize();
+    void clear();
+};
+
+struct SferaWarningLogRuntime {
+    struct Record {
+        std::uint64_t timestamp = 0;
+        std::string date;
+        std::string time;
+        std::string message;
+        std::uint32_t repetitions = 0;
+        std::string context;
+        bool immediate = false;
+    };
+    std::array<Record, 10> records{};
+    void initialize();
+    void append(const char* message, bool immediate);
+    void appendFormatted(bool immediate, const char* format, std::va_list arguments);
+    void flush();
+private:
+    void writeRecord(std::size_t index) const;
+};
+
+struct SferaDebugScriptArrays {
+    struct Module { std::uint32_t count; std::uint32_t range_offset; };
+    struct Range { std::uint32_t begin; std::uint32_t end; };
+    std::array<std::int32_t, 4096> module_indices{};
+    Module* modules = nullptr;
+    Range* ranges = nullptr;
+    std::int32_t current_process = -1;
+    std::uint32_t current_code_range = 0;
+    std::uint32_t current_array = 0;
+    void initialize();
+};
+
+struct SferaCrc32Runtime {
+    std::uint32_t table[256]{};
+    std::uint32_t current = 0;
+    void initialize();
+    std::uint32_t calculate(const void* data, std::size_t size, std::uint32_t seed = 0u, bool signedShift = false) const;
+};
+
+struct SferaCheckFileSpec {
+    char directory[64]{};
+    char masks[64]{};
+    std::uint32_t crc = 0;
+};
+
+struct CheckFileRecord {
+    std::string name;
+    std::uint32_t crc;
+    std::uint32_t size;
+};
+
+struct SferaCheckFilesContext {
+    SferaCrc32Runtime crc;
+    std::array<SferaCheckFileSpec, 100> records{};
+    std::int32_t record_count = 0;
+    std::int32_t throttle = 0;
+    std::int32_t state = -1;
+    std::atomic<std::int32_t> stop_requested{-1};
+    bool running = false;
+    HANDLE thread = nullptr;
+    SferaCheckFilesContext();
+    ~SferaCheckFilesContext();
+    int reset();
+    int add(const char* directory, const char* masks);
+    std::uint32_t fileChecksum(const char* path, std::uint32_t limit = 65536u, bool signedShift = false);
+    std::uint32_t directoryChecksum(const char* directory, const char* mask);
+    int threadStatus() const;
+    int readResults(std::uint32_t* destination, std::int32_t* capacity);
+    int calculateResults(std::uint32_t* destination, std::int32_t* capacity);
+    int start();
+    void stop();
+    void run();
+private:
+    void collect(const char* directory, const char* mask, std::vector<CheckFileRecord>& files, std::uint32_t& throttleCount, bool updateRunning);
+    std::uint32_t calculateRecord(SferaCheckFileSpec& spec, bool synchronous);
+};
+
+struct SferaFileRuntime {
+    bool crash_report_active = false;
+    void beginCrashReport();
+    void endCrashReport();
+private:
+    static void collectCrashLogs();
+    static void appendCrashLog(std::FILE* output, const char* path, std::size_t limit, bool tail);
+};
+
+struct SferaCrtStartupRuntime {
+    bool initialized = false;
+    static void initialize();
+    static void releaseContainers();
+    static const char* commandLineArguments(const char* commandLine);
+};
 
 class WorldMemory {
 public:
@@ -3031,9 +3162,6 @@ public:
     static void drawSunMoon(float rotation);
 };
 
-
-
-
 struct ShadowPoint { float x = 0.0f; float y = 0.0f; };
 class ShadowRasterizer {
 public:
@@ -3131,14 +3259,6 @@ public:
     void sunDirection(float time, SferaVec3F& output) const;
     void lighting(float time, SferaVec3F& sun, SferaVec3F& ambient) const;
 };
-
-
-
-
-
-
-
-
 
 // Sound playback owner.
 class CSoundStream;
@@ -3694,7 +3814,7 @@ struct SferaMbcSavedInvocationState {
 };
 
 struct SferaMbcRuntime {
-    enum class Builtin : std::uint8_t { Sin = 3, Cos = 4, Exp = 125, ArcTangent = 7, AbsoluteInteger = 6, AbsoluteReal = 5, SimulationTick = 8, RandomReal = 106, PackColor = 11, ScaleColor = 134, SquareRoot = 12, SceneContext = 13, KeyboardState = 14, ProcessModule = 19, ActiveTag = 22, ArgumentCount = 23, CurrentModule = 24, CurrentProcess = 39, ZeroResult = 25, ZeroResultAlternate = 27, TickDifference = 80, ProfileValue = 29, ProcessFlag = 32, CopyString = 34, CopyStringCount = 136, AppendString = 35, FindString = 95, FindStringInsensitive = 135, StringLength = 36, CompareStrings = 37, CompareStringsInsensitive = 75, CompareStringsCount = 76, CompareStringsCountInsensitive = 137, DiscardArgument = 86, IntegerValue = 45, RealValue = 46, NextDefaultValue = 64, CallerProcess = 127, CopyMemory = 78, MoveMemory = 96, FillMemory = 79, StopInterpreter = 82, NetworkInitialization = 85, InvalidResult = 119, BitAnd = 138, BitOr = 139, BitXor = 140, BitNot = 141, ShiftLeft = 142, ShiftRight = 143, ClearBit = 144, SetBit = 145, TestBit = 146, WriteByte = 148, WriteShort = 149, WriteThreeBytes = 150, WriteWord = 151, WriteReal = 152, WriteString = 153, ReadByte = 154, ReadShort = 155, ReadThreeBytes = 156, ReadWord = 157, ReadReal = 158, ReadString = 159, LowerBoundInteger = 160, PositionX = 54, PositionY = 55, PositionZ = 56, RotationX = 57, RotationY = 58, RotationZ = 59, SetRotation = 52, MoveLocal = 50, MoveForward = 51, Rotate = 53 };
+    enum class Builtin : std::uint8_t { Sin = 3, Cos = 4, Exp = 125, ArcTangent = 7, AbsoluteInteger = 6, AbsoluteReal = 5, SimulationTick = 8, RandomReal = 106, PackColor = 11, ScaleColor = 134, SquareRoot = 12, SceneContext = 13, KeyboardState = 14, ProcessModule = 19, ActiveTag = 22, ArgumentCount = 23, CurrentModule = 24, CurrentProcess = 39, ZeroResult = 25, ZeroResultAlternate = 27, TickDifference = 80, ProfileValue = 29, ProcessFlag = 32, CopyString = 34, CopyStringCount = 136, AppendString = 35, FindString = 95, FindStringInsensitive = 135, StringLength = 36, CompareStrings = 37, CompareStringsInsensitive = 75, CompareStringsCount = 76, CompareStringsCountInsensitive = 137, DiscardArgument = 86, IntegerValue = 45, RealValue = 46, NextDefaultValue = 64, CallerProcess = 127, CopyMemory = 78, MoveMemory = 96, FillMemory = 79, StopInterpreter = 82, NetworkInitialization = 85, InvalidResult = 119, BitAnd = 138, BitOr = 139, BitXor = 140, BitNot = 141, ShiftLeft = 142, ShiftRight = 143, ClearBit = 144, SetBit = 145, TestBit = 146, WriteByte = 148, WriteShort = 149, WriteThreeBytes = 150, WriteWord = 151, WriteReal = 152, WriteString = 153, ReadByte = 154, ReadShort = 155, ReadThreeBytes = 156, ReadWord = 157, ReadReal = 158, ReadString = 159, LowerBoundInteger = 160, ContainerCommand = 161, ContainerManagement = 162, PositionX = 54, PositionY = 55, PositionZ = 56, RotationX = 57, RotationY = 58, RotationZ = 59, SetRotation = 52, MoveLocal = 50, MoveForward = 51, Rotate = 53 };
     enum class Instruction : std::uint8_t {
         Jump = 'G', JumpShort = 'J', ArgumentCount = ',', ResetStack = '0', LiteralWord = '9', LiteralShort = '(', LiteralByte = ')', StringLiteral = 'A', SliceVariable = 'e', SliceLiteral = 'l', StartProgram = 'R', CallProgram = 'U', StopProgram = 'S', PauseProgram = 'P', ResumeProgram = 'C', ReturnLocal = 't', Assign = '=', Dereference = '^', AddressOf = '&', Add = '+', Subtract = '-', Multiply = '*', Divide = '/', Remainder = '%', Equal = 240, NotEqual = 237, Greater = '>', Less = '<', GreaterEqual = 225, LessEqual = 236, ShortCircuitOr = 'L', ShortCircuitAnd = 'M', IntegerResult = 235, IntegerResultAlternate = 232, Negate = 241, LogicalNot = '!', PreIncrement = 239, PreDecrement = 243, PostIncrement = 246, PostDecrement = 247, Halt = 'H', IntegerToReal = '.', PreviousIntegerToReal = ':', Swap = '~', PointerAdd = '[', PointerSubtract = ']', RealToInteger = '`', PreviousRealToInteger = '"', PointerPreIncrement = 207, PointerPreDecrement = 211, PointerPostIncrement = 214, PointerPostDecrement = 215, IntegerPair = ';', EnterFrame = '1', LeaveFrame = '2', UnlinkedFunction = 'g'
     };
@@ -3788,15 +3908,13 @@ struct SferaMbcRuntime {
 
 
 struct SferaDataContainerHeader {
-    enum class Kind : std::uint32_t { List = 1, Vector, Set, Map, Multimap };
+    enum class Kind : std::uint32_t { List = 1, Vector, Set, Map, HashMap };
     enum class ValueType : std::uint32_t { Integer = 1, Real, Byte, String, Binary };
     static constexpr std::uint32_t Signature = 103045;
     std::uint32_t signature;
     Kind kind;
     std::uint8_t iteration_active;
     std::uint8_t reserved[3];
-    void initialize();
-    void invalidate();
 };
 
 struct SferaScriptContainer {
@@ -3804,19 +3922,28 @@ struct SferaScriptContainer {
     using ValueType = SferaDataContainerHeader::ValueType;
     using Binary = std::vector<std::uint8_t>;
     enum class Command : std::int32_t { Write = 0, Erase = 1, Read = 2, First = 3, Next = 4, IteratorState = 5, Clear = 9, Append = 10, Prepend = 11 };
-    template<class C> struct Content {
+    enum class Lifecycle : std::int32_t { Create = 1, Destroy, Kind, ValueType, KeyType };
+    template<class C, bool HashStorage = false> struct Content {
         using Value = typename C::value_type;
-        static constexpr bool Mapped = requires { typename C::mapped_type; };
+        static constexpr bool Hashed = HashStorage;
+        static constexpr bool Mapped = Hashed || requires { typename C::mapped_type; };
         static constexpr bool Indexed = !Mapped && requires(C& values) { values[0]; };
         static constexpr bool Unique = requires { typename C::key_type; };
         C values;
         std::conditional_t<Indexed, std::size_t, typename C::iterator> cursor{};
+        std::conditional_t<Hashed, std::vector<std::pair<typename C::iterator, typename C::iterator>>, std::monostate> buckets;
+        Content();
+        template<class K> std::size_t bucketIndex(const K& key) const requires Hashed;
+        template<class K> typename C::iterator find(const K& key) requires Hashed;
+        template<class K, class V> void assign(K&& key, V&& value) requires Hashed;
+        void erase(typename C::iterator position) requires Hashed;
+        void rehash(std::size_t count) requires Hashed;
     };
     SferaDataContainerHeader header;
     ValueType value_type;
     ValueType key_type;
-    std::variant<Content<std::list<std::int32_t>>, Content<std::list<float>>, Content<std::list<std::string>>, Content<std::list<Binary>>, Content<std::vector<std::int32_t>>, Content<std::vector<float>>, Content<std::vector<std::uint8_t>>, Content<std::vector<std::string>>, Content<std::vector<Binary>>, Content<std::set<std::int32_t>>, Content<std::set<std::string>>, Content<std::map<std::int32_t, std::int32_t>>, Content<std::map<std::int32_t, float>>, Content<std::map<std::int32_t, std::string>>, Content<std::map<std::int32_t, Binary>>, Content<std::map<std::string, std::int32_t>>, Content<std::map<std::string, float>>, Content<std::map<std::string, std::string>>, Content<std::map<std::string, Binary>>> content;
-    template<class C> SferaScriptContainer(Kind kind, ValueType type, std::in_place_type_t<C>, ValueType keyType) : header{SferaDataContainerHeader::Signature, kind, 0, {}}, value_type(type), key_type(keyType), content(std::in_place_type<Content<C>>) {}
+    std::variant<Content<std::list<std::int32_t>>, Content<std::list<float>>, Content<std::list<std::string>>, Content<std::list<Binary>>, Content<std::vector<std::int32_t>>, Content<std::vector<float>>, Content<std::vector<std::uint8_t>>, Content<std::vector<std::string>>, Content<std::vector<Binary>>, Content<std::set<std::int32_t>>, Content<std::set<std::string>>, Content<std::map<std::int32_t, std::int32_t>>, Content<std::map<std::int32_t, float>>, Content<std::map<std::int32_t, std::string>>, Content<std::map<std::int32_t, Binary>>, Content<std::map<std::string, std::int32_t>>, Content<std::map<std::string, float>>, Content<std::map<std::string, std::string>>, Content<std::map<std::string, Binary>>, Content<std::list<std::pair<const std::int32_t, std::int32_t>>, true>, Content<std::list<std::pair<const std::int32_t, float>>, true>, Content<std::list<std::pair<const std::int32_t, std::string>>, true>, Content<std::list<std::pair<const std::int32_t, Binary>>, true>, Content<std::list<std::pair<const std::string, std::int32_t>>, true>, Content<std::list<std::pair<const std::string, float>>, true>, Content<std::list<std::pair<const std::string, std::string>>, true>, Content<std::list<std::pair<const std::string, Binary>>, true>, Content<std::list<std::pair<const Binary, std::int32_t>>, true>, Content<std::list<std::pair<const Binary, float>>, true>, Content<std::list<std::pair<const Binary, std::string>>, true>, Content<std::list<std::pair<const Binary, Binary>>, true>> content;
+    template<class C, bool Hashed> SferaScriptContainer(Kind kind, ValueType type, std::in_place_type_t<Content<C, Hashed>>, ValueType keyType) : header{SferaDataContainerHeader::Signature, kind, 0, {}}, value_type(type), key_type(keyType), content(std::in_place_type<Content<C, Hashed>>) {}
     SferaScriptContainer(const SferaScriptContainer&) = delete;
     SferaScriptContainer& operator=(const SferaScriptContainer&) = delete;
     static SferaScriptContainer* create(Kind kind, ValueType type, ValueType keyType = ValueType::Integer);

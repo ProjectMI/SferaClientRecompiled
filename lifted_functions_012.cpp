@@ -609,9 +609,9 @@ __declspec(noinline) void sfera_sub_0047D040(LiftCpu* cpu, uint32_t stop_address
     cpu->esi = 1u;
     goto label_0007D070;
     label_0007D71A:
-    cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime.object[0];
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47D724u)); sfera_sub_0049B470(cpu, LIFT_CODE_TOKEN_VA(0x47D724u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47D729u)); sfera_sub_0049A730(cpu, LIFT_CODE_TOKEN_VA(0x47D729u));
+    cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime;
+    reinterpret_cast<SferaWarningLogRuntime*>(cpu->ecx)->flush();
+    g_sfera_profiler_runtime.writeReport();
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47D72Eu)); sfera_sub_004595F0(cpu, LIFT_CODE_TOKEN_VA(0x47D72Eu));
     lift_push32(cpu, cpu->ebx);
     lift_native_call(cpu, native_function_address32(&::exit), LIFT_CODE_TOKEN_RVA(0x7D72Fu));
@@ -625,7 +625,7 @@ __declspec(noinline) void sfera_sub_0047D040(LiftCpu* cpu, uint32_t stop_address
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x7D752u)); sfera_sub_004EE92A(cpu, LIFT_CODE_TOKEN_RVA(0x7D752u));
     label_0007D752:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47D757u)); sfera_sub_004595F0(cpu, LIFT_CODE_TOKEN_VA(0x47D757u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47D75Cu)); sfera_sub_0042EB70(cpu, LIFT_CODE_TOKEN_VA(0x47D75Cu));
+    g_sfera_file_runtime.endCrashReport();
     lift_push32(cpu, cpu->ebx);
     lift_native_call(cpu, native_function_address32(&::exit), LIFT_CODE_TOKEN_VA(0x47D75Du));
     cpu->eip = 0x47D763u; ::DebugBreak(); return;
@@ -731,7 +731,7 @@ __declspec(noinline) void sfera_sub_0047D770(LiftCpu* cpu, uint32_t stop_address
     (*(uint8_t*)(void*)&g_sfera_client_config_runtime.connect_type_enabled) = 0u;
     label_0007D8ED:
     lift_push32(cpu, cpu->ebx); lift_push32(cpu, cpu->ebp);
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x47D8F4u)); sfera_sub_0042E920(cpu, LIFT_CODE_TOKEN_VA(0x47D8F4u));
+    g_sfera_file_runtime.beginCrashReport();
     ::InitializeCriticalSection(&g_sfera_network_send_runtime.critical_section);
 
     ::InitializeCriticalSection(&g_sfera_window_runtime.timing_critical_section);

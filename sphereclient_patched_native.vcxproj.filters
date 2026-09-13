@@ -62,9 +62,6 @@
     <ClCompile Include="lifted_functions_024.cpp">
       <Filter>lifted</Filter>
     </ClCompile>
-    <ClCompile Include="lifted_functions_025.cpp">
-      <Filter>lifted</Filter>
-    </ClCompile>
     <ClCompile Include="semantic_classes.cpp">
       <Filter>semantic</Filter>
     </ClCompile>

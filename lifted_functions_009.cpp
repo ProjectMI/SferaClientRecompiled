@@ -2,8 +2,6 @@
 #include <cmath>
 namespace lifted {
 
-
-
 __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address) { bool sub_pred[1];
     cpu->esp -= 0x90u;
     lift_push32(cpu, cpu->esi); lift_push32(cpu, cpu->edi);
@@ -28,9 +26,9 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     label_00059648:
     lift_push32(cpu, cpu->ebx);
     cpu->ebx = 1u;
-    cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime.object[0];
+    cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime;
     g_sfera_view_motion_runtime.mode_value = cpu->ebx;
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45965Eu)); sfera_sub_0049B470(cpu, LIFT_CODE_TOKEN_VA(0x45965Eu));
+    reinterpret_cast<SferaWarningLogRuntime*>(cpu->ecx)->flush();
     if (static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(g_sfera_world_render_runtime.world_spatial_index)) == cpu->edi) goto label_00059695;
     cpu->edx = 0x44Bu;
     cpu->ecx = (uintptr_t)"..\\ShareClientSeverCode\\main.cpp";
@@ -50,8 +48,8 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     g_sfera_mbc_runtime->halt_all_requested = cpu->ebx;
     lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x596ABu)); sfera_sub_004496F0(cpu, LIFT_CODE_TOKEN_RVA(0x596ABu));
     label_000596AB:
-    cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime.object[0];
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x4596B5u)); sfera_sub_0049B470(cpu, LIFT_CODE_TOKEN_VA(0x4596B5u));
+    cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime;
+    reinterpret_cast<SferaWarningLogRuntime*>(cpu->ecx)->flush();
     g_sfera_sound_runtime.shutdown();
     if (g_sfera_input_device_runtime.shared_object == cpu->edi) goto label_000596F1;
     cpu->edx = 0x457u;
@@ -272,7 +270,7 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     if ((int32_t)cpu->eax <= (int32_t)cpu->edi) goto label_00059A54;
     cpu->edx = cpu->edi;
     cpu->ecx = cpu->esp + 0x1Cu;
-    lift_push32(cpu, LIFT_CODE_TOKEN_RVA(0x59A54u)); sfera_sub_0044C020(cpu, LIFT_CODE_TOKEN_RVA(0x59A54u));
+    g_sfera_files.keepTail(reinterpret_cast<const char*>(cpu->ecx), cpu->edx);
     label_00059A54:
     cpu->edi = 0u;
     label_00059A56:
@@ -290,8 +288,8 @@ __declspec(noinline) void sfera_sub_004595F0(LiftCpu* cpu, uint32_t stop_address
     lift_native_call(cpu, native_function_address32(&::_execl), LIFT_CODE_TOKEN_VA(0x459A89u));
     cpu->esp += 0x10u;
     label_00059A92:
-    cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime.object[0];
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x459A9Cu)); sfera_sub_0049B470(cpu, LIFT_CODE_TOKEN_VA(0x459A9Cu));
+    cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime;
+    reinterpret_cast<SferaWarningLogRuntime*>(cpu->ecx)->flush();
     ::DeleteCriticalSection(&g_sfera_network_send_runtime.critical_section);
 
     ::DeleteCriticalSection(&g_sfera_window_runtime.timing_critical_section);
@@ -357,8 +355,8 @@ __declspec(noinline) void sfera_sub_00459B10(LiftCpu* cpu, uint32_t stop_address
     ++cpu->edi;
     if ((cpu->ecx & 0xFFu)!=0u) goto label_00059B92;
     std::memmove((void*)cpu->edi,(void*)cpu->esi,cpu->eax); cpu->esi += cpu->eax; cpu->edi += cpu->eax;
-    cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime.object[0];
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x459BB2u)); sfera_sub_0049B470(cpu, LIFT_CODE_TOKEN_VA(0x459BB2u));
+    cpu->ecx = (uintptr_t)&g_sfera_warning_log_runtime;
+    reinterpret_cast<SferaWarningLogRuntime*>(cpu->ecx)->flush();
     cpu->eax = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(WorldDiagnostics::scriptContext()));
     if (cpu->eax == 0u) goto label_00059BFC;
     cpu->edi = (uintptr_t)&g_sfera_error_message_scratch_runtime.fatal_message[0];
@@ -480,7 +478,7 @@ __declspec(noinline) void sfera_sub_0045AFB0(LiftCpu* cpu, uint32_t stop_address
     goto label_0005AFD6;
     label_0005B042:
     lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45B047u)); sfera_sub_004595F0(cpu, LIFT_CODE_TOKEN_VA(0x45B047u));
-    lift_push32(cpu, LIFT_CODE_TOKEN_VA(0x45B04Cu)); sfera_sub_0042EB70(cpu, LIFT_CODE_TOKEN_VA(0x45B04Cu));
+    g_sfera_file_runtime.endCrashReport();
     lift_push32(cpu, 0u);
     lift_native_call(cpu, native_function_address32(&::exit), LIFT_CODE_TOKEN_RVA(0x5B04Eu));
     label_0005B054:
@@ -572,10 +570,6 @@ __declspec(noinline) void sfera_sub_0045BC60(LiftCpu* cpu, uint32_t stop_address
     cpu->esp += 0x10u;
     cpu->esp += 4u; cpu->eip = stop_address; return;
 }
-
-
-
-
 
 __declspec(noinline) void sfera_sub_004623C0(LiftCpu* cpu, uint32_t stop_address) {
     (void)stop_address;

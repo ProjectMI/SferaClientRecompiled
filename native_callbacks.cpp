@@ -28,7 +28,6 @@ constexpr std::size_t kPathBufferCapacity = 1024u;
 constexpr std::size_t kFileCrcBufferCapacity = 16384u;
 constexpr std::uint32_t kNetworkProbeIntervalSlices = 20u;
 constexpr DWORD kNetworkProbeIntervalSliceMs = 200u;
-constexpr std::uint32_t kCrc32Polynomial = 0xEDB88320u;
 constexpr WPARAM kSystemCommandMask = 0xFFF0u;
 constexpr DWORD kMsvcCppExceptionCode = 0xE06D7363u;
 constexpr ULONG_PTR kMsvcCppExceptionMagic19930520 = 0x19930520u;
@@ -476,7 +475,7 @@ LONG WINAPI sfera_unhandled_exception_filter(EXCEPTION_POINTERS* exception) noex
     if (file == INVALID_HANDLE_VALUE) {
         return EXCEPTION_EXECUTE_HANDLER;
     }
-    g_sfera_crash_report_runtime.error_log_handle = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(file));
+    g_sfera_crash_report_runtime.error_log_handle = file;
     char line[1024]{};
     const DWORD code = exception && exception->ExceptionRecord ? exception->ExceptionRecord->ExceptionCode : 0u;
     const void* address = exception && exception->ExceptionRecord ? exception->ExceptionRecord->ExceptionAddress : nullptr;
@@ -490,7 +489,7 @@ LONG WINAPI sfera_unhandled_exception_filter(EXCEPTION_POINTERS* exception) noex
     if (exception && exception->ContextRecord) {
     }
     ::CloseHandle(file);
-    g_sfera_crash_report_runtime.error_log_handle = 0u;
+    g_sfera_crash_report_runtime.error_log_handle = nullptr;
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -830,130 +829,11 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
     return 0u;
 }
 
-static std::uint32_t crc_update(const std::uint32_t* table, std::uint32_t crc, const void* data, std::size_t size) noexcept {
-    const auto* bytes = static_cast<const std::uint8_t*>(data);
-    for (std::size_t index = 0u; index < size; ++index) {
-        crc = (crc >> 8u) ^ table[static_cast<std::uint8_t>(crc ^ bytes[index])];
-    }
-    return crc;
-}
-
-static bool has_mdl_extension(const char* path) noexcept {
-    const std::size_t length = path ? std::strlen(path) : 0u;
-    return length > 4u && path[length - 4u] == '.' && std::tolower(static_cast<unsigned char>(path[length - 3u])) == 'm' && std::tolower(static_cast<unsigned char>(path[length - 2u])) == 'd' && std::tolower(static_cast<unsigned char>(path[length - 1u])) == 'l';
-}
-
-static std::uint32_t crc_file_prefix(const std::uint32_t* table, const char* path, std::uint32_t limit) noexcept {
-    FILE* file = open_file(path, "rb");
-    if (!file) {
-        return 0u;
-    }
-    std::vector<std::uint8_t> bytes(limit);
-    const std::size_t read = std::fread(bytes.data(), 1u, bytes.size(), file);
-    std::fclose(file);
-    return crc_update(table, 0u, bytes.data(), read);
-}
-
-static bool check_files_stop_requested(const SferaCheckFilesContext& context) noexcept {
-    return context.stop_requested > 0;
-}
-
-static void collect_check_files(SferaCheckFilesContext& context, const char* prefix, const char* mask, std::vector<CheckFileRecord>& files, std::uint32_t& throttle_count) {
-    if (check_files_stop_requested(context) || !mask || !*mask) {
-        return;
-    }
-    std::string search = prefix ? prefix : "";
-    search += mask;
-    _finddata64i32_t data{};
-    const intptr_t handle = _findfirst64i32(search.c_str(), &data);
-    if (handle == -1) {
-        return;
-    }
-    do {
-        if ((data.attrib & _A_SUBDIR) != 0u || _stricmp(data.name, "filelist.dat") == 0) {
-            continue;
-        }
-        std::string path = prefix ? prefix : "";
-        path += data.name;
-        CheckFileRecord record{};
-        record.name = data.name;
-        record.size = static_cast<std::uint32_t>(data.size);
-        record.crc = crc_file_prefix(context.crc_table, path.c_str(), has_mdl_extension(path.c_str()) ? 1024u : 65536u);
-        files.push_back(std::move(record));
-        if (context.throttle > 0 && ++throttle_count >= static_cast<std::uint32_t>(context.throttle)) {
-            ::Sleep(1000u);
-            throttle_count = 0u;
-        }
-    } while (!check_files_stop_requested(context) && _findnext64i32(handle, &data) == 0);
-    _findclose(handle);
-}
-
-static std::uint32_t calculate_check_record_crc(SferaCheckFilesContext& context, SferaCheckFileSpec& spec) {
-    std::vector<CheckFileRecord> files;
-    std::uint32_t throttle_count = 0u;
-    if (std::strncmp(spec.directory, "xupdate", 7u) == 0) {
-        spec.directory[0] = '\0';
-        collect_check_files(context, spec.directory, "sphere.exe", files, throttle_count);
-        collect_check_files(context, spec.directory, "sphereclient.exe", files, throttle_count);
-    } else {
-        const char* begin = spec.masks;
-        while (*begin && !check_files_stop_requested(context)) {
-            const char* separator = std::strchr(begin, ';');
-            const std::string mask(begin, separator ? static_cast<std::size_t>(separator - begin) : std::strlen(begin));
-            collect_check_files(context, spec.directory, mask.c_str(), files, throttle_count);
-            if (!separator) {
-                break;
-            }
-            begin = separator + 1;
-        }
-    }
-    std::sort(files.begin(), files.end(), [](const CheckFileRecord& left, const CheckFileRecord& right) {
-        return _stricmp(left.name.c_str(), right.name.c_str()) < 0;
-    });
-    std::uint32_t crc = 0u;
-    for (const CheckFileRecord& file : files) {
-        std::string lower = file.name;
-        std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char ch) {
-            return static_cast<char>(std::tolower(ch));
-        });
-        crc = crc_update(context.crc_table, crc, lower.c_str(), lower.size() + 1u);
-        crc = crc_update(context.crc_table, crc, &file.crc, sizeof(file.crc));
-        crc = crc_update(context.crc_table, crc, &file.size, sizeof(file.size));
-        if (check_files_stop_requested(context)) {
-            break;
-        }
-    }
-    context.result_crc = crc;
-    return crc;
-}
-
 DWORD WINAPI sfera_check_files_thread(void* parameter) noexcept {
     auto* context = static_cast<SferaCheckFilesContext*>(parameter);
-    if (!context || context->record_count <= 0) {
-        return 0u;
-    }
-    try {
-        const std::size_t count = std::min<std::size_t>(static_cast<std::size_t>(context->record_count), kCheckFileRecordCount);
-        for (std::size_t index = 0u; index < count && !check_files_stop_requested(*context); ++index) {
-            context->records[index].crc = calculate_check_record_crc(*context, context->records[index]);
-            if (!context->running) {
-                break;
-            }
-        }
-    } catch (...) {
-        context->running = 0u;
-    }
+    if (context == nullptr) return 0u;
+    try { context->run(); } catch (...) { context->running = false; }
     return 0u;
-}
-
-static void initialize_update_crc_table() noexcept {
-    for (std::uint32_t index = 0u; index < 256u; ++index) {
-        std::uint32_t value = index;
-        for (unsigned bit = 0u; bit < 8u; ++bit) {
-            value = (value & 1u) != 0u ? (value >> 1u) ^ kCrc32Polynomial : value >> 1u;
-        }
-        g_sfera_crc32_runtime.table[index] = value;
-    }
 }
 
 static std::uint32_t update_file_crc(FILE* file, std::uint32_t size) noexcept {
@@ -970,7 +850,7 @@ static std::uint32_t update_file_crc(FILE* file, std::uint32_t size) noexcept {
         if (count == 0u) {
             break;
         }
-        crc = crc_update(g_sfera_crc32_runtime.table, crc, buffer.data(), count);
+        crc = g_sfera_crc32_runtime.calculate(buffer.data(), count, crc);
         remaining -= static_cast<std::uint32_t>(count);
     }
     g_sfera_crc32_runtime.current = crc;
@@ -1001,7 +881,7 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
         context->state = state;
         context->completed = 1u;
     };
-    initialize_update_crc_table();
+    g_sfera_crc32_runtime.initialize();
     __time64_t activity = _time64(nullptr);
     std::uint32_t expected_crc = 0u;
     std::uint32_t expected_size = 0u;

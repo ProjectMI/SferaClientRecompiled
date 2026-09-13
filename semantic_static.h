@@ -19,9 +19,6 @@ struct IDirect3DBaseTexture9;
 namespace SphereUI { struct UiSprite; }
 struct SferaDirectPlayClientNative;
 
-
-
-
 namespace {
 
 const uint32_t kDynamicIndexScratchCount = 3000;
@@ -39,8 +36,6 @@ const uint32_t kStackReserve = 0x00100000;
 }
 
 const char* sfera_cursor_texture_name(uint32_t slot);
-
-inline uint32_t g_sfera_log_first_write = 1u;
 
 struct SferaItemArray {
     void** block_vector_begin;
@@ -195,31 +190,23 @@ struct SferaLightRuntime {
     void write(std::int32_t handle, const SferaEffectVec3F& position, const float* color, float radius);
     void release(std::int32_t handle);
 };
-struct SferaAutoBoundsArray {
-    uint32_t data;
-    uint32_t capacity;
-    uint32_t maximum;
-    uint32_t growth;
-    uint32_t element_size;
-    char debug_file[32];
-    uint32_t debug_line;
-};
+
 struct SferaLandscapeRuntime {
     SferaBoundCheckArray<TerrainRegion> file_records;
 };
 struct SferaCollisionRuntime {
     SferaBoundCheckArray<float> candidate_handles;
     SferaBoundCheckArray<std::uint32_t> near_result_handles;
-    SferaAutoBoundsArray contact_objects;
+
 };
 struct SferaSceneArrayRuntime {
-    SferaBoundCheckArray<std::byte> cloud_records;
-    SferaBoundCheckArray<std::byte> render_pass_slots;
+
+    SferaBoundCheckArray<std::uint32_t> render_pass_slots;
     SferaBoundCheckArray<SferaVec3F> clip_vectors;
     SferaBoundCheckArray<SferaVec3F> scene_points;
     SferaBoundCheckArray<SphereRender::SceneSortEntry> object_positions;
     SferaBoundCheckArray<SferaMatrix4x4F> model_matrices;
-    SferaBoundCheckArray<std::byte> world_cell_records;
+
     SferaBoundCheckArray<const TerrainCell*> object_sort_keys;
     SferaBoundCheckArray<float> object_draw_indices;
     SferaBoundCheckArray<std::uint32_t*> object_visibility_indices;
@@ -296,9 +283,7 @@ SferaNatureManager* sfera_nature_manager();
 void sfera_initialize_nature_manager();
 void sfera_shutdown_nature_manager();
 
-struct SferaWarningLogRuntime {
-    uint8_t object[0x5320];
-};
+
 struct SferaControlOptionsRuntime {
     uint32_t active_slot;
     uint32_t configured_bindings[64];
@@ -312,19 +297,8 @@ struct SferaCrashRuntime {
     uint8_t report_pending;
 };
 using SferaDynGreenRuntime = SferaU64Words;
-struct SferaExecutionMonitorRuntime {
-    uint32_t thread_handle;
-    uint8_t reserved_04[8];
-    uint16_t stop_requested;
-    char log_path[0x36];
-    CRITICAL_SECTION critical_section;
-    uint32_t current_value_a;
-    uint32_t current_value_b;
-};
-struct SferaErrorLogRuntime {
-    union { uint8_t object[24]; IOutputDevice* outputs[2]; };
-    uint8_t index_table[0x80];
-};
+
+
 struct SferaFrameRuntime {
     float fps;
     uint32_t fps_sample_count;
@@ -348,6 +322,7 @@ struct SferaHighResolutionClockRuntime {
     SferaU64Words counter_anchor;
 };
 struct SferaProfilerRuntime {
+    void writeReport();
     void begin(std::size_t index);
     void end(std::size_t index);
     SferaU64Words accumulated_ticks[kProfileSlotCount];
@@ -359,10 +334,7 @@ struct SferaProfilerRuntime {
     SferaU64Words report_clock_snapshot;
     uint32_t report_percent[10];
 };
-struct SferaCrc32Runtime {
-    uint32_t table[256];
-    uint32_t current;
-};
+
 struct SferaAsciiLowerRuntime {
     uint8_t table[256];
 };
@@ -481,8 +453,6 @@ struct SferaMainUiStateRuntime {
     bool effectVisible(const IEffect& effect, const SferaEffectVec3F& position) const;
 };
 
-
-
 struct SferaClientConfigRuntime {
     uint8_t reserved_008;
     uint8_t flag_01;
@@ -520,16 +490,6 @@ struct SferaClientConfigRuntime {
     uint32_t state_27;
     uint8_t reserved_098[8];
     uint32_t state_28;
-    uint32_t state_29;
-    uint32_t text_length_01;
-    char text_01[0x10];
-    uint8_t reserved_0bc[0x10];
-    uint32_t text_capacity_01;
-    uint32_t state_30;
-    uint32_t text_length_02;
-    char text_02[0x10];
-    uint8_t reserved_0f4[0x10];
-    uint32_t text_capacity_02;
     uint32_t auto_grass_object;
 };
 
@@ -581,7 +541,7 @@ struct SferaInterScalarRuntime {
     uint32_t mode_03;
     uint32_t state_04;
     uint32_t mode_04;
-    uint32_t state_05;
+    SferaCheckFilesContext* file_checker;
     uint32_t state_06;
     uint32_t state_07;
 };
@@ -609,16 +569,8 @@ struct SferaBrowserWindowRuntime {
     uint8_t reserved_01[3];
     WNDPROC original_window_proc;
 };
-struct SferaCrashReportRuntime {
-    char report_text[0x2000];
-    uint32_t report_length;
-    uint32_t reserved_2004;
-    char error_log_path[0x104];
-    uint32_t previous_exception_filter;
-    uint32_t process_handle;
-    uint32_t error_log_handle;
-};
-struct SferaFileRuntime { std::uint32_t crash_report_instance; };
+
+
 union SferaFloatWord {
     float f32;
     uint32_t u32;
@@ -730,8 +682,8 @@ struct SferaOptionsDialogRuntime {
     uint32_t comparison_graphics_value;
     uint32_t widget_keys_initialized;
     uint32_t reflection_quality;
-    union { struct { SferaVector32 chat_list_fonts; uint32_t reserved_18c; }; SphereUI::UiIndexVector saved_chat_fonts; };
-    union { struct { SferaVector32 chat_edit_fonts; uint32_t reserved_19c; }; SphereUI::UiIndexVector edited_chat_fonts; };
+    SphereUI::UiIndexVector saved_chat_fonts;
+    SphereUI::UiIndexVector edited_chat_fonts;
 };
 struct SferaWindowRuntime {
     uint32_t reserved_004;
@@ -948,14 +900,7 @@ struct SferaWorldSlotTableRuntime {
     SferaWorldSlotRecord slots[401];
     uint32_t active_limit;
 };
-struct SferaConfigTextRuntime {
-    static constexpr std::size_t text_capacity = 2458176u;
-    union { uint8_t owned_text[text_capacity]; char text_storage[text_capacity]; };
-    union { uint32_t current_text; char* text_buffer; };
-    uint32_t text_length;
-    char format_scratch[512];
-    char parser_path[1024];
-};
+
 struct SferaStaticRenderLookupRuntime {
     float normalized_levels[7];
     float command_samples[kRenderSampleCount];
@@ -1007,23 +952,7 @@ struct SferaAlphaMaterialRuntime {
     uint8_t reserved_07;
     float alpha[4];
 };
-struct SferaClientArrayRuntime {
-    SferaAutoBoundsArray e7_records;
-    SferaAutoBoundsArray e8_indices;
-    SferaAutoBoundsArray e9_indices;
-    SferaAutoBoundsArray eb_records;
-    SferaAutoBoundsArray ed_indices;
-    SferaAutoBoundsArray line_102_indices;
-    SferaAutoBoundsArray line_105_records;
-    SferaAutoBoundsArray line_6b1_indices;
-    SferaAutoBoundsArray line_6b3_indices;
-    SferaAutoBoundsArray line_6b4_indices;
-    SferaAutoBoundsArray line_6b5_records;
-    SferaBoundCheckArray<std::byte> line_124d_records;
-    SferaBoundCheckArray<std::byte> line_24de_records;
-    SferaBoundCheckArray<std::byte> line_24e0_records;
-    SferaBoundCheckArray<std::byte> line_24e2_records;
-};
+
 struct SferaRecoveredStaticRuntime {
     uint32_t network_bytes_sent_snapshot;
     uint32_t network_bytes_retried_snapshot;
@@ -1035,7 +964,7 @@ struct SferaRecoveredStaticRuntime {
     uint32_t server_number;
     uint32_t loadcount_guard;
     SferaVec3Word mbc_vector_scratch;
-    uint8_t mbc_service_object[0x4010];
+    SferaDebugScriptArrays debug_script_arrays;
     float inverse_40;
     SferaBoundCheckArray<std::uint32_t> legacy_light_arrays[3];
     uint32_t view_transition_counter;
@@ -1069,10 +998,10 @@ struct SferaRecoveredStaticRuntime {
     uint32_t interaction_input_flags;
     float animation_phase;
     uint32_t animation_result_b;
-    SferaAutoBoundsArray primary_auto_array;
+
     SferaVec3Word flare_clip_vector;
-    SferaAutoBoundsArray secondary_auto_array;
-    SferaAutoBoundsArray tertiary_auto_array;
+
+
     uint32_t ui_counter_a;
     uint32_t ui_counter_b;
 };
@@ -1207,7 +1136,7 @@ inline SferaStaticRenderLookupRuntime g_sfera_static_render_lookup_runtime;
 inline SferaMbcStaticRuntime g_sfera_mbc_static_runtime;
 inline SferaMapGeneratorRuntime g_sfera_map_generator_runtime;
 inline SferaAlphaMaterialRuntime g_sfera_alpha_material_runtime;
-inline SferaClientArrayRuntime g_sfera_client_array_runtime;
+
 inline SferaSpatialIndexRuntime g_sfera_spatial_index_runtime;
 inline SferaStartupCommandLineRuntime g_sfera_startup_command_line_runtime;
 inline SferaCollisionScratchRuntime g_sfera_collision_scratch_runtime;
