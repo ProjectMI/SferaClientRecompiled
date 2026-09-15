@@ -16,58 +16,6 @@ using SferaDirectPlayMessageHandler = HRESULT (WINAPI*)(void* context, DWORD mes
 struct SferaDpnBufferDescRuntime;
 class CSoundStream;
 
-inline constexpr std::size_t kTcpReceiveBufferCapacity = 60000u;
-
-inline constexpr std::size_t kUpdateRequestCapacity = 512u;
-
-enum class TcpMessage : std::uint16_t {
-    connection_limit = 100u,
-    handshake = 200u,
-    payload = 300u,
-    client_mode = 400u,
-    keepalive = 500u,
-    sequence_reset = 600u,
-    packet_counter = 700u
-};
-
-enum class UpdateDownloadState : std::uint32_t {
-    idle = 0u,
-    send_request = 1u,
-    receive_metadata = 2u,
-    send_resume = 3u,
-    receive_file = 4u,
-    failed = 5u,
-    acknowledge = 6u
-};
-
-
-struct SferaTcpConnectionContext {
-    std::uint8_t receive_buffer[kTcpReceiveBufferCapacity];
-    std::uint32_t receive_size;
-    std::uint32_t reserved_after_receive_size;
-    SOCKET socket;
-    std::uint32_t remote_id;
-    std::uint8_t reserved_connection[24];
-    std::uint8_t stop_requested;
-    std::uint8_t reserved_stop[3];
-    std::uint32_t received_bytes_window;
-    std::uint32_t sent_bytes_window;
-    std::uint32_t sent_bytes_per_second;
-    std::uint32_t received_bytes_per_second;
-    std::uint8_t* send_buffer;
-    std::uint32_t send_size;
-    std::uint8_t initialized;
-    std::uint8_t connected;
-    std::uint8_t reserved_flags[2];
-    std::uint32_t round_trip_ms;
-    DWORD keepalive_started_at;
-    std::uint8_t keepalive_answered;
-    std::uint8_t reserved_keepalive;
-    std::uint16_t sequence;
-    std::uint16_t checksum_seed;
-    std::uint16_t reserved_checksum;
-    std::uint32_t packet_counter;
-};
 
 #pragma pack(push, 1)
 struct SferaTcpIncomingHeader {
@@ -81,12 +29,6 @@ struct SferaTcpHandshakePacket {
     std::uint16_t checksum_seed;
 };
 
-struct SferaTcpOutgoingHeader {
-    std::uint16_t size;
-    std::uint16_t checksum;
-    std::uint16_t sequence;
-    std::uint16_t message;
-};
 #pragma pack(pop)
 
 struct SferaDirectPlayReceivePayload {
@@ -127,18 +69,7 @@ struct SferaUpdateSidecar {
 };
 #pragma pack(pop)
 
-struct SferaUpdateDownloadContext {
-    std::uint8_t stop_requested;
-    std::uint8_t completed;
-    std::uint8_t reserved_header[286];
-    SOCKET socket;
-    std::uint8_t reserved_connection[784];
-    UpdateDownloadState state;
-    char request[kUpdateRequestCapacity];
-    std::uint32_t expected_size;
-    std::uint32_t resume_offset;
-    FILE* output;
-};
+
 
 
 class SferaBrowserHost final : public IOleClientSite, public IOleInPlaceSite, public IOleInPlaceFrame, public IDocHostUIHandler {

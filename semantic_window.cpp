@@ -1427,51 +1427,6 @@ namespace {
 
 
 
-    SferaMbcNamedVectorRecord* findNamedUiValues(const char* name) {
-        if (name == nullptr || g_sfera_mbc_runtime == nullptr) return nullptr;
-        for (std::uint32_t index = 0u; index < g_sfera_mbc_runtime->named_vector_count; ++index) {
-            auto& record = g_sfera_mbc_runtime->named_vectors[index];
-            g_sfera_mbc_runtime->current_named_vector = &record;
-            if (const auto* existing = record.name_text; existing != nullptr && std::strcmp(existing, name) == 0) return &record;
-        }
-        g_sfera_mbc_runtime->current_named_vector = g_sfera_mbc_runtime->named_vectors + g_sfera_mbc_runtime->named_vector_count;
-        return nullptr;
-    }
-
-    std::uint32_t namedValue(const char* name, std::int32_t index = 0) {
-        auto* record = findNamedUiValues(name);
-        if (record == nullptr) return 0u;
-        if (index < 0) return record->size;
-        return static_cast<std::uint32_t>(index) < record->size ? record->value_data[index] : 0u;
-    }
-
-    void setNamedValue(const char* name, std::uint32_t value, std::int32_t index = 0) {
-        if (name == nullptr || g_sfera_mbc_runtime == nullptr || index < 0) return;
-        auto* record = findNamedUiValues(name);
-        if (record == nullptr) {
-            if (g_sfera_mbc_runtime->named_vector_count >= std::size(g_sfera_mbc_runtime->named_vectors)) return;
-            const auto length = std::strlen(name) + 1u;
-            auto* stored_name = static_cast<char*>(SphereUI::Runtime::allocate(length));
-            if (stored_name == nullptr) throw std::bad_alloc();
-            std::memcpy(stored_name, name, length);
-            record = &g_sfera_mbc_runtime->named_vectors[g_sfera_mbc_runtime->named_vector_count++];
-            *record = {};
-            record->name_text = stored_name;
-            g_sfera_mbc_runtime->current_named_vector = record;
-        }
-        const auto required = index + 1u;
-        if (required > record->size) {
-            if (required > std::numeric_limits<std::uint32_t>::max() / sizeof(std::uint32_t)) throw std::length_error("named UI values exceed array capacity");
-            auto* values = static_cast<std::uint32_t*>(SphereUI::Runtime::allocate(required * sizeof(std::uint32_t)));
-            if (values == nullptr) throw std::bad_alloc();
-            if (record->size != 0u) std::memcpy(values, record->value_data, record->size * sizeof(std::uint32_t));
-            SphereUI::Runtime::deallocate(record->value_data);
-            record->value_data = values;
-            record->size = required;
-        }
-        record->value_data[index] = value;
-    }
-
     std::uint32_t soundVolume() {
         const auto* manager = g_sfera_sound_runtime.sound_manager;
         return manager == nullptr ? 0u : static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(manager->volume * 100.0)));
@@ -2088,7 +2043,7 @@ namespace {
     }
 
     std::uint32_t bindingCount() {
-        return namedValue("SSKS_NUMBER");
+        return g_sfera_mbc_runtime->namedValue("SSKS_NUMBER");
     }
 
     const char* bindingName(std::uint32_t key) {
@@ -2123,10 +2078,10 @@ namespace {
         if (show) {
             std::fill(std::begin(state.configured_bindings), std::end(state.configured_bindings), 0u);
             for (std::uint32_t slot = 0u; slot < std::max(5u, count); ++slot) {
-                const auto key = namedValue("SSKS", slot);
+                const auto key = g_sfera_mbc_runtime->namedValue("SSKS", slot);
                 state.configured_bindings[slot] = slot < 5u ? uiVirtualKey(key) : key;
             }
-            state.configured_bindings[63] = namedValue("INMS");
+            state.configured_bindings[63] = g_sfera_mbc_runtime->namedValue("INMS");
             std::copy(std::begin(state.configured_bindings), std::end(state.configured_bindings), std::begin(state.working_bindings));
             optionLabel(window, 4u, state.configured_bindings[63] == 0u ? "UISTR_WT_OPT23" : "UISTR_WT_OPT24");
             for (std::uint32_t slot = 0u; slot < count; ++slot) {
@@ -2139,8 +2094,8 @@ namespace {
             return;
         }
         setOptionsVisible(true);
-        setNamedValue("INMS", state.configured_bindings[63]);
-        for (std::uint32_t slot = 0u; slot < std::max(5u, count); ++slot) setNamedValue("SSKS", slot < 5u ? uiScanCode(state.configured_bindings[slot]) : state.configured_bindings[slot], slot);
+        g_sfera_mbc_runtime->setNamedValue("INMS", state.configured_bindings[63]);
+        for (std::uint32_t slot = 0u; slot < std::max(5u, count); ++slot) g_sfera_mbc_runtime->setNamedValue("SSKS", slot < 5u ? uiScanCode(state.configured_bindings[slot]) : state.configured_bindings[slot], slot);
         queueInterfaceRefresh();
         g_sfera_options_dialog_runtime.widget_keys_initialized = 0u;
     }
@@ -2152,7 +2107,7 @@ namespace {
         if (window == nullptr) return;
         auto& state = g_sfera_graphics_options_runtime;
         if (show) {
-            for (std::uint32_t index = 0u; index < 5u; ++index) state.saved_interface_values[index] = index == 2u ? g_sfera_interface_runtime.sounds_enabled : namedValue(interfaceSettingKeys[index]);
+            for (std::uint32_t index = 0u; index < 5u; ++index) state.saved_interface_values[index] = index == 2u ? g_sfera_interface_runtime.sounds_enabled : g_sfera_mbc_runtime->namedValue(interfaceSettingKeys[index]);
             InterfaceConfiguration::open("config.cfg");
             InterfaceConfiguration::readInteger("MBST", state.saved_interface_values[5]);
             state.saved_interface_values[6] = missingConfigValue;
@@ -2169,7 +2124,7 @@ namespace {
             return;
         }
         setOptionsVisible(true);
-        for (std::uint32_t index = 0u; index < std::size(interfaceSettingKeys); ++index) setNamedValue(interfaceSettingKeys[index], state.saved_interface_values[index]);
+        for (std::uint32_t index = 0u; index < std::size(interfaceSettingKeys); ++index) g_sfera_mbc_runtime->setNamedValue(interfaceSettingKeys[index], state.saved_interface_values[index]);
         g_sfera_interface_runtime.description_auto_popup = state.saved_interface_values[7];
         g_sfera_interface_runtime.invite_messages = state.saved_interface_values[8];
         InterfaceConfiguration::open("config.cfg");
@@ -2272,7 +2227,7 @@ namespace {
     }
 
     void setupFogOptions(Window* window) {
-        const auto automatic = g_sfera_client_config_runtime.state_25 != 0u;
+        const auto automatic = g_sfera_client_config_runtime.auto_fog != 0u;
         optionToggleLabel(window, 37u, automatic);
         optionSelection(window, 39u, 1u, automatic);
         optionMessage(window, 28u, UiMessage::setScrollRange, 0u, automatic ? 0u : 170u);
@@ -2291,8 +2246,8 @@ namespace {
             g_sfera_sphere_options_runtime.saved_fog_distance.f32 = graphics.fog_distance;
             g_sfera_sphere_options_runtime.saved_lod_distance.f32 = g_sfera_input_device_runtime.lod_distance.f32;
             g_sfera_sphere_options_runtime.saved_lods_enabled = graphics.lods_enabled;
-            values[9] = g_sfera_client_config_runtime.state_25;
-            values[8] = g_sfera_client_config_runtime.state_26;
+            values[9] = g_sfera_client_config_runtime.auto_fog;
+            values[8] = g_sfera_client_config_runtime.effects_enabled;
             g_sfera_graphics_options_runtime.graphics_page = state.reflection_quality;
             constexpr const char* label_keys[] = {"UISTR_WT_OPT21", "UISTR_WT_OPT20", "UISTR_WT_OPT19", "UISTR_WT_OPT18", "UISTR_WT_OPT17", "UISTR_WT_OPT17", "UISTR_WT_OPT16"};
             for (std::uint32_t index = 0u; index < std::size(label_keys); ++index) detail::copyText(g_sfera_sphere_options_runtime.option_labels[index], g_sfera_interface.localizedText(label_keys[index]));
@@ -2316,8 +2271,8 @@ namespace {
             optionSelection(window, 17u, 4u, values[2]);
             optionSelection(window, 18u, 2u, values[3]);
             optionMessage(window, 26u, UiMessage::setSpinRange, 0u, 1u);
-            optionToggleLabel(window, 31u, g_sfera_client_config_runtime.state_26 == 0u);
-            optionMessage(window, 26u, UiMessage::setSpinValue, g_sfera_client_config_runtime.state_26 == 0u);
+            optionToggleLabel(window, 31u, g_sfera_client_config_runtime.effects_enabled == 0u);
+            optionMessage(window, 26u, UiMessage::setSpinValue, g_sfera_client_config_runtime.effects_enabled == 0u);
             setupLodOptions(window);
             setOptionsModeLabel(window, values[5]);
             optionText(window, 9u, g_sfera_sphere_options_runtime.option_labels[values[2]]);
@@ -2344,14 +2299,14 @@ namespace {
         const auto mode = g_sfera_graphics_runtime.d3d_runtime->display_modes.at(values[5]);
         const std::pair<const char*, std::uint32_t> settings[] = { {
             "XRES", mode.width
-        }, {"YRES", mode.height}, {"DEPTH", mode.depth}, {"GRASS", values[3]}, {"WINDOWED", values[4]}, {"SHAD", values[2]}, {"AUTOFOG", g_sfera_client_config_runtime.state_25}, {"FOGDIST", static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(graphics.fog_distance)))}, {"REFLQUAL", state.reflection_quality}, {"EFFECTS", g_sfera_client_config_runtime.state_26}, {"LODS", graphics.lods_enabled}, {"LOD_DISTANCE", static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(g_sfera_input_device_runtime.minimum_lod_distance.f32)))}, {"MIN_LOD_DIST", static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(g_sfera_input_device_runtime.lod_distance.f32)))}, {"POSTEFFECTS", values[6]}};
+        }, {"YRES", mode.height}, {"DEPTH", mode.depth}, {"GRASS", values[3]}, {"WINDOWED", values[4]}, {"SHAD", values[2]}, {"AUTOFOG", g_sfera_client_config_runtime.auto_fog}, {"FOGDIST", static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(graphics.fog_distance)))}, {"REFLQUAL", state.reflection_quality}, {"EFFECTS", g_sfera_client_config_runtime.effects_enabled}, {"LODS", graphics.lods_enabled}, {"LOD_DISTANCE", static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(g_sfera_input_device_runtime.minimum_lod_distance.f32)))}, {"MIN_LOD_DIST", static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(g_sfera_input_device_runtime.lod_distance.f32)))}, {"POSTEFFECTS", values[6]}};
         for (const auto& setting : settings) InterfaceConfiguration::writeInteger(setting.first, setting.second);
-        g_sfera_effect_manager.effects_enabled = g_sfera_client_config_runtime.state_26;
+        g_sfera_effect_manager.effects_enabled = g_sfera_client_config_runtime.effects_enabled;
         InterfaceConfiguration::save();
         if (values[10] != values[0] || values[11] != values[1] || state.comparison_graphics_value != values[4]) {
             detail::copyText(g_sfera_process_runtime.executable_path, "sphere.exe");
             g_sfera_relaunch_runtime.argument[0] = '\0';
-            g_sfera_render_lookup_runtime.initialized = 1u;
+            g_sfera_render_lookup_runtime.quit_requested = 1u;
         }
     }
 
@@ -2465,12 +2420,12 @@ namespace {
         for (std::uint32_t index = 0u; index < std::size(interfaceControlIds); ++index) if (event.control_id == interfaceControlIds[index]) {
             auto& value = state.interface_values[index];
             value = value == 0u;
-            if (index == 0u) setNamedValue(interfaceSettingKeys[index], value);
+            if (index == 0u) g_sfera_mbc_runtime->setNamedValue(interfaceSettingKeys[index], value);
             if (index == 3u) g_sfera_interface_runtime.cross_enabled = value;
             optionToggleLabel(window, interfaceControlIds[index], value);
             if (index == 2u) g_sfera_interface_runtime.sounds_enabled = value;
             else if (index != 3u) {
-                if (index != 0u && index < std::size(interfaceSettingKeys)) setNamedValue(interfaceSettingKeys[index], value);
+                if (index != 0u && index < std::size(interfaceSettingKeys)) g_sfera_mbc_runtime->setNamedValue(interfaceSettingKeys[index], value);
                 queueInterfaceRefresh();
             }
             return;
@@ -2495,8 +2450,8 @@ namespace {
                 setGraphicsOptionsVisible(false);
                 graphics.fog_distance = g_sfera_sphere_options_runtime.saved_fog_distance.f32;
                 g_sfera_input_device_runtime.lod_distance.f32 = g_sfera_sphere_options_runtime.saved_lod_distance.f32;
-                g_sfera_client_config_runtime.state_25 = values[9];
-                g_sfera_client_config_runtime.state_26 = values[8];
+                g_sfera_client_config_runtime.auto_fog = values[9];
+                g_sfera_client_config_runtime.effects_enabled = values[8];
                 graphics.lods_enabled = g_sfera_sphere_options_runtime.saved_lods_enabled;
                 state.reflection_quality = g_sfera_graphics_options_runtime.graphics_page;
             }
@@ -2525,7 +2480,7 @@ namespace {
                 optionText(window, 22u, g_sfera_sphere_options_runtime.option_labels[4u - event.first]);
                 break;
             case 26u:
-                g_sfera_client_config_runtime.state_26 = event.first == 0u;
+                g_sfera_client_config_runtime.effects_enabled = event.first == 0u;
                 optionText(window, 31u, event.first < 2u ? "" : graphicsBooleanLabel(event.first));
                 break;
             case 34u:
@@ -2550,7 +2505,7 @@ namespace {
                         graphics.fog_distance = graphics.saved_fog_distance;
                         optionMessage(window, 28u, UiMessage::setScrollValue, static_cast<std::uint32_t>(static_cast<std::int64_t>(std::trunc(graphics.fog_distance - 30.0))));
                     }
-                    g_sfera_client_config_runtime.state_25 = automatic;
+                    g_sfera_client_config_runtime.auto_fog = automatic;
                     break;
                 }
             case 43u:
@@ -2601,7 +2556,7 @@ void SphereUI::Runtime::invokeEventHandler(WindowEventHandler handler, Window* w
             if (event.message == UiMessage::close && beginOptionsDialog("authors", handler, false) != nullptr) setOptionsVisible(true);
             return;
         case WindowEventHandler::quit:
-            if (event.message == UiMessage::leftClick && event.control_id == 1u) g_sfera_render_lookup_runtime.initialized = 1u;
+            if (event.message == UiMessage::leftClick && event.control_id == 1u) g_sfera_render_lookup_runtime.quit_requested = 1u;
             else if (event.message == UiMessage::close && beginOptionsDialog("quit", handler, false) != nullptr) setOptionsVisible(true);
             return;
         case WindowEventHandler::sound_options:

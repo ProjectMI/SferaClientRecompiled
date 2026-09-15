@@ -1,7 +1,6 @@
 #pragma once
 
 #include "semantic_classes.h"
-#include "lifted_abi.h"
 #include <windows.h>
 #include <bit>
 #include <cstddef>
@@ -26,13 +25,12 @@ const uint32_t kErrorMessageCapacity = 0x3EC;
 const uint32_t kFontLookupClassCount = 5;
 const uint32_t kFontLookupGlyphCount = 256;
 const uint32_t kLandscapeMapRecordCount = 6400;
-const uint32_t kNetworkProbeSampleCount = 20;
+
 const uint32_t kProfileSlotCount = 100;
 const uint32_t kRenderBlendLutStorageSize = 0x4001;
 const uint32_t kRenderQuantizationTableSize = 3072;
 const uint32_t kRenderSampleCount = 120;
 const uint32_t kTextureCacheEntryCount = 50;
-const uint32_t kStackReserve = 0x00100000;
 }
 
 const char* sfera_cursor_texture_name(uint32_t slot);
@@ -51,112 +49,23 @@ struct SferaItemArray {
     void put(void* item);
     void clear();
 };
-struct SferaDirectPlayCaps32 {
-    uint32_t words[12];
-};
-struct SferaDpnCapsRuntime {
-    uint32_t size;
-    uint32_t flags;
-    uint32_t connect_timeout_ms;
-    uint32_t connect_retries;
-    uint32_t timeout_until_keepalive_ms;
-};
-struct SferaDpnBufferDescRuntime {
-    uint32_t buffer_size;
-    void* buffer_data;
-};
-struct SferaDpnConnectionInfoRuntime {
-    uint32_t size;
-    uint32_t round_trip_latency_ms;
-    uint32_t throughput_bps;
-    uint32_t peak_throughput_bps;
-    uint32_t bytes_sent_guaranteed;
-    uint32_t packets_sent_guaranteed;
-    uint32_t bytes_sent_non_guaranteed;
-    uint32_t packets_sent_non_guaranteed;
-    uint32_t bytes_retried;
-    uint32_t packets_retried;
-    uint32_t bytes_dropped;
-    uint32_t packets_dropped;
-    uint32_t messages_transmitted_high_priority;
-    uint32_t messages_timed_out_high_priority;
-    uint32_t messages_transmitted_normal_priority;
-    uint32_t messages_timed_out_normal_priority;
-    uint32_t messages_transmitted_low_priority;
-    uint32_t messages_timed_out_low_priority;
-    uint32_t bytes_received_guaranteed;
-    uint32_t packets_received_guaranteed;
-    uint32_t bytes_received_non_guaranteed;
-    uint32_t packets_received_non_guaranteed;
-    uint32_t messages_received;
-};
-struct SferaU64Words {
-    uint32_t low;
-    uint32_t high;
-};
-using SferaCounter64Words = SferaU64Words;
-struct SferaNetworkTransportRuntime {
-    uint32_t mode;
-    uint8_t transport_flag;
-    uint8_t receive_busy;
-    uint8_t receive_corrupted;
-    uint8_t reserved_07;
-    SferaDirectPlayAddressNative* primary_address;
-    SferaDirectPlayAddressNative* secondary_address;
-    uint32_t sent_packet_count;
-    SferaCounter64Words sent_bytes;
-    uint32_t received_packet_count;
-    uint32_t receive_read_index;
-    SferaCounter64Words received_bytes;
-    uint32_t receive_write_index;
-    uint32_t reserved_30;
-};
-struct SferaDirectPlayRuntime {
-    SferaDirectPlayClientNative* peer;
-    SferaDpnCapsRuntime caps;
-    CRITICAL_SECTION critical_section;
-    SferaDpnBufferDescRuntime send_buffer;
-    DWORD send_async_handle;
-    SferaDpnConnectionInfoRuntime connection_info;
-    SferaNetworkTransportRuntime transport;
-};
-inline constexpr std::size_t kSferaNetworkMessageSlotCount = 3048u;
-struct SferaNetworkMessageSlot {
-    DWORD message;
-    DWORD sender;
-    DWORD buffer_handle;
-    uint8_t data[400];
-    DWORD data_size;
-    uint8_t reserved[8];
-};
-struct SferaNetworkRuntime {
-    uint32_t initialization_result;
-    uint32_t server_port;
-    uint32_t local_port_candidate;
-    uint32_t connection_slot;
-    uint32_t pending_slot;
-    uint32_t active_slot;
-    uint32_t shutdown_state;
-    uint8_t timeout_marker_pending;
-    uint8_t net_log_has_error;
-    uint8_t network_error_active;
-    uint8_t initialized;
-    uint32_t bytes_sent_delta;
-    uint32_t bytes_retried_delta;
-    uint32_t bytes_received_delta;
-    uint32_t error_budget;
-    SferaDirectPlayCaps32 directplay_caps;
-    DWORD message_call_scratch;
-    SferaNetworkMessageSlot message_slots[kSferaNetworkMessageSlotCount];
-};
-struct SferaNetworkConnectionCheckerRuntime {
-    uint32_t instance;
-};
+
+
+
+
+
+
+
+
+
+
+
+
 struct SferaNetworkSendRuntime { CRITICAL_SECTION critical_section; };
 struct SferaInterpreterScratchRuntime {
     uint32_t diagnostic_step_counter;
     uint32_t network_poll_counter;
-    uint32_t item_lookup_result;
+    CItemListCommonItem* item_lookup_result;
 };
 
 struct WorldObject;
@@ -201,7 +110,7 @@ struct SferaCollisionRuntime {
 };
 struct SferaSceneArrayRuntime {
 
-    SferaBoundCheckArray<std::uint32_t> render_pass_slots;
+    SferaBoundCheckArray<float> render_pass_slots;
     SferaBoundCheckArray<SferaVec3F> clip_vectors;
     SferaBoundCheckArray<SferaVec3F> scene_points;
     SferaBoundCheckArray<SphereRender::SceneSortEntry> object_positions;
@@ -323,6 +232,7 @@ struct SferaHighResolutionClockRuntime {
 };
 struct SferaProfilerRuntime {
     void writeReport();
+    void updateFramePercentages();
     void begin(std::size_t index);
     void end(std::size_t index);
     SferaU64Words accumulated_ticks[kProfileSlotCount];
@@ -344,26 +254,8 @@ struct SferaStringUtilityRuntime {
     uint8_t uppercase[256];
     char format_buffer[512];
 };
-struct SferaNetworkProbeSample {
-    SferaU64Words timestamp;
-    uint32_t probe_result;
-    uint32_t context_a;
-    uint32_t context_b;
-    uint32_t context_c;
-};
-struct SferaNetworkProbeRuntime {
-    uint32_t sample_count;
-    uint8_t stop_requested;
-    char host[64];
-    uint32_t context_a;
-    uint32_t context_b;
-    uint32_t snapshot_count;
-    uint32_t thread_handle;
-    CRITICAL_SECTION critical_section;
-    SferaNetworkProbeSample samples[kNetworkProbeSampleCount];
-    uint32_t context_c;
-    SferaNetworkProbeSample snapshot[kNetworkProbeSampleCount];
-};
+
+
 struct SferaConfigParseScratchRuntime {
     uint8_t token[256];
 };
@@ -379,7 +271,7 @@ struct SferaMainCommandStateRuntime {
     float sky_blend_factor;
     uint32_t lighting_state;
     uint32_t light_update_counter;
-    uint32_t default_cursor_token[2];
+    char default_cursor_name[8];
     uint8_t reserved_1fc[0x0C];
     uint32_t draw_selection_state;
     uint32_t render_channel_mask;
@@ -395,7 +287,7 @@ struct SferaMainCommandStateRuntime {
 struct SferaMainInputStateRuntime {
     uint32_t input_state;
     uint8_t reserved_004[8];
-    uint32_t input_mode;
+    SferaDebugExchange* debug_exchange;
     float motion_accumulator;
     uint32_t input_state_02;
     uint32_t input_state_03;
@@ -405,7 +297,7 @@ struct SferaMainInputStateRuntime {
     SferaMouseInputState mouse;
     float motion_x;
     float motion_y;
-    uint32_t input_state_04;
+    uint32_t main_loop_started;
     uint32_t active_input_handle;
     uint32_t input_state_05;
     uint8_t reserved_050[8];
@@ -455,38 +347,31 @@ struct SferaMainUiStateRuntime {
 
 struct SferaClientConfigRuntime {
     uint8_t reserved_008;
-    uint8_t flag_01;
+    uint8_t interpreter_initialized;
     uint8_t flag_02;
     uint8_t flag_03;
     uint32_t state_03;
-    uint32_t state_09;
-    uint32_t state_10;
-    float scalar_01;
-    uint32_t state_11;
-    uint32_t state_12;
-    uint32_t state_13;
-    uint32_t state_14;
-    uint32_t state_15;
-    uint32_t state_16;
-    uint8_t reserved_048[4];
-    uint32_t state_17;
-    uint32_t state_18;
+    uint32_t language;
+    uint32_t volume_refresh_active;
+    float volume_refresh_frames;
+    uint32_t volume_refresh_direction;
+    std::array<std::uint32_t, 8> render_options;
     uint8_t reserved_054[0x0C];
     uint32_t debug_config_enabled;
     uint8_t reserved_064[4];
-    uint32_t state_19;
-    uint32_t state_20;
-    uint32_t state_21;
-    uint32_t state_22;
-    uint32_t state_23;
+    uint32_t resources_loaded;
+    uint32_t high_resolution_assets;
+    uint32_t alternate_ph_assets;
+    uint32_t alternate_rd_assets;
+    uint32_t refresh_rate;
     uint8_t reserved_07c[5];
     uint8_t connect_type_enabled;
     uint8_t gamexp_sid_present;
     uint8_t reserved_083;
-    uint32_t state_24;
+    SferaTcpConnectionContext* tcp_connection;
     uint8_t reserved_088[4];
-    uint32_t state_25;
-    uint32_t state_26;
+    uint32_t auto_fog;
+    uint32_t effects_enabled;
     uint32_t state_27;
     uint8_t reserved_098[8];
     uint32_t state_28;
@@ -537,10 +422,10 @@ struct SferaInterScalarRuntime {
     uint32_t state_02;
     QuickFile* quick_files;
     uint32_t mode_01;
-    CHash16* registered_object_index;
-    uint32_t mode_03;
+
+    WorldObject* current_object;
     uint32_t state_04;
-    uint32_t mode_04;
+    SferaUpdateDownloadContext* update_download;
     SferaCheckFilesContext* file_checker;
     uint32_t state_06;
     uint32_t state_07;
@@ -642,15 +527,6 @@ struct SferaScreenVertex {
     float u;
     float v;
 };
-template <std::size_t N, typename Member>
-inline uint32_t sfera_screen_vertex_address(SferaScreenVertex (&vertices)[N], std::size_t index, Member SferaScreenVertex::* member) {
-    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&(vertices[index].*member)));
-}
-
-template <std::size_t N, typename Member>
-inline uint32_t sfera_screen_vertex_field_end_address(SferaScreenVertex (&vertices)[N], Member SferaScreenVertex::* member) {
-    return sfera_screen_vertex_address(vertices, 0u, member) + static_cast<uint32_t>(sizeof(vertices));
-}
 struct SferaSceneRenderRuntime {
     SferaScreenVertex textured_quad[4];
     SferaScreenVertex interface_quad[4];
@@ -717,8 +593,8 @@ struct SferaInputDeviceRuntime {
     uint32_t keyboard_state_code;
     uint32_t reserved_01c;
     SferaFloatWord frame_interval;
-    uint32_t render_state;
-    uint32_t shared_object;
+    uint32_t exception_requested;
+    SphereUI::ChatFilter* chat_filter;
 };
 struct SferaScreenClipRuntime {
     uint32_t left;
@@ -746,7 +622,7 @@ struct SferaRenderLookupEntry {
     uint32_t mask;
 };
 struct SferaRenderLookupRuntime {
-    uint32_t initialized;
+    uint32_t quit_requested;
     uint32_t alpha_component;
     SferaRenderLookupEntry entries[256];
 };
@@ -765,7 +641,7 @@ struct SferaProcessRuntime {
 };
 struct SferaClientProcessRuntime {
     uint32_t ui_bridge;
-    uint32_t shutdown_requested;
+    uint32_t startup_complete;
     char locale[10];
     Contours* client_object;
     char log_message[0x390];
@@ -859,7 +735,7 @@ struct SferaLandscapePatchLookupRuntime {
     TerrainRegion* patch_records[6400];
 };
 struct SferaDebugWindowRuntime {
-    uint32_t spider_window;
+    HWND spider_window;
 };
 struct SferaViewMotionRuntime {
     SferaFloatWord motion_terms[5];
@@ -880,21 +756,6 @@ struct SferaRenderSampleRuntime {
 };
 struct SferaTerrainDiagnosticRuntime {
     char normalize_code[12];
-};
-struct SferaWorldSlotRecord {
-    uint32_t object_handle;
-    uint8_t reserved_004[0x0C];
-    uint32_t state;
-    uint32_t linked_handle;
-    uint8_t reserved_018[0x0C];
-    uint32_t primary_state;
-    uint32_t primary_flags;
-    uint8_t primary_payload[0x190];
-    uint32_t secondary_state;
-    uint32_t secondary_flags;
-    uint8_t secondary_payload[0x190];
-    uint32_t record_state;
-    uint8_t reserved_358[0x40];
 };
 struct SferaWorldSlotTableRuntime {
     SferaWorldSlotRecord slots[401];
@@ -925,7 +786,7 @@ struct SferaSpatialIndexRuntime {
 };
 struct SferaStartupCommandLineRuntime {
     char text[0x160];
-    uint32_t parser_state;
+    uint32_t show_command;
 };
 struct SferaCollisionScratchRuntime {
     uint8_t debug_vertices[0x70];
@@ -940,9 +801,6 @@ struct SferaMbcStaticRuntime {
     uint8_t init_flag;
     uint8_t service_flag;
     uint8_t reserved[2];
-};
-struct SferaMapGeneratorRuntime {
-    uint8_t storage[0x68];
 };
 struct SferaAlphaMaterialRuntime {
     int32_t selected_slot;

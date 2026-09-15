@@ -23,7 +23,6 @@
 #include <vector>
 
 namespace {
-constexpr std::size_t kTcpSendBufferCapacity = 80000u;
 constexpr std::size_t kPathBufferCapacity = 1024u;
 constexpr std::size_t kFileCrcBufferCapacity = 16384u;
 constexpr std::uint32_t kNetworkProbeIntervalSlices = 20u;
@@ -414,10 +413,10 @@ LRESULT CALLBACK sfera_browser_subclass_proc(HWND window, UINT message, WPARAM w
 LRESULT CALLBACK sfera_main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
     switch (message) {
     case WM_ACTIVATEAPP:
-        g_sfera_texture_cache_runtime.cache_enabled = g_sfera_window_runtime.windowed != 0u && g_sfera_client_config_runtime.state_23 != 0u ? 1u : static_cast<std::uint32_t>(wparam);
+        g_sfera_texture_cache_runtime.cache_enabled = g_sfera_window_runtime.windowed != 0u && g_sfera_client_config_runtime.refresh_rate != 0u ? 1u : static_cast<std::uint32_t>(wparam);
         ::SI_SetStreamVolume(::SI_GetStreamVolume());
-        g_sfera_client_config_runtime.scalar_01 = 0.0;
-        g_sfera_client_config_runtime.state_10 = 1u;
+        g_sfera_client_config_runtime.volume_refresh_frames = 0.0;
+        g_sfera_client_config_runtime.volume_refresh_active = 1u;
         return 0;
     case WM_QUERYENDSESSION:
         ::PostQuitMessage(0);
@@ -508,88 +507,8 @@ LONG WINAPI sfera_cpp_exception_filter(EXCEPTION_POINTERS* exception) noexcept {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-static void tcp_log_line(const char* suffix, const char* message) noexcept {
-    if (!suffix || !message) {
-        return;
-    }
-    char path[kPathBufferCapacity]{};
-    std::snprintf(path, sizeof(path), "logs\\%u%s", g_sfera_recovered_static_runtime.server_number, suffix);
-    FILE* file = open_file(path, "at");
-    if (!file) {
-        return;
-    }
-    std::fseek(file, 0, SEEK_END);
-    if (std::ftell(file) > 10000000L) {
-        std::fclose(file);
-        file = open_file(path, "w");
-        if (file) {
-            std::fclose(file);
-        }
-        file = open_file(path, "at");
-        if (!file) {
-            return;
-        }
-    }
-    SYSTEMTIME time{};
-    ::GetLocalTime(&time);
-    std::fprintf(file, "%02u.%02u.%04u %02u:%02u:%02u %s", time.wDay, time.wMonth, time.wYear, time.wHour, time.wMinute, time.wSecond, message);
-    std::fclose(file);
-}
 
-static void send_pending_tcp(SferaTcpConnectionContext& context) noexcept {
-    if (!context.connected || !context.send_buffer) {
-        return;
-    }
-    auto* critical_section = &g_sfera_network_send_runtime.critical_section;
-    ::EnterCriticalSection(critical_section);
-    if (context.send_size != 0u) {
-        const int sent = ::send(context.socket, reinterpret_cast<const char*>(context.send_buffer), static_cast<int>(context.send_size), 0);
-        if (sent >= 0) {
-            if (static_cast<std::uint32_t>(sent) < context.send_size) {
-                std::memmove(context.send_buffer, context.send_buffer + sent, context.send_size - static_cast<std::uint32_t>(sent));
-            }
-            context.send_size -= static_cast<std::uint32_t>(sent);
-            context.sent_bytes_window += static_cast<std::uint32_t>(sent);
-        }
-    }
-    ::LeaveCriticalSection(critical_section);
-}
 
-static bool queue_tcp_packet(SferaTcpConnectionContext& context, std::uint32_t payload_size, TcpMessage message, const void* payload) noexcept {
-    auto* critical_section = &g_sfera_network_send_runtime.critical_section;
-    ::EnterCriticalSection(critical_section);
-    const std::uint32_t packet_size = payload_size + sizeof(SferaTcpOutgoingHeader);
-    if (!context.send_buffer || kTcpSendBufferCapacity - context.send_size < packet_size) {
-        tcp_log_line("tcp_ip_connect.log", "-------------------------ERROR: send buffer overload\n");
-        g_sfera_network_runtime.initialization_result = UINT32_MAX;
-        if (context.socket != 0u && context.socket != INVALID_SOCKET) {
-            ::closesocket(context.socket);
-        }
-        ::WSACleanup();
-        context.connected = 0u;
-        ::LeaveCriticalSection(critical_section);
-        return false;
-    }
-    context.sequence = static_cast<std::uint16_t>(context.sequence + static_cast<std::uint16_t>(std::rand() % 4 + 1));
-    auto* packet = reinterpret_cast<SferaTcpOutgoingHeader*>(context.send_buffer + context.send_size);
-    packet->size = static_cast<std::uint16_t>(packet_size);
-    packet->checksum = 0u;
-    packet->sequence = context.sequence;
-    packet->message = static_cast<std::uint16_t>(message);
-    if (payload_size != 0u && payload) {
-        std::memcpy(packet + 1, payload, payload_size);
-    }
-    std::uint16_t checksum = 0u;
-    const auto* bytes = reinterpret_cast<const std::int8_t*>(&packet->sequence);
-    for (std::uint32_t index = 0u; index < packet_size - offsetof(SferaTcpOutgoingHeader, sequence); ++index) {
-        checksum = static_cast<std::uint16_t>(checksum + bytes[index]);
-    }
-    packet->checksum = static_cast<std::uint16_t>(context.checksum_seed ^ checksum);
-    context.send_size += packet_size;
-    ++context.packet_counter;
-    ::LeaveCriticalSection(critical_section);
-    return true;
-}
 
 static void enqueue_directplay_receive(const SferaDirectPlayReceivePayload& payload) noexcept {
     SferaNetworkMessageSlot* slot = acquire_directplay_receive_slot();
@@ -700,7 +619,7 @@ static std::int32_t run_network_probe() noexcept {
 static void tcp_log_error(const char* format, int value) noexcept {
     char message[256]{};
     std::snprintf(message, sizeof(message), format, value);
-    tcp_log_line("tcp_ip_connect.log", message);
+    SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", message);
 }
 
 DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
@@ -722,7 +641,7 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
         const std::uint32_t free_space = static_cast<std::uint32_t>(kTcpReceiveBufferCapacity) - buffered;
         if (free_space == 0u) {
             if (!local_overload_reported) {
-                tcp_log_line("tcp_ip_connect.log", "-------------------------ERROR: local rcv buffer overload\n");
+                SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------ERROR: local rcv buffer overload\n");
                 local_overload_reported = true;
             }
         } else {
@@ -758,7 +677,7 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
             const auto* header = reinterpret_cast<const SferaTcpIncomingHeader*>(local_buffer.data());
             const std::uint16_t packet_size = header->size;
             if (packet_size < sizeof(SferaTcpIncomingHeader) || packet_size > kTcpReceiveBufferCapacity) {
-                tcp_log_line("tcp_ip_connect.log", "-------------------------ERROR: invalid packet size\n");
+                SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------ERROR: invalid packet size\n");
                 g_sfera_network_runtime.initialization_result = UINT32_MAX;
                 context->connected = 0u;
                 buffered = 0u;
@@ -770,7 +689,7 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
             }
             const auto message = static_cast<TcpMessage>(header->message);
             if (message == TcpMessage::connection_limit) {
-                tcp_log_line("tcp_ip_connect.log", "-------------------------IN(ERROR): (limit connections)\n");
+                SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------IN(ERROR): (limit connections)\n");
                 g_sfera_network_runtime.initialization_result = UINT32_MAX;
                 context->connected = 0u;
                 buffered = 0u;
@@ -782,12 +701,12 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
                 context->checksum_seed = handshake->checksum_seed;
                 context->remote_id = handshake->remote_id;
                 const std::uint32_t mode = g_sfera_directplay_runtime.transport.mode;
-                queue_tcp_packet(*context, sizeof(mode), TcpMessage::client_mode, &mode);
+                context->queuePacket(sizeof(mode), TcpMessage::client_mode, &mode);
                 g_sfera_network_runtime.initialization_result = 1u;
                 context->sequence = static_cast<std::uint16_t>(std::rand() % 1000 + 1);
                 char text[96]{};
                 std::snprintf(text, sizeof(text), "Create connection: socket=%u\n", context->remote_id);
-                tcp_log_line("tcp_ip_connect.log", text);
+                SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", text);
             } else if (message == TcpMessage::keepalive) {
                 auto* timing = &g_sfera_window_runtime.timing_critical_section;
                 ::EnterCriticalSection(timing);
@@ -801,7 +720,7 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
                     std::memcpy(context->receive_buffer + context->receive_size, local_buffer.data(), packet_size);
                     context->receive_size += packet_size;
                 } else if (!shared_overload_reported) {
-                    tcp_log_line("tcp_ip_connect.log", "-------------------------ERROR: rcv buffer overload\n");
+                    SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------ERROR: rcv buffer overload\n");
                     shared_overload_reported = true;
                 }
                 ::LeaveCriticalSection(scene_lock);
@@ -817,7 +736,7 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
         }
         ::Sleep(15u);
     }
-    tcp_log_line("tcp_ip_connect.log", "Rcv Thread exit\n");
+    SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "Rcv Thread exit\n");
     context->sent_bytes_per_second = 0u;
     context->received_bytes_per_second = 0u;
     g_sfera_network_runtime.initialization_result = UINT32_MAX;
@@ -878,8 +797,8 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
         return 0u;
     }
     auto finish = [context](UpdateDownloadState state) noexcept {
-        context->state = state;
-        context->completed = 1u;
+        if (context->socket != INVALID_SOCKET) { ::closesocket(context->socket); context->socket = INVALID_SOCKET; }
+        ::WSACleanup(); context->output = nullptr; context->state = state; context->completed = true;
     };
     g_sfera_crc32_runtime.initialize();
     __time64_t activity = _time64(nullptr);
@@ -901,7 +820,7 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
                 std::fclose(output);
                 output = nullptr;
             }
-            ::WSACleanup();
+
             finish(UpdateDownloadState::failed);
             return 0u;
         }
@@ -915,7 +834,7 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
             if (output) {
                 std::fclose(output);
             }
-            ::WSACleanup();
+
             finish(UpdateDownloadState::failed);
             return 0u;
         }
@@ -923,7 +842,7 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
         if (context->state == UpdateDownloadState::send_request && FD_ISSET(context->socket, &writable)) {
             const int length = static_cast<int>(std::strlen(context->request) + 1u);
             if (!update_send(context->socket, context->request, length)) {
-                ::WSACleanup();
+
                 finish(UpdateDownloadState::failed);
                 return 0u;
             }
@@ -932,7 +851,7 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
         } else if (context->state == UpdateDownloadState::receive_metadata && FD_ISSET(context->socket, &readable)) {
             const int received = ::recv(context->socket, reinterpret_cast<char*>(&response) + response_used, static_cast<int>(sizeof(response) - response_used), 0);
             if (received <= 0) {
-                ::WSACleanup();
+
                 finish(UpdateDownloadState::failed);
                 return 0u;
             }
@@ -967,13 +886,13 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
         } else if (context->state == UpdateDownloadState::send_resume && FD_ISSET(context->socket, &writable)) {
             const SferaUpdateResumeRequest request{{'R', 'S', 'A'}, resume_offset};
             if (!update_send(context->socket, &request, static_cast<int>(sizeof(request)))) {
-                ::WSACleanup();
+
                 finish(UpdateDownloadState::failed);
                 return 0u;
             }
             output = open_file(destination.c_str(), resume_offset == 0u ? "w+b" : "a+b");
             if (!output) {
-                ::WSACleanup();
+
                 finish(UpdateDownloadState::failed);
                 return 0u;
             }
@@ -996,7 +915,7 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
                     output = nullptr;
                     context->output = nullptr;
                 }
-                ::WSACleanup(); finish(UpdateDownloadState::failed); return 0u;
+                finish(UpdateDownloadState::failed); return 0u;
             }
             resume_offset += static_cast<std::uint32_t>(received);
             context->resume_offset = resume_offset;
@@ -1008,7 +927,7 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
                     std::fclose(output);
                     output = nullptr;
                     context->output = nullptr;
-                    ::WSACleanup();
+
                     finish(UpdateDownloadState::failed);
                     return 0u;
                 }
@@ -1023,15 +942,14 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
             }
         } else if (context->state == UpdateDownloadState::acknowledge && FD_ISSET(context->socket, &writable)) {
             if (!update_send(context->socket, "DA", 2)) {
-                ::WSACleanup();
+
                 finish(UpdateDownloadState::failed);
                 return 0u;
             }
-            context->state = UpdateDownloadState::idle;
-            context->completed = 1u;
+            finish(UpdateDownloadState::idle);
             return 0u;
         } else if (context->state == UpdateDownloadState::idle || context->state == UpdateDownloadState::failed) {
-            context->completed = 1u;
+            finish(context->state.load());
             return 0u;
         }
         if (progressed) {
@@ -1042,8 +960,8 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
         std::fclose(output);
         context->output = nullptr;
     }
-    ::WSACleanup();
-    finish(context->state);
+
+    finish(context->state.load());
     return 0u;
 }
 
@@ -1062,7 +980,7 @@ DWORD WINAPI sfera_tcp_receive_dispatch_thread(void* parameter) noexcept {
             ::Sleep(10u);
         }
     }
-    tcp_log_line("tcp_ip_connect.log", "Rnd Thread exit\n");
+    SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "Rnd Thread exit\n");
     return 0u;
 }
 
@@ -1093,10 +1011,10 @@ DWORD WINAPI sfera_tcp_send_maintenance_thread(void* parameter) noexcept {
         now = ::GetTickCount();
         if (now - send_tick > 15u) {
             send_tick = now;
-            send_pending_tcp(*context);
+            context->sendPending();
             if (context->sequence > 50000u) {
             context->sequence = 1u;
-            queue_tcp_packet(*context, 0u, TcpMessage::sequence_reset, nullptr);
+            context->queuePacket(0u, TcpMessage::sequence_reset, nullptr);
         }
         }
         now = ::GetTickCount();
@@ -1110,18 +1028,18 @@ DWORD WINAPI sfera_tcp_send_maintenance_thread(void* parameter) noexcept {
         }
             context->keepalive_answered = 0u;
             ::LeaveCriticalSection(timing);
-            queue_tcp_packet(*context, 0u, TcpMessage::keepalive, nullptr);
-            send_pending_tcp(*context);
+            context->queuePacket(0u, TcpMessage::keepalive, nullptr);
+            context->sendPending();
         }
         now = ::GetTickCount();
         if (now - random_tick > random_interval) {
             random_interval = static_cast<DWORD>(std::rand() % 10000 + 3000);
             random_tick = now;
-            queue_tcp_packet(*context, sizeof(context->packet_counter), TcpMessage::packet_counter, &context->packet_counter);
+            context->queuePacket(sizeof(context->packet_counter), TcpMessage::packet_counter, &context->packet_counter);
         }
         ::Sleep(4u);
     }
-    tcp_log_line("tcp_ip_connect.log", "Snd Thread exit\n");
+    SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "Snd Thread exit\n");
     return 0u;
 }
 
@@ -1236,13 +1154,12 @@ DWORD WINAPI sfera_network_probe_thread(void*) noexcept {
         ::EnterCriticalSection(critical_section);
         std::move_backward(std::begin(g_sfera_network_probe_runtime.samples), std::end(g_sfera_network_probe_runtime.samples) - 1, std::end(g_sfera_network_probe_runtime.samples));
         SferaNetworkProbeSample& sample = g_sfera_network_probe_runtime.samples[0];
-        sample.timestamp.low = static_cast<std::uint32_t>(now);
-        sample.timestamp.high = static_cast<std::uint32_t>(static_cast<std::uint64_t>(now) >> 32u);
+        sample.timestamp = static_cast<std::uint64_t>(now);
         sample.probe_result = static_cast<std::uint32_t>(probe_result);
         sample.context_a = context_a;
         sample.context_b = context_b;
         sample.context_c = context_c;
-        g_sfera_network_probe_runtime.sample_count = std::min<std::uint32_t>(g_sfera_network_probe_runtime.sample_count + 1u, kNetworkProbeSampleCount);
+        g_sfera_network_probe_runtime.sample_count = std::min<std::uint32_t>(g_sfera_network_probe_runtime.sample_count + 1u, SferaNetworkProbeRuntime::sample_capacity);
         ::LeaveCriticalSection(critical_section);
     }
 }

@@ -43,13 +43,6 @@ using DS3DBUFFER = _DS3DBUFFER;
 #undef Process32Next
 #endif
 
-template <typename Function> inline uint32_t native_function_address32(Function function) { return static_cast<uint32_t>(reinterpret_cast<std::uintptr_t>(function)); }
-template <typename Method> inline uint32_t native_method_address32(Method method) { uint32_t address = 0u; std::memcpy(&address, &method, sizeof(address)); return address; }
-inline uint32_t native_memchr_address32() { using Function = void* (__cdecl*)(void*, int, std::size_t); return native_function_address32(static_cast<Function>(&::memchr)); }
-inline uint32_t native_strchr_address32() { using Function = char* (__cdecl*)(char*, int); return native_function_address32(static_cast<Function>(&::strchr)); }
-inline uint32_t native_strrchr_address32() { using Function = char* (__cdecl*)(char*, int); return native_function_address32(static_cast<Function>(&::strrchr)); }
-inline uint32_t native_strstr_address32() { using Function = char* (__cdecl*)(char*, const char*); return native_function_address32(static_cast<Function>(&::strstr)); }
-
 struct D3DXMATRIX;
 struct D3DXVECTOR3;
 struct D3DXQUATERNION;

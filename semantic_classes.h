@@ -38,7 +38,9 @@ struct SferaScreenVertex;
 
 #include "semantic_window.h"
 
-struct LiftCpu;
+struct SferaDirectPlayClientNative;
+struct SferaDirectPlayAddressNative;
+struct SferaTcpConnectionContext;
 struct SferaIntrusiveListHeader;
 class CSound;
 class StdAllocator;
@@ -921,6 +923,7 @@ public:
     float position_y;
     float position_z;
     CItem() {}
+    void setName(const char* text);
     virtual void resetItem();
     virtual void releaseItem();
 };
@@ -964,6 +967,12 @@ public:
     std::uint8_t manager_diagnostics_mode = 0;
     std::uint32_t field_d8 = 0;
     CBaseManagerCommonItem() {}
+    void dumpLists();
+    std::int32_t createList(std::int32_t minimum, std::int32_t reserve, std::uint32_t mode, const char* listName, std::uint32_t parameter);
+    std::int32_t deleteList(const char* listName);
+    std::int32_t insertListItem(const CItem& listKey, const CCommonItem& value);
+    std::int32_t deleteListItem(const CItem& listKey, const CItem& itemKey);
+    std::int32_t moveListItem(const CItem& listKey, const CItem& itemKey, float x, float y, float z, bool publish);
     void resetItem() override;
     std::int32_t initialize(std::int32_t minimum, std::int32_t, std::uint32_t mode, const char* list_name, std::uint32_t parameter);
     CItemListCommonItem* findStoredList(const CItem* key);
@@ -1270,6 +1279,7 @@ public:
     void setErrorReporting(bool enabled);
     int open(const char* filename, int flags);
     int create(const char* filename);
+    int transformEnvelope(const char* destination, const char* source, bool compress);
     int read(int descriptor, void* destination, std::uint32_t size);
     int write(int descriptor, const void* source, std::uint32_t size);
     std::int32_t seek(int descriptor, std::int32_t offset, int origin);
@@ -2148,6 +2158,8 @@ struct SferaStringLookupRuntime {
     void initialize();
     const char* findInsensitive(const char* text, const char* needle);
     static const char* fileName(const char* path);
+    static void encodeUri(char* destination, const char* source, std::size_t capacity);
+    static bool matchesWildcard(const char* text, const char* pattern);
     static std::uint32_t copyString(char* destination, const char* source, std::int32_t capacity);
 };
 
@@ -2162,12 +2174,14 @@ struct SferaLogFileRuntime {
     void write(std::int32_t number);
 };
 struct SferaLogRuntime {
+    void initialize();
     SferaLogFileRuntime files[3];
     bool script_first_write = true;
     void writeScript(const char* path, const char* text, bool primary = false);
     void writeScript(const char* path, float value, bool primary = false);
     void writeScript(const char* path, std::int32_t value, bool primary = false);
     void writeTemporary(const char* text);
+    void writeFormatted(const char* format, std::va_list arguments);
     static void datedPath(char* destination, const char* path);
 };
 
@@ -2220,11 +2234,15 @@ struct SferaAllocationHashRuntime {
 
 
 struct SferaConfigTextRuntime {
+    enum class Operation : std::int32_t { Write = 13, Read = 14, Load = 15, Save = 16, Clear = 17, UseText = 30, ReadCommands = 54, SaveCompressed = 55, CopyText = 56, Length = 57, SetFilename = 62 };
+    bool load(const char* filename);
+    bool save(bool compressed = false) const;
+    bool writeValue(std::string_view key, std::string_view value, bool quoted);
+    static std::string encodeBinary(std::span<const std::uint8_t> input);
     static constexpr std::size_t text_capacity = 2458176u;
     char text_storage[text_capacity];
     char* text_buffer;
     std::uint32_t text_length;
-    char format_scratch[512];
     char parser_path[1024];
     std::uint32_t copyText(const char* source, std::uint32_t length, char* path);
     void useText(char* source, char* path);
@@ -2244,7 +2262,7 @@ struct SferaErrorLogRuntime {
     CSphereError* owned_error = nullptr;
     COutputLogDevice* owned_log = nullptr;
     bool enabled = false;
-    std::uint8_t index_table[128]{};
+    char user_name[128]{};
     void initialize(IOutputDevice* error = nullptr, IOutputDevice* log = nullptr);
     void clear();
 };
@@ -2295,15 +2313,28 @@ private:
 };
 
 struct SferaDebugScriptArrays {
-    struct Module { std::uint32_t count; std::uint32_t range_offset; };
-    struct Range { std::uint32_t begin; std::uint32_t end; };
-    std::array<std::int32_t, 4096> module_indices{};
-    Module* modules = nullptr;
-    Range* ranges = nullptr;
+    struct Range { std::uint32_t begin; std::uint32_t end; bool operator==(const Range&) const = default; };
+    struct Module { bool enabled = false; std::vector<Range> ranges; };
+    static constexpr std::uint32_t begin_guard = 0xDEEDDEEDu;
+    static constexpr std::uint8_t end_guard = 0xDEu;
+    std::array<Module, 4096> modules;
     std::int32_t current_process = -1;
     std::uint32_t current_code_range = 0;
     std::uint32_t current_array = 0;
+    bool loaded = false;
     void initialize();
+    void load();
+    void start();
+    void stop();
+    void processUnloaded(std::int32_t index);
+    void discardModule(std::uint32_t tag);
+    void verifyFiles();
+    void checkProcess(const SferaMbcProcessRecord& process);
+    void checkStep(std::uint32_t count);
+private:
+    bool advance();
+    bool checkRange(const SferaMbcProcessRecord& process, std::uint32_t codeRange, const Range& range);
+    void finishCheck(bool corrupted);
 };
 
 struct SferaCrc32Runtime {
@@ -2373,6 +2404,8 @@ public:
     static void* reallocate(void* memory, std::size_t size, const char* source = nullptr, std::uint32_t line = 0u);
     static void release(void* memory, const char* source = nullptr, std::uint32_t line = 0u);
     static void validateBeforeTermination();
+    static std::size_t allocatedBytes(void* memory);
+    static std::size_t payloadSize(void* memory);
 private:
     static void validateAllocation(const SphereUI::Memory::AllocationRecord& record, const char* source, std::uint32_t line);
     static void validateRecent(const char* source, std::uint32_t line);
@@ -2390,6 +2423,7 @@ public:
     static void appendCallStack(char* output);
     static const char* scriptContext();
     static void report(const char* message);
+    static int debugMessage(const char* message);
     static void warning(const char* message);
     [[noreturn]] static void fail(const char* message);
 };
@@ -2914,6 +2948,7 @@ private:
 inline TerrainRenderer g_sfera_terrain_renderer;
 class TerrainTextureCache {
 public:
+    static void initialize();
     static void bindLayer(const TerrainCell& cell, int layer);
     static void release();
     static void loadMicrotextures(const char* pattern);
@@ -3565,7 +3600,7 @@ public:
     void destroy(SferaDialogState* dialog);
     HWND resolve(std::uintptr_t target) const;
     LRESULT sendMessage(std::uintptr_t target, UINT message, WPARAM wparam, LPARAM lparam) const;
-    void pumpMessages() const;
+    void pumpMessages(bool dialogKeys = true) const;
 private:
     std::unordered_map<SferaDialogState*, std::unique_ptr<SferaDialogState>> dialogs;
 };
@@ -3646,12 +3681,13 @@ struct SferaSliceReference32 {
 };
 
 struct SferaMbcValue {
-    enum Type : std::uint32_t { Byte = 0, BytePointer = 1, Integer = 16, Real = 32, Address = 48 };
+    enum Type : std::uint32_t { Byte = 0, BytePointer = 1, Integer = 16, IntegerPointer = 17, Real = 32, RealPointer = 33, Address = 48 };
     std::uint32_t type;
     std::uint32_t width;
     SferaSliceReference32 source;
     SferaSliceReference32 value;
     bool isPointer() const;
+    static std::uint32_t storageSize(std::uint32_t valueType);
     std::int32_t integer() const;
     float real() const;
     std::int32_t asInteger() const;
@@ -3659,7 +3695,9 @@ struct SferaMbcValue {
     void setReal(float number);
     void detach();
     SferaSliceReference32& asSlice();
+    void storeAs(std::uint8_t destinationType, void* destination) const;
     static std::int32_t truncate(double number);
+    static std::int64_t truncateReal(double number);
 };
 
 struct ScriptProgramDiagnostic {
@@ -3687,13 +3725,13 @@ struct ScriptProgramDiagnostic {
 
 struct SferaMbcExecutionContext {
     ScriptProgramDiagnostic* program_table_base;
-    uint32_t instruction_cursor;
+    std::uint8_t* instruction_cursor;
     std::uint8_t* bytecode_base;
-    uint32_t process_memory_base;
+    std::uint8_t* process_memory_base;
     uint32_t process_index;
     uint32_t program_index;
     uint32_t process_id;
-    uint32_t active_process;
+    SferaMbcProcessRecord* active_process;
 };
 struct SferaFindData64i32 {
     uint32_t attrib;
@@ -3704,15 +3742,7 @@ struct SferaFindData64i32 {
     uint32_t size;
     char name[260];
 };
-struct SferaMbcFileIndexNode {
-    uint32_t next;
-    uint32_t prev;
-    char name[0x40];
-    uint8_t reserved_048[0xC0];
-    int64_t checksum;
-    uint32_t file_size;
-    uint32_t reserved_114;
-};
+
 
 struct SferaMbcModuleMemoryStats {
     uint32_t process_count;
@@ -3721,15 +3751,99 @@ struct SferaMbcModuleMemoryStats {
 };
 
 struct SferaMbcNamedVectorRecord {
-    union { uint32_t values; std::uint32_t* value_data; };
+    std::uint32_t* value_data;
     uint32_t size;
     uint32_t reserved_08;
-    union { uint32_t name; char* name_text; };
+    char* name_text;
+};
+
+struct SferaMbcFunctionRecord {
+    char name[32];
+    std::uint32_t declaration_offset;
+    std::uint32_t entry_offset;
+    std::int32_t program_index;
+    std::uint32_t allow_reentry;
+    std::uint32_t reserved;
+};
+
+struct SferaMbcQueuedCommand {
+    char name[32];
+    char argument_types[16];
+    std::uint8_t argument_data[512];
+    SferaMbcQueuedCommand* next;
+};
+
+struct SferaWorldSlotRecord {
+    uint32_t object_handle;
+    uint8_t reserved_004[0x0C];
+    uint32_t state;
+    uint32_t linked_handle;
+    uint8_t reserved_018[0x0C];
+    uint32_t primary_state;
+    uint32_t reliable_bit_count;
+    uint8_t reliable_payload[0x190];
+    uint32_t reliable_process;
+    uint32_t unreliable_bit_count;
+    uint8_t unreliable_payload[0x190];
+    uint32_t unreliable_process;
+    std::int32_t origin[3];
+    std::uint8_t reserved_364[0x34];
+};
+
+struct SferaMbcRegionRecord {
+    std::int8_t formats[28];
+    std::int32_t field_count;
+    std::int8_t flags;
+    std::uint8_t reserved;
+    std::uint16_t program_index;
 };
 
 struct SferaMbcModuleRecord {
-    char name[0x20];
-    uint8_t runtime[0x8B8];
+    char name[32];
+    SferaMbcRegionRecord regions[62];
+};
+
+struct SferaMbcModuleImage {
+    static constexpr std::size_t functionSlotCount = 80;
+    std::array<std::uint8_t, 16> header{};
+    std::uint32_t header_word = 0;
+    std::uint32_t module_tag = 0;
+    std::span<const std::uint8_t> bytecode;
+    std::span<const std::uint8_t> memory;
+    std::vector<ScriptProgramDiagnostic> programs;
+    std::vector<SferaMbcFunctionRecord> functions;
+    std::array<std::uint16_t, functionSlotCount> function_map;
+    std::span<const std::uint8_t> region_definitions;
+    std::array<std::uint32_t, 3> exported_offsets{};
+    std::array<std::vector<std::uint32_t>, 3> relocations;
+    bool read(std::span<const std::uint8_t> data, bool linking);
+};
+
+struct SferaMbcRegionPacket {
+    SferaMbcRegionPacket* next;
+    std::uint8_t* data;
+    std::uint32_t timestamp;
+    std::int32_t origin[3];
+};
+
+class SferaMbcBitStream {
+    std::span<const std::uint8_t> data_;
+    std::uint8_t* output_ = nullptr;
+    std::size_t position_ = 0;
+    bool valid_ = true;
+public:
+    explicit SferaMbcBitStream(std::span<const std::uint8_t> data, std::size_t position = 0) : data_(data), position_(position) {}
+    explicit SferaMbcBitStream(std::span<std::uint8_t> data, std::size_t position = 0) : data_(data), output_(data.data()), position_(position) {}
+    bool valid() const { return valid_; }
+    std::size_t position() const { return position_; }
+    std::uint32_t read(unsigned width);
+    void write(std::uint32_t value, unsigned width);
+    void append(std::span<const std::uint8_t> data, std::size_t bits);
+    bool skipRegion(const SferaMbcRegionRecord& region);
+    std::uint32_t readField(std::int8_t format, std::span<const std::int32_t, 3> origin);
+    bool writeField(std::int8_t format, std::uint32_t value, std::span<const std::int32_t, 3> origin);
+    static std::uint32_t encodeCoordinate(std::int32_t origin, float coordinate);
+    static float decodeCoordinate(std::int32_t origin, std::uint32_t code);
 };
 
 struct SferaMbcProcessRecord {
@@ -3740,6 +3854,12 @@ struct SferaMbcProcessRecord {
     bool activateProgram(std::int32_t index);
     bool activateProgram(const char* name);
     void appendCommand(std::string_view command);
+    std::uint32_t growMemory(std::uint32_t size);
+    SferaMbcFunctionRecord* findFunction(std::string_view name);
+    void discardQueuedCommand();
+    void readRegions(std::span<const std::uint8_t> definitions, std::uint32_t firstProgram);
+    void releaseResources();
+    void queueRegion(std::size_t region, std::uint32_t timestamp, std::span<const std::int32_t, 3> origin, std::span<const std::uint8_t> payload, std::size_t firstBit, std::size_t bitCount, bool ordered);
     uint8_t file_header_prefix[0x0C];
     uint8_t header_code_0c;
     uint8_t header_code_0d;
@@ -3751,13 +3871,13 @@ struct SferaMbcProcessRecord {
     uint32_t module_tag;
     std::uint8_t* bytecode_base;
     uint32_t bytecode_size;
-    uint32_t process_memory_base;
+    std::uint8_t* process_memory_base;
     uint32_t process_memory_size;
     uint32_t program_count;
     ScriptProgramDiagnostic* program_table_base;
     uint32_t field_060;
     uint32_t auxiliary_record_count;
-    uint32_t auxiliary_record_table;
+    SferaMbcFunctionRecord* functions;
     int32_t chain_prev_index;
     int32_t chain_next_index;
     uint16_t program_map_a[4];
@@ -3768,9 +3888,11 @@ struct SferaMbcProcessRecord {
     uint32_t field_090;
     uint32_t flags;
     uint8_t reserved_098[0x02];
-    uint8_t field_09a[0x04];
+    std::int16_t subscriber_count;
+    std::uint16_t subscriber_capacity;
     uint8_t reserved_09e[0x02];
-    uint32_t owned_block_a;
+    struct Subscriber { std::uint16_t slot; std::uint8_t metadata[10]; };
+    Subscriber* subscribers;
     CleanupEntry* cleanup_entries;
     uint32_t cleanup_entry_count;
     uint32_t cleanup_capacity;
@@ -3779,16 +3901,16 @@ struct SferaMbcProcessRecord {
     uint8_t state_byte_b8;
     uint8_t execution_linked;
     uint8_t reserved_0ba[0x02];
-    uint32_t field_0bc;
+    SferaMbcQueuedCommand* queued_commands;
     uint32_t field_0c0;
-    uint32_t workspace_base;
+    std::uint16_t* function_map;
     int32_t execution_prev_index;
     int32_t execution_next_index;
-    uint32_t module_record_base;
+    SferaMbcRegionRecord* regions;
     uint32_t field_0d4;
     int32_t field_0d8;
-    uint8_t reserved_0dc[0xFC];
-    uint8_t execution_scratch[0xFC];
+    std::uint32_t region_timestamps[63];
+    SferaMbcRegionPacket* received_regions[63];
     uint16_t code_range_ids[8];
     uint32_t code_range_begin[8];
     uint32_t code_range_size[8];
@@ -3806,17 +3928,13 @@ struct SferaMbcInterpreterStorage {
     SferaMbcValueStackStorage value_stack;
     SferaMbcModuleRecord module_records[4096];
 };
-struct SferaMbcSavedInvocationState {
-    uint32_t process_memory_base;
-    uint32_t value_stack_size;
-    uint32_t argument_cursor;
-    uint32_t argument_end;
-};
+
 
 struct SferaMbcRuntime {
-    enum class Builtin : std::uint8_t { Sin = 3, Cos = 4, Exp = 125, ArcTangent = 7, AbsoluteInteger = 6, AbsoluteReal = 5, SimulationTick = 8, RandomReal = 106, PackColor = 11, ScaleColor = 134, SquareRoot = 12, SceneContext = 13, KeyboardState = 14, ProcessModule = 19, ActiveTag = 22, ArgumentCount = 23, CurrentModule = 24, CurrentProcess = 39, ZeroResult = 25, ZeroResultAlternate = 27, TickDifference = 80, ProfileValue = 29, ProcessFlag = 32, CopyString = 34, CopyStringCount = 136, AppendString = 35, FindString = 95, FindStringInsensitive = 135, StringLength = 36, CompareStrings = 37, CompareStringsInsensitive = 75, CompareStringsCount = 76, CompareStringsCountInsensitive = 137, DiscardArgument = 86, IntegerValue = 45, RealValue = 46, NextDefaultValue = 64, CallerProcess = 127, CopyMemory = 78, MoveMemory = 96, FillMemory = 79, StopInterpreter = 82, NetworkInitialization = 85, InvalidResult = 119, BitAnd = 138, BitOr = 139, BitXor = 140, BitNot = 141, ShiftLeft = 142, ShiftRight = 143, ClearBit = 144, SetBit = 145, TestBit = 146, WriteByte = 148, WriteShort = 149, WriteThreeBytes = 150, WriteWord = 151, WriteReal = 152, WriteString = 153, ReadByte = 154, ReadShort = 155, ReadThreeBytes = 156, ReadWord = 157, ReadReal = 158, ReadString = 159, LowerBoundInteger = 160, ContainerCommand = 161, ContainerManagement = 162, PositionX = 54, PositionY = 55, PositionZ = 56, RotationX = 57, RotationY = 58, RotationZ = 59, SetRotation = 52, MoveLocal = 50, MoveForward = 51, Rotate = 53 };
+    enum class WindowOperation : std::uint32_t { Create = 0, Destroy = 1, DisplayWidth = 2, DisplayHeight = 3, TextHeight = 4, FontHeight = 5, LineOffset = 6, TakeInput = 7, HitTest = 8, Visible = 9, Bounds = 10, TextSize = 11, GlyphWidth = 12, Scrollable = 13, CursorPosition = 14, SystemCursorVisible = 15, SystemCursorKind = 16, CursorKind = 17, CursorImage = 18, CursorText = 19, Open = 20, Close = 21, PollEvent = 22, SetText = 23, ControlAt = 24, SendMessage = 25, GetText = 26, SystemEvent = 27, WindowUnderCursor = 28, ItemAt = 29, SavedPositionsSize = 30, ReadSavedPositions = 31, WriteSavedPositions = 32, Position = 33, Size = 34, Description = 35, Tooltip = 36, Options = 37, EscapeWindow = 38, CreateDialog = 39, DestroyDialog = 40, PollDialogEvent = 41, SendDialogMessage = 42, DialogItem = 43, SetDialogText = 44, GetDialogText = 45, Shutdown = 46, PumpMessages = 47, ActiveWindow = 55, LoadingProgress = 78, FinishLoading = 79 };
+    enum class Builtin : std::uint8_t { Fail = 0, FailAlternate = 1, Exit = 2, LoadProcess = 16, UnloadProcess = 17, LinkProcess = 18, Connect = 30, Disconnect = 31, FormatText = 67, NamedFormattedLog = 91, System = 103, DiscardInteger = 120, Reserved122 = 122, BoundedFormatText = 123, FormattedLog = 126, Reserved130 = 130, Reserved133 = 133, CallFunction = 20, CallMainFunction = 21, Distance = 81, ScanText = 9, ScriptLog = 38, ParseText = 128, ChatUtility = 129, Window = 10, Send = 26, Receive = 33, Configuration = 117, CreateFile = 40, OpenFile = 41, CloseFile = 42, ReadFile = 44, WriteFile = 43, ReadLine = 124, LockFile = 116, SeekFile = 65, FileSize = 66, FileTime = 70, ResizeFile = 71, SetFileTime = 72, RemoveFile = 69, RenameFile = 68, SetAnimation = 87, SetFrame = 88, AnimationLength = 89, SetInterpolation = 90, MouseMotion = 98, ThisProcessName = 104, ProcessName = 107, ModuleName = 109, FindModule = 110, FontSettings = 118, DestroyObject = 60, DestroyText = 62, DestroySprite = 105, ObjectProcess = 84, SetRenderEnabled = 99, CreateObject = 47, SetPosition = 48, MoveWorld = 49, CommandVelocity = 92, VerticalVelocity = 93, AngularVelocity = 94, Airborne = 97, ObjectBasis = 100, ObjectPosition = 101, ObjectRotation = 102, EditorPick = 131, AllocateMemory = 15, AllocateDynamic = 113, FreeDynamic = 112, SetNamedValue = 114, NamedValue = 115, RebaseSlice = 121, CopyProcessMemory = 77, CopyProcessString = 108, Text = 61, TextColor = 63, Sprite = 73, Effect = 111, MovementContact = 83, FileChecksum = 74, MemoryChecksum = 163, CompareMemory = 147, PlayerLists = 132, FindProcess = 28, Sin = 3, Cos = 4, Exp = 125, ArcTangent = 7, AbsoluteInteger = 6, AbsoluteReal = 5, SimulationTick = 8, RandomReal = 106, PackColor = 11, ScaleColor = 134, SquareRoot = 12, SceneContext = 13, KeyboardState = 14, ProcessModule = 19, ActiveTag = 22, ArgumentCount = 23, CurrentModule = 24, CurrentProcess = 39, ZeroResult = 25, ZeroResultAlternate = 27, TickDifference = 80, ProfileValue = 29, ProcessFlag = 32, CopyString = 34, CopyStringCount = 136, AppendString = 35, FindString = 95, FindStringInsensitive = 135, StringLength = 36, CompareStrings = 37, CompareStringsInsensitive = 75, CompareStringsCount = 76, CompareStringsCountInsensitive = 137, DiscardArgument = 86, IntegerValue = 45, RealValue = 46, NextDefaultValue = 64, CallerProcess = 127, CopyMemory = 78, MoveMemory = 96, FillMemory = 79, StopInterpreter = 82, NetworkInitialization = 85, InvalidResult = 119, BitAnd = 138, BitOr = 139, BitXor = 140, BitNot = 141, ShiftLeft = 142, ShiftRight = 143, ClearBit = 144, SetBit = 145, TestBit = 146, WriteByte = 148, WriteShort = 149, WriteThreeBytes = 150, WriteWord = 151, WriteReal = 152, WriteString = 153, ReadByte = 154, ReadShort = 155, ReadThreeBytes = 156, ReadWord = 157, ReadReal = 158, ReadString = 159, LowerBoundInteger = 160, ContainerCommand = 161, ContainerManagement = 162, PositionX = 54, PositionY = 55, PositionZ = 56, RotationX = 57, RotationY = 58, RotationZ = 59, SetRotation = 52, MoveLocal = 50, MoveForward = 51, Rotate = 53 };
     enum class Instruction : std::uint8_t {
-        Jump = 'G', JumpShort = 'J', ArgumentCount = ',', ResetStack = '0', LiteralWord = '9', LiteralShort = '(', LiteralByte = ')', StringLiteral = 'A', SliceVariable = 'e', SliceLiteral = 'l', StartProgram = 'R', CallProgram = 'U', StopProgram = 'S', PauseProgram = 'P', ResumeProgram = 'C', ReturnLocal = 't', Assign = '=', Dereference = '^', AddressOf = '&', Add = '+', Subtract = '-', Multiply = '*', Divide = '/', Remainder = '%', Equal = 240, NotEqual = 237, Greater = '>', Less = '<', GreaterEqual = 225, LessEqual = 236, ShortCircuitOr = 'L', ShortCircuitAnd = 'M', IntegerResult = 235, IntegerResultAlternate = 232, Negate = 241, LogicalNot = '!', PreIncrement = 239, PreDecrement = 243, PostIncrement = 246, PostDecrement = 247, Halt = 'H', IntegerToReal = '.', PreviousIntegerToReal = ':', Swap = '~', PointerAdd = '[', PointerSubtract = ']', RealToInteger = '`', PreviousRealToInteger = '"', PointerPreIncrement = 207, PointerPreDecrement = 211, PointerPostIncrement = 214, PointerPostDecrement = 215, IntegerPair = ';', EnterFrame = '1', LeaveFrame = '2', UnlinkedFunction = 'g'
+        InvokeBuiltin = 'f', ReturnFunction = 'r', BindParameters = 'O', DispatchCommand = 201, LoadVariable = 105, JumpIfFalse = 73, JumpIfFalseShort = 75, ArrayElement = 97, SliceElement = 98, PointerElement = 109, FieldValue = 100, FieldSlice = 104, CallLocal = 99,         Jump = 'G', JumpShort = 'J', ArgumentCount = ',', ResetStack = '0', LiteralWord = '9', LiteralShort = '(', LiteralByte = ')', StringLiteral = 'A', SliceVariable = 'e', SliceLiteral = 'l', StartProgram = 'R', CallProgram = 'U', StopProgram = 'S', PauseProgram = 'P', ResumeProgram = 'C', ReturnLocal = 't', Assign = '=', Dereference = '^', AddressOf = '&', Add = '+', Subtract = '-', Multiply = '*', Divide = '/', Remainder = '%', Equal = 240, NotEqual = 237, Greater = '>', Less = '<', GreaterEqual = 225, LessEqual = 236, ShortCircuitOr = 'L', ShortCircuitAnd = 'M', IntegerResult = 235, IntegerResultAlternate = 232, Negate = 241, LogicalNot = '!', PreIncrement = 239, PreDecrement = 243, PostIncrement = 246, PostDecrement = 247, Halt = 'H', IntegerToReal = '.', PreviousIntegerToReal = ':', Swap = '~', PointerAdd = '[', PointerSubtract = ']', RealToInteger = '`', PreviousRealToInteger = '"', PointerPreIncrement = 207, PointerPreDecrement = 211, PointerPostIncrement = 214, PointerPostDecrement = 215, IntegerPair = ';', EnterFrame = '1', LeaveFrame = '2', UnlinkedFunction = 'g'
     };
     std::int32_t popInteger();
     SferaSliceReference32& popSlice();
@@ -3827,6 +3945,19 @@ struct SferaMbcRuntime {
     void pushInteger(std::uint32_t value);
     void pushReal(float value);
     void pushSlice(const SferaSliceReference32& value, std::uint32_t type);
+    void pushReference(std::uint32_t type, const SferaSliceReference32& reference, bool load);
+    SferaMbcProcessRecord* findProcess(std::uint32_t id);
+    std::uint32_t loadProcess(std::string_view name, std::uint32_t requestedIndex);
+    std::uint32_t linkProcess(std::string_view name);
+    std::uint32_t unloadProcess(std::uint32_t index);
+    void registerBytecode(std::uint8_t* bytecode, const std::uint8_t* moduleKey, std::uint32_t memorySize);
+    void resetBytecodeCache();
+    std::uint8_t* findBytecode(const std::uint8_t* moduleKey, std::uint32_t memorySize);
+    SferaMbcNamedVectorRecord* findNamedVector(const char* name);
+    std::uint32_t namedValue(const char* name, std::int32_t index = 0);
+    std::uint32_t checksumFile(const char* path);
+    std::uint32_t checksumDirectory(const char* directory);
+    void setNamedValue(const char* name, std::uint32_t value, std::int32_t index = 0);
     bool reportError(const char* message);
     bool reportError(const char* prefix, const char* suffix);
     void enqueueProcess(std::int32_t index, SferaMbcProcessRecord& process);
@@ -3838,6 +3969,30 @@ struct SferaMbcRuntime {
     template<class T> void writeMemory(std::uint32_t offset, const T& value) { std::memcpy(process_memory_base + static_cast<std::int32_t>(offset), &value, sizeof(value)); }
     void reportInvalidInstruction();
     void exportSlice(SferaSliceReference32& destination, const void* data, std::uint32_t size);
+    void initialize();
+    void tick();
+    void reloadQuickFiles();
+    void systemCommand();
+    void buildRegion();
+    std::string formatArguments(const char* pattern, std::size_t limit = std::numeric_limits<std::size_t>::max());
+    void formatText(bool bounded);
+    void writeFormattedLog(bool named);
+    void receiveRegion();
+    void sendRegion(std::int32_t slotIndex, std::uint32_t region, std::uint32_t flags);
+    void bindParameters();
+    void pushCommandArguments(const SferaMbcQueuedCommand& command);
+    void dispatchQueuedCommand();
+    void callFunction(bool mainProcess);
+    void returnFromFunction();
+    void calculateDistance();
+    void scanText();
+    void chatUtility();
+    void parseText();
+    void windowCommand();
+    void writeScriptLog();
+    char* nextText(bool allowNull = false);
+    void pushText(const char* text);
+    void copyText(const SferaSliceReference32& destination, const char* text);
 
     int32_t execution_chain_tail;
     int32_t execution_chain_head;
@@ -3847,30 +4002,23 @@ struct SferaMbcRuntime {
     ScriptProgramDiagnostic* program_table_base;
     uint32_t shared_buffer_size;
     std::uint8_t* instruction_cursor;
-    char file_search_pattern[0x40];
-    union { uint32_t named_vector_cursor; SferaMbcNamedVectorRecord* current_named_vector; };
+    SferaMbcNamedVectorRecord* current_named_vector;
     char diagnostic_context[0x5E8];
-    uint8_t module_link_stream[0x724];
-    uint16_t link_workspace_words[80];
     uint32_t argument_count;
     uint32_t argument_end;
     uint32_t process_index;
     std::uint8_t* current_instruction_address;
     uint32_t active_tag;
-    SferaFindData64i32 file_find_data;
     SferaFindData64i32 script_find_data;
     char startup_option[0x80];
     uint8_t text_buffer[10000];
     uint32_t call_frame_depth;
-    uint32_t module_link_stream_size;
     SferaMbcProcessRecord processes[65536];
     uint32_t process_search_cursor;
     uint32_t instruction_step_count;
-    uint32_t link_relocation_offsets[24000];
     uint32_t program_index;
     uint32_t pending_program_index;
     uint32_t dispatch_process_count;
-    uint32_t file_index_scan_prev;
     uint32_t execution_context_depth;
     std::uint8_t* bytecode_base;
     uint32_t registered_object_count;
@@ -3879,19 +4027,14 @@ struct SferaMbcRuntime {
     uint32_t argument_cursor;
     uint32_t frame_stack_base[22];
     uint32_t halt_all_requested;
-    uint32_t link_relocation_count;
     uint8_t send_field_width[4096];
     ScriptProgramDiagnostic* active_program_record;
     uint32_t value_stack_size;
-    uint32_t file_index_current;
-    char file_path_buffer[0x40];
-    uint8_t file_io_buffer[0x10000];
-    uint32_t file_index_scan;
     SferaMbcProcessRecord* active_process;
-    uint32_t registered_objects[2100];
+    std::uint8_t* registered_objects[2100];
+    CHash16* registered_object_index;
     std::uint8_t* process_memory_base;
-    uint32_t file_crc32_table[256];
-    char file_normalized_name[0x44];
+    SferaCrc32Runtime file_crc;
     uint32_t send_field_count;
     uint32_t execution_failed;
     uint32_t trace_steps_remaining;
@@ -3902,8 +4045,6 @@ struct SferaMbcRuntime {
     SferaMbcNamedVectorRecord named_vectors[1000];
     uint8_t shared_buffer[0x258240];
     uint32_t named_vector_count;
-    uint32_t file_index_head;
-    SferaMbcSavedInvocationState saved_invocation;
 };
 
 
@@ -3949,4 +4090,277 @@ struct SferaScriptContainer {
     static SferaScriptContainer* create(Kind kind, ValueType type, ValueType keyType = ValueType::Integer);
     void execute(SferaMbcRuntime& runtime);
     void destroy();
+};
+
+struct SferaDirectPlayCaps32 {
+    uint32_t words[12];
+};
+
+struct SferaDpnCapsRuntime {
+    uint32_t size;
+    uint32_t flags;
+    uint32_t connect_timeout_ms;
+    uint32_t connect_retries;
+    uint32_t timeout_until_keepalive_ms;
+};
+
+struct SferaDpnBufferDescRuntime {
+    uint32_t buffer_size;
+    void* buffer_data;
+};
+
+struct SferaDpnConnectionInfoRuntime {
+    uint32_t size;
+    uint32_t round_trip_latency_ms;
+    uint32_t throughput_bps;
+    uint32_t peak_throughput_bps;
+    uint32_t bytes_sent_guaranteed;
+    uint32_t packets_sent_guaranteed;
+    uint32_t bytes_sent_non_guaranteed;
+    uint32_t packets_sent_non_guaranteed;
+    uint32_t bytes_retried;
+    uint32_t packets_retried;
+    uint32_t bytes_dropped;
+    uint32_t packets_dropped;
+    uint32_t messages_transmitted_high_priority;
+    uint32_t messages_timed_out_high_priority;
+    uint32_t messages_transmitted_normal_priority;
+    uint32_t messages_timed_out_normal_priority;
+    uint32_t messages_transmitted_low_priority;
+    uint32_t messages_timed_out_low_priority;
+    uint32_t bytes_received_guaranteed;
+    uint32_t packets_received_guaranteed;
+    uint32_t bytes_received_non_guaranteed;
+    uint32_t packets_received_non_guaranteed;
+    uint32_t messages_received;
+};
+
+struct SferaU64Words {
+    uint32_t low;
+    uint32_t high;
+};
+using SferaCounter64Words = SferaU64Words;
+
+struct SferaNetworkTransportRuntime {
+    uint32_t mode;
+    uint8_t transport_flag;
+    uint8_t receive_busy;
+    uint8_t receive_corrupted;
+    uint8_t reserved_07;
+    SferaDirectPlayAddressNative* primary_address;
+    SferaDirectPlayAddressNative* secondary_address;
+    uint32_t sent_packet_count;
+    SferaCounter64Words sent_bytes;
+    uint32_t received_packet_count;
+    uint32_t receive_read_index;
+    SferaCounter64Words received_bytes;
+    uint32_t receive_write_index;
+    uint32_t reserved_30;
+};
+
+struct SferaDirectPlayRuntime {
+    SferaDirectPlayClientNative* peer;
+    SferaDpnCapsRuntime caps;
+    CRITICAL_SECTION critical_section;
+    SferaDpnBufferDescRuntime send_buffer;
+    DWORD send_async_handle;
+    SferaDpnConnectionInfoRuntime connection_info;
+    SferaNetworkTransportRuntime transport;
+};
+
+inline constexpr std::size_t kSferaNetworkMessageSlotCount = 3048u;
+struct SferaNetworkMessageSlot {
+    DWORD message;
+    DWORD sender;
+    DWORD buffer_handle;
+    uint8_t data[400];
+    DWORD data_size;
+    uint8_t reserved[8];
+};
+
+inline constexpr std::size_t kTcpReceiveBufferCapacity = 60000u;
+
+enum class TcpMessage : std::uint16_t {
+    connection_limit = 100u,
+    handshake = 200u,
+    payload = 300u,
+    client_mode = 400u,
+    keepalive = 500u,
+    sequence_reset = 600u,
+    packet_counter = 700u
+};
+
+struct SferaTcpConnectionContext {
+    struct WorkerThread { HANDLE handle; DWORD id; };
+    SferaTcpConnectionContext();
+    ~SferaTcpConnectionContext();
+    int initialize(const char* hostname, std::uint16_t port);
+    void shutdown() noexcept;
+    static constexpr std::uint32_t sendCapacity = 80000;
+    bool queuePacket(std::uint32_t payloadSize, TcpMessage message, const void* payload) noexcept;
+    void sendPending() noexcept;
+    static void writeLog(const char* suffix, const char* message) noexcept;
+    std::uint8_t receive_buffer[kTcpReceiveBufferCapacity];
+    std::uint32_t receive_size;
+    std::uint32_t reserved_after_receive_size;
+    SOCKET socket;
+    std::uint32_t remote_id;
+    WorkerThread workers[3];
+    std::uint8_t stop_requested;
+    std::uint8_t reserved_stop[3];
+    std::uint32_t received_bytes_window;
+    std::uint32_t sent_bytes_window;
+    std::uint32_t sent_bytes_per_second;
+    std::uint32_t received_bytes_per_second;
+    std::uint8_t* send_buffer;
+    std::uint32_t send_size;
+    std::uint8_t initialized;
+    std::uint8_t connected;
+    std::uint8_t reserved_flags[2];
+    std::uint32_t round_trip_ms;
+    DWORD keepalive_started_at;
+    std::uint8_t keepalive_answered;
+    std::uint8_t reserved_keepalive;
+    std::uint16_t sequence;
+    std::uint16_t checksum_seed;
+    std::uint16_t reserved_checksum;
+    std::uint32_t packet_counter;
+};
+
+struct SferaTcpOutgoingHeader {
+    std::uint16_t size;
+    std::uint16_t checksum;
+    std::uint16_t sequence;
+    std::uint16_t message;
+};
+
+struct SferaNetworkRuntime {
+    uint32_t initialization_result;
+    uint32_t server_port;
+    uint32_t local_port_candidate;
+    uint32_t connection_slot;
+    uint32_t pending_slot;
+    uint32_t active_slot;
+    uint32_t shutdown_state;
+    uint8_t timeout_marker_pending;
+    uint8_t net_log_has_error;
+    uint8_t network_error_active;
+    uint8_t initialized;
+    uint32_t bytes_sent_delta;
+    uint32_t bytes_retried_delta;
+    uint32_t bytes_received_delta;
+    uint32_t error_budget;
+    SferaDirectPlayCaps32 directplay_caps;
+    DWORD message_call_scratch;
+    SferaNetworkMessageSlot message_slots[kSferaNetworkMessageSlotCount];
+    int initialize(const char* hostname, std::uint32_t port);
+    void shutdown();
+    void receiveMessages();
+    void receiveMessage(SferaNetworkMessageSlot& message);
+    void receiveEvents(std::span<const std::uint8_t> payload);
+    void sendDiagnosticFile(const char* path, std::uint8_t kind, std::size_t packetSize);
+    void sendPacket(std::uint32_t flags, std::span<std::uint8_t> payload);
+    void updateProbe();
+    static std::int32_t tickDifference(std::uint32_t current, std::uint32_t previous);
+    static void encodePayload(std::uint8_t* data, std::int32_t length);
+    void updateDirectPlayStatistics();
+    void updateTcpStatistics();
+    std::uint32_t findLocalPort();
+};
+
+class SferaGameCalendar { public: static std::uint32_t fromUnixTime(std::int64_t timestamp); static std::uint32_t advance(std::uint32_t calendar); static std::uint32_t component(std::uint32_t calendar, std::int32_t index); static std::uint32_t withComponent(std::uint32_t calendar, std::int32_t index, std::uint32_t value); };
+
+struct SferaNetworkConnectionCheckerRuntime { HANDLE thread = nullptr; void start(); void stop(); };
+
+struct SferaNetworkProbeSample {
+    std::uint64_t timestamp;
+    uint32_t probe_result;
+    uint32_t context_a;
+    uint32_t context_b;
+    uint32_t context_c;
+};
+
+struct SferaNetworkProbeRuntime {
+    static constexpr std::uint32_t sample_capacity = 20;
+    uint32_t sample_count;
+    uint8_t stop_requested;
+    char host[64];
+    uint32_t context_a;
+    uint32_t context_b;
+    uint32_t snapshot_count;
+    HANDLE thread_handle;
+    CRITICAL_SECTION critical_section;
+    SferaNetworkProbeSample samples[sample_capacity];
+    uint32_t context_c;
+    SferaNetworkProbeSample snapshot[sample_capacity];
+    void writeLog(const char* message, bool truncate = false);
+    std::uint32_t writeSamples();
+    void start(const char* hostname);
+    void stop(bool preserveErrorLog);
+};
+
+
+struct SferaDebugExchange {
+    std::byte payload[999];
+    volatile std::uint8_t state;
+};
+
+class SferaClientApplication {
+public:
+    static int run(HINSTANCE instance, int showCommand);
+    static void loadResources();
+    static void shutdown();
+    [[noreturn]] static void terminateWithError(const char* message);
+    [[noreturn]] static void arrayBoundsError(const char* file, std::uint32_t line, std::int32_t index);
+    static int enumerateProcesses(std::span<char> output, std::uint32_t recordStride);
+private:
+    static void configureResourceDirectory();
+    static void resetWorld();
+    static void renderFrame();
+    bool initialize();
+    bool runStartupScripts();
+    void runMainLoop();
+    bool updateSimulation();
+    std::int32_t advanceClock();
+    std::uint32_t previous_tick_ = 0;
+    std::int32_t tick_remainder_ = 0;
+    std::uint32_t object_update_ticks_ = 0;
+    std::uint32_t effect_update_ticks_ = 0;
+    std::uint32_t maintenance_ticks_ = 0;
+};
+
+class SferaMapGeneratorRuntime {
+public:
+    void begin(const char* filename);
+    void openBitmap(const char* filename, std::uint32_t width, std::uint32_t height);
+    ~SferaMapGeneratorRuntime();
+private:
+    std::vector<std::uint8_t> pixels;
+    int descriptor = -1;
+    std::uint32_t row_stride = 0;
+    std::uint32_t row_padding = 0;
+    std::uint32_t tail_padding = 0;
+};
+
+inline constexpr std::size_t kUpdateRequestCapacity = 512;
+enum class UpdateDownloadState : std::uint32_t { idle = 0, send_request, receive_metadata, send_resume, receive_file, failed, acknowledge };
+struct SferaUpdateDownloadContext {
+    SferaUpdateDownloadContext(std::uint16_t port, const char* hostname);
+    ~SferaUpdateDownloadContext();
+    SferaUpdateDownloadContext(const SferaUpdateDownloadContext&) = delete;
+    SferaUpdateDownloadContext& operator=(const SferaUpdateDownloadContext&) = delete;
+    int begin(const char* filename);
+    UpdateDownloadState progress(std::int32_t& percent) const;
+    std::atomic<bool> stop_requested{false};
+    std::atomic<bool> completed{true};
+    SOCKET socket = INVALID_SOCKET;
+    std::atomic<UpdateDownloadState> state{UpdateDownloadState::idle};
+    char request[kUpdateRequestCapacity]{};
+    std::atomic<std::uint32_t> expected_size{0};
+    std::atomic<std::uint32_t> resume_offset{0};
+    FILE* output = nullptr;
+private:
+    std::uint16_t port;
+    std::string hostname;
+    HANDLE worker = nullptr;
 };

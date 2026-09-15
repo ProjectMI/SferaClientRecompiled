@@ -1,6 +1,5 @@
 #include "semantic_static.h"
 #include "import_bridge.h"
-#include "runtime.h"
 
 #include <algorithm>
 #include <array>
