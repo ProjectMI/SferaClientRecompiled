@@ -34,16 +34,7 @@ constexpr ULONG_PTR kMsvcCppExceptionMagic19930521 = 0x19930521u;
 constexpr ULONG_PTR kMsvcCppExceptionMagic19930522 = 0x19930522u;
 constexpr ULONG_PTR kMsvcCppExceptionMagicPure = 0x01994000u;
 
-
-constexpr DWORD kDirectPlayConnectComplete = 0xFFFF0005u;
-constexpr DWORD kDirectPlayCreatePlayer = 0xFFFF0007u;
-constexpr DWORD kDirectPlayDestroyPlayer = 0xFFFF0009u;
-constexpr DWORD kDirectPlayIndicateConnect = 0xFFFF000Eu;
-constexpr DWORD kDirectPlayConnectAborted = 0xFFFF000Fu;
-constexpr DWORD kDirectPlayReceive = 0xFFFF0011u;
-constexpr DWORD kDirectPlayTerminateSession = 0xFFFF0016u;
 constexpr DWORD kDirectPlayHeartbeatTimeoutMs = 180000u;
-constexpr DWORD kDirectPlayHeartbeatSendFlags = 184u;
 
 FILE* open_file(const char* path, const char* mode) noexcept {
     FILE* file = nullptr;
@@ -308,12 +299,12 @@ void append_net_log(const char* message) noexcept {
 
 void log_directplay_message(DWORD message) noexcept {
     switch (message) {
-    case kDirectPlayConnectComplete:
-    case kDirectPlayTerminateSession:
-    case kDirectPlayDestroyPlayer:
-    case kDirectPlayIndicateConnect:
-    case kDirectPlayConnectAborted:
-    case kDirectPlayCreatePlayer:
+    case SferaDirectPlay::connectComplete:
+    case SferaDirectPlay::terminateSession:
+    case SferaDirectPlay::destroyPlayer:
+    case SferaDirectPlay::indicateConnect:
+    case SferaDirectPlay::connectAborted:
+    case SferaDirectPlay::createPlayer:
         break;
     default:
         return;
@@ -402,7 +393,7 @@ LRESULT CALLBACK sfera_browser_subclass_proc(HWND window, UINT message, WPARAM w
         return 0;
     }
     if ((message == WM_KEYDOWN || message == WM_KEYUP) && wparam == VK_ESCAPE) {
-        ::SendMessageA(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(g_sfera_window_runtime.main_window)), message, wparam, lparam);
+        ::SendMessageA(g_sfera_window_runtime.main_window_handle, message, wparam, lparam);
     }
     if (g_sfera_browser_window_runtime.original_window_proc) {
         return ::CallWindowProcA(g_sfera_browser_window_runtime.original_window_proc, window, message, wparam, lparam);
@@ -413,10 +404,10 @@ LRESULT CALLBACK sfera_browser_subclass_proc(HWND window, UINT message, WPARAM w
 LRESULT CALLBACK sfera_main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
     switch (message) {
     case WM_ACTIVATEAPP:
-        g_sfera_texture_cache_runtime.cache_enabled = g_sfera_window_runtime.windowed != 0u && g_sfera_client_config_runtime.refresh_rate != 0u ? 1u : static_cast<std::uint32_t>(wparam);
+        g_sfera_texture_cache_runtime.cache_enabled = (g_sfera_window_runtime.windowed && g_sfera_client_config_runtime.refresh_rate != 0u) || wparam != 0;
         ::SI_SetStreamVolume(::SI_GetStreamVolume());
         g_sfera_client_config_runtime.volume_refresh_frames = 0.0;
-        g_sfera_client_config_runtime.volume_refresh_active = 1u;
+        g_sfera_client_config_runtime.volume_refresh_active = true;
         return 0;
     case WM_QUERYENDSESSION:
         ::PostQuitMessage(0);
@@ -507,19 +498,14 @@ LONG WINAPI sfera_cpp_exception_filter(EXCEPTION_POINTERS* exception) noexcept {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-
-
-
 static void enqueue_directplay_receive(const SferaDirectPlayReceivePayload& payload) noexcept {
     SferaNetworkMessageSlot* slot = acquire_directplay_receive_slot();
     auto& transport = g_sfera_directplay_runtime.transport;
     ++transport.sent_packet_count;
-    slot->message = kDirectPlayReceive;
+    slot->message = SferaDirectPlay::receive;
     slot->sender = payload.sender;
     slot->buffer_handle = UINT32_MAX;
-    const std::uint32_t previous_low = transport.sent_bytes.low;
-    transport.sent_bytes.low += payload.data_size;
-    transport.sent_bytes.high += transport.sent_bytes.low < previous_low ? 1u : 0u;
+    transport.sent_bytes += payload.data_size;
     slot->data_size = std::min<std::uint32_t>(payload.data_size, static_cast<std::uint32_t>(sizeof(slot->data) - 1u));
     if (slot->data_size != 0u && payload.data) {
         std::memcpy(slot->data, payload.data, slot->data_size);
@@ -530,15 +516,17 @@ static void dispatch_tcp_receive_packets(SferaTcpConnectionContext& context) noe
     auto* critical_section = &g_sfera_recovered_static_runtime.scene_lock;
     for (;;) {
         ::EnterCriticalSection(critical_section);
-        const auto* header = reinterpret_cast<const SferaTcpIncomingHeader*>(context.receive_buffer);
-        const std::uint16_t packet_size = context.receive_size >= sizeof(SferaTcpIncomingHeader) ? header->size : 0u;
-        const bool complete = context.receive_size >= sizeof(SferaTcpIncomingHeader) && context.receive_size >= packet_size;
+        const bool has_header = context.receive_size >= SferaTcpIncomingHeader::encodedSize;
+        const auto header = has_header ? SferaTcpIncomingHeader::decode(context.receive_buffer) : SferaTcpIncomingHeader{};
+        const std::uint16_t packet_size = header.size;
+        if (has_header && (packet_size < SferaTcpIncomingHeader::encodedSize || packet_size > kTcpReceiveBufferCapacity)) { context.receive_size = 0; g_sfera_network_runtime.initialization_result = UINT32_MAX; ::LeaveCriticalSection(critical_section); return; }
+        const bool complete = has_header && context.receive_size >= packet_size;
         ::LeaveCriticalSection(critical_section);
         if (!complete) {
             return;
         }
-        if (header->message == static_cast<std::uint16_t>(TcpMessage::payload)) {
-            const SferaDirectPlayReceivePayload payload{sizeof(SferaDirectPlayReceivePayload), context.remote_id, nullptr, context.receive_buffer + sizeof(SferaTcpIncomingHeader), packet_size - sizeof(SferaTcpIncomingHeader), UINT32_MAX};
+        if (header.message == static_cast<std::uint16_t>(TcpMessage::payload)) {
+            const SferaDirectPlayReceivePayload payload{sizeof(SferaDirectPlayReceivePayload), context.remote_id, nullptr, context.receive_buffer + SferaTcpIncomingHeader::encodedSize, packet_size - SferaTcpIncomingHeader::encodedSize, UINT32_MAX};
             enqueue_directplay_receive(payload);
         }
         ::EnterCriticalSection(critical_section);
@@ -547,40 +535,6 @@ static void dispatch_tcp_receive_packets(SferaTcpConnectionContext& context) noe
         ::LeaveCriticalSection(critical_section);
     }
 }
-
-static bool append_sound_event(SoundEventQueue* queue, const SoundEventRecord& event, float signal, std::uint32_t position) noexcept {
-    if (!queue) {
-        return false;
-    }
-    if (!queue->records || queue->count >= queue->capacity) {
-        const std::uint32_t next_capacity = queue->capacity == 0u ? queue->growth : queue->capacity + queue->growth;
-        if (next_capacity == 0u) {
-            return false;
-        }
-        void* memory = queue->records ? std::realloc(queue->records, sizeof(SoundEventRecord) * next_capacity) : std::malloc(sizeof(SoundEventRecord) * next_capacity);
-        if (!memory) {
-            return false;
-        }
-        queue->records = static_cast<SoundEventRecord*>(memory);
-        queue->capacity = next_capacity;
-    }
-    queue->records[queue->count++] = SoundEventRecord{event.type, event.argument, signal, position};
-    return true;
-}
-
-static bool pop_sound_event(SoundEventQueue* queue, SoundEventRecord& record) noexcept {
-    if (!queue || !queue->records || queue->count == 0u) {
-        return false;
-    }
-    record = queue->records[0];
-    --queue->count;
-    if (queue->count != 0u) {
-        std::move(queue->records + 1u, queue->records + queue->count + 1u, queue->records);
-    }
-    return true;
-}
-
-static SoundEventRecord next_sound_event(SferaSoundPlaybackState& state) noexcept { return state.nextEvent(); }
 
 static std::int32_t run_network_probe() noexcept {
     std::array<char, kPathBufferCapacity> system_directory{};
@@ -673,10 +627,10 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
                 context->received_bytes_window += static_cast<std::uint32_t>(received);
             }
         }
-        while (buffered >= sizeof(SferaTcpIncomingHeader)) {
-            const auto* header = reinterpret_cast<const SferaTcpIncomingHeader*>(local_buffer.data());
-            const std::uint16_t packet_size = header->size;
-            if (packet_size < sizeof(SferaTcpIncomingHeader) || packet_size > kTcpReceiveBufferCapacity) {
+        while (buffered >= SferaTcpIncomingHeader::encodedSize) {
+            const auto header = SferaTcpIncomingHeader::decode(local_buffer.data());
+            const std::uint16_t packet_size = header.size;
+            if (packet_size < SferaTcpIncomingHeader::encodedSize || packet_size > kTcpReceiveBufferCapacity) {
                 SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------ERROR: invalid packet size\n");
                 g_sfera_network_runtime.initialization_result = UINT32_MAX;
                 context->connected = 0u;
@@ -687,7 +641,7 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
             if (buffered < packet_size) {
                 break;
             }
-            const auto message = static_cast<TcpMessage>(header->message);
+            const auto message = static_cast<TcpMessage>(header.message);
             if (message == TcpMessage::connection_limit) {
                 SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------IN(ERROR): (limit connections)\n");
                 g_sfera_network_runtime.initialization_result = UINT32_MAX;
@@ -696,10 +650,10 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
                 terminate = true;
                 break;
             }
-            if (message == TcpMessage::handshake && packet_size >= sizeof(SferaTcpHandshakePacket)) {
-                const auto* handshake = reinterpret_cast<const SferaTcpHandshakePacket*>(local_buffer.data());
-                context->checksum_seed = handshake->checksum_seed;
-                context->remote_id = handshake->remote_id;
+            if (message == TcpMessage::handshake && packet_size >= SferaTcpHandshakePacket::encodedSize) {
+                const auto handshake = SferaTcpHandshakePacket::decode(local_buffer.data());
+                context->checksum_seed = handshake.checksum_seed;
+                context->remote_id = handshake.remote_id;
                 const std::uint32_t mode = g_sfera_directplay_runtime.transport.mode;
                 context->queuePacket(sizeof(mode), TcpMessage::client_mode, &mode);
                 g_sfera_network_runtime.initialization_result = 1u;
@@ -810,7 +764,7 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
     std::string destination;
     std::string sidecar;
     FILE* output = nullptr;
-    SferaUpdateMetadata response{};
+    std::array<std::uint8_t, SferaUpdateMetadata::encodedSize> response_bytes{};
     std::size_t response_used = 0u;
     std::array<std::uint8_t, 4096u> transfer{};
     while (!context->stop_requested) {
@@ -849,7 +803,7 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
             context->state = UpdateDownloadState::receive_metadata;
             progressed = true;
         } else if (context->state == UpdateDownloadState::receive_metadata && FD_ISSET(context->socket, &readable)) {
-            const int received = ::recv(context->socket, reinterpret_cast<char*>(&response) + response_used, static_cast<int>(sizeof(response) - response_used), 0);
+            const int received = ::recv(context->socket, reinterpret_cast<char*>(response_bytes.data() + response_used), static_cast<int>(response_bytes.size() - response_used), 0);
             if (received <= 0) {
 
                 finish(UpdateDownloadState::failed);
@@ -857,7 +811,8 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
             }
             response_used += static_cast<std::size_t>(received);
             progressed = true;
-            if (response_used == sizeof(response)) {
+            if (response_used == response_bytes.size()) {
+                const auto response = SferaUpdateMetadata::decode(response_bytes.data());
                 expected_size = response.file_size;
                 expected_crc = response.crc;
                 access_time = response.access_time;
@@ -868,9 +823,10 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
                 resume_offset = 0u;
                 FILE* metadata = open_file(sidecar.c_str(), "rb");
                 if (metadata) {
-                    SferaUpdateSidecar stored{};
-                    const bool valid_metadata = std::fread(&stored, sizeof(stored), 1u, metadata) == 1u;
+                    std::array<std::uint8_t, SferaUpdateSidecar::encodedSize> stored_bytes{};
+                    const bool valid_metadata = std::fread(stored_bytes.data(), 1u, stored_bytes.size(), metadata) == stored_bytes.size();
                     std::fclose(metadata);
+                    const auto stored = SferaUpdateSidecar::decode(stored_bytes.data());
                     if (valid_metadata && stored.crc == expected_crc && stored.file_size == expected_size) {
                         struct _stat64i32 file_info{};
                         if (_stat64i32(destination.c_str(), &file_info) == 0 && file_info.st_size > 0) {
@@ -884,8 +840,8 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
                 context->state = UpdateDownloadState::send_resume;
             }
         } else if (context->state == UpdateDownloadState::send_resume && FD_ISSET(context->socket, &writable)) {
-            const SferaUpdateResumeRequest request{{'R', 'S', 'A'}, resume_offset};
-            if (!update_send(context->socket, &request, static_cast<int>(sizeof(request)))) {
+            const auto request = SferaUpdateResumeRequest{resume_offset}.encode();
+            if (!update_send(context->socket, request.data(), static_cast<int>(request.size()))) {
 
                 finish(UpdateDownloadState::failed);
                 return 0u;
@@ -900,8 +856,8 @@ DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept {
             if (resume_offset == 0u) {
                 FILE* metadata = open_file(sidecar.c_str(), "wb");
                 if (metadata) {
-                    const SferaUpdateSidecar stored{expected_crc, expected_size};
-                    std::fwrite(&stored, sizeof(stored), 1u, metadata);
+                    const auto stored = SferaUpdateSidecar{expected_crc, expected_size}.encode();
+                    std::fwrite(stored.data(), 1u, stored.size(), metadata);
                     std::fclose(metadata);
                 }
             }
@@ -1048,7 +1004,7 @@ std::uint32_t __fastcall sfera_sound_decode_callback(CSoundStream* sound_stream,
     if (!playback) {
         return 0u;
     }
-    const auto event = next_sound_event(*playback);
+    const auto event = playback->nextEvent();
     if (event.type == SoundEventType::end) {
         if (sound_stream) {
             sound_stream->Stop();
@@ -1058,9 +1014,9 @@ std::uint32_t __fastcall sfera_sound_decode_callback(CSoundStream* sound_stream,
         return 0u;
     }
     const auto type = event.type;
-    const std::uint32_t index = event.argument;
+    const std::size_t index = event.argument;
     if (playback->force_stop) {
-        append_sound_event(playback->event_queue, event, -1.0f, UINT32_MAX);
+        playback->queueEvent(event, -1.0f, UINT32_MAX);
         if (sound_stream) {
             sound_stream->decode_event_position = UINT32_MAX;
         }
@@ -1071,10 +1027,10 @@ std::uint32_t __fastcall sfera_sound_decode_callback(CSoundStream* sound_stream,
     }
     if (type == SoundEventType::seek && index != 0u) {
         const auto* format = sound_stream ? sound_stream->Format() : nullptr;
-        if (playback->timings && index <= playback->timing_count && format) {
+        if (index <= playback->timings.size() && format) {
             const SferaSoundTiming& timing = playback->timings[index - 1u];
             const std::uint32_t byte_position = static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(static_cast<double>(format->nSamplesPerSec) * timing.seek_time))) * format->nBlockAlign;
-            append_sound_event(playback->event_queue, event, timing.signal, byte_position);
+            playback->queueEvent(event, timing.signal, byte_position);
             if (sound_stream) {
             sound_stream->SeekToTime(timing.seek_time);
             sound_stream->SetDecodeSignal(timing.signal);
@@ -1083,7 +1039,7 @@ std::uint32_t __fastcall sfera_sound_decode_callback(CSoundStream* sound_stream,
         return 1u;
     }
     if (type == SoundEventType::stop || (type == SoundEventType::wait && index != 0u)) {
-        append_sound_event(playback->event_queue, event, -1.0f, UINT32_MAX);
+        playback->queueEvent(event, -1.0f, UINT32_MAX);
         if (sound_stream) {
             sound_stream->decode_event_position = UINT32_MAX;
         }
@@ -1096,13 +1052,14 @@ std::uint32_t __fastcall sfera_sound_play_callback(CSoundStream* sound_stream, v
     if (!playback) {
         return 0u;
     }
-    SoundEventRecord record{};
-    if (!pop_sound_event(playback->event_queue, record)) {
+    const auto queued = playback->popEvent();
+    if (!queued) {
         if (sound_stream) {
             sound_stream->play_event_position = UINT32_MAX;
         }
         return 1u;
     }
+    const auto& record = *queued;
     const auto* format = sound_stream ? sound_stream->Format() : nullptr;
     if (sound_stream && record.position != UINT32_MAX && format) {
         const std::uint32_t signal_position = static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(static_cast<double>(format->nSamplesPerSec) * playback->play_signal))) * format->nBlockAlign;
@@ -1121,9 +1078,8 @@ std::uint32_t __fastcall sfera_sound_play_callback(CSoundStream* sound_stream, v
         if (sound_stream) {
             sound_stream->Stop();
         }
-        playback->pending_track = record.argument;
-        playback->timer_low = UINT32_MAX;
-        playback->timer_high = UINT32_MAX;
+        playback->wait_seconds = record.argument;
+        playback->wait_started_at = UINT64_MAX;
         playback->playing = 0u;
         return 1u;
     }
@@ -1171,7 +1127,7 @@ DWORD WINAPI sfera_directplay_heartbeat_thread(void*) noexcept {
             std::uint8_t payload = 5u;
             DWORD async_handle = 0u;
             const SferaDpnBufferDescRuntime buffer{1u, &payload};
-            client->Send(&buffer, 1u, kDirectPlayHeartbeatTimeoutMs, nullptr, &async_handle, kDirectPlayHeartbeatSendFlags);
+            client->Send(&buffer, 1u, kDirectPlayHeartbeatTimeoutMs, nullptr, &async_handle, SferaDirectPlay::heartbeatFlags);
         }
         ::Sleep(2000u);
     }
@@ -1182,23 +1138,23 @@ HRESULT WINAPI sfera_directplay_message_handler(void*, DWORD message, void* payl
         return S_OK;
     }
     log_directplay_message(message);
-    if (message == kDirectPlayTerminateSession) {
+    if (message == SferaDirectPlay::terminateSession) {
         g_sfera_network_runtime.initialization_result = UINT32_MAX;
-        g_sfera_network_runtime.timeout_marker_pending = 1u;
+        g_sfera_network_runtime.timeout_marker_pending = true;
         return S_OK;
     }
-    if (message == kDirectPlayConnectComplete) {
+    if (message == SferaDirectPlay::connectComplete) {
         const auto* result = static_cast<const SferaDirectPlayConnectResult*>(payload);
         g_sfera_network_runtime.initialization_result = result && SUCCEEDED(result->result) ? 1u : UINT32_MAX;
         return S_OK;
     }
-    if (message == kDirectPlayReceive && payload) {
+    if (message == SferaDirectPlay::receive && payload) {
         enqueue_directplay_receive(*static_cast<const SferaDirectPlayReceivePayload*>(payload));
     }
     return S_OK;
 }
 
 std::uint32_t __fastcall sfera_client_critical_error(const char* message, std::uint32_t critical) noexcept {
-    const int result = ::MessageBoxA(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(g_sfera_window_runtime.main_window)), message, critical ? "Critical" : "Error", critical ? MB_ICONERROR : (MB_ICONERROR | MB_OKCANCEL));
+    const int result = ::MessageBoxA(g_sfera_window_runtime.main_window_handle, message, critical ? "Critical" : "Error", critical ? MB_ICONERROR : (MB_ICONERROR | MB_OKCANCEL));
     return critical ? 0u : static_cast<std::uint32_t>(result == IDOK);
 }

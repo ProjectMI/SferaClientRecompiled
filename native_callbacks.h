@@ -11,25 +11,17 @@
 #include <string>
 #include "semantic_classes.h"
 
+namespace SferaDirectPlay {
+    enum SendFlags : DWORD { guaranteed = 1u << 3, nonSequential = 1u << 4, noLoopback = 1u << 5, highPriority = 1u << 7 };
+    constexpr DWORD messageBase = DWORD{UINT16_MAX} << 16;
+    enum Message : DWORD { connectComplete = messageBase | 5u, createPlayer = messageBase | 7u, destroyPlayer = messageBase | 9u, indicateConnect = messageBase | 14u, connectAborted = messageBase | 15u, receive = messageBase | 17u, terminateSession = messageBase | 22u };
+    constexpr DWORD heartbeatFlags = guaranteed | nonSequential | noLoopback | highPriority;
+}
+
 using SferaDirectPlayMessageHandler = HRESULT (WINAPI*)(void* context, DWORD message, void* payload);
 
 struct SferaDpnBufferDescRuntime;
 class CSoundStream;
-
-
-#pragma pack(push, 1)
-struct SferaTcpIncomingHeader {
-    std::uint16_t size;
-    std::uint16_t message;
-};
-
-struct SferaTcpHandshakePacket {
-    SferaTcpIncomingHeader header;
-    std::uint32_t remote_id;
-    std::uint16_t checksum_seed;
-};
-
-#pragma pack(pop)
 
 struct SferaDirectPlayReceivePayload {
     DWORD size;
@@ -48,29 +40,6 @@ struct SferaDirectPlayConnectResult {
     const void* reply_data;
     DWORD reply_size;
 };
-
-#pragma pack(push, 1)
-struct SferaUpdateMetadata {
-    std::uint32_t file_size;
-    std::uint32_t crc;
-    std::int32_t access_time;
-    std::int32_t modify_time;
-    std::uint32_t reserved;
-};
-
-struct SferaUpdateResumeRequest {
-    char command[3];
-    std::uint32_t offset;
-};
-
-struct SferaUpdateSidecar {
-    std::uint32_t crc;
-    std::uint32_t file_size;
-};
-#pragma pack(pop)
-
-
-
 
 class SferaBrowserHost final : public IOleClientSite, public IOleInPlaceSite, public IOleInPlaceFrame, public IDocHostUIHandler {
     class Storage final : public IStorage {
@@ -156,7 +125,6 @@ private:
     IOleObject* object_ = nullptr;
     Storage storage_;
 };
-
 
 struct SferaDirectPlayAddressNative {
     virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** output) = 0;

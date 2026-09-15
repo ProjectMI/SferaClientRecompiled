@@ -2,9 +2,13 @@
 
 #include <winsock2.h>
 #include <d3d9.h>
+#include <mmsystem.h>
+#include <dsound.h>
 #include <cstdio>
 #include <cstdarg>
 #include <atomic>
+#include <bit>
+#include <io.h>
 #include <iosfwd>
 #include <chrono>
 #include <filesystem>
@@ -33,6 +37,7 @@ struct SferaScreenVertex;
 #include <unordered_set>
 #include <cstdint>
 #include <string>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -45,7 +50,22 @@ struct SferaIntrusiveListHeader;
 class CSound;
 class StdAllocator;
 struct SferaMbcProcessRecord;
+struct SferaScriptContainer;
 
+namespace SferaBinary {
+    template<class T> requires (std::is_integral_v<T> && !std::is_same_v<T, bool>)
+    T readLittleEndian(const std::uint8_t* bytes) noexcept {
+        using Unsigned = std::make_unsigned_t<T>;
+        Unsigned value = 0;
+        for (std::size_t index = 0; index < sizeof(T); ++index) value |= static_cast<Unsigned>(static_cast<Unsigned>(bytes[index]) << (index * 8));
+        return std::bit_cast<T>(value);
+    }
+    template<class T> requires (std::is_integral_v<T> && !std::is_same_v<T, bool>)
+    void writeLittleEndian(std::uint8_t* bytes, T value) noexcept {
+        const auto bits = std::bit_cast<std::make_unsigned_t<T>>(value);
+        for (std::size_t index = 0; index < sizeof(T); ++index) bytes[index] = static_cast<std::uint8_t>(bits >> (index * 8));
+    }
+}
 
 struct SferaVec3F {
     float x;
@@ -118,18 +138,6 @@ struct SferaBoundsCornersRuntime {
     void getExtents(SferaVec3F& minimum, SferaVec3F& maximum) const;
 };
 
-struct SferaTransformRuntime {
-    SferaMatrix4x4F matrix = SferaMatrix4x4F::identity();
-    SferaVec3F scale{1.0f, 1.0f, 1.0f};
-    SferaVec3F secondary_scale{1.0f, 1.0f, 1.0f};
-    std::uint32_t flags = 65536u;
-};
-
-struct SferaSpatialStateRuntime {
-    SferaTransformRuntime transform;
-    SferaBoundsCornersRuntime bounds = SferaBoundsCornersRuntime::empty();
-};
-
 struct SferaPlaneF {
     SferaVec3F normal;
     float distance;
@@ -155,12 +163,12 @@ public:
 inline SferaPolygon3F g_sfera_clipped_polygon;
 
 struct SferaIntBounds3 {
-    std::uint32_t min_x;
-    std::uint32_t max_x;
-    std::uint32_t min_y;
-    std::uint32_t max_y;
-    std::uint32_t min_z;
-    std::uint32_t max_z;
+    std::int64_t min_x;
+    std::int64_t max_x;
+    std::int64_t min_y;
+    std::int64_t max_y;
+    std::int64_t min_z;
+    std::int64_t max_z;
 };
 
 struct SferaViewProjectionScratchRuntime {
@@ -171,8 +179,8 @@ struct SferaViewProjectionScratchRuntime {
 };
 
 struct SferaParserRange {
-    std::int32_t begin;
-    std::int32_t end;
+    std::ptrdiff_t begin;
+    std::ptrdiff_t end;
 };
 
 class SferaSimpleParser {
@@ -181,47 +189,46 @@ public:
     char* source_begin = nullptr;
     char* source_end = nullptr;
     char** line_table = nullptr;
-    std::uint32_t line_count = 0u;
+    std::ptrdiff_t line_count = 0u;
     char token[1024];
-    std::int32_t scan_begin;
-    std::int32_t scan_end;
-    std::int32_t block_begin;
-    std::int32_t block_end;
+    std::ptrdiff_t scan_begin;
+    std::ptrdiff_t scan_end;
+    std::ptrdiff_t block_begin;
+    std::ptrdiff_t block_end;
 
     void initialize();
     void release();
     void rebuildLineTable();
     void load(const char* filename);
     const char* firstToken(const char* line) const;
-    const char* lineAt(std::int32_t index) const;
-    std::int32_t findClosingBrace(std::int32_t begin, std::int32_t end) const;
-    std::int32_t parseBlockAt(const char* first_token, std::int32_t line_index, std::int32_t end, SferaParserRange* output_range);
-    bool findBlock(const char* name, SferaParserRange* output_range, const SferaParserRange* search_range, std::int32_t occurrence);
-    std::int32_t countBlocks(const char* name, const SferaParserRange* search_range);
+    const char* lineAt(std::ptrdiff_t index) const;
+    std::ptrdiff_t findClosingBrace(std::ptrdiff_t begin, std::ptrdiff_t end) const;
+    std::ptrdiff_t parseBlockAt(const char* first_token, std::ptrdiff_t line_index, std::ptrdiff_t end, SferaParserRange* output_range);
+    bool findBlock(const char* name, SferaParserRange* output_range, const SferaParserRange* search_range, std::ptrdiff_t occurrence);
+    std::ptrdiff_t countBlocks(const char* name, const SferaParserRange* search_range);
     bool findValue(const char* name, const SferaParserRange* search_range);
     void setScanRange(const SferaParserRange* range);
     void clearScanRange();
     bool nextValue(const char* name);
-    std::uint32_t tokenCount() const;
+    std::size_t tokenCount() const;
     void setBlockRange(const SferaParserRange* range);
     void clearBlockRange();
     bool nextBlock(const char* name, SferaParserRange* output_range);
     void getBlockRange(SferaParserRange* output_range) const;
     void getScanRange(SferaParserRange* output_range) const;
-    const char* tokenAt(std::uint32_t index) const;
-    bool tryReadFloat(std::uint32_t index, float& output) const;
-    bool tryReadInt(std::uint32_t index, std::int32_t& output) const;
-    bool readFloatSequence(std::uint32_t index, float* output, std::size_t count) const;
-    bool readIntSequence(std::uint32_t index, std::int32_t* output, std::size_t count) const;
-    float readFloat(std::uint32_t index) const;
-    std::int32_t readInt(std::uint32_t index) const;
-    char* readString(std::uint32_t index, char* output) const;
-    char* readStringBounded(std::uint32_t index, char* output, std::size_t capacity) const;
-    char* readQuotedString(std::uint32_t index, char* output) const;
-    bool readBool(std::uint32_t index) const;
+    const char* tokenAt(std::size_t index) const;
+    bool tryReadFloat(std::size_t index, float& output) const;
+    bool tryReadInt(std::size_t index, int& output) const;
+    bool readFloatSequence(std::size_t index, float* output, std::size_t count) const;
+    bool readIntSequence(std::size_t index, int* output, std::size_t count) const;
+    float readFloat(std::size_t index) const;
+    int readInt(std::size_t index) const;
+    char* readString(std::size_t index, char* output) const;
+    char* readStringBounded(std::size_t index, char* output, std::size_t capacity) const;
+    char* readQuotedString(std::size_t index, char* output) const;
+    bool readBool(std::size_t index) const;
     static bool equalsIgnoreCase(const char* left, const char* right);
 };
-
 
 using SferaEffectVec3F = SferaVec3F;
 
@@ -230,8 +237,9 @@ struct SferaEffectRenderSlot {
     std::uint32_t color[4][4];
     float uv[4][2];
     std::int32_t resource_id;
-    std::uint32_t blend_mode;
-    std::uint32_t primitive_kind;
+    int self_illumination;
+    bool additive;
+    bool custom_uv;
 };
 
 struct SferaRainParticle {
@@ -245,43 +253,25 @@ struct SferaRainParticle {
 
 struct SferaEffectParameter {
     std::uint32_t id;
-    std::uint32_t reserved;
+
     const void* value;
 };
 
 class SferaEffectTrack;
 struct SferaParticleSystemDefinition;
 
-struct SferaEffectColor32 {
-    union {
-        struct {
-            std::uint8_t red;
-            std::uint8_t green;
-            std::uint8_t blue;
-            std::uint8_t alpha;
-        };
-        std::uint8_t channels[4];
-    };
-};
-
 struct SferaEffectMeshResource {
-    char name[32];
-    std::uint32_t load_state;
-    std::uint32_t face_count;
-    std::uint32_t vertex_count;
-    std::uint32_t uv_count;
-    SferaEffectVec3F* vertices;
-    float (*uv)[2];
-    std::uint32_t (*face_vertices)[4];
-    std::uint32_t (*face_uv)[4];
-    SferaEffectColor32* colors;
-    SferaEffectVec3F* transformed_vertices;
-    float (*translated_uv)[2];
-    SferaEffectColor32* transformed_colors;
-    SferaEffectMeshResource* previous;
-    SferaEffectMeshResource* next;
-
-    void release();
+    char name[32]{};
+    std::vector<SferaEffectVec3F> vertices;
+    std::vector<std::array<float, 2>> uv;
+    std::vector<std::array<std::size_t, 4>> face_vertices;
+    std::vector<std::array<std::size_t, 4>> face_uv;
+    std::vector<SferaColor> colors;
+    std::vector<SferaEffectVec3F> transformed_vertices;
+    std::vector<std::array<float, 2>> translated_uv;
+    std::vector<SferaColor> transformed_colors;
+    SferaEffectMeshResource* previous = nullptr;
+    SferaEffectMeshResource* next = nullptr;
 };
 
 struct SferaEffectMeshDefinition {
@@ -296,9 +286,9 @@ struct SferaEffectMeshDefinition {
     SferaEffectTrack* color_track;
     float u_offset;
     float v_offset;
-    SferaEffectColor32 color;
-    std::uint32_t self_illumination;
-    std::uint32_t runtime_clone;
+    SferaColor color;
+    int self_illumination;
+    bool runtime_clone;
     std::uint32_t random_row;
     std::uint32_t random_offset;
     std::uint32_t random_state;
@@ -306,11 +296,12 @@ struct SferaEffectMeshDefinition {
     float transform[16];
     char* texture_name;
     std::int32_t texture_id;
-    std::uint32_t primitive_flags;
+    bool additive;
+    bool custom_uv;
 
     void initializeDefinition();
     bool loadDefinition(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range);
-    std::uint32_t renderSlotCount();
+    std::size_t renderSlotCount();
     void initializeClone();
     void resetClone(const SferaEffectMeshDefinition& source);
     void destroyClone();
@@ -322,17 +313,17 @@ struct SferaParticleRenderSlot {
     SferaEffectVec3F spawn_position;
     SferaEffectVec3F position;
     SferaEffectVec3F render_position;
-    SferaEffectColor32 color;
+    SferaColor color;
     float remaining_lifetime;
     float total_lifetime;
     float size;
     std::uint32_t random_row;
     std::uint16_t random_seed_0;
     std::uint16_t random_seed_1;
-    std::uint16_t size_track_index;
-    std::uint16_t color_track_index;
-    std::uint16_t velocity_track_index;
-    std::uint16_t gravity_track_index;
+    SferaEffectTrack* size_track;
+    SferaEffectTrack* color_track;
+    SferaEffectTrack* velocity_track;
+    SferaEffectTrack* gravity_track;
     float texture_frame;
     SferaParticleSystemDefinition* linked_particle_system;
     std::int32_t link_index;
@@ -340,7 +331,7 @@ struct SferaParticleRenderSlot {
 
 struct SferaParticleSystemLink {
     char* target_name;
-    std::uint32_t instance_count;
+    std::size_t instance_count;
     SferaParticleSystemDefinition* runtime_cursor;
     SferaParticleSystemDefinition* runtime_begin;
     std::int32_t target_index;
@@ -353,9 +344,10 @@ struct SferaParticleTextureFrame {
 };
 
 struct SferaParticleSystemDefinition {
+    enum class Shape { Points, Line, Disk, Sphere, Box, Cylinder, Ring, Annulus };
     char* name;
     SferaParticleRenderSlot* render_slots;
-    std::uint32_t shape;
+    Shape shape;
     float radius;
     float height;
     float width;
@@ -363,7 +355,7 @@ struct SferaParticleSystemDefinition {
     std::int32_t random_factor;
     SferaEffectVec3F direction;
     SferaEffectVec3F* shape_points;
-    std::uint32_t shape_point_count;
+    std::size_t shape_point_count;
     SferaEffectVec3F emitter_position;
     SferaEffectTrack* emission_track;
     SferaEffectTrack* emission_position_track;
@@ -372,13 +364,13 @@ struct SferaParticleSystemDefinition {
     SferaEffectTrack* rotation_track;
     SferaEffectTrack* scale_track;
     SferaEffectTrack* position_track;
-    std::uint32_t render_slot_count;
-    std::uint32_t active_particle_count;
+    std::size_t render_slot_count;
+    std::size_t active_particle_count;
     SferaEffectTrack* lifetime_track;
     float lifetime_random_factor;
     float lifetime;
     float emission_fraction;
-    std::uint32_t phase_mode;
+    bool emitting;
     SferaEffectTrack* power_track;
     float power;
     SferaEffectTrack* magnet_factor_track;
@@ -390,30 +382,31 @@ struct SferaParticleSystemDefinition {
     SferaEffectVec3F current_position;
     SferaEffectVec3F previous_position;
     SferaEffectVec3F previous_origin;
-    std::uint8_t first_update;
+    bool first_update;
     std::uint32_t runtime_random_row;
     std::uint32_t runtime_random_seed_0;
     std::uint32_t runtime_random_seed_1;
-    std::uint32_t self_illumination;
-    std::uint32_t texture_flags;
+    int self_illumination;
+    bool additive;
+    bool custom_uv;
     SferaEffectVec3F render_basis[4];
     float transform[16];
-    std::uint32_t size_track_count;
-    std::uint32_t color_track_count;
-    std::uint32_t velocity_track_count;
-    std::uint32_t gravity_track_count;
+    std::size_t size_track_count;
+    std::size_t color_track_count;
+    std::size_t velocity_track_count;
+    std::size_t gravity_track_count;
     SferaEffectTrack** size_tracks;
     SferaEffectTrack** color_tracks;
     SferaEffectTrack** velocity_tracks;
     SferaEffectTrack** gravity_tracks;
     SferaParticleTextureFrame* texture_frames;
-    std::uint32_t texture_frame_count;
+    std::size_t texture_frame_count;
     float texture_animation_speed;
     SferaParticleSystemLink* links;
-    std::uint32_t link_count;
-    std::uint32_t runtime_active;
-    std::uint32_t runtime_stop_requested;
-    std::uint32_t runtime_clone;
+    std::size_t link_count;
+    bool runtime_active;
+    bool runtime_stop_requested;
+    bool runtime_clone;
 
     void initializeDefinition();
     bool loadDefinition(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range);
@@ -425,63 +418,49 @@ struct SferaParticleSystemDefinition {
 };
 
 struct SferaSubeffectDefinition {
-    std::uint16_t definition_index;
-    std::uint8_t kind;
+    enum class Kind { ParticleSystem, Mesh };
+    std::ptrdiff_t definition_index;
+    Kind kind;
     std::uint8_t attach_mode;
 };
 
 struct SferaSoundSource {
     char* filename;
-    std::uint8_t silence;
+    bool silence;
     float silence_duration;
 };
 
 struct SferaSoundTimeGroup {
     float begin;
     float end;
-    std::uint32_t source_begin = 0u;
-    std::uint32_t source_end = 0u;
-};
-
-struct SferaSound3DParameters {
-    std::uint32_t structure_size;
-    SferaEffectVec3F position;
-    SferaEffectVec3F velocity;
-    std::uint32_t inside_cone_angle;
-    std::uint32_t outside_cone_angle;
-    SferaEffectVec3F cone_orientation;
-    std::int32_t cone_outside_volume;
-    float min_distance;
-    float max_distance;
-    std::uint32_t mode;
+    std::size_t source_begin = 0u;
+    std::size_t source_end = 0u;
 };
 
 class CSoundEffect {
 public:
     std::uint32_t effect_number;
     std::uint32_t flags;
-    std::uint32_t silence_active;
-    std::uint32_t silence_reserved;
-    std::uint32_t silence_started_low;
-    std::uint32_t silence_started_high;
+    bool silence_active;
+
+    std::uint64_t silence_started_at;
     float silence_duration;
     float saved_play_time;
-    std::uint32_t transition_started_low;
-    std::uint32_t transition_started_high;
+    std::uint64_t transition_started_at;
     SferaSoundSource* sources;
-    std::uint32_t source_count;
+    std::size_t source_count;
     SferaSoundTimeGroup* time_groups;
-    std::uint32_t time_group_count;
-    std::uint32_t distance_paused;
+    std::size_t time_group_count;
+    bool distance_paused;
     SferaEffectVec3F offset;
     SferaEffectVec3F region_radius;
     SferaEffectVec3F region_offset;
     float mix_duration;
-    std::int32_t last_source_index;
+    std::optional<std::size_t> last_source_index;
     CSound* active_sound;
     std::int32_t cache_lifetime;
-    std::uint32_t shared_definition;
-    SferaSound3DParameters sound_parameters;
+    bool shared_definition;
+    DS3DBUFFER sound_parameters;
     SferaEffectVec3F last_position;
 
     void initialize();
@@ -490,8 +469,8 @@ public:
     void resetFrom(const CSoundEffect& source);
     void destroy();
     float startTime() const;
-    void start(void* frame, bool after_start_time);
-    void update(void* frame, float age);
+    void start(const SferaEffectVec3F* frame, bool after_start_time);
+    void update(const SferaEffectVec3F* frame, float age);
     void stop();
     bool isComplete() const;
 };
@@ -504,10 +483,10 @@ struct SferaActiveEffect {
     std::uint32_t source_handle;
     std::uint32_t age_ticks;
     SferaEffectVec3F position;
-    std::uint32_t reserved_update_handler;
+
     IEffect* effect;
     CSoundEffect* resource;
-    std::uint32_t sound_started;
+    bool sound_started;
     std::uint32_t listener_key;
     float viewer_distance;
     SferaActiveEffect* next;
@@ -523,17 +502,17 @@ public:
     std::int32_t light_index;
     SferaEffectVec3F position;
     float color[4];
-    std::uint32_t field_2c;
-    std::uint32_t field_30;
-    std::uint32_t flags;
+    bool shared_tracks;
+    bool registered;
+    bool randomize_color;
+    bool vary_brightness;
     std::int32_t random_color[6];
     float brightness;
     float brightness_delta;
     std::uint8_t brightness_frequency;
-    std::uint8_t reserved_59[3];
-    std::uint32_t field_5c;
+
+    std::uint64_t brightness_tick;
     std::uint8_t attach_mode;
-    std::uint8_t reserved_61[3];
 
     void initializeDefaults();
     bool load(SferaSimpleParser& parser, const SferaParserRange& range);
@@ -541,44 +520,42 @@ public:
     void release();
 };
 
-
 struct SferaEffectTrackKey {
     float time;
-    std::uint32_t mode;
+    enum class Mode { Fixed, Random, MirroredRandom };
+    Mode mode;
     float scalar_min;
     float scalar_max;
-    SferaEffectColor32 color;
-    SferaEffectColor32 color_random_range;
+    SferaColor color;
+    SferaColor color_random_range;
     float vector_min[3];
     float vector_max[3];
 };
 
-
 class SferaEffectTrack {
 public:
     SferaEffectTrackKey* keys;
-    std::uint32_t key_count;
-    std::uint32_t state;
+    std::size_t key_count;
+    bool cosine_interpolation;
 
     void initialize();
     void release();
-    void allocateKeys(std::uint32_t count);
-    void setKey(std::uint32_t index, const SferaEffectTrackKey& key);
+    void allocateKeys(std::size_t count);
+    void setKey(std::size_t index, const SferaEffectTrackKey& key);
     void evaluateVector(float age, SferaEffectVec3F& output) const;
     void evaluateScalar(float age, float& output, const std::uint16_t* random_values = nullptr, std::uint32_t random_offset = 0u) const;
 };
-
 
 SferaEffectTrack* sfera_load_scalar_effect_track(SferaSimpleParser* parser, const SferaParserRange* range);
 SferaEffectTrack* sfera_load_vector_effect_track(SferaSimpleParser* parser, const SferaParserRange* range);
 
 struct SferaEffectUpdateContext {
-    void* frame;
+    const SferaEffectVec3F* frame;
     float viewer_distance;
 };
 
 struct SferaEffectQueryContext {
-    void* frame;
+    const SferaEffectVec3F* frame;
     float age;
 };
 
@@ -591,11 +568,11 @@ struct SferaEffectWorldFrames {
 };
 
 struct SferaEffectInitializeContext {
-    void* spatial_frame;
+    const SferaEffectVec3F* spatial_frame;
     std::uint32_t mode;
     float age;
     bool visible;
-    void* world_frame;
+    const float (*world_frame)[16];
 };
 
 class IEffectListener {
@@ -626,42 +603,43 @@ struct SferaBloodVertex {
 
 struct SferaBloodSpot {
     float life;
-    std::uint32_t vertex_count;
+    std::size_t vertex_count;
     SferaBloodVertex vertices[90];
 };
 
 struct SferaBloodEffectRuntime : BloodEffListener {
     void render();
     SferaBloodSpot spots[30];
-    std::uint32_t active_count;
+    std::size_t active_count;
     float phase;
-    std::uint32_t texture_id;
+    int texture_id;
 };
 
 class IEffect {
 public:
+    enum class Kind { Preset, Scripted, Rain = 3 };
     char* script_name;
     std::uint32_t effect_id;
-    std::uint8_t borrows_definition_storage;
-    std::uint8_t deactivated;
-    std::uint8_t resources_released;
-    std::uint8_t activation_blocked;
+    bool borrows_definition_storage;
+    bool deactivated;
+    bool resources_released;
+    bool activation_blocked;
     std::uint32_t cycle_length;
     std::uint32_t lifetime_ticks;
     float range_min;
     float range_max;
     IEffect* next;
     IEffect* previous;
-    std::uint32_t effect_kind;
+    Kind effect_kind;
     SferaEffectVec3F position;
     IEffectListener* listener;
     float bounds_min[3];
     float bounds_max[3];
-    std::uint8_t spatial_gate_enabled;
-    std::uint32_t render_slot_budget;
+    bool spatial_gate_enabled;
+    std::size_t render_slot_budget;
 
     IEffect() = default;
-    void initializeBaseState(std::uint32_t kind);
+    void initializeBaseState(Kind kind);
     void assignScriptName(const char* name);
     virtual void initializeEffect(const SferaEffectInitializeContext& context);
     virtual void updateEffect(const SferaEffectUpdateContext& context);
@@ -670,7 +648,7 @@ public:
     virtual void deactivateEffect(bool preserve_resources);
     virtual void renderEffect();
     virtual IEffect* createEffectResources();
-    virtual void setParameter(const SferaEffectParameter* parameters, std::uint32_t count);
+    virtual void setParameter(const SferaEffectParameter* parameters, std::size_t count);
     virtual void resetEffect();
     virtual void releaseEffect();
     virtual bool isEffectComplete() const;
@@ -680,36 +658,36 @@ public:
 class CScriptedEffect : public IEffect {
 public:
     CScriptedEffect* pooled_instances[16];
-    std::uint32_t pooled_count;
+    std::size_t pooled_count;
     CScriptedEffect* source_definition;
     SferaSubeffectDefinition* subeffects;
-    std::uint32_t sound_started;
-    std::uint32_t update_visible_only;
-    std::uint32_t effect_type;
+    bool sound_started;
+    bool update_visible_only;
+    bool completes_immediately;
     CSoundEffect* sound_effect;
-    std::uint32_t effect_mesh_definition_count;
-    std::uint32_t light_definition_count;
-    std::uint32_t subeffect_count;
-    std::uint32_t particle_system_definition_count;
-    std::uint32_t linked_particle_system_count;
-    std::uint32_t linked_render_slot_count;
+    std::size_t effect_mesh_definition_count;
+    std::size_t light_definition_count;
+    std::size_t subeffect_count;
+    std::size_t particle_system_definition_count;
+    std::size_t linked_particle_system_count;
+    std::size_t linked_render_slot_count;
     std::uint32_t phase_ticks_remaining;
     std::uint32_t work_time_min;
     std::uint32_t work_time_max;
     std::uint32_t sleep_time_min;
     std::uint32_t sleep_time_max;
-    std::uint32_t work_phase;
+    bool work_phase_active;
     SferaEffectMeshDefinition* effect_mesh_definitions;
     SferaLightDefinition* light_definitions;
     SferaParticleSystemDefinition* particle_system_definitions;
-    void* linked_render_slots;
+    SferaParticleRenderSlot* linked_render_slots;
     SferaParticleSystemDefinition* linked_particle_systems;
 
     CScriptedEffect() = default;
     void initializeScriptedState();
     bool loadScript(const char* filename);
-    std::int32_t findEffectMeshDefinitionIndex(const char* name) const;
-    std::int32_t findParticleSystemDefinitionIndex(const char* name) const;
+    std::ptrdiff_t findEffectMeshDefinitionIndex(const char* name) const;
+    std::ptrdiff_t findParticleSystemDefinitionIndex(const char* name) const;
     void buildLinkedParticleSystems();
     void resetRuntimeState();
     void initializeEffect(const SferaEffectInitializeContext& context) override;
@@ -719,7 +697,7 @@ public:
     void deactivateEffect(bool preserve_resources) override;
     void renderEffect() override;
     IEffect* createEffectResources() override;
-    void setParameter(const SferaEffectParameter* parameters, std::uint32_t count) override;
+    void setParameter(const SferaEffectParameter* parameters, std::size_t count) override;
     void releaseEffect() override;
     bool isEffectComplete() const override;
     void destroyEffect(bool free_storage) override;
@@ -736,17 +714,17 @@ public:
     void deactivateEffect(bool preserve_resources) override;
     void renderEffect() override;
     IEffect* createEffectResources() override;
-    void setParameter(const SferaEffectParameter* parameters, std::uint32_t count) override;
+    void setParameter(const SferaEffectParameter* parameters, std::size_t count) override;
 };
 
 class CMolEffect : public IEffect {
 public:
     SferaEffectVec3F anchor;
     float texture_phase;
-    std::uint32_t anchor_initialized;
+    bool anchor_initialized;
     std::int32_t resource_id;
     CSoundEffect* sound_effect;
-    std::uint32_t sound_started;
+    bool sound_started;
     CMolEffect() = default;
     void initializePreset();
     void initializeEffect(const SferaEffectInitializeContext& context) override;
@@ -755,7 +733,7 @@ public:
     void deactivateEffect(bool preserve_resources) override;
     void renderEffect() override;
     IEffect* createEffectResources() override;
-    void setParameter(const SferaEffectParameter* parameters, std::uint32_t count) override;
+    void setParameter(const SferaEffectParameter* parameters, std::size_t count) override;
     void destroyEffect(bool free_storage) override;
 };
 
@@ -763,7 +741,7 @@ class CBladeEffect : public IEffect {
 public:
     SferaEffectVec3F anchor;
     float progress;
-    std::uint32_t anchor_initialized;
+    bool anchor_initialized;
     std::int32_t resource_id;
     CBladeEffect() = default;
     void initializePreset();
@@ -773,7 +751,7 @@ public:
     void deactivateEffect(bool preserve_resources) override;
     void renderEffect() override;
     IEffect* createEffectResources() override;
-    void setParameter(const SferaEffectParameter* parameters, std::uint32_t count) override;
+    void setParameter(const SferaEffectParameter* parameters, std::size_t count) override;
 };
 
 struct SferaGazerEffectSlot {
@@ -785,18 +763,18 @@ struct SferaGazerEffectSlot {
 class CGazerLakeEffect : public IEffect {
 public:
     std::uint32_t field_5c;
-    std::uint32_t slot_count;
+    std::size_t slot_count;
     float radius;
     SferaGazerEffectSlot slots[16];
     CGazerLakeEffect() = default;
-    void initializePreset(std::uint32_t id, float effect_radius, std::uint32_t count);
+    void initializePreset(std::uint32_t id, float effect_radius, std::size_t count);
     void initializeEffect(const SferaEffectInitializeContext& context) override;
     void updateEffect(const SferaEffectUpdateContext& context) override;
     bool activateEffect(bool visible) override;
     void deactivateEffect(bool preserve_resources) override;
     void renderEffect() override;
     IEffect* createEffectResources() override;
-    void setParameter(const SferaEffectParameter* parameters, std::uint32_t count) override;
+    void setParameter(const SferaEffectParameter* parameters, std::size_t count) override;
     void destroyEffect(bool free_storage) override;
 };
 
@@ -816,21 +794,20 @@ public:
     void deactivateEffect(bool preserve_resources) override;
     void renderEffect() override;
     IEffect* createEffectResources() override;
-    void setParameter(const SferaEffectParameter* parameters, std::uint32_t count) override;
+    void setParameter(const SferaEffectParameter* parameters, std::size_t count) override;
     void destroyEffect(bool free_storage) override;
 };
 
 class CLightEffect : public IEffect {
 public:
-    std::uint32_t field_5c;
     float color[4];
-    float field_70;
-    std::uint32_t field_74;
-    std::int32_t field_78;
-    float field_7c;
-    std::uint8_t field_80;
-    std::uint8_t reserved_81[3];
-    std::uint32_t field_84;
+    float radius;
+    bool registered;
+    std::int32_t light_index;
+    float brightness_jitter;
+    std::uint8_t brightness_frequency;
+
+    std::uint64_t brightness_tick;
     CLightEffect() = default;
     void initializePreset();
     void initializeEffect(const SferaEffectInitializeContext& context) override;
@@ -839,7 +816,7 @@ public:
     void deactivateEffect(bool preserve_resources) override;
     void renderEffect() override;
     IEffect* createEffectResources() override;
-    void setParameter(const SferaEffectParameter* parameters, std::uint32_t count) override;
+    void setParameter(const SferaEffectParameter* parameters, std::size_t count) override;
     void destroyEffect(bool free_storage) override;
 };
 
@@ -881,48 +858,14 @@ private:
     std::uint32_t timestamp_ = 0;
 };
 
-class SferaHashMap {
-public:
-    struct Entry { std::uint32_t value; std::uint32_t key_length; std::uint16_t next; std::vector<std::uint8_t> key; };
-    std::uint32_t max_key_length;
-    std::vector<Entry> entries;
-    std::uint32_t entry_capacity;
-    std::vector<std::uint8_t> key_buffer;
-    std::uint16_t free_entry;
-    std::uint16_t field_16;
-    std::vector<std::uint16_t> buckets;
-    std::uint16_t invalid_entry;
-    std::uint8_t case_sensitive;
-    std::uint8_t field_1f;
-    std::uint32_t bucket_count;
-    std::uint32_t* result_pointer;
-    std::uint32_t field_28;
-    std::uint32_t field_2c;
-    std::uint16_t current_index;
-    std::uint16_t field_36;
-    Entry* current_entry;
-    Entry* previous_entry;
-    std::uint16_t next_index;
-    std::uint16_t hash_value;
-    SferaHashMap() = default;
-    SferaHashMap* initialize(std::uint32_t maximum_key_length, bool keys_case_sensitive, std::int32_t initial_capacity, std::uint32_t hash_bucket_count);
-    Entry* entry(std::uint16_t index);
-    const Entry* entry(std::uint16_t index) const;
-    std::uint32_t findEntry(const char* key, std::uint32_t length, bool normalize_case);
-    std::uint32_t findValue(const char* key);
-    bool erase(const char* key, std::uint32_t length);
-    std::uint32_t insert(const char* key, std::uint32_t length, const std::uint32_t* value);
-    void releaseStorage();
-};
-
 class CItem {
 public:
-    char name[150];
-    std::uint8_t active;
-    float position_x;
-    float position_y;
-    float position_z;
-    CItem() {}
+    char name[150]{};
+    bool active = false;
+    float position_x = 0.0f;
+    float position_y = 0.0f;
+    float position_z = 0.0f;
+    CItem() = default;
     void setName(const char* text);
     virtual void resetItem();
     virtual void releaseItem();
@@ -930,28 +873,27 @@ public:
 
 class CCommonItem : public CItem {
 public:
-    std::uint32_t field_a8;
-    std::uint32_t field_ac;
-    std::uint32_t field_b0;
-    std::uint32_t field_b4;
-    std::uint32_t field_b8;
-    std::uint8_t payload[256];
-    CCommonItem() {}
+    int field_a8 = 0;
+    int field_ac = 0;
+    int field_b0 = 0;
+
+    std::uint32_t field_b8 = 0;
+    std::uint8_t payload[256]{};
+    CCommonItem() = default;
 };
 
 class CItemListCommonItem : public CItem {
 public:
-    std::uint32_t minimum_items = 0;
-    std::uint32_t capacity = 0;
-    std::uint32_t item_count = 0;
+    std::size_t minimum_items = 0;
+    std::size_t capacity = 0;
+    std::size_t item_count = 0;
     std::uint32_t list_mode = 0;
     std::uint32_t item_parameter = 0;
-    std::uint32_t field_bc = 0;
-    std::uint32_t field_c0 = 0;
-    std::int32_t iterator_index = 0;
-    std::uint8_t diagnostics_mode = 0;
-    SferaHashMap* item_index = nullptr;
-    void* item_storage = nullptr;
+
+    std::ptrdiff_t iterator_index = 0;
+    int diagnostics_mode = 0;
+    std::unordered_map<std::string, std::size_t> item_index;
+    std::vector<CCommonItem> item_storage;
     CItemListCommonItem() {}
     std::int32_t initialize(std::int32_t minimum, std::int32_t, std::uint32_t mode, const char* list_name, std::uint32_t parameter);
     CCommonItem* findStoredItem(const CItem* key);
@@ -964,7 +906,8 @@ public:
 
 class CBaseManagerCommonItem : public CItemListCommonItem {
 public:
-    std::uint8_t manager_diagnostics_mode = 0;
+    std::vector<CItemListCommonItem> list_storage;
+    int manager_diagnostics_mode = 0;
     std::uint32_t field_d8 = 0;
     CBaseManagerCommonItem() {}
     void dumpLists();
@@ -1009,8 +952,8 @@ public:
     CSound* first;
     CSound* last;
     float volume;
-    std::uint32_t enabled;
-    std::uint32_t count;
+    bool enabled;
+    std::size_t count;
 };
 
 struct SferaCursorPosition { std::int32_t x; std::int32_t y; };
@@ -1019,15 +962,15 @@ public:
     struct ImageLayer {
         std::int32_t x = 0;
         std::int32_t y = 0;
-        std::uint32_t texture = UINT32_MAX;
-        std::uint32_t width = 0u;
-        std::uint32_t height = 0u;
+        int texture = -1;
+        int width = 0u;
+        int height = 0u;
     };
     struct TextLayer {
         std::int32_t x = 0;
         std::int32_t y = 0;
         std::string text;
-        std::uint32_t font = 0u;
+        int font = 0u;
         std::uint32_t color = 0u;
     };
     bool system_visible = true;
@@ -1036,12 +979,12 @@ public:
     SferaInterfaceCursor() = default;
     bool loadTextures();
     void setImage(std::size_t layer, const char* texture, std::int32_t x, std::int32_t y);
-    void setImageSize(std::size_t layer, std::uint32_t width, std::uint32_t height);
-    void setText(std::size_t layer, const char* text, std::int32_t x, std::int32_t y, std::uint32_t font, std::uint32_t color);
+    void setImageSize(std::size_t layer, int width, int height);
+    void setText(std::size_t layer, const char* text, std::int32_t x, std::int32_t y, int font, std::uint32_t color);
     void setKind(std::uint32_t cursor_kind);
     void draw(float x, float y) const;
 private:
-    std::array<std::uint32_t, 4> textures{};
+    std::array<int, 4> textures{};
     std::array<ImageLayer, 3> images{};
     std::array<TextLayer, 3> labels{};
 };
@@ -1070,8 +1013,8 @@ public:
     std::uint32_t texture_width = 0u;
     std::uint32_t texture_height = 0u;
     HCURSOR cursor_handle = nullptr;
-    std::uint8_t clip_enabled = 0u;
-    std::uint8_t saved_system_visible = 0u;
+    bool clip_enabled = false;
+    bool saved_system_visible = 0u;
     std::uint32_t kind = 255u;
     std::int32_t saved_x = 0;
     std::int32_t saved_y = 0;
@@ -1099,8 +1042,8 @@ public:
     std::uint32_t texture_height = 0u;
     std::int32_t x = 0;
     std::int32_t y = 0;
-    std::uint8_t active = 0u;
-    std::uint8_t saved_system_visible = 0u;
+    bool active = 0u;
+    bool saved_system_visible = 0u;
     std::uint32_t saved_kind = 255u;
     std::int32_t saved_x = 0;
     std::int32_t saved_y = 0;
@@ -1145,11 +1088,11 @@ private:
 class UnmanagedResourceVB final : public UnmanagedResourceBase {
 public:
     IDirect3DVertexBuffer9* native_buffer = nullptr;
-    std::uint32_t length;
-    std::uint32_t usage;
-    std::uint32_t fvf;
+    std::size_t length;
+    DWORD usage;
+    DWORD fvf;
     D3DPOOL pool;
-    UnmanagedResourceVB(CD3D9Device& device, std::uint32_t length, std::uint32_t usage, std::uint32_t fvf, D3DPOOL pool);
+    UnmanagedResourceVB(CD3D9Device& device, std::size_t length, DWORD usage, DWORD fvf, D3DPOOL pool);
     ~UnmanagedResourceVB() override;
     void restoreResource() override;
     void releaseResource() override;
@@ -1158,11 +1101,11 @@ public:
 class UnmanagedResourceIB final : public UnmanagedResourceBase {
 public:
     IDirect3DIndexBuffer9* native_buffer = nullptr;
-    std::uint32_t length;
-    std::uint32_t usage;
+    std::size_t length;
+    DWORD usage;
     D3DFORMAT format;
     D3DPOOL pool;
-    UnmanagedResourceIB(CD3D9Device& device, std::uint32_t length, std::uint32_t usage, D3DFORMAT format, D3DPOOL pool);
+    UnmanagedResourceIB(CD3D9Device& device, std::size_t length, DWORD usage, D3DFORMAT format, D3DPOOL pool);
     ~UnmanagedResourceIB() override;
     void restoreResource() override;
     void releaseResource() override;
@@ -1187,23 +1130,23 @@ public:
 class DynamicVertexStream {
 public:
     std::unique_ptr<UnmanagedResourceVB> buffer;
-    std::uint32_t capacity = 0u;
-    std::uint32_t position = 0u;
-    DynamicVertexStream(CD3D9Device& device, std::uint32_t stride, std::uint32_t fvf);
-    std::byte* lock(std::int32_t count);
+    std::size_t capacity = 0u;
+    std::size_t position = 0u;
+    DynamicVertexStream(CD3D9Device& device, std::size_t stride, DWORD fvf);
+    template<class Vertex> Vertex* lock(std::size_t count);
 private:
     CD3D9Device& device;
-    std::uint32_t stride;
-    std::uint32_t fvf;
+    std::size_t stride;
+    DWORD fvf;
 };
 
 class DynamicIndexStream {
 public:
     std::unique_ptr<UnmanagedResourceIB> buffer;
-    std::uint32_t capacity = 0u;
-    std::uint32_t position = 0u;
+    std::size_t capacity = 0u;
+    std::size_t position = 0u;
     explicit DynamicIndexStream(CD3D9Device& device);
-    std::uint16_t* lock(std::int32_t count);
+    std::uint16_t* lock(std::size_t count);
 private:
     CD3D9Device& device;
 };
@@ -1248,8 +1191,8 @@ public:
     void setColorOperation(std::uint32_t stage, D3DTEXTUREOP operation, std::uint32_t first, std::uint32_t second);
     void setAlphaOperation(std::uint32_t stage, D3DTEXTUREOP operation, std::uint32_t first, std::uint32_t second);
     void setWhiteMaterial(float alpha);
-    void drawBuffer(IDirect3DVertexBuffer9* vertices, D3DPRIMITIVETYPE topology, std::uint32_t flags, std::int32_t base_vertex, std::uint32_t vertex_count, IDirect3DIndexBuffer9* indices, std::uint32_t index_count, std::uint32_t start_index, std::uint32_t stride);
-    void drawVertices(D3DPRIMITIVETYPE topology, std::uint32_t flags, const void* vertices, std::uint32_t vertex_count, const std::uint16_t* indices, std::uint32_t index_count, std::uint32_t stride);
+    void drawBuffer(IDirect3DVertexBuffer9* vertices, D3DPRIMITIVETYPE topology, std::uint32_t flags, std::ptrdiff_t base_vertex, std::size_t vertex_count, IDirect3DIndexBuffer9* indices, std::size_t index_count, std::size_t start_index, std::size_t stride);
+    void drawVertices(D3DPRIMITIVETYPE topology, std::uint32_t flags, const void* vertices, std::size_t vertex_count, const std::uint16_t* indices, std::size_t index_count, std::size_t stride);
     bool beginScene();
     void releaseResources();
     void restoreResources();
@@ -1259,7 +1202,6 @@ private:
     friend class UnmanagedResourceBase;
     std::vector<UnmanagedResourceBase*> unmanaged_resources;
 };
-
 
 class StdAllocator {
 public:
@@ -1280,13 +1222,13 @@ public:
     int open(const char* filename, int flags);
     int create(const char* filename);
     int transformEnvelope(const char* destination, const char* source, bool compress);
-    int read(int descriptor, void* destination, std::uint32_t size);
-    int write(int descriptor, const void* source, std::uint32_t size);
-    std::int32_t seek(int descriptor, std::int32_t offset, int origin);
+    std::ptrdiff_t read(int descriptor, void* destination, std::size_t size);
+    std::ptrdiff_t write(int descriptor, const void* source, std::size_t size);
+    std::int64_t seek(int descriptor, std::int64_t offset, int origin);
     int close(int descriptor);
-    std::int32_t fileSize(const char* filename);
+    std::int64_t fileSize(const char* filename);
     std::vector<std::uint8_t> readAll(const char* filename);
-    void keepTail(const char* filename, std::uint32_t size);
+    void keepTail(const char* filename, std::size_t size);
     void addSearchPath(const char* directory);
     std::vector<std::string> candidatePaths(const char* filename, bool search_nested_paths = false) const;
 private:
@@ -1305,50 +1247,24 @@ inline SferaFileManager g_sfera_files;
 // End recovered files cluster.
 
 // Begin recovered quickfile cluster.
-struct CHash16Entry {
-    std::uint32_t length;
-    std::uint32_t value;
-    std::uint16_t next;
-    std::vector<std::uint8_t> bytes;
-    std::uint8_t* key();
-    const std::uint8_t* key() const;
-};
-
-class CHash16 {
-public:
-    static constexpr std::uint16_t no_entry = std::numeric_limits<std::uint16_t>::max();
-    std::uint32_t max_key_length;
-    std::uint32_t missing_value;
-    std::vector<CHash16Entry> entries;
-    std::uint32_t entry_capacity;
-    std::uint16_t free_entry;
-    std::uint16_t buckets[65536];
-    CHash16* initialize(std::uint32_t maximum_key_length, std::uint32_t absent_value, std::uint32_t initial_capacity);
-    void release();
-    std::uint32_t find(const void* key, std::uint32_t length, bool fold_case);
-    bool insert(const void* key, std::uint32_t length, std::uint32_t value, bool fold_case);
-private:
-    CHash16Entry& entry(std::uint16_t index);
-    void reserve(std::uint32_t capacity);
-};
-
 struct QuickFileEntry {
-    std::uint32_t size;
-    std::uint8_t* data;
+    std::vector<std::uint8_t> bytes;
+    std::uint16_t module_id;
 };
 
 class QuickFile {
 public:
-    static constexpr std::size_t file_capacity = 400u;
-    QuickFileEntry files[file_capacity];
-    CHash16 index;
-    std::uint16_t count;
+    static constexpr std::size_t file_capacity = 400;
     QuickFile* initialize(const char* directory);
     void release();
-    std::int32_t load(const char* filename, std::uint32_t size);
-    std::uint8_t* find(const char* filename, std::uint32_t* size, std::uint16_t* file_id);
+    int load(const char* filename, std::size_t size);
+    const QuickFileEntry* find(std::string_view filename) const;
+private:
+    static constexpr std::size_t maximum_filename_length = 32;
+    std::vector<QuickFileEntry> files;
+    std::unordered_map<std::string, std::size_t> index;
+    static std::string filenameKey(std::string_view filename);
 };
-
 
 // End recovered quickfile cluster.
 
@@ -1356,7 +1272,7 @@ public:
 class SferaFileMap {
 public:
     const std::byte* mapped_view;
-    std::uint32_t file_size;
+    std::size_t file_size;
     char filename[32];
 
     explicit SferaFileMap(const char* path) noexcept;
@@ -1366,16 +1282,14 @@ public:
     bool open(const char* path) noexcept;
     void close() noexcept;
     bool isOpen() const noexcept;
-    std::uint32_t size() const noexcept;
+    std::size_t size() const noexcept;
     const std::byte* data() const noexcept;
 
 private:
     void reportError(const char* format, bool fatal) const noexcept;
 };
 
-
 // End recovered filemap cluster.
-
 
 namespace SphereUI {
     struct CursorGeometry {
@@ -1415,16 +1329,30 @@ namespace SphereUI {
         std::int16_t bearing_x = 0;
         std::int16_t bearing_y = 0;
         std::int16_t advance = 0;
-        std::uint16_t reserved = 0u;
+
         float u0 = 0.0f;
         float v0 = 0.0f;
         float u1 = 0.0f;
         float v1 = 0.0f;
+        static constexpr std::size_t encodedSize = 28;
+        static FontGlyph decode(const std::uint8_t* bytes) {
+            FontGlyph glyph;
+            glyph.width = SferaBinary::readLittleEndian<std::uint16_t>(bytes);
+            glyph.height = SferaBinary::readLittleEndian<std::uint16_t>(bytes + 2);
+            glyph.bearing_x = SferaBinary::readLittleEndian<std::int16_t>(bytes + 4);
+            glyph.bearing_y = SferaBinary::readLittleEndian<std::int16_t>(bytes + 6);
+            glyph.advance = SferaBinary::readLittleEndian<std::int16_t>(bytes + 8);
+            glyph.u0 = std::bit_cast<float>(SferaBinary::readLittleEndian<std::uint32_t>(bytes + 12));
+            glyph.v0 = std::bit_cast<float>(SferaBinary::readLittleEndian<std::uint32_t>(bytes + 16));
+            glyph.u1 = std::bit_cast<float>(SferaBinary::readLittleEndian<std::uint32_t>(bytes + 20));
+            glyph.v1 = std::bit_cast<float>(SferaBinary::readLittleEndian<std::uint32_t>(bytes + 24));
+            return glyph;
+        }
     };
 
     class FontFace {
     public:
-        std::uint32_t texture = std::numeric_limits<std::uint32_t>::max();
+        int texture = -1;
         std::array<FontGlyph, 256> glyphs{};
         std::string name;
         std::int32_t line_height = 0;
@@ -1434,9 +1362,9 @@ namespace SphereUI {
 
     class InterfaceRenderer {
     public:
-        static TextExtent measureText(const char* text, std::uint32_t font, bool initialized);
-        static std::uint32_t tracking(std::uint32_t font) noexcept;
-        static void drawText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, std::uint32_t font, bool initialized, const UiRect& clip, bool opaque);
+        static TextExtent measureText(const char* text, int font, bool initialized);
+        static std::uint32_t tracking(int font) noexcept;
+        static void drawText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, int font, bool initialized, const UiRect& clip, bool opaque);
         static void reportError(const char* message);
         static void drawTexture(IDirect3DBaseTexture9* texture, float left, float top, float right, float bottom, std::uint32_t color, float u = 1.0f, float v = 1.0f, bool textured = true);
         static void setSpriteRenderMode(std::uint32_t mode);
@@ -1444,15 +1372,15 @@ namespace SphereUI {
         static void setViewport(const UiViewport& viewport);
 
     private:
-        static void drawFaceText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, std::uint32_t font, const UiRect& clip);
+        static void drawFaceText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, int font, const UiRect& clip);
     };
 
     class InterfaceConfiguration {
     public:
         static const char* value(const char* key);
         static void open(const char* filename);
-        static void readInteger(const char* key, std::uint32_t& value);
-        static void writeInteger(const char* key, std::uint32_t value);
+        static int readInteger(const char* key, int fallback);
+        static void writeInteger(const char* key, int value);
         static void save();
     };
 
@@ -1467,14 +1395,14 @@ namespace SphereUI {
         bool load(const char* filename, const char* texture_name);
         void loadNamedFont(const char* name);
         void loadConfiguration();
-        std::uint32_t count() const noexcept;
-        const FontFace& face(std::uint32_t font) const;
+        std::size_t count() const noexcept;
+        const FontFace& face(int font) const;
     private:
         friend class InterfaceRenderer;
         std::vector<std::unique_ptr<FontFace>> faces;
         std::vector<SferaScreenVertex> vertices;
         std::vector<std::uint16_t> quad_indices;
-        std::uint32_t vertex_count = 0u;
+        std::size_t vertex_count = 0u;
     };
 }
 
@@ -1521,17 +1449,17 @@ namespace SphereUI {
         std::vector<HyperTextRegion> links;
         std::vector<HyperTextRegion> tooltips;
         std::int32_t line_height = 0;
-        std::uint32_t font = 0;
+        int font = 0;
         std::uint32_t link_color = D3DCOLOR_ARGB(255, 80, 160, 160);
         std::uint32_t hover_color = D3DCOLOR_ARGB(255, 255, 255, 0);
         HyperTextDocument() = default;
-        HyperTextDocument(std::string_view text, std::int32_t width, std::uint32_t format, std::uint32_t font);
+        HyperTextDocument(std::string_view text, std::int32_t width, std::uint32_t format, int font);
         void setName(const char* value);
         bool load(const char* filename);
         void load(const SferaSimpleParser& parser, const SferaParserRange& range);
         void parse(std::string_view input);
-        HyperTextDocument* clone(std::int32_t width, std::uint32_t format, std::uint32_t font) const;
-        void layout(std::int32_t width, std::uint32_t format, std::uint32_t font);
+        HyperTextDocument* clone(std::int32_t width, std::uint32_t format, int font) const;
+        void layout(std::int32_t width, std::uint32_t format, int font);
         void draw(std::int32_t left, std::int32_t top, std::int32_t clip_offset, std::int32_t clip_height, std::uint32_t alpha);
         std::int32_t totalHeight() const;
         void resetRegions();
@@ -1547,7 +1475,7 @@ namespace SphereUI {
         static UiString* buildLink(UiString& output, UiString& scheme, UiString& target, UiString& caption);
         static bool extractPlayerPrefix(UiString& input, UiString* output, UiString* plain);
         static bool removePlayerPrefix(UiString& input, UiString* output, UiString* plain);
-        static bool eraseRange(UiString& input, std::uint32_t first, std::uint32_t last, UiString* output, UiString* plain);
+        static bool eraseRange(UiString& input, std::size_t first, std::size_t last, UiString* output, UiString* plain);
         static HyperTextCommand command(std::string_view name);
         static bool parseCommand(std::string_view tag, HyperDocumentNode& node, std::string& argument);
         static void parseImage(std::string_view argument, HyperDocumentNode& node);
@@ -1568,7 +1496,6 @@ struct LocalizedTextEntry {
     std::string key;
     std::string value;
 };
-
 
 class InterfaceManager {
 public:
@@ -1596,7 +1523,7 @@ public:
     SavedWindowPosition* savedPosition(const char* name, bool create);
     bool findSavedPosition(const char* name, SferaCursorPosition& position);
     void saveWindowPosition(Window& window);
-    std::uint32_t savedPositionsSize() const;
+    std::size_t savedPositionsSize() const;
     void writeSavedPositions(std::span<std::byte> destination) const;
     void readSavedPositions(std::span<const std::byte> source);
     enum OpenFlag : std::uint32_t { explicitPosition = 1u, preserveVisibility = 2u, skipOpeningAnimation = 4u, centerOnScreen = 8u };
@@ -1641,7 +1568,7 @@ public:
     void setCursorImage(const char* texture, std::int32_t x, std::int32_t y);
     void update(std::uint8_t key = 0u, std::uint8_t character = 0u, std::uint32_t mouse_buttons = 0u, std::int32_t wheel_delta = 0);
     void draw();
-    std::uint32_t sendMessage(Window* window, std::uint32_t message, std::uint32_t first, std::uint32_t second);
+    std::uint32_t sendMessage(Window* window, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second);
     void showLoadingScreen(bool visible, std::int32_t width, std::int32_t height, bool english);
     void setLoadingProgress(std::int32_t percent);
     void registerWindow(Window& window);
@@ -1660,9 +1587,9 @@ inline SphereUI::InterfaceManager g_sfera_interface;
 namespace SphereUI {
     struct ImageDescriptionParameters {
         char texture_name[64];
-        std::uint32_t width;
-        std::uint32_t height;
-        std::uint32_t rectangle[4];
+        int width;
+        int height;
+        UiRect rectangle;
         std::uint32_t flags;
     };
 
@@ -1671,7 +1598,6 @@ namespace SphereUI {
         ImageDescriptionParameters image;
     };
 }
-
 
 namespace SphereRender {
 
@@ -1703,6 +1629,7 @@ private:
     class Parser;
     std::vector<Value> values_;
     static StorageMode storage_mode_;
+    static constexpr std::uint8_t storageKey = 203;
 };
 
 class ModelParameters {
@@ -1738,25 +1665,24 @@ public:
     void load(const char* binary_path, const char* configuration_path = "Models\\Materials.cfg");
     void clear();
     const Material* find(std::string_view name) const;
-    std::optional<std::uint16_t> findIndex(std::string_view name) const;
-    std::optional<std::uint16_t> indexOf(const Material& material) const;
     const Material* at(std::size_t index) const;
     const Material* defaultMaterial() const;
     std::size_t size() const;
 private:
     std::vector<Material> materials_;
-    std::optional<std::uint16_t> default_index_;
+    std::optional<std::size_t> default_index_;
 };
 
 }
 inline SphereRender::MaterialLibrary g_sfera_materials;
-
 
 namespace SphereRender {
 
 class ModelParameters;
 class MaterialLibrary;
 struct Material;
+
+enum class CollisionKind { AxisAlignedBounds, OrientedBounds, Triangles, None };
 
 struct ModelVertex {
     SferaVec3F position{};
@@ -1768,20 +1694,17 @@ struct ModelVertex {
 
 struct ModelFace {
     std::uint16_t vertices[3]{};
-    std::uint32_t attributes = 0u;
 };
 
 struct Submesh {
-    std::uint8_t bone_index = 0u;
+    std::size_t bone_index = 0u;
     bool inverted_fade = false;
-    std::uint16_t material_index = 0u;
-    std::uint16_t first_face = 0u;
-    std::uint16_t face_count = 0u;
-    std::uint16_t first_vertex = 0u;
-    std::uint16_t vertex_count = 0u;
-    std::uint8_t flags = 0u;
-    std::array<std::uint16_t, 2> export_metadata{};
-    std::uint8_t boneIndex() const noexcept { return bone_index; }
+    const Material* material = nullptr;
+    std::size_t first_face = 0u;
+    std::size_t face_count = 0u;
+    std::size_t first_vertex = 0u;
+    std::size_t vertex_count = 0u;
+
 };
 
 struct BoneBounds {
@@ -1793,17 +1716,17 @@ struct BoneBounds {
 };
 
 struct BoneAnimation {
-    std::uint8_t suppress_secondary_animation = 0u;
-    std::uint8_t animated = 0u;
-    std::uint16_t pose_index = 0u;
+    bool suppress_secondary_animation = false;
+    bool animated = false;
+    std::size_t pose_index = 0u;
     std::uint8_t attachment_slot = 255u;
 };
 
 struct Bone {
     char name[32]{};
-    std::uint8_t geometry_kind = 0u;
-    std::uint8_t child_count = 0u;
-    std::uint8_t first_child = 0u;
+    bool has_geometry = true;
+    std::size_t child_count = 0u;
+    std::size_t first_child = 0u;
     union { BoneBounds bounds{}; BoneAnimation animation; };
 };
 
@@ -1812,19 +1735,17 @@ struct ModelKeyframe {
     SferaQuaternionF rotation{};
 };
 
-#pragma pack(push, 1)
 struct AnimationFrame {
-    std::uint16_t keyframe = 0u;
+    std::size_t keyframe = 0u;
     std::uint8_t interpolation = 255u;
 };
-#pragma pack(pop)
 
 struct FaceColorIndices { std::uint16_t vertices[3]{}; };
 
 struct ModelCollisionGroup {
-    std::uint32_t bone = 0u;
-    std::uint32_t triangle_count = 0u;
-    std::uint32_t first_triangle = 0u;
+    std::size_t bone = 0u;
+    std::size_t triangle_count = 0u;
+    std::size_t first_triangle = 0u;
 };
 
 struct ModelCollisionTriangle {
@@ -1839,10 +1760,11 @@ struct ModelCollisionTriangle {
 enum class VegetationKind : std::int32_t { None = -1, Grass = 0, SynchronizedGrass = 1, InteractiveGrass = 2, Tree = 3 };
 
 struct GrassInfluence {
-    enum : std::uint16_t { Fixed = 65535u, Horizontal = 65534u };
-    std::uint16_t anchor_vertex = Fixed;
-    std::uint16_t phase = 0u;
-    std::uint16_t share_phase = 0u;
+    enum class Anchor { Fixed, Horizontal, Vertex };
+    Anchor anchor_kind = Anchor::Fixed;
+    std::size_t anchor_vertex = 0;
+    std::uint16_t phase = 0;
+    bool share_phase = false;
     float distance = 0.0f;
 };
 
@@ -1862,27 +1784,26 @@ struct VegetationVertex { SferaVec3F position{}; SferaVec3F normal{}; };
 class Model {
 public:
     char name[32]{};
-    std::uint32_t vertex_count = 0u;
+    std::size_t vertex_count = 0u;
     ModelVertex* vertices = nullptr;
-    std::uint32_t face_count = 0u;
+    std::size_t face_count = 0u;
     ModelFace* faces = nullptr;
-    std::uint32_t submesh_count = 0u;
+    std::size_t submesh_count = 0u;
     Submesh* submeshes = nullptr;
-    std::uint32_t bone_count = 0u;
+    std::size_t bone_count = 0u;
     Bone* bones = nullptr;
-    std::uint8_t render_flags = 0u;
-    std::uint32_t material_count = 0u;
-    std::uint16_t* material_indices = nullptr;
-    std::uint8_t* child_bones = nullptr;
-    std::uint8_t animation_count = 0u;
-    std::uint16_t frame_count = 0u;
+    std::size_t root_bone = 0;
+    std::vector<const Material*> materials;
+    std::size_t* child_bones = nullptr;
+    std::size_t animation_count = 0u;
+    std::size_t frame_count = 0u;
     ModelKeyframe* keyframes = nullptr;
     AnimationFrame* animation_frames = nullptr;
-    std::uint16_t* animation_lengths = nullptr;
-    std::uint8_t has_vertex_colors = 0u;
+    std::size_t* animation_lengths = nullptr;
+    bool has_vertex_colors = false;
     std::uint32_t* vertex_colors = nullptr;
     FaceColorIndices* face_colors = nullptr;
-    std::uint32_t collision_kind = 0u;
+    CollisionKind collision_kind = CollisionKind::AxisAlignedBounds;
     SferaVec3F minimum{};
     SferaVec3F maximum{};
     SferaBoundsCornersRuntime oriented_corners{};
@@ -1891,7 +1812,7 @@ public:
     SferaVec3F oriented_size{};
     float radius = 0.0f;
     float minimum_size = 0.0f;
-    std::uint32_t collision_group_count = 0u;
+    std::size_t collision_group_count = 0u;
     ModelCollisionGroup* collision_groups = nullptr;
     ModelCollisionTriangle* collision_triangles = nullptr;
     float lod_distance = 1000.0f;
@@ -1899,7 +1820,7 @@ public:
     float shadow_fade = 0.5f;
     float shadow_scale = 2.0f;
     float shadow_spread = 0.85f;
-    std::uint32_t casts_static_shadow = 0u;
+    bool casts_static_shadow = false;
     float trace_distance = -1.0f;
     VegetationKind vegetation_kind = VegetationKind::None;
     union { GrassInfluence* grass_influences = nullptr; TreeInfluence* tree_influences; };
@@ -1917,21 +1838,20 @@ public:
     void prepareGrass(bool synchronized, float ground_y);
     void prepareTree(float dead_radius, float phase_multiplier);
     void prepareVegetation(const ModelParameters& parameters);
-    void initializeGrassGeometry(std::uint32_t vertices_needed, std::uint32_t faces_needed, float height);
+    void initializeGrassGeometry(std::size_t vertices_needed, std::size_t faces_needed, float height);
     void finishGrassGeometry(std::span<const Submesh> groups);
 
 private:
     void recoverBounds();
-    void assignMaterials(const MaterialLibrary& materials);
+    void assignMaterials();
     std::unique_ptr<ModelVertex[]> vertex_storage_;
     std::unique_ptr<ModelFace[]> face_storage_;
     std::unique_ptr<Submesh[]> submesh_storage_;
     std::unique_ptr<Bone[]> bone_storage_;
-    std::unique_ptr<std::uint16_t[]> material_storage_;
-    std::unique_ptr<std::uint8_t[]> child_bone_storage_;
+    std::unique_ptr<std::size_t[]> child_bone_storage_;
     std::unique_ptr<ModelKeyframe[]> keyframe_storage_;
     std::unique_ptr<AnimationFrame[]> animation_frame_storage_;
-    std::unique_ptr<std::uint16_t[]> animation_length_storage_;
+    std::unique_ptr<std::size_t[]> animation_length_storage_;
     std::unique_ptr<std::uint32_t[]> vertex_color_storage_;
     std::unique_ptr<FaceColorIndices[]> face_color_storage_;
     std::unique_ptr<ModelCollisionGroup[]> collision_group_storage_;
@@ -1942,7 +1862,6 @@ private:
 };
 
 }
-
 
 namespace SphereRender {
     struct SceneSortEntry;
@@ -1958,18 +1877,18 @@ namespace SphereRender {
         void addFolder(const char* directory);
         void finishRegistration();
         void clear();
-        std::int32_t find(const char* name) const;
-        IDirect3DBaseTexture9* resource(std::uint32_t index);
-        SphereUI::TextExtent size(std::uint32_t index);
-        bool hasAlpha(std::uint32_t index);
+        int find(const char* name) const;
+        IDirect3DBaseTexture9* resource(int index);
+        SphereUI::TextExtent size(int index);
+        bool hasAlpha(int index);
         std::size_t count() const { return entries.size(); }
-        std::uint32_t defaultTexture() const { return default_texture; }
+        int defaultTexture() const { return default_texture; }
     private:
         std::vector<Entry> entries;
-        std::unordered_map<std::string, std::uint32_t> names;
-        std::uint32_t default_texture = UINT32_MAX;
+        std::unordered_map<std::string, int> names;
+        int default_texture = -1;
         bool initialized = false;
-        Entry* resolve(std::uint32_t index);
+        Entry* resolve(int index);
         void load(Entry& entry, std::span<const std::uint8_t> bytes);
     };
 
@@ -1984,27 +1903,26 @@ namespace SphereRender {
         void initialize();
         void addFolder(const char* directory);
         void finishRegistration();
-        std::int32_t find(const char* name) const;
-        Model* model(std::uint32_t index);
+        int find(const char* name) const;
+        Model* model(int index);
         void releaseModels();
         void evictUnused(std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now());
         void clear();
         void recordRequest(std::string_view name);
         void writeRequestStatistics() const;
         std::size_t count() const { return entries.size(); }
-        std::map<std::string, std::uint32_t> request_counts;
+        std::map<std::string, std::size_t> request_counts;
         ModelParameters parameters;
     private:
         std::vector<Entry> entries;
-        std::unordered_map<std::string, std::uint32_t> names;
-        std::uint32_t requests_since_scan = 0;
+        std::unordered_map<std::string, int> names;
+        std::size_t requests_since_scan = 0;
         std::size_t scan_index = 0;
     };
 }
 
 inline SphereRender::TextureRepository g_sfera_textures;
 inline SphereRender::ModelRepository g_sfera_models;
-
 
 class CD3D9Device;
 struct ID3DXConstantTable;
@@ -2068,7 +1986,6 @@ private:
     void blur();
 };
 
-
 struct WaterMaterial {
     std::uint32_t primary_animation;
     std::uint32_t secondary_animation;
@@ -2081,28 +1998,25 @@ struct WaterMaterial {
 struct SferaGraphicsRuntime {
     float fog_distance;
     float saved_fog_distance;
-    uint32_t lods_enabled;
-    uint32_t hardware_cursor_enabled;
+    bool lods_enabled;
+    bool hardware_cursor_enabled;
     float environment_factor;
-    uint8_t render_mode_enabled;
+    bool render_mode_enabled;
     uint32_t base_microtexture_id;
     float view_parameter;
     float view_scale;
-    uint32_t post_effects_enabled;
+    bool post_effects_enabled;
     uint32_t rebuild_percent;
     uint32_t runtime_counter;
     float base_render_factor;
-    uint32_t display_width;
-    uint32_t display_height;
+    int display_width;
+    int display_height;
     std::unique_ptr<CD3D9Device> d3d_runtime;
     std::array<WaterMaterial, 10> water_materials{};
     void initialize();
     void initializeWater();
 };
-union SferaLogPath {
-    char text[52];
-    uint32_t words[13];
-};
+struct SferaLogPath { char text[52]; };
 struct SferaAntifloodQueueRuntime {
     std::array<std::string, 20> messages;
     std::array<std::string, 20> keys;
@@ -2150,9 +2064,8 @@ private:
 };
 
 struct SferaStringLookupRuntime {
-    uint16_t hash_mix[256];
     uint8_t case_fold[256];
-    uint32_t initialized;
+    bool initialized;
     std::array<char32_t, 256> unicode_cp1251{};
     std::array<std::uint8_t, 256> lowercase_cp1251{};
     void initialize();
@@ -2163,11 +2076,10 @@ struct SferaStringLookupRuntime {
     static std::uint32_t copyString(char* destination, const char* source, std::int32_t capacity);
 };
 
-
 struct SferaLogFileRuntime {
     SferaLogPath path;
-    uint32_t truncate_on_first_write;
-    uint32_t has_written;
+    bool truncate_on_first_write;
+    bool has_written;
     uint32_t size_limit;
     std::FILE* open() const;
     void write(const char* text);
@@ -2185,7 +2097,6 @@ struct SferaLogRuntime {
     static void datedPath(char* destination, const char* path);
 };
 
-
 struct SferaLandscapeMapRecord;
 struct SferaViewProjectionScratchRuntime;
 
@@ -2195,43 +2106,40 @@ namespace SphereUI::Memory { struct AllocationRecord; struct AllocationSource; }
 
 struct SferaMemoryRuntime {
     const char* allocation_source_name;
-    uint32_t allocation_source_line;
-    uint32_t reserved_critical_handler;
-    uint32_t tracker_primary;
-    uint32_t tracker_auxiliary;
-    uint32_t tracker_floor;
-    uint32_t tracker_ceiling;
-    uint32_t bucket_bytes[1024];
-    uint32_t bucket_allocations[1024];
-    uint8_t tracking_initialized;
-    uint8_t diagnostics_dirty;
-    uint32_t live_allocation_count;
-    uint32_t validation_pass_count;
-    CRITICAL_SECTION critical_section;
-    uint8_t lock_initialized;
-    uint8_t lock_held;
-};
+    unsigned int allocation_source_line;
 
+    std::size_t tracker_primary;
+    std::size_t tracker_auxiliary;
+    std::size_t tracker_floor;
+    std::size_t tracker_ceiling;
+    std::size_t bucket_bytes[1024];
+    std::size_t bucket_allocations[1024];
+    bool tracking_initialized;
+    bool diagnostics_dirty;
+    std::size_t live_allocation_count;
+    std::size_t validation_pass_count;
+    CRITICAL_SECTION critical_section;
+    bool lock_initialized;
+    bool lock_held;
+};
 
 struct SferaMemorySourceHashRuntime {
     void grow();
-    std::uint16_t findOrInsert(const char* name);
+    std::size_t findOrInsert(const char* name);
     SphereUI::Memory::AllocationSource* source_entries;
-    uint32_t capacity;
-    uint16_t free_index;
-    uint16_t bucket_heads[1024];
+    std::size_t capacity;
+    std::size_t free_index;
+    std::size_t bucket_heads[1024];
 };
-
 
 struct SferaAllocationHashRuntime {
     void grow();
-    std::uint32_t* findLink(SphereUI::Memory::AllocationHeader* allocation);
+    std::size_t* findLink(SphereUI::Memory::AllocationHeader* allocation);
     SphereUI::Memory::AllocationRecord* allocation_records;
-    uint32_t capacity;
-    uint32_t free_index;
-    uint32_t bucket_heads[65536];
+    std::size_t capacity;
+    std::size_t free_index;
+    std::size_t bucket_heads[65536];
 };
-
 
 struct SferaConfigTextRuntime {
     enum class Operation : std::int32_t { Write = 13, Read = 14, Load = 15, Save = 16, Clear = 17, UseText = 30, ReadCommands = 54, SaveCompressed = 55, CopyText = 56, Length = 57, SetFilename = 62 };
@@ -2242,19 +2150,18 @@ struct SferaConfigTextRuntime {
     static constexpr std::size_t text_capacity = 2458176u;
     char text_storage[text_capacity];
     char* text_buffer;
-    std::uint32_t text_length;
+    std::size_t text_length;
     char parser_path[1024];
-    std::uint32_t copyText(const char* source, std::uint32_t length, char* path);
+    std::size_t copyText(const char* source, std::size_t length, char* path);
     void useText(char* source, char* path);
     void clear(char* path, const char* filename);
     char* find(const char* key) const;
     bool readInteger(const char* key, std::int32_t& value) const;
     bool readFloat(const char* key, float& value) const;
-    bool readString(const char* key, char* destination, std::uint32_t capacity) const;
-    bool readBinary(const char* key, std::uint8_t* destination, std::uint32_t capacity) const;
-    std::uint32_t copyTo(char* destination, std::uint32_t capacity) const;
-    static bool writeFile(const char* path, const void* data, std::uint32_t size);
-    static void copyBits(std::uint8_t* destination, std::int32_t* destinationBit, const std::uint8_t* source, std::int32_t* sourceBit, std::int32_t count, std::int32_t capacity);
+    bool readString(const char* key, char* destination, std::size_t capacity) const;
+    bool readBinary(const char* key, std::uint8_t* destination, std::size_t capacity) const;
+    std::size_t copyTo(char* destination, std::size_t capacity) const;
+    static bool writeFile(const char* path, const void* data, std::size_t size);
 };
 
 struct SferaErrorLogRuntime {
@@ -2282,8 +2189,7 @@ struct SferaExecutionMonitorRuntime {
 };
 
 struct SferaCrashReportRuntime {
-    char report_text[8192]{};
-    std::uint32_t report_length = 0;
+
     char error_log_path[MAX_PATH]{};
     LPTOP_LEVEL_EXCEPTION_FILTER previous_exception_filter = nullptr;
     HANDLE process_handle = nullptr;
@@ -2315,8 +2221,9 @@ private:
 struct SferaDebugScriptArrays {
     struct Range { std::uint32_t begin; std::uint32_t end; bool operator==(const Range&) const = default; };
     struct Module { bool enabled = false; std::vector<Range> ranges; };
-    static constexpr std::uint32_t begin_guard = 0xDEEDDEEDu;
-    static constexpr std::uint8_t end_guard = 0xDEu;
+    // Boundary signatures stored in compiled MBC modules.
+    static constexpr std::array<std::uint8_t, 4> begin_guard{237, 222, 237, 222};
+    static constexpr std::uint8_t end_guard = 222;
     std::array<Module, 4096> modules;
     std::int32_t current_process = -1;
     std::uint32_t current_code_range = 0;
@@ -2338,7 +2245,19 @@ private:
 };
 
 struct SferaCrc32Runtime {
-    std::uint32_t table[256]{};
+    static constexpr std::array<std::uint32_t, 256> makeTable() {
+        constexpr std::array<unsigned, 14> exponents{26, 23, 22, 16, 12, 11, 10, 8, 7, 5, 4, 2, 1, 0};
+        std::uint32_t polynomial = 0;
+        for (const auto exponent : exponents) polynomial |= 1u << (31u - exponent);
+        std::array<std::uint32_t, 256> result{};
+        for (std::uint32_t index = 0; index < result.size(); ++index) {
+            auto value = index;
+            for (unsigned bit = 0; bit < std::numeric_limits<std::uint8_t>::digits; ++bit) value = (value >> 1u) ^ ((value & 1u) != 0u ? polynomial : 0u);
+            result[index] = value;
+        }
+        return result;
+    }
+    std::array<std::uint32_t, 256> table{};
     std::uint32_t current = 0;
     void initialize();
     std::uint32_t calculate(const void* data, std::size_t size, std::uint32_t seed = 0u, bool signedShift = false) const;
@@ -2400,18 +2319,18 @@ struct SferaCrtStartupRuntime {
 
 class WorldMemory {
 public:
-    static void* allocate(std::size_t size, const char* source = nullptr, std::uint32_t line = 0u, bool zeroed = true);
-    static void* reallocate(void* memory, std::size_t size, const char* source = nullptr, std::uint32_t line = 0u);
-    static void release(void* memory, const char* source = nullptr, std::uint32_t line = 0u);
+    static void* allocate(std::size_t size, const char* source = nullptr, unsigned int line = 0u, bool zeroed = true);
+    static void* reallocate(void* memory, std::size_t size, const char* source = nullptr, unsigned int line = 0u);
+    static void release(void* memory, const char* source = nullptr, unsigned int line = 0u);
     static void validateBeforeTermination();
     static std::size_t allocatedBytes(void* memory);
     static std::size_t payloadSize(void* memory);
 private:
-    static void validateAllocation(const SphereUI::Memory::AllocationRecord& record, const char* source, std::uint32_t line);
-    static void validateRecent(const char* source, std::uint32_t line);
+    static void validateAllocation(const SphereUI::Memory::AllocationRecord& record, const char* source, unsigned int line);
+    static void validateRecent(const char* source, unsigned int line);
     static void resetSource();
-    static void registerAllocation(SphereUI::Memory::AllocationHeader* header, std::size_t size, std::uint16_t source, std::uint32_t line);
-    static void unregisterAllocation(std::uint32_t index, std::uint32_t& hashLink);
+    static void registerAllocation(SphereUI::Memory::AllocationHeader* header, std::size_t size, std::size_t source, unsigned int line);
+    static void unregisterAllocation(std::size_t index, std::size_t& hashLink);
 };
 class WorldDiagnostics {
 public:
@@ -2436,23 +2355,23 @@ public:
 };
 template<class T> struct SferaBoundCheckArray {
     T* data;
-    uint32_t capacity;
+    std::size_t capacity;
     char debug_file[32];
     uint32_t debug_line;
 
     T* element(std::size_t index) const noexcept { return data && index < capacity ? &data[index] : nullptr; }
     void reserve(std::size_t count, const char* source = nullptr, std::uint32_t line = 0u) {
         if (count <= capacity) return;
-        if (count > std::numeric_limits<std::uint32_t>::max() || count > std::numeric_limits<std::size_t>::max() / sizeof(T)) throw std::bad_alloc();
+        if (count > std::size_t{std::numeric_limits<std::ptrdiff_t>::max()} / sizeof(T)) throw std::bad_alloc();
         auto* replacement = static_cast<T*>(WorldMemory::allocate(count * sizeof(T), source, line));
         if (!replacement) throw std::bad_alloc();
         if (capacity) std::memcpy(replacement, data, capacity * sizeof(T));
         std::fill_n(replacement + capacity, count - capacity, T{});
         WorldMemory::release(data);
         data = replacement;
-        capacity = static_cast<std::uint32_t>(count);
+        capacity = count;
     }
-    void initialize(std::uint32_t count, const char* source, std::uint32_t line) {
+    void initialize(std::size_t count, const char* source, std::uint32_t line) {
         std::string_view file(source == nullptr ? "" : source);
         const auto separator = file.find_last_of('\\');
         if (separator != std::string_view::npos) file.remove_prefix(separator + 1u);
@@ -2466,17 +2385,17 @@ template<class T> struct SferaBoundCheckArray {
         data = nullptr;
         capacity = 0u;
     }
-    std::uint32_t firstVacant() const {
+    std::size_t firstVacant() const {
         if (!data) WorldDiagnostics::fail("Handle table is not initialized");
         const auto* empty = std::find(data, data + capacity, T{});
         if (empty == data + capacity) WorldDiagnostics::fail("Handle table is full");
-        return static_cast<std::uint32_t>(empty - data);
+        return static_cast<std::size_t>(empty - data);
     }
 };
 struct WorldObject {
     bool owns_model;
-    std::uint8_t model_padding[3];
-    union { std::uint32_t model_handle; SphereRender::Model* generated_model; };
+
+    union { int model_id; SphereRender::Model* generated_model; };
     SferaVec3F position;
     SferaVec3F rotation;
     uint32_t spatial_membership;
@@ -2494,14 +2413,15 @@ struct WorldObject {
     uint32_t linked_objects[5];
     SferaActiveEffect* attached_effects[10];
     uint32_t lighting_color;
-    uint8_t extended_pose_available;
-    uint8_t visible;
+    bool extended_pose_available;
+    bool visible;
 };
 struct ExtendedWorldObject : WorldObject {
-    uint32_t extended_object_index;
+    static constexpr std::size_t unregistered = std::numeric_limits<std::size_t>::max();
+    std::size_t extended_object_index = unregistered;
     uint8_t motion_state;
-    uint8_t render_enabled;
-    uint8_t view_projection_mode;
+    bool render_enabled;
+    bool steep_slope;
     int32_t render_cache_handle;
     float scale;
     SferaVec3F orientation_basis[3];
@@ -2519,18 +2439,18 @@ struct ExtendedWorldObject : WorldObject {
     float effect_frame_transform_b[16];
     SferaVec3F effect_frame_position_c;
     float effect_frame_transform_c[16];
-    std::uint8_t simulation_enabled;
-    std::uint8_t full_rate_simulation;
-    std::uint8_t gravity_enabled;
-    std::uint8_t motion_padding;
-    std::uint32_t airborne;
+    bool simulation_enabled;
+    bool full_rate_simulation;
+    bool gravity_enabled;
+
+    bool airborne;
     SferaVec3F commanded_velocity;
     SferaVec3F physical_velocity;
     float angular_velocity;
-    std::uint32_t unused_motion_words[2];
-    std::uint8_t movement_blocked;
-    std::uint8_t avoidance_enabled;
-    std::uint16_t contact_padding;
+
+    bool movement_blocked;
+    bool avoidance_enabled;
+
     SferaVec3F avoidance_direction;
     float avoidance_depth;
     SferaVec3F previous_spatial_position;
@@ -2548,7 +2468,7 @@ public:
     uint32_t contour_mode;
     SferaBoundCheckArray<WorldObject*> object_handles;
     SferaBoundCheckArray<std::uint32_t> extended_object_handles;
-    uint32_t extended_object_count;
+    std::size_t extended_object_count;
 
     WorldObject* effectObject(std::uint32_t handle) const;
     SferaEffectVec3F referencePosition() const;
@@ -2584,30 +2504,36 @@ public:
     ExtendedWorldObject* linkModel(std::uint32_t parent, const char* name, std::uint32_t slot);
 };
 
-
-// Landscape assets retain their published 32-bit layouts while native methods own their lifecycle.
+// Runtime terrain storage is independent of the encoded landscape headers.
 struct TerrainVertex { SferaVec3F position; SferaVec3F normal; float textureU; float textureV; float detailU; float detailV; };
 struct TerrainTriangle { std::uint16_t indices[3]; std::uint16_t material; std::uint32_t attributes[2]; SferaVec3F normal; };
-struct TerrainCell { std::int32_t x; std::int32_t z; std::int32_t triangleCount; TerrainTriangle* triangles; std::uint16_t baseMicrotexture; std::uint16_t reserved; std::int32_t layerCount; std::uint16_t layers[10]; std::uint8_t* masks; };
-struct TerrainSurfaceGroup { std::uint32_t vertexCount; std::uint32_t firstVertex; std::uint32_t firstIndex; std::uint32_t colored_vertex_offset; std::uint32_t light_mask : 30; std::uint32_t distant : 1; std::uint32_t reserved : 1; };
-struct TerrainWater { float height; std::uint32_t material; };
+struct TerrainCell { std::int32_t x; std::int32_t z; std::size_t triangleCount; TerrainTriangle* triangles; std::uint16_t baseMicrotexture;  std::size_t layerCount; std::uint16_t layers[10]; std::uint8_t* masks; };
+struct TerrainSurfaceGroup { std::size_t vertexCount; std::size_t firstVertex; std::size_t firstIndex; std::size_t colored_vertex_offset; std::uint32_t light_mask; bool distant;  };
+struct TerrainWater { float height; std::size_t material; };
 struct TerrainBounds { SferaVec3F corners[8]; std::int32_t scaledBounds[6]; void lowerMinimum(float height); };
 class TerrainPatch {
 public:
-    std::uint32_t format; std::uint32_t vertexCount; TerrainVertex* vertices; TerrainCell cells[144]; TerrainSurfaceGroup* surfaceGroups; TerrainSurfaceGroup* renderGroups; TerrainVertex* groupedVertices; std::uint16_t* groupedIndices; TerrainWater* waters; TerrainBounds bounds; TerrainBounds quarterBounds[4]; TerrainBounds groupBounds[16]; TerrainBounds cellBounds[144]; std::uint32_t flags; std::uint16_t* cornerIndices[4]; std::uint32_t cornerCounts[4]; std::uint8_t cornerSmoothed[4]; std::uint16_t* edgeGroups[4]; std::uint32_t edgeGroupCounts[4];
+    std::size_t vertexCount = 0; TerrainVertex* vertices = nullptr; TerrainCell cells[144]{}; TerrainSurfaceGroup* surfaceGroups = nullptr; TerrainSurfaceGroup* renderGroups = nullptr; TerrainVertex* groupedVertices = nullptr; std::uint16_t* groupedIndices = nullptr; TerrainWater* waters = nullptr; TerrainBounds bounds{}; TerrainBounds quarterBounds[4]{}; TerrainBounds groupBounds[16]{}; TerrainBounds cellBounds[144]{}; std::uint32_t flags = 0; std::array<std::vector<std::size_t>, 4> cornerIndices; bool cornerSmoothed[4]{}; std::array<std::vector<std::vector<std::size_t>>, 4> edgeGroups;
+    ~TerrainPatch() { releaseResources(); }
     void releaseResources();
     void partitionEdges();
     void rebuildSurfaceGroups();
     void rebuildSurfaceGroup(const TerrainCell& cell);
     void updateBounds();
-    bool validateEdge(const TerrainPatch& other, std::uint32_t side, std::uint32_t otherSide, int row, int column) const;
-    bool smoothEdge(TerrainPatch& other, std::uint32_t side, std::uint32_t otherSide, int row, int column);
-    void smoothCorner(TerrainPatch* diagonal, TerrainPatch* vertical, TerrainPatch* horizontal, std::uint32_t corner, std::uint32_t diagonalCorner, std::uint32_t verticalCorner, std::uint32_t horizontalCorner);
+    bool validateEdge(const TerrainPatch& other, std::size_t side, std::size_t otherSide, int row, int column) const;
+    bool smoothEdge(TerrainPatch& other, std::size_t side, std::size_t otherSide, int row, int column);
+    void smoothCorner(TerrainPatch* diagonal, TerrainPatch* vertical, TerrainPatch* horizontal, std::size_t corner, std::size_t diagonalCorner, std::size_t verticalCorner, std::size_t horizontalCorner);
     void readGeometry(int descriptor, const std::vector<std::uint8_t>& masks, const std::vector<std::uint8_t>& waterData, const std::uint16_t* microtextureRemap, std::uint16_t baseMicrotexture);
+};
+struct TerrainTextureImage {
+    static constexpr std::size_t width = 256;
+    static constexpr std::size_t height = 256;
+    std::array<std::uint8_t, 32> metadata;
+    std::array<std::uint16_t, width * height> pixels;
 };
 class TerrainRegion {
 public:
-    char name[30]; char directory[102]; std::int32_t rows; std::int32_t columns; TerrainPatch* patches[100]; std::uint32_t textureIds[100]; std::uint8_t* textures[100]; std::uint32_t expiry[100];
+    char name[30]; char directory[102]; std::int32_t rows; std::int32_t columns; TerrainPatch* patches[100]; int textureIds[100]; TerrainTextureImage* textures[100]; std::uint32_t expiry[100];
     TerrainPatch* patch(int row, int column) const;
     void loadPatch(int row, int column);
     void touchPatch(int row, int column);
@@ -2628,7 +2554,6 @@ public:
     static bool saveDebugImage(const char* filename, int size, const std::uint16_t* pixels);
     static void markSmoothingError(std::uint32_t color, float x, float z);
 };
-
 
 // Terrain contour records retain the contours.bin field order.
 struct Contour {
@@ -2702,7 +2627,6 @@ private:
     void sortSelected();
 };
 
-
 struct SferaServerWallEffectRecord {
     SferaEffectVec3F positions[4]{};
     float duration = 0.0f;
@@ -2716,9 +2640,9 @@ public:
     std::vector<SferaVec3F> normals;
     std::array<SferaServerWallEffectRecord, 100> effects{};
     std::array<SferaServerWallTextureFrame, 16> texture_frames{};
-    std::uint32_t texture_id = UINT32_MAX;
+    int texture_id = -1;
     void clear();
-    void setSegments(const float* coordinates, std::uint32_t count);
+    void setSegments(const float* coordinates, std::size_t count);
     void prepareGeometry();
     void generateEffects();
     void generateEffects(const WorldObject& observer, float field_of_view, const SferaFrustumF& frustum);
@@ -2727,7 +2651,6 @@ public:
     static std::uint32_t classifyVisibility(const SferaFrustumF& frustum, const SferaVec3F* points, std::int32_t count);
     static std::int32_t intersectXZ(const SferaVec3F& first, const SferaVec3F& second, const SferaVec3F& other_first, const SferaVec3F& other_second, SferaVec3F& output);
 };
-
 
 namespace SphereWorld {
 struct Bounds {
@@ -2742,24 +2665,22 @@ struct Bounds {
     SferaBoundsCornersRuntime corners() const;
 };
 struct SpatialLeaf {
-    std::int32_t object_count;
-    std::uint32_t object_capacity;
-    std::uint32_t* objects;
-    std::uint32_t contains_landscape;
-    TerrainRegion* region;
-    std::int32_t patch_row;
-    std::int32_t patch_column;
-    std::int32_t quarter;
-    std::int32_t group;
-    std::int32_t cell;
-    float origin_x;
-    float origin_z;
+    std::vector<std::uint32_t> objects;
+    bool contains_landscape = false;
+    TerrainRegion* region = nullptr;
+    int patch_row = 0;
+    int patch_column = 0;
+    int quarter = 0;
+    int group = 0;
+    int cell = 0;
+    float origin_x = 0.0f;
+    float origin_z = 0.0f;
 };
 struct TerrainCandidate { TerrainPatch* patch; const TerrainCell* cell; float origin_x; float origin_z; };
 struct NearContact {
     std::uint32_t handle = 0;
-    std::uint32_t subject_kind = 0;
-    std::uint32_t geometry_kind = 0;
+    SphereRender::CollisionKind subject_kind = SphereRender::CollisionKind::AxisAlignedBounds;
+    SphereRender::CollisionKind geometry_kind = SphereRender::CollisionKind::AxisAlignedBounds;
     Bounds bounds;
     SferaBoundsCornersRuntime corners{};
     std::vector<SphereRender::ModelCollisionTriangle> triangles;
@@ -2810,12 +2731,11 @@ private:
 inline SphereWorld::WorldSpatialIndex g_sfera_world_spatial;
 inline SphereWorld::ContactQuery g_sfera_contacts;
 
-
 namespace SphereWorld {
 
 struct GrassCell {
     std::uint32_t object_handle = 0;
-    std::uint32_t source_count = 0;
+    std::size_t source_count = 0;
     std::array<SphereRender::Model*, 36> source_models{};
 };
 
@@ -2915,7 +2835,6 @@ private:
 
 inline SphereWorld::Vegetation g_sfera_vegetation;
 
-
 class TerrainQueries {
 public:
     struct Location { int patchX; int patchZ; int cellX; int cellZ; int mapIndex; bool valid() const; int cellIndex() const; };
@@ -2926,7 +2845,7 @@ public:
     static bool clearViewToFlare(const TerrainPatch& patch, const TerrainCell& cell);
 };
 struct TerrainVisibleCell { TerrainCell* cell; SferaBoundsCornersRuntime bounds; };
-struct TerrainWaterSurface { std::int32_t x; std::int32_t z; float height; std::uint32_t lightMask; std::uint32_t material; SferaBoundsCornersRuntime bounds; };
+struct TerrainWaterSurface { std::int32_t x; std::int32_t z; float height; std::uint32_t lightMask; std::size_t material; SferaBoundsCornersRuntime bounds; };
 class TerrainRenderer {
 public:
     std::vector<TerrainVisibleCell> visibleCells;
@@ -2938,7 +2857,7 @@ public:
     void prepareAndDraw(TerrainPatch& patch);
     void drawCells(TerrainPatch& patch, int first, int last);
     void drawLandscape();
-    void saveWater(std::uint32_t material, float height);
+    void saveWater(std::size_t material, float height);
     void sortWater(int first, int last);
     void drawWater();
 private:
@@ -2952,9 +2871,8 @@ public:
     static void bindLayer(const TerrainCell& cell, int layer);
     static void release();
     static void loadMicrotextures(const char* pattern);
-    static void blendLayer(const TerrainCell& cell, int layer, std::span<std::uint8_t> texture);
+    static void blendLayer(const TerrainCell& cell, int layer, TerrainTextureImage& texture);
 };
-
 
 namespace SphereWorld {
 class Motion {
@@ -2980,9 +2898,8 @@ private:
 }
 inline SphereWorld::Motion g_sfera_motion;
 
-
 struct WorldGuiControl { std::uint32_t kind; std::uint32_t windowHandle; std::uint32_t windowSlot; std::int32_t left; std::int32_t top; std::int32_t right; std::int32_t bottom; std::uint32_t objectHandle; std::uint32_t alignment; float opacity; std::uint32_t color; };
-struct WorldGuiText : WorldGuiControl { std::uint32_t lineCount; std::int32_t lineX[300]; std::int32_t lineY[300]; char* lines[300]; };
+struct WorldGuiText : WorldGuiControl { std::size_t lineCount; std::int32_t lineX[300]; std::int32_t lineY[300]; char* lines[300]; };
 class WorldGuiControls {
 public:
     static std::uint32_t createText(std::int32_t x, std::int32_t y, const char* text, std::uint32_t window);
@@ -3010,11 +2927,10 @@ private:
     static void box(const SferaBoundsCornersRuntime& corners, std::uint32_t color);
 };
 
-
 namespace SphereRender {
 class ModelPose {
 public:
-    static void updateBone(const SferaMatrix4x4F& parent, std::uint32_t bone_index);
+    static void updateBone(const SferaMatrix4x4F& parent, std::size_t bone_index);
     static std::int32_t animationLength(std::uint32_t handle, std::int32_t animation);
     static std::int32_t* animation(std::uint32_t handle);
     static std::int32_t* frame(std::uint32_t handle);
@@ -3023,34 +2939,31 @@ public:
     static std::int32_t* secondaryAnimation(std::uint32_t handle);
     static SferaVec3F* neckPosition(SferaVec3F& output);
 private:
-    static ModelKeyframe keyframe(const Model& model, const BoneAnimation& animation, std::uint32_t frame);
+    static ModelKeyframe keyframe(const Model& model, const BoneAnimation& animation, std::size_t frame);
     static ExtendedWorldObject* queryObject(std::uint32_t handle, const char* operation);
-    static std::uint32_t frameOffset(const Model& model, std::int32_t animation, std::int32_t frame, bool secondary);
+    static std::size_t frameOffset(const Model& model, std::int32_t animation, std::int32_t frame, bool secondary);
 };
 }
-
 
 namespace SphereRender {
 struct CharacterPose { SferaVec4F rotation; SferaVec3F translation; };
 struct CharacterSkeleton {
-    std::int32_t bone_count;
-    std::int32_t frame_count;
-    std::int32_t* parents;
-    char (*names)[30];
-    CharacterPose* poses;
-    std::int32_t animation_count;
-    std::int32_t* animation_lengths;
-    std::int32_t attachments[7];
-    SferaMatrix4x4F* initial_pose;
-    void calculate(std::int32_t frame, std::int32_t bone, const SferaMatrix4x4F& parent, SferaMatrix4x4F* output) const;
-    void calculateSplit(std::int32_t firstFrame, std::int32_t secondFrame, float interpolation, std::int32_t bone, const SferaMatrix4x4F& parent, std::int32_t region, SferaMatrix4x4F* output) const;
-    std::int32_t absoluteFrame(std::int32_t animation, std::int32_t frame) const;
+    enum class Region { Whole, UpperBody, LowerBody };
+    std::vector<std::optional<std::size_t>> parents;
+    std::vector<std::array<char, 30>> names;
+    std::vector<CharacterPose> poses;
+    std::vector<std::size_t> animation_lengths;
+    std::array<std::size_t, 7> attachments{};
+    std::vector<SferaMatrix4x4F> initial_pose;
+    void calculate(std::size_t frame, std::size_t bone, const SferaMatrix4x4F& parent, SferaMatrix4x4F* output) const;
+    void calculateSplit(std::size_t firstFrame, std::size_t secondFrame, std::size_t bone, const SferaMatrix4x4F& parent, Region region, SferaMatrix4x4F* output) const;
+    std::size_t absoluteFrame(std::int32_t animation, std::int32_t frame) const;
 };
-struct CharacterVertex { SferaVec3F position; SferaVec3F normal; float u; float v; std::uint32_t bones; float weight; };
+struct CharacterVertex { SferaVec3F position; SferaVec3F normal; float u; float v; std::size_t first_bone; std::size_t second_bone; float weight; };
 struct CharacterSkinnedVertex { SferaVec3F position; SferaVec3F normal; float u; float v; };
 struct CharacterGeometry { std::vector<CharacterVertex> vertices; std::vector<std::uint16_t> indices; };
-struct CharacterAsset { char name[32]; std::int32_t directory; CharacterGeometry* geometry; std::uint32_t age; };
-struct CharacterPart { std::int32_t asset; std::int32_t textures[20]; };
+struct CharacterAsset { char name[32]{}; std::size_t directory = 0; std::unique_ptr<CharacterGeometry> geometry; };
+struct CharacterPart { CharacterAsset* asset = nullptr; int textures[20]{}; };
 struct CharacterAppearance { std::int32_t sex; std::uint8_t parts[16]; };
 struct CharacterSlot { ExtendedWorldObject* owner; CharacterAppearance appearance; };
 class CharacterModels {
@@ -3061,19 +2974,17 @@ public:
     SferaVec3F bounds[8];
     CharacterSkeleton skeletons[2];
     char directories[100][200];
-    std::int32_t directory_count;
-    CharacterAsset* assets;
-    std::int32_t asset_count;
-    CharacterPart* parts;
-    std::array<std::array<std::uint16_t, 256>, 26>* part_indices;
+    std::vector<CharacterAsset> assets;
+    std::vector<CharacterPart> parts;
+    std::array<std::array<std::array<const CharacterPart*, 256>, 26>, 2> part_indices{};
     CharacterSlot instances[400];
     std::int32_t small_helm[21];
     std::uint64_t last_lod_update;
-    std::uint32_t rendered_count;
+    std::size_t rendered_count;
     float lod_start;
     float lod_end;
-    std::uint32_t reserved;
-    CharacterModels* load(const char* const* folders, std::int32_t count);
+
+    CharacterModels* load(const char* const* folders, std::size_t count);
     void clear();
     void initializeBounds();
     std::int32_t classify(const SferaMatrix4x4F& world) const;
@@ -3085,7 +2996,7 @@ public:
     std::int32_t partAnimationLength(const ExtendedWorldObject& object, std::int32_t animation) const;
     std::int32_t usesSmallHelm(std::int32_t sex, std::int32_t code) const;
     void loadSkeleton(const char* path, CharacterSkeleton& skeleton);
-    void preload(std::int32_t index, const CharacterSkeleton& skeleton);
+    void preload(CharacterAsset& asset, const CharacterSkeleton& skeleton);
     void animate(const CharacterSkeleton& skeleton, std::int32_t animation, std::int32_t frame, std::int32_t secondaryAnimation, std::int32_t secondaryFrame, float interpolation, SferaMatrix4x4F* output, bool attachmentsOnly) const;
     SferaVec3F neckPosition(const ExtendedWorldObject& object) const;
     void drawPart(std::int32_t sex, std::int32_t kind, std::uint8_t model, std::int32_t visibility, const CharacterSkeleton& skeleton, const SferaMatrix4x4F* pose, bool cull, std::int32_t transparent, std::int32_t textureCode, std::uint32_t passes);
@@ -3100,7 +3011,6 @@ private:
     void updateEffectFrames(ExtendedWorldObject& object, const CharacterSkeleton& skeleton, std::span<SferaMatrix4x4F> pose, const SferaMatrix4x4F& world) const;
 };
 }
-
 
 namespace SphereRender {
 struct CameraRectangle { std::int32_t left = 0, top = 0, right = 0, bottom = 0; bool operator==(const CameraRectangle&) const = default; };
@@ -3141,13 +3051,11 @@ private:
 }
 inline SphereRender::GameCamera g_sfera_camera;
 
-
 struct SferaViewSpatialRuntime;
 namespace SphereRender {
-struct SceneSortEntry { std::uint32_t object; std::uint32_t key; float distance; };
+struct SceneSortEntry { std::uint32_t object; std::size_t key; float distance; };
 class SceneRenderer {
 public:
-    static void initializeRenderLookup();
     static void waitForGpu();
     static bool bindTexture(std::int32_t texture);
     static void textureSize(std::int32_t texture, std::uint32_t* dimensions);
@@ -3167,7 +3075,7 @@ public:
     static void sortLights(std::int32_t first, std::int32_t last);
     static void collectLights();
     static void activateObjectLights(std::uint32_t object);
-    static void classifyBone(std::uint32_t bone);
+    static void classifyBone(std::size_t bone);
     static void drawModel(std::uint32_t handle);
     static void drawObject(std::uint32_t handle);
     static void drawObjects(bool updateVegetation);
@@ -3180,15 +3088,15 @@ public:
 };
 }
 
-struct SceneSkyLayer { char texture[20]; float projectionWarp; float uvScale; std::uint32_t trackOffset; float minimumTime; float maximumTime; SferaVec3F colors[11]; };
+struct SceneSkyLayer { char texture[20]; float projectionWarp; float uvScale; std::size_t trackOffset; float minimumTime; float maximumTime; SferaVec3F colors[11]; };
 struct SceneSkyLayers { SceneSkyLayer primary; SceneSkyLayer secondary; float opacity; };
 class SceneSky {
 public:
     static void rotateUv(float x, float y, float angle, float& u, float& v);
-    static std::uint32_t buildLayerGeometry(const SceneSkyLayer& layer, float opacity);
+    static std::size_t buildLayerGeometry(const SceneSkyLayer& layer, float opacity);
     static void layerColor(const SceneSkyLayer& layer, SferaVec3F& output);
-    static void drawColorLayer(const char* texture, const SferaVec3F& color, std::uint32_t indices);
-    static void drawMaskLayer(const char* texture, std::uint32_t indices);
+    static void drawColorLayer(const char* texture, const SferaVec3F& color, std::size_t indices);
+    static void drawMaskLayer(const char* texture, std::size_t indices);
     static void drawLayers(const SceneSkyLayers& layers);
     static void orbit(float& x, float& y, std::uint32_t orbit);
     static float horizonFog(float elevation, float amount);
@@ -3210,7 +3118,6 @@ private:
     void flushSpans(int height, const D3DLOCKED_RECT& surface, bool displaced);
 };
 
-
 class ShadowMap {
 public:
     std::uint8_t quality = 0u;
@@ -3229,9 +3136,9 @@ public:
     float projectionExtension(const WorldObject& object) const;
     bool prepareModel(WorldObject& object, const SferaVec3F* position, float opacity, std::uint8_t detail);
     bool prepareGeometry(WorldObject& object, const SferaVec3F* position, float opacity, std::uint8_t detail, float scale, float spot_scale);
-    void projectModel(const SphereRender::Model& model, std::uint32_t submesh, const SferaMatrix4x4F* world = nullptr);
-    template<class Vertex> void projectVertices(const Vertex* vertices, std::uint32_t vertex_count, const std::uint16_t* indices, std::uint32_t index_count);
-    void draw(const SferaVec3F* vertices, std::uint32_t triangle_count);
+    void projectModel(const SphereRender::Model& model, std::size_t submesh, const SferaMatrix4x4F* world = nullptr);
+    template<class Vertex> void projectVertices(const Vertex* vertices, std::size_t vertex_count, const std::uint16_t* indices, std::size_t index_count);
+    void draw(const SferaVec3F* vertices, std::size_t triangle_count);
     void save();
     void restore();
     static void initialize(std::uint32_t default_quality);
@@ -3255,18 +3162,13 @@ private:
 };
 inline std::unique_ptr<ShadowMap> g_sfera_shadows;
 
-
 class SoundEffectRegistry {
 public:
-    CSoundEffect** definitions;
-    std::uint32_t capacity;
-    std::uint32_t count;
-    std::uint32_t growth;
-    SoundEffectRegistry(std::int32_t initialCapacity = 100, std::uint32_t growthCount = 50);
+    std::vector<CSoundEffect*> definitions;
+    SoundEffectRegistry();
     ~SoundEffectRegistry();
     CSoundEffect* add();
     CSoundEffect* find(std::uint32_t id) const;
-    void sort(std::int32_t begin, std::int32_t end);
     bool load();
     void clear();
 };
@@ -3279,9 +3181,9 @@ struct SkyState {
     float time;
     float sunPhase;
     SferaVec3F sunColor;
-    float sunReserved;
+
     SferaVec3F ambientColor;
-    float ambientReserved;
+
 };
 class SkyEnvironment {
 public:
@@ -3301,17 +3203,11 @@ enum class SoundEventType : std::uint8_t { none, seek, wait, stop, playlist, end
 
 struct SoundEventRecord {
     SoundEventType type = SoundEventType::end;
-    std::uint32_t argument = 0u;
+    std::size_t argument = 0u;
     float signal = -1.0f;
     std::uint32_t position = std::numeric_limits<std::uint32_t>::max();
 };
 
-struct SoundEventQueue {
-    SoundEventRecord* records;
-    std::uint32_t capacity;
-    std::uint32_t count;
-    std::uint32_t growth;
-};
 
 struct SferaSoundTiming {
     float seek_time;
@@ -3319,22 +3215,15 @@ struct SferaSoundTiming {
 };
 
 struct SferaSoundEventList {
-    void clear();
-    void resize(std::uint32_t count);
-    void resizeGroup(std::uint32_t group, std::uint32_t count);
-    void parseGroup(std::uint32_t group, const char* text);
-    SoundEventRecord** event_groups;
-    std::uint32_t* group_sizes;
-    std::uint32_t item_index;
-    std::uint32_t group_index;
-    std::uint32_t group_count;
+    void parseGroup(std::size_t group, const char* text);
+    std::vector<std::vector<SoundEventRecord>> groups;
+    std::size_t item_index = 0;
+    std::size_t group_index = 0;
 };
 
 struct SferaSoundPlaybackState {
     SferaSoundPlaybackState();
     ~SferaSoundPlaybackState();
-    void resizeTimings(std::uint32_t count);
-    void resizePatterns(std::uint32_t count);
     static float parseTime(const char* text);
     bool load(const char* filename);
     bool start();
@@ -3342,31 +3231,30 @@ struct SferaSoundPlaybackState {
     void clear();
     void update();
     SoundEventRecord nextEvent() noexcept;
-    SoundEventQueue* event_queue;
-    SferaSoundTiming* timings;
-    std::uint32_t timing_count;
-    std::uint32_t playing;
-    std::uint32_t pending_track;
-    std::uint32_t reserved_14;
-    std::uint32_t timer_low;
-    std::uint32_t timer_high;
+    bool queueEvent(SoundEventRecord event, float signal, std::uint32_t position) noexcept;
+    std::optional<SoundEventRecord> popEvent() noexcept;
+    std::deque<SoundEventRecord> event_queue;
+    std::vector<SferaSoundTiming> timings;
+    bool playing;
+    std::size_t wait_seconds;
+
+    std::uint64_t wait_started_at;
     float play_signal;
-    SferaSoundEventList* playlists;
-    std::uint32_t playlist_count;
+    std::vector<SferaSoundEventList> playlists;
     SferaSoundEventList* current_list;
-    std::uint32_t playlist_index;
+    std::size_t playlist_index;
     CSoundStream* stream;
-    void* source;
-    std::uint32_t finished;
-    std::uint32_t stopped;
-    std::uint32_t volume_scale;
-    std::uint32_t force_stop;
-    std::uint32_t reserved_4c;
+    char* source;
+    bool finished;
+    bool stopped;
+    int volume_scale;
+    bool force_stop;
+
 };
 
 struct SferaSoundRuntime {
     SoundEffectRegistry* effect_manager;
-    union { uint32_t manager; CSoundManager* sound_manager; };
+    CSoundManager* sound_manager;
     std::list<std::unique_ptr<SferaSoundPlaybackState>> tracks;
     SferaSoundPlaybackState* loadTrack(const char* filename);
     bool deleteTrack(SferaSoundPlaybackState* track);
@@ -3429,7 +3317,6 @@ public:
     float age = 0.0f;
 };
 
-
 struct WeatherState {
     float rain = 0.0f;
     float lightning = 0.0f;
@@ -3443,34 +3330,33 @@ struct WeatherState {
 
 struct WeatherSkyPair { char primary[20]; char secondary[20]; };
 struct WeatherKeyframe { std::int32_t time; std::array<float, 4> properties; };
-struct WeatherScenario { std::int32_t duration; WeatherSkyPair sky; float skyStart; float skyEnd; std::uint32_t keyframeCount; std::array<WeatherKeyframe, 10> keyframes; };
+struct WeatherScenario { std::int32_t duration; WeatherSkyPair sky; float skyStart; float skyEnd; std::size_t keyframeCount; std::array<WeatherKeyframe, 10> keyframes; };
 class WeatherScenarios {
 public:
-    enum class Property : std::uint32_t { rain, lightning, wind, cloud };
+    enum class Property { rain, lightning, wind, cloud };
     std::array<SceneSkyLayer, 30> textures;
-    std::uint32_t textureCount;
+    std::size_t textureCount;
     std::array<WeatherSkyPair, 30> pairs;
-    std::uint32_t pairCount;
+    std::size_t pairCount;
     std::array<WeatherScenario, 100> scenarios;
-    std::uint32_t scenarioCount;
+    std::size_t scenarioCount;
     std::array<std::uint16_t, 200> sequence;
-    std::uint32_t sequenceCount;
+    std::size_t sequenceCount;
     std::int32_t totalDuration;
     std::int32_t lastUpdate;
     WeatherScenarios* load(const char* filename);
     void update(std::int32_t time, float dayTime, WeatherState& output, bool alternateClouds);
-    void locate(std::int32_t time, std::uint32_t& sequenceIndex, std::int32_t& startTime, std::int32_t& localTime) const;
-    std::int32_t advance(std::uint32_t& sequenceIndex, std::uint32_t& keyframe) const;
-    std::int32_t retreat(std::uint32_t& sequenceIndex, std::uint32_t& keyframe) const;
-    double nextValue(std::uint32_t sequenceIndex, std::int32_t time, Property property, std::int32_t& distance) const;
-    double previousValue(std::uint32_t sequenceIndex, std::int32_t time, Property property, std::int32_t& distance) const;
+    void locate(std::int32_t time, std::size_t& sequenceIndex, std::int32_t& startTime, std::int32_t& localTime) const;
+    std::int32_t advance(std::size_t& sequenceIndex, std::size_t& keyframe) const;
+    std::int32_t retreat(std::size_t& sequenceIndex, std::size_t& keyframe) const;
+    double nextValue(std::size_t sequenceIndex, std::int32_t time, Property property, std::int32_t& distance) const;
+    double previousValue(std::size_t sequenceIndex, std::int32_t time, Property property, std::int32_t& distance) const;
     void selectSky(std::int32_t time, float dayTime, char* primary, char* secondary) const;
     void copyTexture(const char* name, SceneSkyLayer& output) const;
     static void windDirection(bool refresh, std::int32_t seed, float& x, float& z);
 private:
-    const WeatherScenario& at(std::uint32_t sequenceIndex) const;
+    const WeatherScenario& at(std::size_t sequenceIndex) const;
 };
-
 
 struct SferaWeatherRuntime {
     float direction_cos_component = 0.0f;
@@ -3496,27 +3382,26 @@ private:
 };
 }
 
-
 struct GameUiWindow {
     enum TextStyle : std::uint32_t { centerHorizontal = 1u, centerVertical = 2u, fitHorizontal = 4u, fitVertical = 8u, centerLines = 16u, measureOnly = 32u, alignBottom = 64u };
-    std::uint32_t visible;
-    std::uint32_t scrollable;
+    bool visible;
+    bool scrollable;
     std::uint32_t opacity;
     std::int32_t left, right, top, bottom;
     std::int32_t contentLeft, contentRight, contentTop, contentBottom;
     std::int32_t width, height;
     float scrollX, scrollY;
     std::uint32_t layer;
-    std::uint32_t controlCount;
+    std::size_t controlCount;
     std::uint32_t controls[7000];
     std::uint32_t order;
     std::uint32_t textColor = 0u;
     std::uint32_t textStyle = 0u;
-    std::uint32_t font = 0u;
+    int font = 0u;
     std::uint32_t fontScale = 1u;
     std::uint32_t eventControls[10]{};
     std::uint32_t eventMessages[10]{};
-    std::uint32_t eventCount = 0u;
+    std::size_t eventCount = 0u;
     std::uint32_t attach(std::uint32_t control);
     void detach(std::uint32_t slot);
     void recalculateSize();
@@ -3531,7 +3416,7 @@ struct GameUiElement : WorldGuiText {
     ~GameUiElement();
     void layoutText(const char* text, const GameUiWindow& window, std::int32_t x, std::int32_t y);
     std::uint32_t fontScale;
-    std::uint32_t font;
+    int font;
     std::int32_t spriteLeft, spriteTop, spriteWidth, spriteHeight;
     char texture[40];
     std::uint32_t alpha;
@@ -3547,13 +3432,13 @@ public:
     static void destroyWindow(std::uint32_t handle);
     static GameUiHit hitTest(SferaCursorPosition point);
     static void updateInput();
-    static std::uint32_t fontHeight(std::uint32_t font, std::uint32_t scale);
-    static std::uint32_t glyphWidth(std::uint32_t character, std::uint32_t font);
-    static std::uint32_t textHeight(std::uint32_t font, std::uint32_t scale, std::uint32_t lines);
-    static std::uint32_t lineOffset(std::uint32_t font, std::uint32_t scale, std::uint32_t line);
-    static void drawAtlasText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, std::int32_t scale, std::uint32_t font, float depth);
-    static std::uint32_t drawSpriteQuad(std::uint32_t color, const float* uv, float left, float top, float right, float bottom);
-    static std::uint32_t drawSpriteTexture(std::uint32_t color, std::int32_t texture, float left, float top, float right, float bottom, const float* uv, bool reserved = false);
+    static std::uint32_t fontHeight(int font, std::uint32_t scale);
+    static std::uint32_t glyphWidth(std::uint32_t character, int font);
+    static std::uint32_t textHeight(int font, std::uint32_t scale, std::uint32_t lines);
+    static std::uint32_t lineOffset(int font, std::uint32_t scale, std::uint32_t line);
+    static void drawAtlasText(const char* text, std::int32_t x, std::int32_t y, std::uint32_t color, std::int32_t scale, int font, float depth);
+    static HRESULT drawSpriteQuad(std::uint32_t color, const float* uv, float left, float top, float right, float bottom);
+    static HRESULT drawSpriteTexture(std::uint32_t color, std::int32_t texture, float left, float top, float right, float bottom, const float* uv, bool reserved = false);
     static void drawTexture(std::int32_t left, std::int32_t top, std::int32_t width, std::int32_t height, const char* name, std::uint32_t alpha, float depth, const float* uv);
     static void tintTexture(std::int32_t left, std::int32_t top, std::int32_t width, std::int32_t height, const char* name, std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint32_t alpha, const float* uv);
     static void drawFullscreenOverlay();
@@ -3567,7 +3452,6 @@ public:
     static void finishLoading();
 };
 
-
 class SferaDialogState;
 
 struct SferaDialogEvent {
@@ -3576,7 +3460,7 @@ struct SferaDialogEvent {
     UINT message = 0;
     WPARAM wparam = 0;
     LPARAM lparam = 0;
-    std::uint32_t reserved[2]{};
+
 };
 
 class SferaDialogState {
@@ -3598,8 +3482,7 @@ class Win32Dialogs {
 public:
     SferaDialogState* create(HINSTANCE instance, std::uint32_t resource);
     void destroy(SferaDialogState* dialog);
-    HWND resolve(std::uintptr_t target) const;
-    LRESULT sendMessage(std::uintptr_t target, UINT message, WPARAM wparam, LPARAM lparam) const;
+    LRESULT sendMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) const;
     void pumpMessages(bool dialogKeys = true) const;
 private:
     std::unordered_map<SferaDialogState*, std::unique_ptr<SferaDialogState>> dialogs;
@@ -3611,7 +3494,7 @@ struct SferaFontGlyphRuntime {
     uint32_t texture_index;
     float u;
     float v;
-    uint32_t defined;
+    bool defined;
 };
 struct SferaFontAtlasLayoutRuntime {
     uint32_t span[5];
@@ -3632,7 +3515,7 @@ public:
     GameFontAtlas& operator=(const GameFontAtlas&) = delete;
     ~GameFontAtlas();
     void clear() noexcept;
-    void load(std::uint32_t font, const char* filename, std::int32_t outline, std::uint32_t spacing, std::uint32_t emptyWidth);
+    void load(int font, const char* filename, std::int32_t outline, std::uint32_t spacing, std::uint32_t emptyWidth);
 };
 
 inline GameFontAtlas g_sfera_font_runtime;
@@ -3651,6 +3534,7 @@ struct SferaMouseInputState {
 
 class SferaInputDevices {
 public:
+    static constexpr std::uint8_t pressedMask = 1u << (std::numeric_limits<std::uint8_t>::digits - 1);
     SferaInputDevices() = default;
     SferaInputDevices(const SferaInputDevices&) = delete;
     SferaInputDevices& operator=(const SferaInputDevices&) = delete;
@@ -3681,13 +3565,14 @@ struct SferaSliceReference32 {
 };
 
 struct SferaMbcValue {
-    enum Type : std::uint32_t { Byte = 0, BytePointer = 1, Integer = 16, IntegerPointer = 17, Real = 32, RealPointer = 33, Address = 48 };
-    std::uint32_t type;
-    std::uint32_t width;
+    enum Type : std::uint8_t { Byte = 0, BytePointer = 1, Integer = 16, IntegerPointer = 17, Real = 32, RealPointer = 33, Address = 48 };
+    Type type;
+    std::size_t width;
     SferaSliceReference32 source;
     SferaSliceReference32 value;
     bool isPointer() const;
-    static std::uint32_t storageSize(std::uint32_t valueType);
+    static std::size_t storageSize(Type valueType);
+    std::size_t elementSize() const;
     std::int32_t integer() const;
     float real() const;
     std::int32_t asInteger() const;
@@ -3695,7 +3580,7 @@ struct SferaMbcValue {
     void setReal(float number);
     void detach();
     SferaSliceReference32& asSlice();
-    void storeAs(std::uint8_t destinationType, void* destination) const;
+    void storeAs(Type destinationType, void* destination) const;
     static std::int32_t truncate(double number);
     static std::int64_t truncateReal(double number);
 };
@@ -3707,20 +3592,19 @@ struct ScriptProgramDiagnostic {
     std::uint32_t stop_offset;
     std::int8_t state;
     std::uint8_t priority;
-    std::uint16_t reserved_flags;
+
     std::uint32_t local_memory_offset;
     std::uint32_t return_offsets[20];
     std::uint8_t callDepth;
-    std::uint8_t reserved_depth[3];
+
     std::uint32_t instruction_offset;
-    std::uint32_t wake_tick;
-    std::uint32_t delay_ticks;
-    std::uint8_t executing;
-    std::uint8_t reserved_execution[3];
+
+    bool executing;
+
     std::int32_t caller_program;
     std::uint16_t previous_program;
     std::uint16_t next_program;
-    std::uint32_t reserved_tail;
+
 };
 
 struct SferaMbcExecutionContext {
@@ -3729,31 +3613,21 @@ struct SferaMbcExecutionContext {
     std::uint8_t* bytecode_base;
     std::uint8_t* process_memory_base;
     uint32_t process_index;
-    uint32_t program_index;
+    std::int32_t program_index;
     uint32_t process_id;
     SferaMbcProcessRecord* active_process;
 };
-struct SferaFindData64i32 {
-    uint32_t attrib;
-    uint32_t reserved_04;
-    int64_t time_create;
-    int64_t time_access;
-    int64_t time_write;
-    uint32_t size;
-    char name[260];
-};
-
 
 struct SferaMbcModuleMemoryStats {
-    uint32_t process_count;
-    uint32_t process_memory_bytes;
-    uint32_t dynamic_memory_bytes;
+    std::size_t process_count;
+    std::size_t process_memory_bytes;
+    std::size_t dynamic_memory_bytes;
 };
 
 struct SferaMbcNamedVectorRecord {
     std::uint32_t* value_data;
     uint32_t size;
-    uint32_t reserved_08;
+
     char* name_text;
 };
 
@@ -3762,8 +3636,8 @@ struct SferaMbcFunctionRecord {
     std::uint32_t declaration_offset;
     std::uint32_t entry_offset;
     std::int32_t program_index;
-    std::uint32_t allow_reentry;
-    std::uint32_t reserved;
+    bool allow_reentry;
+
 };
 
 struct SferaMbcQueuedCommand {
@@ -3774,27 +3648,33 @@ struct SferaMbcQueuedCommand {
 };
 
 struct SferaWorldSlotRecord {
+    static constexpr std::size_t packetPayloadCapacity = 400;
     uint32_t object_handle;
-    uint8_t reserved_004[0x0C];
     uint32_t state;
     uint32_t linked_handle;
-    uint8_t reserved_018[0x0C];
     uint32_t primary_state;
     uint32_t reliable_bit_count;
-    uint8_t reliable_payload[0x190];
+    uint8_t reliable_payload[packetPayloadCapacity];
     uint32_t reliable_process;
     uint32_t unreliable_bit_count;
-    uint8_t unreliable_payload[0x190];
+    uint8_t unreliable_payload[packetPayloadCapacity];
     uint32_t unreliable_process;
     std::int32_t origin[3];
-    std::uint8_t reserved_364[0x34];
 };
 
 struct SferaMbcRegionRecord {
+    static constexpr SferaMbcRegionRecord undefined() {
+        SferaMbcRegionRecord result{};
+        std::fill(std::begin(result.formats), std::end(result.formats), std::int8_t{-1});
+        result.field_count = -1;
+        result.flags = -1;
+        result.program_index = UINT16_MAX;
+        return result;
+    }
     std::int8_t formats[28];
     std::int32_t field_count;
     std::int8_t flags;
-    std::uint8_t reserved;
+
     std::uint16_t program_index;
 };
 
@@ -3805,7 +3685,6 @@ struct SferaMbcModuleRecord {
 
 struct SferaMbcModuleImage {
     static constexpr std::size_t functionSlotCount = 80;
-    std::array<std::uint8_t, 16> header{};
     std::uint32_t header_word = 0;
     std::uint32_t module_tag = 0;
     std::span<const std::uint8_t> bytecode;
@@ -3827,6 +3706,9 @@ struct SferaMbcRegionPacket {
 };
 
 class SferaMbcBitStream {
+    static constexpr unsigned coordinateMagnitudeBits = 11;
+    static constexpr std::uint32_t coordinateSignBit = 1u << coordinateMagnitudeBits;
+    static constexpr std::uint32_t coordinateMagnitudeMask = coordinateSignBit - 1u;
     std::span<const std::uint8_t> data_;
     std::uint8_t* output_ = nullptr;
     std::size_t position_ = 0;
@@ -3846,10 +3728,19 @@ public:
     static float decodeCoordinate(std::int32_t origin, std::uint32_t code);
 };
 
+using SferaMbcModuleIds = std::array<std::uint16_t, 8>;
+struct SferaMbcBytecodeKey {
+    SferaMbcModuleIds modules;
+    std::uint32_t memory_size;
+    bool operator<(const SferaMbcBytecodeKey& other) const noexcept { return modules == other.modules ? memory_size < other.memory_size : modules < other.modules; }
+};
+
 struct SferaMbcProcessRecord {
-    struct CleanupEntry { std::uint32_t handle; std::uint32_t kind; };
-    void registerResource(std::uint32_t handle, std::uint32_t kind);
-    void unregisterResource(std::uint32_t handle, std::uint32_t kind);
+    enum Flags : std::uint32_t { unloadAfterExecution = 1u << 2, markedForUnload = 1u << 5 };
+    enum class ResourceKind { worldObject, file, fileSearch, dynamicArray, textControl, spriteControl, gameWindow, interfaceWindow, dialog, container };
+    struct CleanupEntry { std::uint32_t handle; ResourceKind kind; };
+    void registerResource(std::uint32_t handle, ResourceKind kind);
+    void unregisterResource(std::uint32_t handle, ResourceKind kind);
     void linkProgram(std::uint32_t index);
     bool activateProgram(std::int32_t index);
     bool activateProgram(const char* name);
@@ -3860,23 +3751,18 @@ struct SferaMbcProcessRecord {
     void readRegions(std::span<const std::uint8_t> definitions, std::uint32_t firstProgram);
     void releaseResources();
     void queueRegion(std::size_t region, std::uint32_t timestamp, std::span<const std::int32_t, 3> origin, std::span<const std::uint8_t> payload, std::size_t firstBit, std::size_t bitCount, bool ordered);
-    uint8_t file_header_prefix[0x0C];
-    uint8_t header_code_0c;
-    uint8_t header_code_0d;
-    uint8_t header_code_0e;
-    uint8_t header_code_0f;
-    char name[0x20];
-    uint8_t module_key[0x10];
+    char name[32];
+    SferaMbcModuleIds linked_modules;
     uint32_t field_040;
     uint32_t module_tag;
     std::uint8_t* bytecode_base;
     uint32_t bytecode_size;
     std::uint8_t* process_memory_base;
     uint32_t process_memory_size;
-    uint32_t program_count;
+    std::size_t program_count;
     ScriptProgramDiagnostic* program_table_base;
-    uint32_t field_060;
-    uint32_t auxiliary_record_count;
+
+    std::size_t auxiliary_record_count;
     SferaMbcFunctionRecord* functions;
     int32_t chain_prev_index;
     int32_t chain_next_index;
@@ -3887,20 +3773,17 @@ struct SferaMbcProcessRecord {
     uint32_t field_08c;
     uint32_t field_090;
     uint32_t flags;
-    uint8_t reserved_098[0x02];
     std::int16_t subscriber_count;
     std::uint16_t subscriber_capacity;
-    uint8_t reserved_09e[0x02];
     struct Subscriber { std::uint16_t slot; std::uint8_t metadata[10]; };
     Subscriber* subscribers;
     CleanupEntry* cleanup_entries;
-    uint32_t cleanup_entry_count;
-    uint32_t cleanup_capacity;
+    std::size_t cleanup_entry_count;
+    std::size_t cleanup_capacity;
     char* owned_block_b;
     uint32_t process_id;
-    uint8_t state_byte_b8;
-    uint8_t execution_linked;
-    uint8_t reserved_0ba[0x02];
+    bool programs_queued;
+    bool execution_linked;
     SferaMbcQueuedCommand* queued_commands;
     uint32_t field_0c0;
     std::uint16_t* function_map;
@@ -3916,11 +3799,11 @@ struct SferaMbcProcessRecord {
     uint32_t code_range_size[8];
     uint32_t code_range_memory_offset[8];
     uint16_t code_range_count;
-    uint16_t reserved_346;
+
 };
 
 struct SferaMbcValueStackStorage {
-    SferaMbcValue base_slot;
+
     SferaMbcValue entries[256];
 };
 struct SferaMbcInterpreterStorage {
@@ -3929,13 +3812,47 @@ struct SferaMbcInterpreterStorage {
     SferaMbcModuleRecord module_records[4096];
 };
 
-
 struct SferaMbcRuntime {
+    enum class HaltState { Running, Requested, Dispatched };
+    using ResourceKind = SferaMbcProcessRecord::ResourceKind;
     enum class WindowOperation : std::uint32_t { Create = 0, Destroy = 1, DisplayWidth = 2, DisplayHeight = 3, TextHeight = 4, FontHeight = 5, LineOffset = 6, TakeInput = 7, HitTest = 8, Visible = 9, Bounds = 10, TextSize = 11, GlyphWidth = 12, Scrollable = 13, CursorPosition = 14, SystemCursorVisible = 15, SystemCursorKind = 16, CursorKind = 17, CursorImage = 18, CursorText = 19, Open = 20, Close = 21, PollEvent = 22, SetText = 23, ControlAt = 24, SendMessage = 25, GetText = 26, SystemEvent = 27, WindowUnderCursor = 28, ItemAt = 29, SavedPositionsSize = 30, ReadSavedPositions = 31, WriteSavedPositions = 32, Position = 33, Size = 34, Description = 35, Tooltip = 36, Options = 37, EscapeWindow = 38, CreateDialog = 39, DestroyDialog = 40, PollDialogEvent = 41, SendDialogMessage = 42, DialogItem = 43, SetDialogText = 44, GetDialogText = 45, Shutdown = 46, PumpMessages = 47, ActiveWindow = 55, LoadingProgress = 78, FinishLoading = 79 };
     enum class Builtin : std::uint8_t { Fail = 0, FailAlternate = 1, Exit = 2, LoadProcess = 16, UnloadProcess = 17, LinkProcess = 18, Connect = 30, Disconnect = 31, FormatText = 67, NamedFormattedLog = 91, System = 103, DiscardInteger = 120, Reserved122 = 122, BoundedFormatText = 123, FormattedLog = 126, Reserved130 = 130, Reserved133 = 133, CallFunction = 20, CallMainFunction = 21, Distance = 81, ScanText = 9, ScriptLog = 38, ParseText = 128, ChatUtility = 129, Window = 10, Send = 26, Receive = 33, Configuration = 117, CreateFile = 40, OpenFile = 41, CloseFile = 42, ReadFile = 44, WriteFile = 43, ReadLine = 124, LockFile = 116, SeekFile = 65, FileSize = 66, FileTime = 70, ResizeFile = 71, SetFileTime = 72, RemoveFile = 69, RenameFile = 68, SetAnimation = 87, SetFrame = 88, AnimationLength = 89, SetInterpolation = 90, MouseMotion = 98, ThisProcessName = 104, ProcessName = 107, ModuleName = 109, FindModule = 110, FontSettings = 118, DestroyObject = 60, DestroyText = 62, DestroySprite = 105, ObjectProcess = 84, SetRenderEnabled = 99, CreateObject = 47, SetPosition = 48, MoveWorld = 49, CommandVelocity = 92, VerticalVelocity = 93, AngularVelocity = 94, Airborne = 97, ObjectBasis = 100, ObjectPosition = 101, ObjectRotation = 102, EditorPick = 131, AllocateMemory = 15, AllocateDynamic = 113, FreeDynamic = 112, SetNamedValue = 114, NamedValue = 115, RebaseSlice = 121, CopyProcessMemory = 77, CopyProcessString = 108, Text = 61, TextColor = 63, Sprite = 73, Effect = 111, MovementContact = 83, FileChecksum = 74, MemoryChecksum = 163, CompareMemory = 147, PlayerLists = 132, FindProcess = 28, Sin = 3, Cos = 4, Exp = 125, ArcTangent = 7, AbsoluteInteger = 6, AbsoluteReal = 5, SimulationTick = 8, RandomReal = 106, PackColor = 11, ScaleColor = 134, SquareRoot = 12, SceneContext = 13, KeyboardState = 14, ProcessModule = 19, ActiveTag = 22, ArgumentCount = 23, CurrentModule = 24, CurrentProcess = 39, ZeroResult = 25, ZeroResultAlternate = 27, TickDifference = 80, ProfileValue = 29, ProcessFlag = 32, CopyString = 34, CopyStringCount = 136, AppendString = 35, FindString = 95, FindStringInsensitive = 135, StringLength = 36, CompareStrings = 37, CompareStringsInsensitive = 75, CompareStringsCount = 76, CompareStringsCountInsensitive = 137, DiscardArgument = 86, IntegerValue = 45, RealValue = 46, NextDefaultValue = 64, CallerProcess = 127, CopyMemory = 78, MoveMemory = 96, FillMemory = 79, StopInterpreter = 82, NetworkInitialization = 85, InvalidResult = 119, BitAnd = 138, BitOr = 139, BitXor = 140, BitNot = 141, ShiftLeft = 142, ShiftRight = 143, ClearBit = 144, SetBit = 145, TestBit = 146, WriteByte = 148, WriteShort = 149, WriteThreeBytes = 150, WriteWord = 151, WriteReal = 152, WriteString = 153, ReadByte = 154, ReadShort = 155, ReadThreeBytes = 156, ReadWord = 157, ReadReal = 158, ReadString = 159, LowerBoundInteger = 160, ContainerCommand = 161, ContainerManagement = 162, PositionX = 54, PositionY = 55, PositionZ = 56, RotationX = 57, RotationY = 58, RotationZ = 59, SetRotation = 52, MoveLocal = 50, MoveForward = 51, Rotate = 53 };
     enum class Instruction : std::uint8_t {
-        InvokeBuiltin = 'f', ReturnFunction = 'r', BindParameters = 'O', DispatchCommand = 201, LoadVariable = 105, JumpIfFalse = 73, JumpIfFalseShort = 75, ArrayElement = 97, SliceElement = 98, PointerElement = 109, FieldValue = 100, FieldSlice = 104, CallLocal = 99,         Jump = 'G', JumpShort = 'J', ArgumentCount = ',', ResetStack = '0', LiteralWord = '9', LiteralShort = '(', LiteralByte = ')', StringLiteral = 'A', SliceVariable = 'e', SliceLiteral = 'l', StartProgram = 'R', CallProgram = 'U', StopProgram = 'S', PauseProgram = 'P', ResumeProgram = 'C', ReturnLocal = 't', Assign = '=', Dereference = '^', AddressOf = '&', Add = '+', Subtract = '-', Multiply = '*', Divide = '/', Remainder = '%', Equal = 240, NotEqual = 237, Greater = '>', Less = '<', GreaterEqual = 225, LessEqual = 236, ShortCircuitOr = 'L', ShortCircuitAnd = 'M', IntegerResult = 235, IntegerResultAlternate = 232, Negate = 241, LogicalNot = '!', PreIncrement = 239, PreDecrement = 243, PostIncrement = 246, PostDecrement = 247, Halt = 'H', IntegerToReal = '.', PreviousIntegerToReal = ':', Swap = '~', PointerAdd = '[', PointerSubtract = ']', RealToInteger = '`', PreviousRealToInteger = '"', PointerPreIncrement = 207, PointerPreDecrement = 211, PointerPostIncrement = 214, PointerPostDecrement = 215, IntegerPair = ';', EnterFrame = '1', LeaveFrame = '2', UnlinkedFunction = 'g'
+        Yield = '|', EndProgram = '#', InvokeBuiltin = 'f', ReturnFunction = 'r', BindParameters = 'O', DispatchCommand = 201, LoadVariable = 105, JumpIfFalse = 73, JumpIfFalseShort = 75, ArrayElement = 97, SliceElement = 98, PointerElement = 109, FieldValue = 100, FieldSlice = 104, CallLocal = 99,         Jump = 'G', JumpShort = 'J', ArgumentCount = ',', ResetStack = '0', LiteralWord = '9', LiteralShort = '(', LiteralByte = ')', StringLiteral = 'A', SliceVariable = 'e', SliceLiteral = 'l', StartProgram = 'R', CallProgram = 'U', StopProgram = 'S', PauseProgram = 'P', ResumeProgram = 'C', ReturnLocal = 't', Assign = '=', Dereference = '^', AddressOf = '&', Add = '+', Subtract = '-', Multiply = '*', Divide = '/', Remainder = '%', Equal = 240, NotEqual = 237, Greater = '>', Less = '<', GreaterEqual = 225, LessEqual = 236, ShortCircuitOr = 'L', ShortCircuitAnd = 'M', IntegerResult = 235, IntegerResultAlternate = 232, Negate = 241, LogicalNot = '!', PreIncrement = 239, PreDecrement = 243, PostIncrement = 246, PostDecrement = 247, Halt = 'H', IntegerToReal = '.', PreviousIntegerToReal = ':', Swap = '~', PointerAdd = '[', PointerSubtract = ']', RealToInteger = '`', PreviousRealToInteger = '"', PointerPreIncrement = 207, PointerPreDecrement = 211, PointerPostIncrement = 214, PointerPostDecrement = 215, IntegerPair = ';', EnterFrame = '1', LeaveFrame = '2', UnlinkedFunction = 'g'
     };
+    // Script words remain 32-bit; mapped addresses never contain truncated native pointers.
+    static constexpr std::uint32_t mappedAddressBegin = 1u << 31;
+    struct MemoryRegion { const std::uint8_t* data; std::size_t size; SferaMbcProcessRecord* process; const void* owner; };
+    using NativeResource = std::variant<SphereUI::Window*, SferaActiveEffect*, SferaDialogState*, HWND, SferaScriptContainer*, std::intptr_t>;
+    std::map<std::uint32_t, MemoryRegion> mapped_memory;
+    std::unordered_map<std::uint32_t, NativeResource> native_resources;
+    std::unordered_map<NativeResource, std::uint32_t> native_resource_ids;
+    std::uint32_t next_native_handle = 1;
+    std::uint8_t* memoryAt(std::uint32_t address, std::size_t size = 1, SferaMbcProcessRecord* process = nullptr) const;
+    char* textAt(std::uint32_t address) const;
+    std::uint32_t mapMemory(const void* data, std::size_t size, const void* owner = nullptr);
+    std::uint32_t mapProcessMemory(SferaMbcProcessRecord& process);
+    SferaSliceReference32 rebaseSlice(SferaSliceReference32 slice, SferaMbcProcessRecord& source);
+    void forgetMemory(const void* owner);
+    std::uint32_t addMemoryRegion(MemoryRegion region);
+    template<class T> std::uint32_t nativeHandle(T value) {
+        if constexpr (std::is_pointer_v<T>) { if (value == nullptr) return 0; }
+        else if (value == -1) return UINT32_MAX;
+        const NativeResource resource{value};
+        if (const auto existing = native_resource_ids.find(resource); existing != native_resource_ids.end()) return existing->second;
+        if (next_native_handle >= static_cast<std::uint32_t>(INT32_MAX)) throw std::length_error("Script resource handles exhausted");
+        const auto handle = next_native_handle++;
+        native_resources.emplace(handle, resource);
+        try { native_resource_ids.emplace(resource, handle); } catch (...) { native_resources.erase(handle); throw; }
+        return handle;
+    }
+    template<class T> T nativeResource(std::uint32_t handle) const {
+        if (const auto entry = native_resources.find(handle); entry != native_resources.end()) if (const auto* value = std::get_if<T>(&entry->second)) return *value;
+        if constexpr (std::is_pointer_v<T>) return nullptr; else return -1;
+    }
+    void forgetNativeResource(const NativeResource& resource);
+    HWND dialogWindow(std::uint32_t handle) const;
+
     std::int32_t popInteger();
     SferaSliceReference32& popSlice();
     std::int32_t nextInteger();
@@ -3944,15 +3861,15 @@ struct SferaMbcRuntime {
     SferaSliceReference32 nextSlice();
     void pushInteger(std::uint32_t value);
     void pushReal(float value);
-    void pushSlice(const SferaSliceReference32& value, std::uint32_t type);
-    void pushReference(std::uint32_t type, const SferaSliceReference32& reference, bool load);
+    void pushSlice(const SferaSliceReference32& value, SferaMbcValue::Type type);
+    void pushReference(SferaMbcValue::Type type, const SferaSliceReference32& reference, bool load);
     SferaMbcProcessRecord* findProcess(std::uint32_t id);
     std::uint32_t loadProcess(std::string_view name, std::uint32_t requestedIndex);
     std::uint32_t linkProcess(std::string_view name);
     std::uint32_t unloadProcess(std::uint32_t index);
-    void registerBytecode(std::uint8_t* bytecode, const std::uint8_t* moduleKey, std::uint32_t memorySize);
+    void registerBytecode(std::uint8_t* bytecode, const SferaMbcModuleIds& modules, std::uint32_t memorySize);
     void resetBytecodeCache();
-    std::uint8_t* findBytecode(const std::uint8_t* moduleKey, std::uint32_t memorySize);
+    std::uint8_t* findBytecode(const SferaMbcModuleIds& modules, std::uint32_t memorySize);
     SferaMbcNamedVectorRecord* findNamedVector(const char* name);
     std::uint32_t namedValue(const char* name, std::int32_t index = 0);
     std::uint32_t checksumFile(const char* path);
@@ -3962,13 +3879,13 @@ struct SferaMbcRuntime {
     bool reportError(const char* prefix, const char* suffix);
     void enqueueProcess(std::int32_t index, SferaMbcProcessRecord& process);
     void dequeueProcess(SferaMbcProcessRecord& process);
-    bool executeInstruction(std::uint8_t opcode);
-    bool executeBuiltin(std::uint8_t function);
+    bool executeInstruction(Instruction instruction);
+    bool executeBuiltin(Builtin builtin);
     template<class T> T readOperand() { T result; std::memcpy(&result, instruction_cursor, sizeof(result)); instruction_cursor += sizeof(result); return result; }
-    template<class T> T readMemory(std::uint32_t offset) const { T result; std::memcpy(&result, process_memory_base + static_cast<std::int32_t>(offset), sizeof(result)); return result; }
-    template<class T> void writeMemory(std::uint32_t offset, const T& value) { std::memcpy(process_memory_base + static_cast<std::int32_t>(offset), &value, sizeof(value)); }
+    template<class T> T readMemory(std::uint32_t offset) const { T result; std::memcpy(&result, memoryAt(offset, sizeof(result)), sizeof(result)); return result; }
+    template<class T> void writeMemory(std::uint32_t offset, const T& value) { std::memcpy(memoryAt(offset, sizeof(value)), &value, sizeof(value)); }
     void reportInvalidInstruction();
-    void exportSlice(SferaSliceReference32& destination, const void* data, std::uint32_t size);
+    void exportSlice(SferaSliceReference32& destination, const void* data, std::size_t size, const void* owner);
     void initialize();
     void tick();
     void reloadQuickFiles();
@@ -3996,66 +3913,59 @@ struct SferaMbcRuntime {
 
     int32_t execution_chain_tail;
     int32_t execution_chain_head;
-    uint32_t execution_chain_count;
+    std::size_t execution_chain_count;
     int32_t process_chain_first;
     int32_t process_chain_last;
     ScriptProgramDiagnostic* program_table_base;
-    uint32_t shared_buffer_size;
     std::uint8_t* instruction_cursor;
     SferaMbcNamedVectorRecord* current_named_vector;
-    char diagnostic_context[0x5E8];
-    uint32_t argument_count;
-    uint32_t argument_end;
+    char diagnostic_context[1512];
+    std::int32_t argument_count;
+    std::size_t argument_end;
     uint32_t process_index;
     std::uint8_t* current_instruction_address;
     uint32_t active_tag;
-    SferaFindData64i32 script_find_data;
-    char startup_option[0x80];
-    uint8_t text_buffer[10000];
-    uint32_t call_frame_depth;
+    _finddata64i32_t script_find_data;
+    char startup_option[128];
+    char text_buffer[10000];
+    std::size_t call_frame_depth;
     SferaMbcProcessRecord processes[65536];
     uint32_t process_search_cursor;
     uint32_t instruction_step_count;
-    uint32_t program_index;
-    uint32_t pending_program_index;
-    uint32_t dispatch_process_count;
-    uint32_t execution_context_depth;
+    std::int32_t program_index;
+    std::int32_t pending_program_index;
+    std::size_t dispatch_process_count;
+    std::size_t execution_context_depth;
     std::uint8_t* bytecode_base;
-    uint32_t registered_object_count;
     SferaMbcExecutionContext execution_context_stack[100];
     uint32_t file_crc32;
-    uint32_t argument_cursor;
-    uint32_t frame_stack_base[22];
-    uint32_t halt_all_requested;
+    std::size_t argument_cursor;
+    std::size_t frame_stack_base[22];
+    HaltState halt_state;
     uint8_t send_field_width[4096];
     ScriptProgramDiagnostic* active_program_record;
-    uint32_t value_stack_size;
+    std::size_t value_stack_size;
     SferaMbcProcessRecord* active_process;
-    std::uint8_t* registered_objects[2100];
-    CHash16* registered_object_index;
+    std::map<SferaMbcBytecodeKey, std::uint8_t*> bytecode_cache;
     std::uint8_t* process_memory_base;
     SferaCrc32Runtime file_crc;
-    uint32_t send_field_count;
-    uint32_t execution_failed;
-    uint32_t trace_steps_remaining;
-    uint8_t current_opcode;
-    uint8_t trace_program_header_pending;
-    uint8_t trace_process_header_pending;
-    uint8_t trace_reserved;
-    SferaMbcNamedVectorRecord named_vectors[1000];
-    uint8_t shared_buffer[0x258240];
-    uint32_t named_vector_count;
-};
+    std::size_t send_field_count;
+    bool execution_failed;
+    std::int32_t trace_steps_remaining;
+    Instruction current_opcode;
+    bool trace_program_header_pending;
+    bool trace_process_header_pending;
 
+    SferaMbcNamedVectorRecord named_vectors[1000];
+    std::size_t named_vector_count;
+};
 
 struct SferaDataContainerHeader {
     enum class Kind : std::uint32_t { List = 1, Vector, Set, Map, HashMap };
     enum class ValueType : std::uint32_t { Integer = 1, Real, Byte, String, Binary };
-    static constexpr std::uint32_t Signature = 103045;
-    std::uint32_t signature;
     Kind kind;
-    std::uint8_t iteration_active;
-    std::uint8_t reserved[3];
+    bool iteration_active;
+
 };
 
 struct SferaScriptContainer {
@@ -4084,7 +3994,7 @@ struct SferaScriptContainer {
     ValueType value_type;
     ValueType key_type;
     std::variant<Content<std::list<std::int32_t>>, Content<std::list<float>>, Content<std::list<std::string>>, Content<std::list<Binary>>, Content<std::vector<std::int32_t>>, Content<std::vector<float>>, Content<std::vector<std::uint8_t>>, Content<std::vector<std::string>>, Content<std::vector<Binary>>, Content<std::set<std::int32_t>>, Content<std::set<std::string>>, Content<std::map<std::int32_t, std::int32_t>>, Content<std::map<std::int32_t, float>>, Content<std::map<std::int32_t, std::string>>, Content<std::map<std::int32_t, Binary>>, Content<std::map<std::string, std::int32_t>>, Content<std::map<std::string, float>>, Content<std::map<std::string, std::string>>, Content<std::map<std::string, Binary>>, Content<std::list<std::pair<const std::int32_t, std::int32_t>>, true>, Content<std::list<std::pair<const std::int32_t, float>>, true>, Content<std::list<std::pair<const std::int32_t, std::string>>, true>, Content<std::list<std::pair<const std::int32_t, Binary>>, true>, Content<std::list<std::pair<const std::string, std::int32_t>>, true>, Content<std::list<std::pair<const std::string, float>>, true>, Content<std::list<std::pair<const std::string, std::string>>, true>, Content<std::list<std::pair<const std::string, Binary>>, true>, Content<std::list<std::pair<const Binary, std::int32_t>>, true>, Content<std::list<std::pair<const Binary, float>>, true>, Content<std::list<std::pair<const Binary, std::string>>, true>, Content<std::list<std::pair<const Binary, Binary>>, true>> content;
-    template<class C, bool Hashed> SferaScriptContainer(Kind kind, ValueType type, std::in_place_type_t<Content<C, Hashed>>, ValueType keyType) : header{SferaDataContainerHeader::Signature, kind, 0, {}}, value_type(type), key_type(keyType), content(std::in_place_type<Content<C, Hashed>>) {}
+    template<class C, bool Hashed> SferaScriptContainer(Kind kind, ValueType type, std::in_place_type_t<Content<C, Hashed>>, ValueType keyType) : header{kind, false}, value_type(type), key_type(keyType), content(std::in_place_type<Content<C, Hashed>>) {}
     SferaScriptContainer(const SferaScriptContainer&) = delete;
     SferaScriptContainer& operator=(const SferaScriptContainer&) = delete;
     static SferaScriptContainer* create(Kind kind, ValueType type, ValueType keyType = ValueType::Integer);
@@ -4092,8 +4002,31 @@ struct SferaScriptContainer {
     void destroy();
 };
 
-struct SferaDirectPlayCaps32 {
-    uint32_t words[12];
+struct SferaDpnExtendedCaps {
+    std::uint32_t size;
+    std::uint32_t flags;
+    std::uint32_t connect_timeout_ms;
+    std::uint32_t connect_retries;
+    std::uint32_t timeout_until_keepalive_ms;
+    std::uint32_t maximum_receive_message_size;
+    std::uint32_t send_retries;
+    std::uint32_t maximum_send_retry_interval_ms;
+    std::uint32_t drop_threshold_rate;
+    std::uint32_t throttle_rate;
+    std::uint32_t hard_disconnect_sends;
+    std::uint32_t maximum_hard_disconnect_period_ms;
+};
+
+struct SferaDpnServiceProviderCaps {
+    std::uint32_t size;
+    std::uint32_t flags;
+    std::uint32_t thread_count;
+    std::uint32_t default_enumeration_count;
+    std::uint32_t default_enumeration_retry_interval_ms;
+    std::uint32_t default_enumeration_timeout_ms;
+    std::uint32_t maximum_enumeration_payload_size;
+    std::uint32_t buffers_per_thread;
+    std::uint32_t system_buffer_size;
 };
 
 struct SferaDpnCapsRuntime {
@@ -4135,27 +4068,21 @@ struct SferaDpnConnectionInfoRuntime {
     uint32_t messages_received;
 };
 
-struct SferaU64Words {
-    uint32_t low;
-    uint32_t high;
-};
-using SferaCounter64Words = SferaU64Words;
-
 struct SferaNetworkTransportRuntime {
     uint32_t mode;
     uint8_t transport_flag;
     uint8_t receive_busy;
     uint8_t receive_corrupted;
-    uint8_t reserved_07;
+
     SferaDirectPlayAddressNative* primary_address;
     SferaDirectPlayAddressNative* secondary_address;
     uint32_t sent_packet_count;
-    SferaCounter64Words sent_bytes;
+    std::uint64_t sent_bytes;
     uint32_t received_packet_count;
     uint32_t receive_read_index;
-    SferaCounter64Words received_bytes;
+    std::uint64_t received_bytes;
     uint32_t receive_write_index;
-    uint32_t reserved_30;
+
 };
 
 struct SferaDirectPlayRuntime {
@@ -4175,7 +4102,7 @@ struct SferaNetworkMessageSlot {
     DWORD buffer_handle;
     uint8_t data[400];
     DWORD data_size;
-    uint8_t reserved[8];
+
 };
 
 inline constexpr std::size_t kTcpReceiveBufferCapacity = 60000u;
@@ -4202,12 +4129,12 @@ struct SferaTcpConnectionContext {
     static void writeLog(const char* suffix, const char* message) noexcept;
     std::uint8_t receive_buffer[kTcpReceiveBufferCapacity];
     std::uint32_t receive_size;
-    std::uint32_t reserved_after_receive_size;
+
     SOCKET socket;
     std::uint32_t remote_id;
     WorkerThread workers[3];
     std::uint8_t stop_requested;
-    std::uint8_t reserved_stop[3];
+
     std::uint32_t received_bytes_window;
     std::uint32_t sent_bytes_window;
     std::uint32_t sent_bytes_per_second;
@@ -4216,22 +4143,68 @@ struct SferaTcpConnectionContext {
     std::uint32_t send_size;
     std::uint8_t initialized;
     std::uint8_t connected;
-    std::uint8_t reserved_flags[2];
+
     std::uint32_t round_trip_ms;
     DWORD keepalive_started_at;
     std::uint8_t keepalive_answered;
-    std::uint8_t reserved_keepalive;
+
     std::uint16_t sequence;
     std::uint16_t checksum_seed;
-    std::uint16_t reserved_checksum;
+
     std::uint32_t packet_counter;
 };
 
+struct SferaTcpIncomingHeader {
+    static constexpr std::uint32_t encodedSize = 4;
+    std::uint16_t size;
+    std::uint16_t message;
+    static SferaTcpIncomingHeader decode(const std::uint8_t* bytes) noexcept { return {SferaBinary::readLittleEndian<std::uint16_t>(bytes), SferaBinary::readLittleEndian<std::uint16_t>(bytes + 2)}; }
+};
+
+struct SferaTcpHandshakePacket {
+    static constexpr std::uint32_t encodedSize = SferaTcpIncomingHeader::encodedSize + 6;
+    std::uint32_t remote_id;
+    std::uint16_t checksum_seed;
+    static SferaTcpHandshakePacket decode(const std::uint8_t* bytes) noexcept { const auto* payload = bytes + SferaTcpIncomingHeader::encodedSize; return {SferaBinary::readLittleEndian<std::uint32_t>(payload), SferaBinary::readLittleEndian<std::uint16_t>(payload + 4)}; }
+};
+
 struct SferaTcpOutgoingHeader {
+    static constexpr std::uint32_t encodedSize = 8;
+    static constexpr std::uint32_t checksumOffset = 2;
+    static constexpr std::uint32_t checksumPayloadOffset = 4;
     std::uint16_t size;
     std::uint16_t checksum;
     std::uint16_t sequence;
     std::uint16_t message;
+    void encode(std::uint8_t* bytes) const noexcept {
+        SferaBinary::writeLittleEndian(bytes, size);
+        SferaBinary::writeLittleEndian(bytes + checksumOffset, checksum);
+        SferaBinary::writeLittleEndian(bytes + checksumPayloadOffset, sequence);
+        SferaBinary::writeLittleEndian(bytes + 6, message);
+    }
+};
+
+struct SferaUpdateMetadata {
+    static constexpr std::size_t encodedSize = 20;
+    std::uint32_t file_size;
+    std::uint32_t crc;
+    std::int32_t access_time;
+    std::int32_t modify_time;
+    static SferaUpdateMetadata decode(const std::uint8_t* bytes) noexcept { return {SferaBinary::readLittleEndian<std::uint32_t>(bytes), SferaBinary::readLittleEndian<std::uint32_t>(bytes + 4), SferaBinary::readLittleEndian<std::int32_t>(bytes + 8), SferaBinary::readLittleEndian<std::int32_t>(bytes + 12)}; }
+};
+
+struct SferaUpdateResumeRequest {
+    static constexpr std::size_t encodedSize = 7;
+    std::uint32_t offset;
+    std::array<std::uint8_t, encodedSize> encode() const noexcept { std::array<std::uint8_t, encodedSize> bytes{'R', 'S', 'A'}; SferaBinary::writeLittleEndian(bytes.data() + 3, offset); return bytes; }
+};
+
+struct SferaUpdateSidecar {
+    static constexpr std::size_t encodedSize = 8;
+    std::uint32_t crc;
+    std::uint32_t file_size;
+    static SferaUpdateSidecar decode(const std::uint8_t* bytes) noexcept { return {SferaBinary::readLittleEndian<std::uint32_t>(bytes), SferaBinary::readLittleEndian<std::uint32_t>(bytes + 4)}; }
+    std::array<std::uint8_t, encodedSize> encode() const noexcept { std::array<std::uint8_t, encodedSize> bytes{}; SferaBinary::writeLittleEndian(bytes.data(), crc); SferaBinary::writeLittleEndian(bytes.data() + 4, file_size); return bytes; }
 };
 
 struct SferaNetworkRuntime {
@@ -4239,18 +4212,19 @@ struct SferaNetworkRuntime {
     uint32_t server_port;
     uint32_t local_port_candidate;
     uint32_t connection_slot;
-    uint32_t pending_slot;
+    SferaActiveEffect* pending_effect;
     uint32_t active_slot;
     uint32_t shutdown_state;
-    uint8_t timeout_marker_pending;
-    uint8_t net_log_has_error;
-    uint8_t network_error_active;
+    bool timeout_marker_pending;
+    bool net_log_has_error;
+    bool network_error_active;
     uint8_t initialized;
     uint32_t bytes_sent_delta;
     uint32_t bytes_retried_delta;
     uint32_t bytes_received_delta;
     uint32_t error_budget;
-    SferaDirectPlayCaps32 directplay_caps;
+    SferaDpnExtendedCaps directplay_caps;
+    SferaDpnServiceProviderCaps service_provider_caps;
     DWORD message_call_scratch;
     SferaNetworkMessageSlot message_slots[kSferaNetworkMessageSlotCount];
     int initialize(const char* hostname, std::uint32_t port);
@@ -4268,7 +4242,25 @@ struct SferaNetworkRuntime {
     std::uint32_t findLocalPort();
 };
 
-class SferaGameCalendar { public: static std::uint32_t fromUnixTime(std::int64_t timestamp); static std::uint32_t advance(std::uint32_t calendar); static std::uint32_t component(std::uint32_t calendar, std::int32_t index); static std::uint32_t withComponent(std::uint32_t calendar, std::int32_t index, std::uint32_t value); };
+class SferaGameCalendar {
+    struct Field { unsigned shift; unsigned width; std::uint32_t bias; constexpr std::uint32_t mask() const { return (1u << width) - 1u; } };
+    static constexpr std::array<Field, 6> fields{{{0, 2, 0}, {2, 6, 0}, {8, 5, 0}, {13, 5, 0}, {18, 4, 0}, {22, 10, 7800}}};
+    static constexpr const Field& field(std::int32_t index) { return fields[index >= 1 && index <= 5 ? index - 1 : 5]; }
+public:
+    enum Component : std::int32_t { Quarter = 1, Minute, Hour, Day, Month, Year };
+    static constexpr std::uint32_t firstYear = 7800;
+    static constexpr std::uint32_t quartersPerMinute = 4, minutesPerHour = 60, hoursPerDay = 24, daysPerYear = 365;
+    static constexpr std::uint32_t quartersPerHour = quartersPerMinute * minutesPerHour, quartersPerDay = quartersPerHour * hoursPerDay, quartersPerYear = quartersPerDay * daysPerYear;
+    static constexpr std::array<std::uint32_t, 13> monthStarts{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365};
+    static constexpr std::uint32_t daysInMonth(std::uint32_t month) { return month >= 1 && month <= 12 ? monthStarts[month] - monthStarts[month - 1] : 0; }
+    static constexpr std::uint32_t daysBeforeMonth(std::uint32_t month) { return month >= 1 && month <= 13 ? monthStarts[month - 1] : 0; }
+    static constexpr std::uint32_t pack(std::uint32_t year, std::uint32_t month, std::uint32_t day, std::uint32_t hour, std::uint32_t minute, std::uint32_t quarter = 0) { return ((year - firstYear) << field(Year).shift) | (month << field(Month).shift) | ((day & field(Day).mask()) << field(Day).shift) | (hour << field(Hour).shift) | (minute << field(Minute).shift) | quarter; }
+    static std::uint32_t fromUnixTime(std::int64_t timestamp);
+    static std::uint32_t advance(std::uint32_t calendar);
+    static std::uint32_t component(std::uint32_t calendar, std::int32_t index);
+    static std::uint32_t withComponent(std::uint32_t calendar, std::int32_t index, std::uint32_t value);
+    static std::uint32_t ticks(std::uint32_t calendar);
+};
 
 struct SferaNetworkConnectionCheckerRuntime { HANDLE thread = nullptr; void start(); void stop(); };
 
@@ -4281,13 +4273,13 @@ struct SferaNetworkProbeSample {
 };
 
 struct SferaNetworkProbeRuntime {
-    static constexpr std::uint32_t sample_capacity = 20;
-    uint32_t sample_count;
+    static constexpr std::size_t sample_capacity = 20;
+    std::size_t sample_count;
     uint8_t stop_requested;
     char host[64];
     uint32_t context_a;
     uint32_t context_b;
-    uint32_t snapshot_count;
+    std::size_t snapshot_count;
     HANDLE thread_handle;
     CRITICAL_SECTION critical_section;
     SferaNetworkProbeSample samples[sample_capacity];
@@ -4298,7 +4290,6 @@ struct SferaNetworkProbeRuntime {
     void start(const char* hostname);
     void stop(bool preserveErrorLog);
 };
-
 
 struct SferaDebugExchange {
     std::byte payload[999];
@@ -4335,11 +4326,7 @@ public:
     void openBitmap(const char* filename, std::uint32_t width, std::uint32_t height);
     ~SferaMapGeneratorRuntime();
 private:
-    std::vector<std::uint8_t> pixels;
     int descriptor = -1;
-    std::uint32_t row_stride = 0;
-    std::uint32_t row_padding = 0;
-    std::uint32_t tail_padding = 0;
 };
 
 inline constexpr std::size_t kUpdateRequestCapacity = 512;

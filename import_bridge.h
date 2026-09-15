@@ -7,6 +7,7 @@
 #include <dinput.h>
 #include <d3d9.h>
 #include <mmsystem.h>
+#include <dsound.h>
 #include <dbghelp.h>
 #include <shellapi.h>
 #include <ole2.h>
@@ -32,9 +33,6 @@
 #include <sys/stat.h>
 #include <sys/utime.h>
 #include <mbctype.h>
-
-struct _DS3DBUFFER;
-using DS3DBUFFER = _DS3DBUFFER;
 
 #ifdef Process32First
 #undef Process32First

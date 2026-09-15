@@ -16,7 +16,7 @@
 #include <memory>
 #include <new>
 #include <string>
-
+#include <utility>
 
 const char* sfera_cursor_texture_name(uint32_t slot) {
     const char* name = nullptr;
@@ -29,7 +29,6 @@ const char* sfera_cursor_texture_name(uint32_t slot) {
     }
     return name;
 }
-
 
 namespace {
 constexpr std::uint32_t kInvalidHandle = std::numeric_limits<std::uint32_t>::max();
@@ -48,9 +47,9 @@ constexpr std::uint32_t kSoundEffectIdBase = 5000u;
 constexpr std::uint32_t kAmbientRainSoundId = 5050u;
 constexpr std::uint32_t kLightingSoundFarId = 5051u;
 constexpr std::uint32_t kLightingSoundNearId = 5052u;
-constexpr std::uint32_t kMaximumActiveEffects = 6000u;
-constexpr std::uint32_t kMaximumRenderSlots = 10000u;
-constexpr std::uint32_t kParticleRandomValueCount = 65536u;
+constexpr std::size_t kMaximumActiveEffects = 6000u;
+constexpr std::size_t kMaximumRenderSlots = 10000u;
+constexpr std::size_t kParticleRandomValueCount = 65536u;
 constexpr std::uint32_t kVisibilityRefreshPeriod = 32u;
 constexpr int kFlareAlphaStep = 35;
 constexpr int kMaximumAlpha = 255;
@@ -63,9 +62,8 @@ void* SferaEffectManager::allocate(std::size_t size) const { return size == 0u ?
 void SferaEffectManager::free(void* pointer) const { std::free(pointer); }
 void SferaEffectManager::reportError(const char* message) const { if (message != nullptr) std::fprintf(stderr, "%s\n", message); }
 SferaEffectRenderSlot* SferaEffectManager::acquireRenderSlot() {
-    const std::uint32_t index = render_slot_count++;
-    if (index >= render_slots.capacity || render_slots.data == nullptr) return nullptr;
-    return render_slots.element(index);
+    if (render_slot_count >= render_slots.capacity || render_slots.data == nullptr) return nullptr;
+    return render_slots.element(render_slot_count++);
 }
 void SferaEffectManager::finalizeBillboard(SferaEffectRenderSlot& slot, const SferaEffectVec3F& position, float size) const {
     const SferaEffectVec3F viewer{viewer_position.x, viewer_position.y, viewer_position.z};
@@ -89,7 +87,6 @@ float SferaEffectManager::viewerDistance(const SferaEffectVec3F& position) const
     return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 float SferaEffectManager::viewerDistance(std::uint32_t source_handle) const { return viewerDistance(g_sfera_world_objects.objectPosition(source_handle)); }
-
 
 bool SferaMainUiStateRuntime::effectVisible(const IEffect& effect, const SferaEffectVec3F& position) const {
     const SferaEffectVec3F minimum{position.x + effect.bounds_min[0], position.y + effect.bounds_min[1], position.z + effect.bounds_min[2]};
@@ -142,9 +139,6 @@ void SferaLightRuntime::release(std::int32_t handle) {
     if (g_sfera_recovered_static_runtime.client_state_02 != 0u) --g_sfera_recovered_static_runtime.client_state_02;
 }
 
-
-
-
 void SferaEffectManager::appendDefinition(IEffect* effect) {
     if (effect == nullptr) return;
     effect->next = nullptr;
@@ -174,7 +168,6 @@ int32_t SferaEffectManager::findDefinitionId(const char* script_name) const {
     return effect != nullptr ? static_cast<int32_t>(effect->effect_id) : -1;
 }
 
-
 void sfera_effect_list_append(SferaIntrusiveListHeader& list, SferaActiveEffect& item) {
     item.next = nullptr;
     item.previous = list.last;
@@ -191,8 +184,8 @@ void sfera_effect_list_remove(SferaIntrusiveListHeader& list, SferaActiveEffect&
     item.owner_list = nullptr;
 }
 
-bool SferaItemArray::grow(std::uint32_t item_size) {
-    if (growth_count == 0u || item_size == 0u || growth_count > std::numeric_limits<std::uint32_t>::max() - free_capacity) return false;
+bool SferaItemArray::grow(std::size_t item_size) {
+    if (growth_count == 0u || item_size == 0u || growth_count > std::numeric_limits<std::size_t>::max() - free_capacity || growth_count > std::numeric_limits<std::size_t>::max() / item_size) return false;
     const std::size_t block_count = block_vector_begin ? block_vector_end - block_vector_begin : 0u;
     const auto new_capacity = free_capacity + growth_count;
     auto* block = static_cast<std::byte*>(std::calloc(growth_count, item_size));
@@ -201,7 +194,7 @@ bool SferaItemArray::grow(std::uint32_t item_size) {
     if (!block || !new_blocks || !new_free) { std::free(block); std::free(new_blocks); std::free(new_free); return false; }
     if (block_count) std::copy_n(block_vector_begin, block_count, new_blocks);
     if (free_count) std::copy_n(free_items, free_count, new_free);
-    for (std::uint32_t index = 0u; index < growth_count; ++index) new_free[free_count + index] = block + std::size_t(index) * item_size;
+    for (std::size_t index = 0; index < growth_count; ++index) new_free[free_count + index] = block + std::size_t(index) * item_size;
     new_blocks[block_count] = block;
     std::free(block_vector_begin);
     std::free(free_items);
@@ -228,17 +221,16 @@ void initialize_identity_frame(float* matrix) {
     std::fill_n(matrix, 16u, 0.0f); matrix[0] = 1.0f; matrix[5] = 1.0f; matrix[10] = 1.0f; matrix[15] = 1.0f;
 }
 void initialize_particle_random_table(SferaEffectManager& manager) {
-    if (manager.particle_random_table == nullptr) manager.particle_random_table = static_cast<std::uint16_t*>(std::calloc(1u, static_cast<std::size_t>(kParticleRandomValueCount) * sizeof(std::uint16_t)));
+    if (manager.particle_random_table == nullptr) manager.particle_random_table = static_cast<std::uint16_t*>(std::calloc(1u, kParticleRandomValueCount * sizeof(std::uint16_t)));
     auto* values = manager.particle_random_table; if (values == nullptr) return;
     const auto seed = static_cast<unsigned>(std::chrono::steady_clock::now().time_since_epoch().count()); std::srand(seed);
-    for (std::uint32_t index = 0u; index < kParticleRandomValueCount; ++index) values[index] = static_cast<std::uint16_t>(std::rand());
+    for (std::size_t index = 0u; index < kParticleRandomValueCount; ++index) values[index] = static_cast<std::uint16_t>(std::rand());
     std::srand(static_cast<unsigned>(std::chrono::steady_clock::now().time_since_epoch().count()));
 }
 template <class T, class Initializer> void append_fixed_effect(SferaEffectManager& manager, Initializer&& initialize) {
     auto* memory = static_cast<T*>(manager.allocate(sizeof(T))); if (memory == nullptr) return; auto* effect = std::construct_at(memory); initialize(*effect); manager.appendDefinition(effect);
 }
 }
-
 
 SferaNatureManager* sfera_nature_manager() { return g_sfera_nature_runtime.manager; }
 
@@ -258,7 +250,7 @@ void SferaNatureManager::shutdown() { g_sfera_effect_manager.unregisterListener(
 
 bool SferaNatureManager::attachRainEffect(IEffect& effect) {
     if (rain_effect != nullptr) return false;
-    if (effect.effect_kind != 3u) g_sfera_effect_manager.reportError("Unknown effect classID for rain.");
+    if (effect.effect_kind != IEffect::Kind::Rain) g_sfera_effect_manager.reportError("Unknown effect classID for rain.");
     if (effect.script_name == nullptr || std::strcmp(effect.script_name, "rain") != 0) g_sfera_effect_manager.reportError("Unknown effect manager for 'rain' not found.");
     rain_effect = &effect; rain_scale = 60.0f; static_cast<CRainEffect&>(effect).spawn_rate = rain_intensity * rain_scale; updateAmbientRainEffects(); return true;
 }
@@ -267,7 +259,7 @@ void SferaNatureManager::detachRainEffect() { for (auto& handle : ambient_rain_h
 
 bool SferaNatureManager::attachLightingEffect(IEffect& effect) {
     if (lighting_effect != nullptr) return false;
-    if (effect.effect_kind != 1u) g_sfera_effect_manager.reportError("Unknown effect classID for lighting.");
+    if (effect.effect_kind != IEffect::Kind::Scripted) g_sfera_effect_manager.reportError("Unknown effect classID for lighting.");
     lighting_effect = &effect;
     if (g_sfera_world_objects.controlled_object_handle != kInvalidHandle) { effect.cycle_length = static_cast<std::uint32_t>(std::trunc((1.0f - lighting_level) * 640.0f + 320.0f)); effect.lifetime_ticks = kInvalidHandle; }
     lighting_listener.change_tick = 1u; return true;
@@ -276,7 +268,7 @@ bool SferaNatureManager::attachLightingEffect(IEffect& effect) {
 void SferaNatureManager::detachLightingEffect() { lighting_effect = nullptr; }
 
 void SferaNatureManager::onLightingEffectChanged(IEffect& effect, SferaActiveEffect& item) {
-    if (effect.effect_kind != 1u) return;
+    if (effect.effect_kind != IEffect::Kind::Scripted) return;
     auto& scripted = static_cast<CScriptedEffect&>(effect);
     if (scripted.light_definitions == nullptr || scripted.light_definition_count == 0u || scripted.particle_system_definitions == nullptr || scripted.particle_system_definition_count == 0u) return;
     SferaParticleSystemDefinition& particle = scripted.particle_system_definitions[0]; if (particle.render_slots == nullptr || particle.render_slot_count == 0u) return;
@@ -312,61 +304,44 @@ void SferaEffectManager::registerEffectMeshFile(const char* filename) {
     std::ifstream stream;
     for (const std::string& path : g_sfera_files.candidatePaths(filename)) { stream.open(path, std::ios::binary); if (stream.is_open()) break; stream.clear(); }
     if (!stream.is_open()) return;
-    auto read_exact = [&](void* output, std::size_t size) {
+    stream.seekg(0, std::ios::end);
+    const auto file_size = stream.tellg();
+    if (file_size < 0) return;
+    stream.seekg(0, std::ios::beg);
+    std::uint64_t remaining = static_cast<std::uint64_t>(file_size);
+    const auto read_exact = [&](void* output, std::size_t size) {
+        if (size > remaining || std::cmp_greater(size, std::numeric_limits<std::streamsize>::max())) return false;
         stream.read(static_cast<char*>(output), static_cast<std::streamsize>(size));
-        return static_cast<std::size_t>(stream.gcount()) == size;
+        if (static_cast<std::size_t>(stream.gcount()) != size) return false;
+        remaining -= size;
+        return true;
     };
+    const auto read_word = [&](std::uint32_t& value) { std::array<std::uint8_t, 4> bytes{}; if (!read_exact(bytes.data(), bytes.size())) return false; value = SferaBinary::readLittleEndian<std::uint32_t>(bytes.data()); return true; };
+    const auto read_float = [&](float& value) { std::uint32_t bits = 0; if (!read_word(bits)) return false; value = std::bit_cast<float>(bits); return true; };
     std::array<char, 4> magic{};
-    std::uint32_t version = 0u;
-    std::uint32_t mesh_count = 0u;
-    std::uint32_t reserved = 0u;
-    if (!read_exact(magic.data(), magic.size()) || !read_exact(&version, sizeof(version)) || magic != std::array<char, 4>{'S', 'S', 'M', '1'} || version != 1u || !read_exact(&mesh_count, sizeof(mesh_count)) || !read_exact(&reserved, sizeof(reserved))) return;
-    for (std::uint32_t mesh_index = 0u; mesh_index < mesh_count; ++mesh_index) {
-        auto* mesh = static_cast<SferaEffectMeshResource*>(allocate(sizeof(SferaEffectMeshResource)));
-        if (mesh == nullptr) return;
-        std::uint32_t skipped_vertex_count = 0u, ignored_count = 0u;
-        bool ok = read_exact(mesh->name, sizeof(mesh->name)) && read_exact(&mesh->vertex_count, sizeof(mesh->vertex_count)) && read_exact(&skipped_vertex_count, sizeof(skipped_vertex_count)) && read_exact(&mesh->uv_count, sizeof(mesh->uv_count)) && read_exact(&mesh->face_count, sizeof(mesh->face_count)) && read_exact(&ignored_count, sizeof(ignored_count));
-        if (ok && mesh->vertex_count != 0u) {
-            mesh->vertices = static_cast<SferaEffectVec3F*>(allocate(static_cast<std::size_t>(mesh->vertex_count) * sizeof(SferaEffectVec3F)));
-            mesh->colors = static_cast<SferaEffectColor32*>(allocate(static_cast<std::size_t>(mesh->vertex_count) * sizeof(SferaEffectColor32)));
-            mesh->transformed_vertices = static_cast<SferaEffectVec3F*>(allocate(static_cast<std::size_t>(mesh->vertex_count) * sizeof(SferaEffectVec3F)));
-            mesh->transformed_colors = static_cast<SferaEffectColor32*>(allocate(static_cast<std::size_t>(mesh->vertex_count) * sizeof(SferaEffectColor32)));
-            ok = mesh->vertices != nullptr && mesh->colors != nullptr && mesh->transformed_vertices != nullptr && mesh->transformed_colors != nullptr;
-        }
-        if (ok && mesh->uv_count != 0u) {
-            mesh->uv = static_cast<float(*)[2]>(allocate(static_cast<std::size_t>(mesh->uv_count) * sizeof(float[2])));
-            mesh->translated_uv = static_cast<float(*)[2]>(allocate(static_cast<std::size_t>(mesh->uv_count) * sizeof(float[2])));
-            ok = mesh->uv != nullptr && mesh->translated_uv != nullptr;
-        }
-        if (ok && mesh->face_count != 0u) {
-            mesh->face_vertices = static_cast<std::uint32_t(*)[4]>(allocate(static_cast<std::size_t>(mesh->face_count) * sizeof(std::uint32_t[4])));
-            mesh->face_uv = static_cast<std::uint32_t(*)[4]>(allocate(static_cast<std::size_t>(mesh->face_count) * sizeof(std::uint32_t[4])));
-            ok = mesh->face_vertices != nullptr && mesh->face_uv != nullptr;
-        }
-        if (ok && mesh->vertex_count != 0u) ok = read_exact(mesh->vertices, static_cast<std::size_t>(mesh->vertex_count) * sizeof(SferaEffectVec3F));
-        if (ok && skipped_vertex_count != 0u) {
-            stream.seekg(static_cast<std::streamoff>(skipped_vertex_count) * static_cast<std::streamoff>(sizeof(SferaEffectVec3F)), std::ios::cur);
-            ok = static_cast<bool>(stream);
-        }
-        if (ok && mesh->face_count != 0u) ok = read_exact(mesh->face_vertices, static_cast<std::size_t>(mesh->face_count) * sizeof(std::uint32_t[4]));
-        if (ok && mesh->vertex_count != 0u) ok = read_exact(mesh->colors, static_cast<std::size_t>(mesh->vertex_count) * sizeof(SferaEffectColor32));
-        if (ok && mesh->uv_count != 0u) ok = read_exact(mesh->uv, static_cast<std::size_t>(mesh->uv_count) * sizeof(float[2]));
-        if (ok && mesh->face_count != 0u) ok = read_exact(mesh->face_uv, static_cast<std::size_t>(mesh->face_count) * sizeof(std::uint32_t[4]));
-        if (!ok) {
-            mesh->release();
-            free(mesh);
-            return;
-        }
-        mesh->previous = nullptr;
-        mesh->next = nullptr;
-        auto* head = particle_resource_head;
-        if (head == nullptr) particle_resource_head = mesh;
-        else {
-            auto* tail = head;
-            while (tail->next != nullptr) tail = tail->next;
-            tail->next = mesh;
-            mesh->previous = tail;
-        }
+    std::uint32_t version = 0, mesh_count = 0, reserved = 0;
+    if (!read_exact(magic.data(), magic.size()) || !read_word(version) || magic != std::array<char, 4>{'S', 'S', 'M', '1'} || version != 1 || !read_word(mesh_count) || !read_word(reserved)) return;
+    for (std::size_t mesh_index = 0; mesh_index < mesh_count; ++mesh_index) {
+        auto mesh = std::make_unique<SferaEffectMeshResource>();
+        std::uint32_t vertex_count = 0, skipped_vertex_count = 0, uv_count = 0, face_count = 0, ignored_count = 0;
+        if (!read_exact(mesh->name, sizeof(mesh->name)) || !read_word(vertex_count) || !read_word(skipped_vertex_count) || !read_word(uv_count) || !read_word(face_count) || !read_word(ignored_count)) return;
+        mesh->name[std::size(mesh->name) - 1] = '\0';
+        const auto payload_size = std::uint64_t{vertex_count} * 16 + std::uint64_t{skipped_vertex_count} * 12 + std::uint64_t{uv_count} * 8 + std::uint64_t{face_count} * 32;
+        if (payload_size > remaining || vertex_count > mesh->vertices.max_size() || uv_count > mesh->uv.max_size() || face_count > mesh->face_vertices.max_size()) return;
+        mesh->vertices.resize(vertex_count); mesh->colors.resize(vertex_count); mesh->transformed_vertices.resize(vertex_count); mesh->transformed_colors.resize(vertex_count);
+        mesh->uv.resize(uv_count); mesh->translated_uv.resize(uv_count); mesh->face_vertices.resize(face_count); mesh->face_uv.resize(face_count);
+        for (auto& vertex : mesh->vertices) if (!read_float(vertex.x) || !read_float(vertex.y) || !read_float(vertex.z)) return;
+        const auto skipped_bytes = std::uint64_t{skipped_vertex_count} * 12;
+        stream.seekg(static_cast<std::streamoff>(skipped_bytes), std::ios::cur);
+        if (!stream) return;
+        remaining -= skipped_bytes;
+        const auto read_faces = [&](auto& faces, std::size_t limit) { for (auto& face : faces) for (auto& index : face) { std::uint32_t value = 0; if (!read_word(value) || value >= limit) return false; index = value; } return true; };
+        if (!read_faces(mesh->face_vertices, mesh->vertices.size())) return;
+        for (auto& color : mesh->colors) if (!read_exact(color.channels.data(), color.channels.size())) return;
+        for (auto& uv : mesh->uv) for (auto& coordinate : uv) if (!read_float(coordinate)) return;
+        if (!read_faces(mesh->face_uv, mesh->uv.size())) return;
+        if (particle_resource_head == nullptr) particle_resource_head = mesh.release();
+        else { auto* tail = particle_resource_head; while (tail->next != nullptr) tail = tail->next; mesh->previous = tail; tail->next = mesh.release(); }
     }
 }
 
@@ -379,11 +354,11 @@ void SferaEffectManager::reportLoadProgress(std::uint32_t progress) {
     g_sfera_graphics_runtime.rebuild_percent = static_cast<std::uint32_t>(percent);
     auto* device_runtime = g_sfera_graphics_runtime.d3d_runtime.get();
     if (device_runtime == nullptr || !device_runtime->beginScene()) return;
-    g_sfera_world_render_runtime.scene_active = 1u;
+    g_sfera_world_render_runtime.scene_active = true;
     g_sfera_interface.setLoadingProgress(percent);
     device_runtime->checkResult(device_runtime->native_device->EndScene(), "EndScene");
     device_runtime->waitForGpu();
-    g_sfera_world_render_runtime.scene_active = 0u;
+    g_sfera_world_render_runtime.scene_active = false;
     device_runtime->checkResult(device_runtime->native_device->Present(nullptr, nullptr, nullptr, nullptr), "Present");
 }
 
@@ -391,7 +366,7 @@ void SferaEffectManager::initializeBloodEffect() {
     if (g_sfera_blood_effect_instance != nullptr) return;
     auto* runtime = static_cast<SferaBloodEffectRuntime*>(allocate(sizeof(SferaBloodEffectRuntime)));
     if (runtime == nullptr) return;
-    std::construct_at(runtime); runtime->change_tick = 64u; runtime->texture_id = static_cast<std::uint32_t>(g_sfera_textures.find("fx_bspot"));
+    std::construct_at(runtime); runtime->change_tick = 64u; runtime->texture_id = g_sfera_textures.find("fx_bspot");
     registerListener(kBloodEffectId, *runtime); g_sfera_blood_effect_instance = runtime;
 }
 void SferaEffectManager::shutdownBloodEffect() {
@@ -426,7 +401,7 @@ void SferaEffectManager::loadDefinitions() {
 void SferaEffectManager::destroyDefinitions() {
     for (IEffect* definition = effect_definition_head; definition != nullptr;) { IEffect* next = definition->next; definition->destroyEffect(true); definition = next; }
     effect_definition_head = nullptr;
-    for (SferaEffectMeshResource* resource = particle_resource_head; resource != nullptr;) { SferaEffectMeshResource* next = resource->next; resource->release(); free(resource); resource = next; }
+    for (SferaEffectMeshResource* resource = particle_resource_head; resource != nullptr;) { SferaEffectMeshResource* next = resource->next; delete resource; resource = next; }
     particle_resource_head = nullptr; g_sfera_effect_manager.free(particle_random_table); particle_random_table = nullptr;
 }
 
@@ -478,13 +453,15 @@ SferaActiveEffect* SferaEffectManager::createActiveEffect(const char* script_nam
 void SferaEffectManager::removeActiveEffect(SferaActiveEffect& item) {
     if (active_effect_count == 0u) return;
     if (item.effect != nullptr) { IEffectListener* listener = item.effect->listener != nullptr ? item.effect->listener : findListener(item.listener_key); if (listener != nullptr && !listener->onEffectDetached(*item.effect, item)) return; }
+    g_sfera_mbc_runtime->forgetNativeResource(&item);
+    if (g_sfera_network_runtime.pending_effect == &item) g_sfera_network_runtime.pending_effect = nullptr;
     if (item.position_source == 0u) g_sfera_world_objects.detachEffect(item.source_handle, item);
     if (item.effect != nullptr) { item.effect->releaseEffect(); item.effect = nullptr; }
     if (item.resource != nullptr) { g_sfera_sound_runtime.destroyEffect(item.resource); item.resource = nullptr; if (active_resource_count != 0u) --active_resource_count; }
-    item.age_ticks = kInvalidHandle; item.reserved_update_handler = 0u; item.listener_key = kInvalidHandle; if (active_effect_count != 0u) --active_effect_count; if (item.owner_list != nullptr) sfera_effect_list_remove(*item.owner_list, item); g_sfera_effect_items.put(&item);
+    item.age_ticks = kInvalidHandle; item.listener_key = kInvalidHandle; if (active_effect_count != 0u) --active_effect_count; if (item.owner_list != nullptr) sfera_effect_list_remove(*item.owner_list, item); g_sfera_effect_items.put(&item);
 }
 
-bool SferaEffectManager::setEffectParameters(std::uint32_t source_handle, const SferaEffectParameter* parameters, std::uint32_t count) { SferaActiveEffect* item = g_sfera_world_objects.firstEffect(source_handle); if (item == nullptr || item->effect == nullptr) return false; item->effect->setParameter(parameters, count); return true; }
+bool SferaEffectManager::setEffectParameters(std::uint32_t source_handle, const SferaEffectParameter* parameters, std::size_t count) { SferaActiveEffect* item = g_sfera_world_objects.firstEffect(source_handle); if (item == nullptr || item->effect == nullptr) return false; item->effect->setParameter(parameters, count); return true; }
 
 void SferaEffectManager::updateActiveEffect(SferaActiveEffect& item, std::uint16_t state_flags, float viewer_distance) {
     if (item.resource != nullptr && item.effect == nullptr) {
@@ -507,15 +484,14 @@ void SferaEffectManager::updateActiveEffect(SferaActiveEffect& item, std::uint16
     if (effect->range_min != -1.0f) { const float env = g_sfera_graphics_runtime.environment_factor; bool outside = false; if (effect->range_max < effect->range_min) outside = env > effect->range_min || env < effect->range_max; else outside = env > effect->range_min && env < effect->range_max; if (outside) { if (effect->deactivated == 0u) effect->deactivateEffect(false); return; } }
     if (effect->cycle_length != 0u && item.age_ticks >= effect->cycle_length) item.age_ticks %= effect->cycle_length;
     if ((state_flags & 2u) != 0u) { if (effect->resources_released != 0u) effect->renderEffect(); effect->queryEffectState({&spatial.frames[0], static_cast<float>(item.age_ticks)}); return; }
-    if (effect->deactivated != 0u) effect->renderEffect(); effect->initializeEffect({&spatial.frames[0], item.position_source == 1u ? 1u : 5u, static_cast<float>(item.age_ticks), visible, &world.frames[0][0]});
+    if (effect->deactivated != 0u) effect->renderEffect(); effect->initializeEffect({&spatial.frames[0], item.position_source == 1u ? 1u : 5u, static_cast<float>(item.age_ticks), visible, world.frames});
 }
-
 
 void SferaEffectManager::updateActiveEffects() {
     const SferaEffectVec3F viewer = g_sfera_world_objects.referencePosition(); viewer_position = {viewer.x, viewer.y, viewer.z};
-    if (flare_transition != 0u) { int alpha = static_cast<int>(flare_alpha) + (flare_transition == 1u ? -kFlareAlphaStep : kFlareAlphaStep); if (alpha < 0) { alpha = 0; flare_transition = 0u; } else if (alpha > kMaximumAlpha) { alpha = kMaximumAlpha; flare_transition = 0u; } flare_alpha = static_cast<std::uint32_t>(alpha); }
+    if (flare_transition != FlareTransition::Idle) { int alpha = flare_alpha + (flare_transition == FlareTransition::FadeOut ? -kFlareAlphaStep : kFlareAlphaStep); if (alpha < 0) { alpha = 0; flare_transition = FlareTransition::Idle; } else if (alpha > kMaximumAlpha) { alpha = kMaximumAlpha; flare_transition = FlareTransition::Idle; } flare_alpha = alpha; }
     render_slot_count = 0u; bool refresh_visibility = false; if (++render_cycle == kVisibilityRefreshPeriod) { render_cycle = 0u; refresh_visibility = true; }
-    const float visibility_distance = g_sfera_view_spatial_runtime.basis[0].z.f32 + 10.0f;
+    const float visibility_distance = g_sfera_view_spatial_runtime.basis[0].z + 10.0f;
     for (SferaActiveEffect* item = active_effects.first; item != nullptr;) {
         SferaActiveEffect* next = item->next;
         if (refresh_visibility || item->state_flags == kUninitializedEffectState) {
