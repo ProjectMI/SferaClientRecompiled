@@ -3,202 +3,26 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <mmsystem.h>
-#include <oleidl.h>
-#include <mshtmhst.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <string>
 #include "semantic_classes.h"
 
-namespace SferaDirectPlay {
-    enum SendFlags : DWORD { guaranteed = 1u << 3, nonSequential = 1u << 4, noLoopback = 1u << 5, highPriority = 1u << 7 };
-    constexpr DWORD messageBase = DWORD{UINT16_MAX} << 16;
-    enum Message : DWORD { connectComplete = messageBase | 5u, createPlayer = messageBase | 7u, destroyPlayer = messageBase | 9u, indicateConnect = messageBase | 14u, connectAborted = messageBase | 15u, receive = messageBase | 17u, terminateSession = messageBase | 22u };
-    constexpr DWORD heartbeatFlags = guaranteed | nonSequential | noLoopback | highPriority;
-}
-
-using SferaDirectPlayMessageHandler = HRESULT (WINAPI*)(void* context, DWORD message, void* payload);
-
-struct SferaDpnBufferDescRuntime;
-class CSoundStream;
-
-struct SferaDirectPlayReceivePayload {
-    DWORD size;
-    DWORD sender;
-    void* player_context;
-    const std::uint8_t* data;
-    DWORD data_size;
-    DWORD buffer_handle;
-};
-
-struct SferaDirectPlayConnectResult {
-    DWORD size;
-    DWORD async_handle;
-    void* user_context;
-    HRESULT result;
-    const void* reply_data;
-    DWORD reply_size;
-};
-
-class SferaBrowserHost final : public IOleClientSite, public IOleInPlaceSite, public IOleInPlaceFrame, public IDocHostUIHandler {
-    class Storage final : public IStorage {
-    public:
-        HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** output) override;
-        ULONG STDMETHODCALLTYPE AddRef() override { return 1u; }
-        ULONG STDMETHODCALLTYPE Release() override { return 1u; }
-        HRESULT STDMETHODCALLTYPE CreateStream(const OLECHAR*, DWORD, DWORD, DWORD, IStream**) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE OpenStream(const OLECHAR*, void*, DWORD, DWORD, IStream**) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE CreateStorage(const OLECHAR*, DWORD, DWORD, DWORD, IStorage**) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE OpenStorage(const OLECHAR*, IStorage*, DWORD, SNB, DWORD, IStorage**) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE CopyTo(DWORD, const IID*, SNB, IStorage*) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE MoveElementTo(const OLECHAR*, IStorage*, const OLECHAR*, DWORD) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE Commit(DWORD) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE Revert() override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE EnumElements(DWORD, void*, DWORD, IEnumSTATSTG**) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE DestroyElement(const OLECHAR*) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE RenameElement(const OLECHAR*, const OLECHAR*) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE SetElementTimes(const OLECHAR*, const FILETIME*, const FILETIME*, const FILETIME*) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE SetClass(REFCLSID) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE SetStateBits(DWORD, DWORD) override { return E_NOTIMPL; }
-        HRESULT STDMETHODCALLTYPE Stat(STATSTG*, DWORD) override { return E_NOTIMPL; }
-    };
-
-public:
-    explicit SferaBrowserHost(HWND window) noexcept;
-    ~SferaBrowserHost();
-    HRESULT create() noexcept;
-    void resize(LONG width, LONG height) noexcept;
-    HWND documentWindow() noexcept;
-    void refresh() noexcept;
-    HRESULT navigate(const char* url) noexcept;
-    void location(char* buffer, std::uint32_t capacity) noexcept;
-    HRESULT draw(HDC target, LONG width, LONG height) noexcept;
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** output) override;
-    ULONG STDMETHODCALLTYPE AddRef() override { return 1u; }
-    ULONG STDMETHODCALLTYPE Release() override { return 1u; }
-    HRESULT STDMETHODCALLTYPE SaveObject() override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetMoniker(DWORD, DWORD, IMoniker**) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetContainer(IOleContainer** output) override;
-    HRESULT STDMETHODCALLTYPE ShowObject() override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE OnShowWindow(BOOL) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE RequestNewObjectLayout() override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetWindow(HWND* output) override;
-    HRESULT STDMETHODCALLTYPE ContextSensitiveHelp(BOOL) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE CanInPlaceActivate() override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE OnInPlaceActivate() override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE OnUIActivate() override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE GetWindowContext(IOleInPlaceFrame** frame, IOleInPlaceUIWindow** document, LPRECT, LPRECT, LPOLEINPLACEFRAMEINFO info) override;
-    HRESULT STDMETHODCALLTYPE Scroll(SIZE) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE OnUIDeactivate(BOOL) override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE OnInPlaceDeactivate() override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE DiscardUndoState() override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE DeactivateAndUndo() override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE OnPosRectChange(LPCRECT rect) override;
-    HRESULT STDMETHODCALLTYPE GetBorder(LPRECT) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE RequestBorderSpace(LPCBORDERWIDTHS) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetBorderSpace(LPCBORDERWIDTHS) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetActiveObject(IOleInPlaceActiveObject*, LPCOLESTR) override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE InsertMenus(HMENU, LPOLEMENUGROUPWIDTHS) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetMenu(HMENU, HOLEMENU, HWND) override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE RemoveMenus(HMENU) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetStatusText(LPCOLESTR) override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE EnableModeless(BOOL) override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE TranslateAccelerator(LPMSG, WORD) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE ShowContextMenu(DWORD, POINT*, IUnknown*, IDispatch*) override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE GetHostInfo(DOCHOSTUIINFO* info) override;
-    HRESULT STDMETHODCALLTYPE ShowUI(DWORD, IOleInPlaceActiveObject*, IOleCommandTarget*, IOleInPlaceFrame*, IOleInPlaceUIWindow*) override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE HideUI() override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE UpdateUI() override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE OnDocWindowActivate(BOOL) override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE OnFrameWindowActivate(BOOL) override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE ResizeBorder(LPCRECT, IOleInPlaceUIWindow*, BOOL) override { return S_OK; }
-    HRESULT STDMETHODCALLTYPE TranslateAccelerator(LPMSG, const GUID*, DWORD) override { return S_FALSE; }
-    HRESULT STDMETHODCALLTYPE GetOptionKeyPath(LPOLESTR* output, DWORD) override;
-    HRESULT STDMETHODCALLTYPE GetDropTarget(IDropTarget*, IDropTarget** output) override;
-    HRESULT STDMETHODCALLTYPE GetExternal(IDispatch** output) override;
-    HRESULT STDMETHODCALLTYPE TranslateUrl(DWORD, OLECHAR*, OLECHAR** output) override;
-    HRESULT STDMETHODCALLTYPE FilterDataObject(IDataObject*, IDataObject** output) override;
-
-private:
-    HWND window_ = nullptr;
-    IOleObject* object_ = nullptr;
-    Storage storage_;
-};
-
-struct SferaDirectPlayAddressNative {
-    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** output) = 0;
-    virtual ULONG STDMETHODCALLTYPE AddRef() = 0;
-    virtual ULONG STDMETHODCALLTYPE Release() = 0;
-    virtual HRESULT STDMETHODCALLTYPE BuildFromURLW(const wchar_t* url) = 0;
-    virtual HRESULT STDMETHODCALLTYPE BuildFromURLA(const char* url) = 0;
-    virtual HRESULT STDMETHODCALLTYPE Duplicate(SferaDirectPlayAddressNative** output) = 0;
-    virtual HRESULT STDMETHODCALLTYPE SetEqual(SferaDirectPlayAddressNative* address) = 0;
-    virtual HRESULT STDMETHODCALLTYPE IsEqual(SferaDirectPlayAddressNative* address) = 0;
-    virtual HRESULT STDMETHODCALLTYPE Clear() = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetURLW(wchar_t* url, DWORD* characters) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetURLA(char* url, DWORD* characters) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetSP(GUID* provider) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetUserData(void* data, DWORD* size) = 0;
-    virtual HRESULT STDMETHODCALLTYPE SetSP(const GUID* provider) = 0;
-    virtual HRESULT STDMETHODCALLTYPE SetUserData(const void* data, DWORD size) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetNumComponents(DWORD* count) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetComponentByName(const wchar_t* name, void* buffer, DWORD* size, DWORD* type) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetComponentByIndex(DWORD index, wchar_t* name, DWORD* name_characters, void* buffer, DWORD* size, DWORD* type) = 0;
-    virtual HRESULT STDMETHODCALLTYPE AddComponent(const wchar_t* name, const void* data, DWORD size, DWORD type) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetDevice(GUID* device) = 0;
-    virtual HRESULT STDMETHODCALLTYPE SetDevice(const GUID* device) = 0;
-    virtual HRESULT STDMETHODCALLTYPE BuildFromDirectPlay4Address(void* address, DWORD size) = 0;
-};
-
-struct SferaDirectPlayClientNative {
-    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** output) = 0;
-    virtual ULONG STDMETHODCALLTYPE AddRef() = 0;
-    virtual ULONG STDMETHODCALLTYPE Release() = 0;
-    virtual HRESULT STDMETHODCALLTYPE Initialize(void* context, SferaDirectPlayMessageHandler handler, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE EnumServiceProviders(const GUID*, const GUID*, void*, DWORD*, DWORD*, DWORD) = 0;
-    virtual HRESULT STDMETHODCALLTYPE EnumHosts(const void*, SferaDirectPlayAddressNative*, SferaDirectPlayAddressNative*, const void*, DWORD, DWORD, DWORD, DWORD, void*, DWORD*, DWORD) = 0;
-    virtual HRESULT STDMETHODCALLTYPE CancelAsyncOperation(DWORD handle, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE Connect(const void* application, SferaDirectPlayAddressNative* host, SferaDirectPlayAddressNative* device, const void* security, const void* credentials, const void* user_data, DWORD user_data_size, void* async_context, DWORD* async_handle, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE Send(const SferaDpnBufferDescRuntime* buffers, DWORD buffer_count, DWORD timeout, void* async_context, DWORD* async_handle, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetSendQueueInfo(DWORD* messages, DWORD* bytes, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetApplicationDesc(void* description, DWORD* size, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE SetClientInfo(const void* info, void* async_context, DWORD* async_handle, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetServerInfo(void* info, DWORD* size, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetServerAddress(SferaDirectPlayAddressNative** address, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE Close(DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE ReturnBuffer(DWORD handle, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetCaps(void* caps, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE SetCaps(const void* caps, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE SetSPCaps(const GUID* provider, const void* caps, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetSPCaps(const GUID* provider, void* caps, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetConnectionInfo(void* info, DWORD flags) = 0;
-    virtual HRESULT STDMETHODCALLTYPE RegisterLobby(DWORD handle, void* application, DWORD flags) = 0;
-};
-
 int __cdecl sfera_compare_record_key(const void* left, const void* right) noexcept;
 
-LRESULT CALLBACK sfera_browser_subclass_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
-LRESULT CALLBACK sfera_browser_host_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
-HWND sfera_browser_document_window(HWND window) noexcept;
-void sfera_browser_refresh(HWND window) noexcept;
-HRESULT sfera_browser_draw(HWND window, HDC target, LONG width, LONG height) noexcept;
 
 LRESULT CALLBACK sfera_main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
 INT_PTR CALLBACK sfera_dialog_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
 LONG WINAPI sfera_unhandled_exception_filter(EXCEPTION_POINTERS* exception) noexcept;
 LONG WINAPI sfera_cpp_exception_filter(EXCEPTION_POINTERS* exception) noexcept;
 
-HRESULT WINAPI sfera_directplay_message_handler(void* context, DWORD message, void* payload) noexcept;
 DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept;
 DWORD WINAPI sfera_tcp_receive_dispatch_thread(void* parameter) noexcept;
 DWORD WINAPI sfera_tcp_send_maintenance_thread(void* parameter) noexcept;
 DWORD WINAPI sfera_network_probe_thread(void* parameter) noexcept;
-DWORD WINAPI sfera_directplay_heartbeat_thread(void* parameter) noexcept;
 
 DWORD WINAPI sfera_check_files_thread(void* parameter) noexcept;
 DWORD WINAPI sfera_update_download_thread(void* parameter) noexcept;
 
-std::uint32_t __fastcall sfera_sound_decode_callback(CSoundStream* stream, void* state) noexcept;
-std::uint32_t __fastcall sfera_sound_play_callback(CSoundStream* stream, void* state) noexcept;
 std::uint32_t __fastcall sfera_client_critical_error(const char* message, std::uint32_t critical) noexcept;

@@ -9,12 +9,10 @@
 namespace SphereUI { struct SavedWindowPosition; struct LocalizedTextEntry; struct DisplayMode; }
 struct SferaScreenVertex;
 struct IDirect3DBaseTexture9;
-struct SferaDirectPlayAddressNative;
 struct IDirect3D9;
 struct IDirect3DDevice9;
 struct IDirect3DBaseTexture9;
 namespace SphereUI { struct UiSprite; }
-struct SferaDirectPlayClientNative;
 
 namespace {
 
@@ -213,10 +211,6 @@ struct SferaAsciiLowerRuntime {
     uint8_t table[256];
 };
 
-struct SferaMusicRuntime {
-    char requested_path[512];
-    SferaSoundPlaybackState* current_stream;
-};
 struct SferaMainCommandStateRuntime {
 
     bool lighting_enabled;
@@ -305,7 +299,6 @@ struct SferaClientConfigRuntime {
     bool alternate_rd_assets;
     uint32_t refresh_rate;
 
-    bool connect_type_enabled;
     bool gamexp_sid_present;
 
     SferaTcpConnectionContext* tcp_connection;
@@ -365,12 +358,6 @@ struct SferaInterfaceRuntime {
 };
 using SferaStdAllocator = StdAllocator;
 namespace SphereUI::Memory { struct AllocationHeader; struct AllocationRecord; struct AllocationSource; }
-
-struct SferaBrowserWindowRuntime {
-    bool class_registered;
-
-    WNDPROC original_window_proc;
-};
 
 struct SferaSceneVectorRuntime {
     SferaVec3F render_scale;
@@ -698,9 +685,6 @@ struct SferaAlphaMaterialRuntime {
 };
 
 struct SferaRecoveredStaticRuntime {
-    uint32_t network_bytes_sent_snapshot;
-    uint32_t network_bytes_retried_snapshot;
-    uint32_t network_bytes_received_snapshot;
     uint32_t simulation_tick;
     bool vertical_sync_enabled;
     uint32_t memory_warning_as_error;
@@ -818,9 +802,7 @@ struct SferaEffectManager {
 inline SferaItemArray g_sfera_effect_items{.growth_count = 6000u};
 inline SferaItemArray g_sfera_sound_effect_items{.growth_count = 128u};
 inline SferaServerWall g_sfera_server_wall{.texture_id = -1};
-inline SferaNetworkRuntime g_sfera_network_runtime{.initialization_result = UINT32_MAX, .server_port = 25858u, .local_port_candidate = 26860u, .connection_slot = UINT32_MAX, .pending_effect = nullptr, .active_slot = UINT32_MAX, .shutdown_state = UINT32_MAX};
-inline SferaDirectPlayRuntime g_sfera_directplay_runtime;
-inline SferaNetworkConnectionCheckerRuntime g_sfera_network_connection_checker;
+inline SferaNetworkRuntime g_sfera_network_runtime{.initialization_result = UINT32_MAX, .server_port = 25858u, .connection_slot = UINT32_MAX, .pending_effect = nullptr, .active_slot = UINT32_MAX, .shutdown_state = UINT32_MAX};
 inline SferaNetworkSendRuntime g_sfera_network_send_runtime;
 inline SkyEnvironment* g_sfera_primary_sky_environment;
 
@@ -895,7 +877,6 @@ inline SferaSceneBuildRuntime g_sfera_scene_build_runtime;
 inline SferaWeatherRuntime g_sfera_weather_runtime;
 inline SferaModelMaterialLookupRuntime g_sfera_model_material_lookup_runtime;
 inline SferaNatureRuntime g_sfera_nature_runtime;
-inline SferaSoundRuntime g_sfera_sound_runtime;
 inline SferaWarningLogRuntime g_sfera_warning_log_runtime;
 inline SferaControlOptionsRuntime g_sfera_control_options{.active_slot = UINT32_MAX};
 inline SferaSpriteRuntime g_sfera_sprite_runtime{.render_mode = UINT32_MAX};
@@ -909,7 +890,6 @@ inline SferaCrc32Runtime g_sfera_crc32_runtime;
 inline SferaStringLookupRuntime g_sfera_string_lookup_runtime;
 inline SferaAsciiLowerRuntime g_sfera_ascii_lower_runtime;
 inline SferaNetworkProbeRuntime g_sfera_network_probe_runtime;
-inline SferaMusicRuntime g_sfera_music_runtime;
 inline uint32_t g_sfera_graphics_display_depth_bits = 32u;
 inline SferaMainCommandStateRuntime g_sfera_main_command_state_runtime;
 inline SferaMainInputStateRuntime g_sfera_main_input_state_runtime;
@@ -928,7 +908,6 @@ inline SferaDiagnosticLogObjectRuntime g_sfera_log_memory_object;
 inline SferaDiagnosticLogObjectRuntime g_sfera_log_warnings_object;
 inline SferaDiagnosticLogObjectRuntime g_sfera_log_errors_object;
 inline SferaD3D9SemanticStateRuntime g_sfera_d3d9_semantic_state;
-inline SferaBrowserWindowRuntime g_sfera_browser_window_runtime;
 inline SferaCrtStartupRuntime g_sfera_crt_startup_runtime;
 inline SferaCrashReportRuntime g_sfera_crash_report_runtime;
 inline SferaBloodEffectRuntime* g_sfera_blood_effect_instance;

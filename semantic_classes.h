@@ -3,7 +3,6 @@
 #include <winsock2.h>
 #include <d3d9.h>
 #include <mmsystem.h>
-#include <dsound.h>
 #include <cstdio>
 #include <cstdarg>
 #include <atomic>
@@ -43,11 +42,8 @@ struct SferaScreenVertex;
 
 #include "semantic_window.h"
 
-struct SferaDirectPlayClientNative;
-struct SferaDirectPlayAddressNative;
 struct SferaTcpConnectionContext;
 struct SferaIntrusiveListHeader;
-class CSound;
 class StdAllocator;
 struct SferaMbcProcessRecord;
 struct SferaScriptContainer;
@@ -231,6 +227,8 @@ public:
 };
 
 using SferaEffectVec3F = SferaVec3F;
+
+#include "sfera_sound_runtime.h"
 
 struct SferaEffectRenderSlot {
     SferaEffectVec3F position[4];
@@ -422,57 +420,6 @@ struct SferaSubeffectDefinition {
     std::ptrdiff_t definition_index;
     Kind kind;
     std::uint8_t attach_mode;
-};
-
-struct SferaSoundSource {
-    char* filename;
-    bool silence;
-    float silence_duration;
-};
-
-struct SferaSoundTimeGroup {
-    float begin;
-    float end;
-    std::size_t source_begin = 0u;
-    std::size_t source_end = 0u;
-};
-
-class CSoundEffect {
-public:
-    std::uint32_t effect_number;
-    std::uint32_t flags;
-    bool silence_active;
-
-    std::uint64_t silence_started_at;
-    float silence_duration;
-    float saved_play_time;
-    std::uint64_t transition_started_at;
-    SferaSoundSource* sources;
-    std::size_t source_count;
-    SferaSoundTimeGroup* time_groups;
-    std::size_t time_group_count;
-    bool distance_paused;
-    SferaEffectVec3F offset;
-    SferaEffectVec3F region_radius;
-    SferaEffectVec3F region_offset;
-    float mix_duration;
-    std::optional<std::size_t> last_source_index;
-    CSound* active_sound;
-    std::int32_t cache_lifetime;
-    bool shared_definition;
-    DS3DBUFFER sound_parameters;
-    SferaEffectVec3F last_position;
-
-    void initialize();
-    bool loadDefinition(SferaSimpleParser& parser, const SferaParserRange& range);
-    CSoundEffect* clone() const;
-    void resetFrom(const CSoundEffect& source);
-    void destroy();
-    float startTime() const;
-    void start(const SferaEffectVec3F* frame, bool after_start_time);
-    void update(const SferaEffectVec3F* frame, float age);
-    void stop();
-    bool isComplete() const;
 };
 
 class IEffect;
@@ -941,19 +888,6 @@ public:
     bool onEffectAttached(IEffect& effect, SferaActiveEffect& item, float distance) override;
     bool onEffectDetached(IEffect& effect, SferaActiveEffect& item) override;
     void onEffectChanged(std::uint32_t age_ticks, IEffect& effect, SferaActiveEffect& item) override;
-};
-
-class CSoundManager {
-public:
-    void detach(CSound& sound);
-    void setVolume(std::int32_t percent);
-    void update();
-    void clear();
-    CSound* first;
-    CSound* last;
-    float volume;
-    bool enabled;
-    std::size_t count;
 };
 
 struct SferaCursorPosition { std::int32_t x; std::int32_t y; };
@@ -1925,33 +1859,34 @@ inline SphereRender::TextureRepository g_sfera_textures;
 inline SphereRender::ModelRepository g_sfera_models;
 
 class CD3D9Device;
-struct ID3DXConstantTable;
 
 class CShaderMgr {
 public:
     struct WaterParameters { float gradient = 0.0f; float specular = 0.0f; float reflection = 0.0f; };
-    struct TexelOffset { float x; float y; };
     struct Variant {
         std::string filename;
         IDirect3DPixelShader9* pixel_shader = nullptr;
-        ID3DXConstantTable* constants = nullptr;
+        int alpha_register = -1;
+        int down_filter_register = -1;
+        int water_gradient_register = -1;
+        int water_specular_register = -1;
+        int water_reflection_register = -1;
         Variant() = default;
         ~Variant();
         Variant(const Variant&) = delete;
         Variant& operator=(const Variant&) = delete;
-        void setConstant(CD3D9Device& device, const char* name, const void* data, std::uint32_t bytes);
     };
     std::map<std::pair<bool, std::array<std::uint8_t, 8>>, Variant> variants;
     std::string vertex_directory;
     std::string pixel_directory;
     std::array<float, 512> wave_samples;
-    std::array<TexelOffset, 16> downsample_offsets;
+    std::array<SferaVec4F, 16> downsample_offsets;
     CShaderMgr(CD3D9Device& device, const char* vertex_directory, const char* pixel_directory);
     CShaderMgr(const CShaderMgr&) = delete;
     CShaderMgr& operator=(const CShaderMgr&) = delete;
     static std::pair<bool, std::array<std::uint8_t, 8>> instanceCode(std::string_view filename, bool pixel);
     static std::array<float, 512> makeWaveSamples();
-    static std::array<TexelOffset, 16> makeDownsampleOffsets(float width, float height);
+    static std::array<SferaVec4F, 16> makeDownsampleOffsets(float width, float height);
     static WaterParameters waterParameters(float environment, float height);
     void loadFolder(const char* directory, bool pixel);
     void setPixelShader(std::uint32_t group);
@@ -3162,16 +3097,6 @@ private:
 };
 inline std::unique_ptr<ShadowMap> g_sfera_shadows;
 
-class SoundEffectRegistry {
-public:
-    std::vector<CSoundEffect*> definitions;
-    SoundEffectRegistry();
-    ~SoundEffectRegistry();
-    CSoundEffect* add();
-    CSoundEffect* find(std::uint32_t id) const;
-    bool load();
-    void clear();
-};
 struct SkyState {
     SferaVec4F primaryColors[10];
     float primaryPositions[10];
@@ -3195,82 +3120,6 @@ public:
     void sample(float time, SkyState& output) const;
     void sunDirection(float time, SferaVec3F& output) const;
     void lighting(float time, SferaVec3F& sun, SferaVec3F& ambient) const;
-};
-
-// Sound playback owner.
-class CSoundStream;
-enum class SoundEventType : std::uint8_t { none, seek, wait, stop, playlist, end };
-
-struct SoundEventRecord {
-    SoundEventType type = SoundEventType::end;
-    std::size_t argument = 0u;
-    float signal = -1.0f;
-    std::uint32_t position = std::numeric_limits<std::uint32_t>::max();
-};
-
-
-struct SferaSoundTiming {
-    float seek_time;
-    float signal;
-};
-
-struct SferaSoundEventList {
-    void parseGroup(std::size_t group, const char* text);
-    std::vector<std::vector<SoundEventRecord>> groups;
-    std::size_t item_index = 0;
-    std::size_t group_index = 0;
-};
-
-struct SferaSoundPlaybackState {
-    SferaSoundPlaybackState();
-    ~SferaSoundPlaybackState();
-    static float parseTime(const char* text);
-    bool load(const char* filename);
-    bool start();
-    void stop();
-    void clear();
-    void update();
-    SoundEventRecord nextEvent() noexcept;
-    bool queueEvent(SoundEventRecord event, float signal, std::uint32_t position) noexcept;
-    std::optional<SoundEventRecord> popEvent() noexcept;
-    std::deque<SoundEventRecord> event_queue;
-    std::vector<SferaSoundTiming> timings;
-    bool playing;
-    std::size_t wait_seconds;
-
-    std::uint64_t wait_started_at;
-    float play_signal;
-    std::vector<SferaSoundEventList> playlists;
-    SferaSoundEventList* current_list;
-    std::size_t playlist_index;
-    CSoundStream* stream;
-    char* source;
-    bool finished;
-    bool stopped;
-    int volume_scale;
-    bool force_stop;
-
-};
-
-struct SferaSoundRuntime {
-    SoundEffectRegistry* effect_manager;
-    CSoundManager* sound_manager;
-    std::list<std::unique_ptr<SferaSoundPlaybackState>> tracks;
-    SferaSoundPlaybackState* loadTrack(const char* filename);
-    bool deleteTrack(SferaSoundPlaybackState* track);
-    void clearTracks();
-    bool updateTracks();
-    void requestTrack(const char* filename);
-
-    CSoundManager* ensureManager();
-    bool initialize();
-    void update();
-    void shutdown();
-    void loadDefinitions();
-    void clearDefinitions();
-    bool interfaceAvailable() const;
-    CSoundEffect* createEffect(std::uint32_t effect_id);
-    void destroyEffect(CSoundEffect* effect);
 };
 
 class PathZones {
@@ -3718,6 +3567,7 @@ public:
     explicit SferaMbcBitStream(std::span<std::uint8_t> data, std::size_t position = 0) : data_(data), output_(data.data()), position_(position) {}
     bool valid() const { return valid_; }
     std::size_t position() const { return position_; }
+    std::size_t remaining() const { return position_ <= data_.size() * 8 ? data_.size() * 8 - position_ : 0; }
     std::uint32_t read(unsigned width);
     void write(std::uint32_t value, unsigned width);
     void append(std::span<const std::uint8_t> data, std::size_t bits);
@@ -4002,107 +3852,26 @@ struct SferaScriptContainer {
     void destroy();
 };
 
-struct SferaDpnExtendedCaps {
-    std::uint32_t size;
-    std::uint32_t flags;
-    std::uint32_t connect_timeout_ms;
-    std::uint32_t connect_retries;
-    std::uint32_t timeout_until_keepalive_ms;
-    std::uint32_t maximum_receive_message_size;
-    std::uint32_t send_retries;
-    std::uint32_t maximum_send_retry_interval_ms;
-    std::uint32_t drop_threshold_rate;
-    std::uint32_t throttle_rate;
-    std::uint32_t hard_disconnect_sends;
-    std::uint32_t maximum_hard_disconnect_period_ms;
-};
-
-struct SferaDpnServiceProviderCaps {
-    std::uint32_t size;
-    std::uint32_t flags;
-    std::uint32_t thread_count;
-    std::uint32_t default_enumeration_count;
-    std::uint32_t default_enumeration_retry_interval_ms;
-    std::uint32_t default_enumeration_timeout_ms;
-    std::uint32_t maximum_enumeration_payload_size;
-    std::uint32_t buffers_per_thread;
-    std::uint32_t system_buffer_size;
-};
-
-struct SferaDpnCapsRuntime {
-    uint32_t size;
-    uint32_t flags;
-    uint32_t connect_timeout_ms;
-    uint32_t connect_retries;
-    uint32_t timeout_until_keepalive_ms;
-};
-
-struct SferaDpnBufferDescRuntime {
-    uint32_t buffer_size;
-    void* buffer_data;
-};
-
-struct SferaDpnConnectionInfoRuntime {
-    uint32_t size;
-    uint32_t round_trip_latency_ms;
-    uint32_t throughput_bps;
-    uint32_t peak_throughput_bps;
-    uint32_t bytes_sent_guaranteed;
-    uint32_t packets_sent_guaranteed;
-    uint32_t bytes_sent_non_guaranteed;
-    uint32_t packets_sent_non_guaranteed;
-    uint32_t bytes_retried;
-    uint32_t packets_retried;
-    uint32_t bytes_dropped;
-    uint32_t packets_dropped;
-    uint32_t messages_transmitted_high_priority;
-    uint32_t messages_timed_out_high_priority;
-    uint32_t messages_transmitted_normal_priority;
-    uint32_t messages_timed_out_normal_priority;
-    uint32_t messages_transmitted_low_priority;
-    uint32_t messages_timed_out_low_priority;
-    uint32_t bytes_received_guaranteed;
-    uint32_t packets_received_guaranteed;
-    uint32_t bytes_received_non_guaranteed;
-    uint32_t packets_received_non_guaranteed;
-    uint32_t messages_received;
-};
-
 struct SferaNetworkTransportRuntime {
-    uint32_t mode;
-    uint8_t transport_flag;
-    uint8_t receive_busy;
-    uint8_t receive_corrupted;
-
-    SferaDirectPlayAddressNative* primary_address;
-    SferaDirectPlayAddressNative* secondary_address;
-    uint32_t sent_packet_count;
+    std::uint32_t client_mode;
+    bool connection_lost;
+    bool receive_busy;
+    bool receive_corrupted;
     std::uint64_t sent_bytes;
-    uint32_t received_packet_count;
-    uint32_t receive_read_index;
     std::uint64_t received_bytes;
-    uint32_t receive_write_index;
-
+    std::uint32_t receive_read_index;
+    std::uint32_t receive_write_index;
 };
 
-struct SferaDirectPlayRuntime {
-    SferaDirectPlayClientNative* peer;
-    SferaDpnCapsRuntime caps;
-    CRITICAL_SECTION critical_section;
-    SferaDpnBufferDescRuntime send_buffer;
-    DWORD send_async_handle;
-    SferaDpnConnectionInfoRuntime connection_info;
-    SferaNetworkTransportRuntime transport;
+struct SferaNetworkConnectionInfoRuntime {
+    std::uint32_t round_trip_latency_ms;
+    std::uint32_t throughput_bps;
 };
 
 inline constexpr std::size_t kSferaNetworkMessageSlotCount = 3048u;
 struct SferaNetworkMessageSlot {
-    DWORD message;
-    DWORD sender;
-    DWORD buffer_handle;
-    uint8_t data[400];
-    DWORD data_size;
-
+    std::uint8_t data[400];
+    std::uint32_t data_size;
 };
 
 inline constexpr std::size_t kTcpReceiveBufferCapacity = 60000u;
@@ -4210,12 +3979,10 @@ struct SferaUpdateSidecar {
 struct SferaNetworkRuntime {
     uint32_t initialization_result;
     uint32_t server_port;
-    uint32_t local_port_candidate;
     uint32_t connection_slot;
     SferaActiveEffect* pending_effect;
     uint32_t active_slot;
     uint32_t shutdown_state;
-    bool timeout_marker_pending;
     bool net_log_has_error;
     bool network_error_active;
     uint8_t initialized;
@@ -4223,23 +3990,20 @@ struct SferaNetworkRuntime {
     uint32_t bytes_retried_delta;
     uint32_t bytes_received_delta;
     uint32_t error_budget;
-    SferaDpnExtendedCaps directplay_caps;
-    SferaDpnServiceProviderCaps service_provider_caps;
-    DWORD message_call_scratch;
+    SferaNetworkTransportRuntime transport;
+    SferaNetworkConnectionInfoRuntime connection_info;
+    CRITICAL_SECTION receive_critical_section;
     SferaNetworkMessageSlot message_slots[kSferaNetworkMessageSlotCount];
-    int initialize(const char* hostname, std::uint32_t port);
+    int initialize(const char* hostname, std::uint32_t mode);
     void shutdown();
     void receiveMessages();
     void receiveMessage(SferaNetworkMessageSlot& message);
     void receiveEvents(std::span<const std::uint8_t> payload);
-    void sendDiagnosticFile(const char* path, std::uint8_t kind, std::size_t packetSize);
-    void sendPacket(std::uint32_t flags, std::span<std::uint8_t> payload);
+    bool sendPacket(std::uint32_t flags, std::span<const std::uint8_t> payload);
     void updateProbe();
     static std::int32_t tickDifference(std::uint32_t current, std::uint32_t previous);
     static void encodePayload(std::uint8_t* data, std::int32_t length);
-    void updateDirectPlayStatistics();
     void updateTcpStatistics();
-    std::uint32_t findLocalPort();
 };
 
 class SferaGameCalendar {
@@ -4262,7 +4026,6 @@ public:
     static std::uint32_t ticks(std::uint32_t calendar);
 };
 
-struct SferaNetworkConnectionCheckerRuntime { HANDLE thread = nullptr; void start(); void stop(); };
 
 struct SferaNetworkProbeSample {
     std::uint64_t timestamp;

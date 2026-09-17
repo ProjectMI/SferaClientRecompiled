@@ -1,86 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="semantic_window.cpp">
-      <Filter>semantic</Filter>
-    </ClCompile>
-    <ClCompile Include="zlib.cpp">
-      <Filter>core</Filter>
-    </ClCompile>
-    <ClCompile Include="semantic_classes.cpp">
-      <Filter>semantic</Filter>
-    </ClCompile>
-    <ClCompile Include="semantic_static.cpp">
-      <Filter>semantic</Filter>
-    </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>core</Filter>
-    </ClCompile>
-    <ClCompile Include="native_callbacks.cpp">
-      <Filter>core</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="zlib.h">
-      <Filter>core</Filter>
-    </ClInclude>
-    <ClInclude Include="semantic_classes.h">
-      <Filter>semantic</Filter>
-    </ClInclude>
-    <ClInclude Include="semantic_window.h">
-      <Filter>semantic</Filter>
-    </ClInclude>
-    <ClInclude Include="semantic_static.h">
-      <Filter>semantic</Filter>
-    </ClInclude>
-    <ClInclude Include="native_callbacks.h">
-      <Filter>core</Filter>
-    </ClInclude>
-    <ClInclude Include="import_bridge.h">
-      <Filter>core</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="imports\d3dx9_26.def">
-      <Filter>imports</Filter>
-    </None>
-    <None Include="runtime_dlls\d3dx9_26.dll">
-      <Filter>imports</Filter>
-    </None>
-    <None Include="runtime_dlls\d3dx9_30.dll">
-      <Filter>imports</Filter>
-    </None>
-    <None Include="runtime_dlls\dbghelp.dll">
-      <Filter>imports</Filter>
-    </None>
-    <None Include="runtime_dlls\msvcr100.dll">
-      <Filter>imports</Filter>
-    </None>
-    <None Include="runtime_dlls\msvcp71.dll">
-      <Filter>imports</Filter>
-    </None>
-    <None Include="runtime_dlls\msvcp100.dll">
-      <Filter>imports</Filter>
-    </None>
-    <None Include="runtime_dlls\msvcr71.dll">
-      <Filter>imports</Filter>
-    </None>
-    <None Include="runtime_dlls\sound.dll">
-      <Filter>imports</Filter>
-    </None>
-    <None Include="imports\sound.def">
-      <Filter>imports</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="imports">
-      <UniqueIdentifier>{21f70185-4287-4368-bb2f-f5dc1bfbf80c}</UniqueIdentifier>
+    <Filter Include="core">
+      <UniqueIdentifier>{24bf44e0-41a2-4b07-b9a9-c2a28aa80c8a}</UniqueIdentifier>
     </Filter>
     <Filter Include="semantic">
       <UniqueIdentifier>{5fe1d1c2-bc4c-41bf-b8e8-159b946abb23}</UniqueIdentifier>
     </Filter>
-    <Filter Include="core">
-      <UniqueIdentifier>{24bf44e0-41a2-4b07-b9a9-c2a28aa80c8a}</UniqueIdentifier>
+    <Filter Include="sound">
+      <UniqueIdentifier>{A2CB33E6-16B3-4C91-9DD4-F81732D81F0F}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp"><Filter>core</Filter></ClCompile>
+    <ClCompile Include="native_callbacks.cpp"><Filter>core</Filter></ClCompile>
+    <ClCompile Include="zlib.cpp"><Filter>core</Filter></ClCompile>
+    <ClCompile Include="semantic_classes.cpp"><Filter>semantic</Filter></ClCompile>
+    <ClCompile Include="semantic_static.cpp"><Filter>semantic</Filter></ClCompile>
+    <ClCompile Include="semantic_window.cpp"><Filter>semantic</Filter></ClCompile>
+    <ClCompile Include="sfera_sound.cpp"><Filter>sound</Filter></ClCompile>
+    <ClCompile Include="sfera_sound_runtime.cpp"><Filter>sound</Filter></ClCompile>
+    <ClCompile Include="sfera_vorbis.cpp"><Filter>sound</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="native_callbacks.h"><Filter>core</Filter></ClInclude>
+    <ClInclude Include="zlib.h"><Filter>core</Filter></ClInclude>
+    <ClInclude Include="semantic_classes.h"><Filter>semantic</Filter></ClInclude>
+    <ClInclude Include="semantic_static.h"><Filter>semantic</Filter></ClInclude>
+    <ClInclude Include="semantic_window.h"><Filter>semantic</Filter></ClInclude>
+    <ClInclude Include="sfera_sound.h"><Filter>sound</Filter></ClInclude>
+    <ClInclude Include="sfera_sound_runtime.h"><Filter>sound</Filter></ClInclude>
+    <ClInclude Include="sfera_vorbis.h"><Filter>sound</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="third_party\stb_vorbis.c"><Filter>sound</Filter></None>
   </ItemGroup>
 </Project>

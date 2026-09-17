@@ -108,8 +108,6 @@ namespace SphereUI {
     class ScrollBar;
     class SpinButton;
     class ButtonCtrl;
-    struct BrowserSurface;
-    struct BrowserSession;
     struct UiContainerProxy;
     struct WindowInput {
         int mouse_x;
@@ -1297,28 +1295,6 @@ namespace SphereUI {
         void handleInput(const WindowInput& input) override;
     };
 
-    class CWebBrowserControl : public Window {
-    public:
-        UiString url;
-        BrowserSurface* surface;
-        BrowserSession* browser;
-        bool mouse_pressed;
-
-        CWebBrowserControl() {
-        }
-
-        void initialize();
-        void copyBrowserState(const CWebBrowserControl& source);
-        bool open(const char* address);
-        bool navigate(const char* address);
-        bool updateBrowser();
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
-        Window* clone() override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
-        void draw() override;
-        void handleInput(const WindowInput& input) override;
-        void destroy(bool free_storage) override;
-    };
 }
 
 // Native window entry points used by the remaining ABI adapters.
@@ -1460,11 +1436,6 @@ enum class UiMessage : std::uint32_t {
     appendFilteredListText = 6501u,
     clearFilteredList = 6502u,
     setListFilter = 6503u,
-    openBrowser = 7001u,
-    updateBrowser = 7002u,
-    navigateBrowser = 7003u,
-    refreshBrowser = 7004u,
-    getBrowserLocation = 7005u,
     menuItemActivated = 7100u,
     clearMenu = 7101u,
     appendMenuItem = 7102u,
@@ -1529,7 +1500,6 @@ enum class UiControlKind {
     spinButton = 16u,
     richEdit = 17u,
     filteredList = 18u,
-    webBrowser = 19u,
     minimap = 20u,
     menu = 21u,
     hyperTextChat = 22u,

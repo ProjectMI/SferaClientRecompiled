@@ -3,9 +3,20 @@
 #include "semantic_static.h"
 #include "native_callbacks.h"
 #include <tlhelp32.h>
+#include <commctrl.h>
+#include <dinput.h>
+#include <dbghelp.h>
+#include <objbase.h>
 #include <direct.h>
+#include <process.h>
 #include <shellapi.h>
-#include "import_bridge.h"
+
+#ifdef Process32First
+#undef Process32First
+#endif
+#ifdef Process32Next
+#undef Process32Next
+#endif
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -43,6 +54,29 @@
 #include <utility>
 #include <ws2tcpip.h>
 namespace {
+    std::uint64_t sound_clock_ticks() {
+        return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 100u;
+    }
+
+    unsigned mbc_field_minimum_bits(std::int8_t format) {
+        const auto value = std::abs(static_cast<int>(format));
+        if (value <= 32) return static_cast<unsigned>(value);
+        if (value == 'g') return 6u;
+        if (value >= 'i' && value <= 'k') return 12u;
+        if (value == 'l') return 8u;
+        return 0u;
+    }
+
+    std::uint32_t mbc_array_count(std::uint32_t encodedCount, std::int8_t countFormat, std::int8_t elementFormat, std::size_t remainingBits) {
+        if (countFormat != 'f') return encodedCount;
+        // Some short server regions carry 0x40 even when 64 additional elements cannot be present.
+        // Keep the full count when it fits; clear only that bit when the full count is impossible.
+        const auto elementBits = mbc_field_minimum_bits(elementFormat);
+        if (elementBits == 0u || encodedCount <= remainingBits / elementBits) return encodedCount;
+        const auto compactCount = encodedCount & 0x3Fu;
+        return compactCount <= remainingBits / elementBits ? compactCount : encodedCount;
+    }
+
     HWND main_window_handle() { return g_sfera_window_runtime.main_window_handle; }
     void set_system_cursor_visibility(bool visible) { if (visible) { while (::ShowCursor(TRUE) < 0) {} } else { while (::ShowCursor(FALSE) >= 0) {} } }
     bool cursor_uses_center_clip(std::uint32_t kind) { const char* name = kind < 4u ? sfera_cursor_texture_name(kind) : nullptr; return name != nullptr && name[0] != '_'; }
@@ -71,6 +105,16 @@ namespace {
             ++length;
         }
         output[length] = '\0';
+    }
+    void reset_pending_network_regions() noexcept {
+        for (auto& slot : g_sfera_world_slot_table_runtime.slots) {
+            slot.reliable_bit_count = 0u;
+            slot.unreliable_bit_count = 0u;
+            slot.reliable_process = UINT32_MAX;
+            slot.unreliable_process = UINT32_MAX;
+            std::fill(std::begin(slot.reliable_payload), std::end(slot.reliable_payload), std::uint8_t{});
+            std::fill(std::begin(slot.unreliable_payload), std::end(slot.unreliable_payload), std::uint8_t{});
+        }
     }
 }
 void SferaSimpleParser::initialize() {
@@ -3379,509 +3423,6 @@ void SferaParticleSystemDefinition::commit() {
         }
     }
 }
-namespace {
-    std::uint64_t sound_clock_ticks() {
-        return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 100;
-    }
-    float sound_elapsed(std::uint64_t start) {
-        return static_cast<float>(static_cast<std::int64_t>(sound_clock_ticks() - start)) * 0.0001f;
-    }
-    std::uint32_t sound_flag(const char* token) {
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_TYPE_ENVIRONMENT")) return 1u << 0u;
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_RANDOM")) return 1u << 2u;
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_RANDOMMIX")) return 1u << 3u;
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_LOOPED")) return 1u << 4u;
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_USEREGION")) return 1u << 5u;
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_TIMEGROUPS")) return 1u << 6u;
-        return 0u;
-    }
-    struct SemanticSoundCacheEntry {
-        CSound* sound;
-        std::chrono::steady_clock::time_point idle_since;
-        bool idle_started;
-    };
-    std::vector<SemanticSoundCacheEntry>& semantic_sound_cache() {
-        static std::vector<SemanticSoundCacheEntry> cache;
-        return cache;
-    }
-    void destroy_semantic_sound(CSound* sound) {
-        if (sound == nullptr) return;
-        if (sound->IsSoundPlaying() != 0) sound->CSound::Stop();
-        sound->~CSound();
-        std::free(sound);
-    }
-    void service_semantic_sound_cache() {
-        auto& cache = semantic_sound_cache();
-        const auto now = std::chrono::steady_clock::now();
-        for (std::size_t index = 0u; index < cache.size();) {
-            auto& entry = cache[index];
-            CSound* sound = entry.sound;
-            if (sound == nullptr) {
-                cache.erase(cache.begin() + static_cast<std::ptrdiff_t>(index));
-                continue;
-            }
-            const bool playing = sound->IsSoundPlaying() != 0;
-            sound->playback_finished = playing ? 0u : 1u;
-            if (playing || sound->cache_available == 0u) {
-                entry.idle_started = false;
-                ++index;
-                continue;
-            }
-            const std::int32_t lifetime = sound->cache_lifetime_seconds;
-            if (lifetime < 0) {
-                ++index;
-                continue;
-            }
-            if (!entry.idle_started) {
-                entry.idle_since = now;
-                entry.idle_started = true;
-            }
-            if (lifetime != 0 && std::chrono::duration_cast<std::chrono::seconds>(now - entry.idle_since).count() < lifetime) {
-                ++index;
-                continue;
-            }
-            destroy_semantic_sound(sound);
-            cache.erase(cache.begin() + static_cast<std::ptrdiff_t>(index));
-        }
-    }
-    void release_active_sound(CSoundEffect& effect) {
-        if (effect.active_sound == nullptr) return;
-        auto* sound = effect.active_sound;
-        if (sound != nullptr) {
-            if (sound->playback_finished == 0u && sound->IsSoundPlaying() != 0) sound->CSound::Stop();
-            sound->cache_available = 1u;
-        }
-        effect.active_sound = nullptr;
-        service_semantic_sound_cache();
-    }
-    bool play_sound(CSound& sound, int looped, float position) {
-        sound.SetPlayTimepos(position);
-        if (sound.CSound::Play(looped) == 0) return false;
-        sound.cache_idle_since_low = std::numeric_limits<std::uint32_t>::max();
-        sound.cache_idle_since_high = std::numeric_limits<std::uint32_t>::max();
-        sound.playback_finished = 0u;
-        return true;
-    }
-    CSound* find_cached_sound(const char* filename) {
-        if (filename == nullptr) return nullptr;
-        service_semantic_sound_cache();
-        for (auto& entry : semantic_sound_cache()) {
-            CSound* sound = entry.sound;
-            if (sound == nullptr || sound->IsSoundPlaying() != 0 || sound->cache_available == 0u) continue;
-            const char* name = sound->filename;
-            if (name != nullptr && SferaSimpleParser::equalsIgnoreCase(filename, name)) {
-                entry.idle_started = false;
-                return sound;
-            }
-        }
-        return nullptr;
-    }
-    CSound* create_cached_sound(CSoundManager& manager, const char* filename, const DS3DBUFFER* parameters, std::int32_t cache_lifetime) {
-        if (!manager.enabled || filename == nullptr) return nullptr;
-        CSound* sound = find_cached_sound(filename);
-        if (sound == nullptr) {
-            FILE* file = nullptr;
-            if (fopen_s(&file, filename, "rb") != 0 || file == nullptr) return nullptr;
-            std::fclose(file);
-            void* memory = std::calloc(1u, sizeof(CSound));
-            if (memory == nullptr) return nullptr;
-            sound = ::new (memory) CSound();
-            sound->cache_idle_since_low = std::numeric_limits<std::uint32_t>::max();
-            sound->cache_idle_since_high = std::numeric_limits<std::uint32_t>::max();
-            sound->cache_lifetime_seconds = 0u;
-            sound->cache_available = 1u;
-            sound->playback_finished = 1u;
-            sound->cache_next = nullptr;
-            sound->cache_previous = nullptr;
-            const unsigned long load_flags = parameters == nullptr ? (1ul << 3u) : ((1ul << 0u) | (1ul << 3u) | (1ul << 5u));
-            if (sound->LoadSound(filename, load_flags) == 0) {
-                destroy_semantic_sound(sound);
-                return nullptr;
-            }
-            semantic_sound_cache().push_back({sound, {}, false});
-        }
-        sound->cache_lifetime_seconds = cache_lifetime;
-        sound->cache_available = 1u;
-        if (parameters != nullptr) sound->SetAllParameters(parameters, 0);
-        sound->SetVolume(manager.volume);
-        return sound;
-    }
-    void release_sound_sources(CSoundEffect& effect) {
-        if (effect.sources != nullptr) {
-            auto* sources = effect.sources;
-            for (std::size_t index = 0u; index < effect.source_count; ++index) std::free(sources[index].filename);
-            std::free(sources);
-        }
-        effect.sources = nullptr;
-        effect.source_count = 0u;
-    }
-    bool allocate_sound_sources(CSoundEffect& effect, std::size_t count) {
-        release_sound_sources(effect);
-        if (count == 0u) return true;
-        auto* values = static_cast<SferaSoundSource*>(std::calloc(count, sizeof(SferaSoundSource)));
-        if (values == nullptr) return false;
-        effect.sources = values;
-        effect.source_count = count;
-        return true;
-    }
-    bool allocate_sound_time_groups(CSoundEffect& effect, std::size_t count) {
-        std::free(effect.time_groups);
-        effect.time_groups = nullptr;
-        effect.time_group_count = 0u;
-        if (count == 0u) return true;
-        auto* values = static_cast<SferaSoundTimeGroup*>(std::calloc(count, sizeof(SferaSoundTimeGroup)));
-        if (values == nullptr) return false;
-        effect.time_groups = values;
-        effect.time_group_count = count;
-        return true;
-    }
-    bool assign_sound_filename(SferaSoundSource& source, const char* filename) {
-        std::free(source.filename);
-        source.filename = nullptr;
-        if (filename == nullptr) return false;
-        const std::size_t size = std::strlen(filename) + 1u;
-        auto* copy = static_cast<char*>(std::calloc(1u, size));
-        if (copy == nullptr) return false;
-        std::memcpy(copy, filename, size);
-        source.filename = copy;
-        return true;
-    }
-    bool sound_time_matches(float value, const SferaSoundTimeGroup& group) {
-        return group.end < group.begin ? value < group.end || value >= group.begin : value >= group.begin && value < group.end;
-    }
-    std::size_t choose_sound_source(CSoundEffect& effect) {
-        if ((effect.flags & (1u << 6u)) != 0u && effect.time_groups != nullptr && effect.time_group_count != 0u) {
-            auto* groups = effect.time_groups;
-            std::size_t selected = effect.time_group_count;
-            for (std::size_t index = 0u; index < effect.time_group_count; ++index) if (sound_time_matches(g_sfera_graphics_runtime.environment_factor, groups[index])) {
-                selected = index;
-                break;
-            }
-            if (selected == effect.time_group_count) return 0u;
-            const auto& group = groups[selected];
-            if ((effect.flags & ((1u << 2u) | (1u << 3u))) != 0u && group.source_end >= group.source_begin && group.source_end - group.source_begin + 1u > 1u) {
-                std::size_t value = group.source_begin;
-                do value = group.source_begin + static_cast<std::size_t>(std::rand()) % (group.source_end - group.source_begin + 1u);
-                while (effect.last_source_index == value);
-                return value;
-            }
-            return group.source_begin;
-        }
-        if ((effect.flags & ((1u << 2u) | (1u << 3u))) != 0u && effect.source_count > 1u) {
-            std::size_t value = 0u;
-            do value = static_cast<std::size_t>(std::rand()) % effect.source_count;
-            while (effect.last_source_index == value);
-            return value;
-        }
-        return 0u;
-    }
-    bool sound_distance_gate(CSoundEffect& effect, const SferaEffectVec3F* frame, float distance) {
-        if ((effect.flags & (1u << 0u)) != 0u) return true;
-        if (distance > effect.sound_parameters.flMaxDistance) {
-            if (!effect.distance_paused) {
-                if (effect.active_sound != nullptr) {
-                    auto* sound = effect.active_sound;
-                    if ((effect.flags & ((1u << 2u) | (1u << 3u) | (1u << 4u))) == 0u) effect.saved_play_time = sound->GetPlayTimepos();
-                    release_active_sound(effect);
-                }
-                effect.silence_active = false;
-                effect.distance_paused = true;
-                effect.transition_started_at = sound_clock_ticks();
-            }
-            return false;
-        }
-        if (!effect.distance_paused) return true;
-        const float elapsed = sound_elapsed(effect.transition_started_at);
-        if ((effect.flags & ((1u << 2u) | (1u << 3u) | (1u << 4u))) == 0u && effect.active_sound != nullptr) {
-            auto* sound = effect.active_sound;
-            const float resume = effect.saved_play_time + elapsed;
-            const float length = sound->duration_seconds;
-            if (resume > length) {
-                release_active_sound(effect);
-                effect.distance_paused = false;
-                return true;
-            }
-            play_sound(*sound, 0, resume);
-            effect.distance_paused = false;
-            return true;
-        }
-        effect.distance_paused = false;
-        effect.start(frame, false);
-        return true;
-    }
-    CSoundEffect* find_sound_definition(std::uint32_t effect_id) { auto* registry = g_sfera_sound_runtime.effect_manager; return registry == nullptr ? nullptr : registry->find(effect_id); }
-    bool grow_sound_effect_pool() {
-        auto& pool = g_sfera_sound_effect_items;
-        if (!pool.grow(sizeof(CSoundEffect))) return false;
-        auto* objects = static_cast<CSoundEffect*>(pool.block_vector_end[-1]);
-        for (std::size_t index = 0; index < pool.growth_count; ++index) std::construct_at(&objects[index])->initialize();
-        return true;
-    }
-}
-void CSoundEffect::initialize() {
-    *this = {};
-    mix_duration = 1.0f;
-    cache_lifetime = 4;
-    shared_definition = false;
-    sound_parameters.dwSize = sizeof(sound_parameters);
-    sound_parameters.dwInsideConeAngle = 360u;
-    sound_parameters.dwOutsideConeAngle = 360u;
-    sound_parameters.vConeOrientation = {0.0f, 0.0f, -1.0f};
-    sound_parameters.flMinDistance = 1.0f;
-    sound_parameters.flMaxDistance = 1000000000.0f;
-}
-bool CSoundEffect::loadDefinition(SferaSimpleParser& parser, const SferaParserRange& range) {
-    flags = 0u;
-    if (parser.findValue("eff_number", &range)) effect_number = parser.readInt(0u);
-    SferaParserRange block{};
-    char text[1024]{};
-    if (parser.findBlock("audio_files", &block, &range, 1)) {
-        parser.setScanRange(&block);
-        std::size_t source_lines = 0u;
-        while (parser.nextValue("source")) ++source_lines;
-        if (source_lines == 0u || !allocate_sound_sources(*this, source_lines)) {
-            parser.clearScanRange();
-            return false;
-        }
-        parser.setScanRange(&block);
-        while (parser.nextValue("source")) {
-            const std::int32_t index = parser.readInt(0u);
-            if (index < 0 || std::cmp_greater_equal(index, source_count)) {
-                parser.clearScanRange();
-                return false;
-            }
-            auto& source = sources[index];
-            if (parser.readQuotedString(1u, text) == nullptr) {
-                parser.clearScanRange();
-                return false;
-            }
-            if (SferaSimpleParser::equalsIgnoreCase(text, "silence")) {
-                source.silence = true;
-                source.silence_duration = parser.readFloat(2u);
-            } else if (!assign_sound_filename(source, text)) {
-                parser.clearScanRange();
-                return false;
-            }
-        }
-        parser.clearScanRange();
-    } else if (parser.findValue("audio_file", &range)) {
-        if (!allocate_sound_sources(*this, 1u) || parser.readQuotedString(0u, text) == nullptr || !assign_sound_filename(sources[0], text)) return false;
-    } else return false;
-    if (parser.findBlock("time_groups", &block, &range, 1)) {
-        parser.setScanRange(&block);
-        std::size_t count = 0u;
-        while (parser.nextValue("time")) ++count;
-        if (!allocate_sound_time_groups(*this, count)) {
-            parser.clearScanRange();
-            return false;
-        }
-        parser.setScanRange(&block);
-        std::size_t index = 0u;
-        while (parser.nextValue("time") && index < count) {
-            float begin = parser.readFloat(0u);
-            float end = parser.readFloat(1u);
-            std::int32_t source_begin = parser.readInt(2u);
-            std::int32_t source_end = parser.readInt(3u);
-            if (source_begin < 0 || source_end < 0 || std::cmp_greater_equal(source_begin, source_count) || std::cmp_greater_equal(source_end, source_count)) {
-                parser.clearScanRange();
-                return false;
-            }
-            auto& group = time_groups[index++];
-            group.begin = begin == 0.0f ? 1.0f : 1.0f - begin / 24.0f;
-            group.end = end == 0.0f ? 1.0f : 1.0f - end / 24.0f;
-            group.source_begin = std::min(source_begin, source_end);
-            group.source_end = std::max(source_begin, source_end);
-        }
-        parser.clearScanRange();
-    }
-    if (parser.findValue("flags", &range)) for (std::size_t index = 0u; index < parser.tokenCount(); index += 2u) flags |= sound_flag(parser.readStringBounded(index, text, sizeof(text)));
-    if (parser.findValue("region_radius", &range)) parser.readFloatSequence(0u, &region_radius.x, 3u);
-    bool has_min = false;
-    bool has_max = false;
-    if (parser.findValue("min_distance", &range)) {
-        sound_parameters.flMinDistance = parser.readFloat(0u);
-        has_min = true;
-    }
-    if (parser.findValue("max_distance", &range)) {
-        sound_parameters.flMaxDistance = parser.readFloat(0u);
-        has_max = true;
-    }
-    if (parser.findValue("mix_duration", &range)) mix_duration = parser.readFloat(0u);
-    float barrier = 0.03f;
-    if (parser.findValue("vol_barier", &range)) {
-        barrier = parser.readFloat(0u);
-        barrier = barrier == 0.0f ? 0.01f : std::min(barrier / 100.0f, 1.0f);
-    }
-    if (has_min && !has_max && barrier > 0.0f) sound_parameters.flMaxDistance = sound_parameters.flMinDistance / barrier;
-    else if (has_max && !has_min) sound_parameters.flMinDistance = sound_parameters.flMaxDistance * barrier;
-    if (parser.findValue("offset_vec", &range)) parser.readFloatSequence(0u, &offset.x, 3u);
-    if (parser.findValue("cache_lifetime", &range)) cache_lifetime = std::min(parser.readInt(0u), 10);
-    return true;
-}
-CSoundEffect* CSoundEffect::clone() const {
-    auto* result = static_cast<CSoundEffect*>(g_sfera_effect_manager.allocate(sizeof(CSoundEffect)));
-    if (result == nullptr) return nullptr;
-    result->initialize();
-    result->resetFrom(*this);
-    return result;
-}
-void CSoundEffect::resetFrom(const CSoundEffect& source) {
-    active_sound = nullptr;
-    last_position = {};
-    effect_number = source.effect_number;
-    flags = source.flags;
-    silence_active = source.silence_active;
-    silence_duration = source.silence_duration;
-    saved_play_time = source.saved_play_time;
-    sources = source.sources;
-    source_count = source.source_count;
-    time_groups = source.time_groups;
-    time_group_count = source.time_group_count;
-    distance_paused = source.distance_paused;
-    offset = source.offset;
-    region_radius = source.region_radius;
-    region_offset = source.region_offset;
-    mix_duration = source.mix_duration;
-    last_source_index = source.last_source_index;
-    cache_lifetime = source.cache_lifetime;
-    sound_parameters = source.sound_parameters;
-    shared_definition = true;
-}
-void CSoundEffect::destroy() {
-    if (!shared_definition) {
-        release_sound_sources(*this);
-        std::free(time_groups);
-    }
-    release_active_sound(*this);
-    silence_active = false;
-    distance_paused = false;
-    sources = nullptr;
-    source_count = 0u;
-    time_groups = nullptr;
-    time_group_count = 0u;
-    shared_definition = false;
-}
-float CSoundEffect::startTime() const {
-    return sound_parameters.flMaxDistance;
-}
-void CSoundEffect::start(const SferaEffectVec3F* frame, bool after_start_time) {
-    if (sources == nullptr || source_count == 0u || g_sfera_sound_runtime.sound_manager == nullptr) return;
-    release_active_sound(*this);
-    const auto index = std::min(choose_sound_source(*this), source_count - 1u);
-    last_source_index = index;
-    const auto& source = sources[index];
-    if (source.silence) {
-        silence_active = true;
-        silence_duration = source.silence_duration;
-        silence_started_at = sound_clock_ticks();
-        return;
-    }
-    const char* filename = source.filename;
-    auto* manager = g_sfera_sound_runtime.sound_manager;
-    if (manager == nullptr || filename == nullptr) return;
-    if ((flags & (1u << 5u)) != 0u) {
-        auto random_component = [](float radius) {
-            return static_cast<float>(std::rand() - std::rand()) * 3.0518509447574615e-05f * radius;
-        };
-        region_offset = {random_component(region_radius.x), random_component(region_radius.y), random_component(region_radius.z)};
-    }
-    if (frame != nullptr) {
-        const auto& position = *frame;
-        sound_parameters.vPosition = {position.x - offset.x + region_offset.x, position.y - offset.y + region_offset.y, position.z - offset.z + region_offset.z};
-        last_position = {sound_parameters.vPosition.x, sound_parameters.vPosition.y, sound_parameters.vPosition.z};
-    }
-    if (after_start_time && (flags & ((1u << 2u) | (1u << 3u) | (1u << 4u))) != 0u) {
-        distance_paused = true;
-        transition_started_at = sound_clock_ticks();
-        return;
-    }
-    auto* sound = create_cached_sound(*manager, filename, (flags & (1u << 0u)) != 0u ? nullptr : &sound_parameters, cache_lifetime);
-    if (sound != nullptr) {
-        active_sound = sound;
-        sound->cache_available = 0u;
-        if (!after_start_time) play_sound(*sound, static_cast<int>(flags & (1u << 4u)), 0.0f);
-    }
-    distance_paused = after_start_time ? 1u : 0u;
-    if (after_start_time) transition_started_at = sound_clock_ticks();
-}
-void CSoundEffect::update(const SferaEffectVec3F* frame, float age) {
-    service_semantic_sound_cache();
-    if (!sound_distance_gate(*this, frame, age)) return;
-    if (silence_active) {
-        const float elapsed = sound_elapsed(silence_started_at);
-        if (elapsed < 0.0f) {
-            silence_active = false;
-            return;
-        }
-        if ((flags & (1u << 3u)) != 0u && elapsed >= silence_duration - mix_duration) {
-            silence_active = false;
-            start(frame, false);
-            return;
-        }
-        if (elapsed >= silence_duration) silence_active = false;
-        return;
-    }
-    if (active_sound == nullptr) return;
-    auto* sound = active_sound;
-    if (sound == nullptr) {
-        active_sound = nullptr;
-        return;
-    }
-    if (sound->IsSoundPlaying() == 0 || sound->playback_finished != 0u) {
-        sound->cache_available = 1u;
-        active_sound = nullptr;
-        service_semantic_sound_cache();
-        return;
-    }
-    if ((flags & (1u << 3u)) != 0u) {
-        const float length = sound->duration_seconds;
-        if (sound->GetPlayTimepos() >= length - mix_duration) {
-            release_active_sound(*this);
-            start(frame, false);
-            if (active_sound == nullptr) return;
-            sound = active_sound;
-        }
-    }
-    if ((flags & (1u << 0u)) != 0u || frame == nullptr || sound == nullptr) return;
-    const auto& position = *frame;
-    const SferaEffectVec3F current{position.x - offset.x + region_offset.x, position.y - offset.y + region_offset.y, position.z - offset.z + region_offset.z};
-    const SferaEffectVec3F velocity{current.x - last_position.x, current.y - last_position.y, current.z - last_position.z};
-    if (velocity.x != 0.0f || velocity.y != 0.0f || velocity.z != 0.0f) {
-        last_position = current;
-        sound->SetVelocity(velocity.x, velocity.y, velocity.z, 0);
-        sound->SetPosition(current.x, current.y, current.z, 0);
-    }
-}
-void CSoundEffect::stop() {
-    release_active_sound(*this);
-    silence_active = false;
-    distance_paused = false;
-}
-bool CSoundEffect::isComplete() const {
-    if (distance_paused || silence_active) return false;
-    return active_sound == nullptr || active_sound->playback_finished != 0u;
-}
-
-bool SferaSoundRuntime::interfaceAvailable() const {
-    return SI_GetInterface() != nullptr;
-}
-
-CSoundEffect* SferaSoundRuntime::createEffect(std::uint32_t effect_id) {
-    CSoundEffect* definition = find_sound_definition(effect_id);
-    if (definition == nullptr) return nullptr;
-    if (g_sfera_sound_effect_items.free_count == 0u && !grow_sound_effect_pool()) return nullptr;
-    auto* result = static_cast<CSoundEffect*>(g_sfera_sound_effect_items.take());
-    if (result == nullptr) return nullptr;
-    result->resetFrom(*definition);
-    return result;
-}
-
-void SferaSoundRuntime::destroyEffect(CSoundEffect* effect) {
-    if (effect == nullptr) return;
-    effect->stop();
-    g_sfera_sound_effect_items.put(effect);
-}
-
 // Begin recovered files cluster.
 SferaFileManager::~SferaFileManager() { for (const auto& file : open_files) ::_close(file.first); }
 void SferaFileManager::setErrorReporting(bool enabled) { error_reporting_enabled = enabled; }
@@ -7423,21 +6964,7 @@ namespace {
         static PcxHeader decode(const std::uint8_t* bytes) noexcept { return {SferaBinary::readLittleEndian<std::uint16_t>(bytes + 6), SferaBinary::readLittleEndian<std::uint16_t>(bytes + 10)}; }
     };
 
-    struct DdsHeader {
-        static constexpr std::size_t encodedSize = 128;
-        static constexpr std::uint32_t cubeMap = 1u << 9;
-        std::array<char, 4> signature;
-        std::uint32_t encoding;
-        std::uint32_t extended_capabilities;
-        bool isCubeMap() const noexcept { return (extended_capabilities & cubeMap) != 0u; }
-        static DdsHeader decode(const std::uint8_t* bytes) noexcept {
-            DdsHeader result{};
-            std::copy_n(reinterpret_cast<const char*>(bytes), result.signature.size(), result.signature.begin());
-            result.encoding = SferaBinary::readLittleEndian<std::uint32_t>(bytes + 84);
-            result.extended_capabilities = SferaBinary::readLittleEndian<std::uint32_t>(bytes + 112);
-            return result;
-        }
-    };
+
 }
 
 void SphereRender::TextureRepository::initialize() {
@@ -7585,27 +7112,141 @@ void SphereRender::ModelRepository::writeRequestStatistics() const {
     log.has_written = true;
 }
 
+namespace {
+    struct SferaD3D9TextureLoadResult {
+        HRESULT status = D3DERR_INVALIDCALL;
+        IDirect3DTexture9* texture = nullptr;
+        bool has_alpha = false;
+    };
+
+    std::uint32_t sfera_dds_u32(const std::uint8_t* data) noexcept {
+        std::uint32_t value = 0u;
+        std::memcpy(&value, data, sizeof(value));
+        return value;
+    }
+
+    SferaD3D9TextureLoadResult sfera_create_d3d9_texture_from_dds(
+        IDirect3DDevice9* device,
+        std::span<const std::uint8_t> data) noexcept {
+        constexpr std::size_t header_size = 128u;
+        constexpr std::uint32_t dds_magic = 0x20534444u;
+        constexpr std::uint32_t dds_fourcc = 0x4u;
+        constexpr std::uint32_t dds_rgb = 0x40u;
+        constexpr std::uint32_t dds_alpha = 0x1u;
+
+        SferaD3D9TextureLoadResult result;
+        if (device == nullptr || data.size() < header_size || sfera_dds_u32(data.data()) != dds_magic ||
+            sfera_dds_u32(data.data() + 4u) != 124u || sfera_dds_u32(data.data() + 76u) != 32u) return result;
+
+        const std::uint32_t height = sfera_dds_u32(data.data() + 12u);
+        const std::uint32_t width = sfera_dds_u32(data.data() + 16u);
+        const std::uint32_t mip_count = (std::max)(1u, sfera_dds_u32(data.data() + 28u));
+        const std::uint32_t flags = sfera_dds_u32(data.data() + 80u);
+        const std::uint32_t fourcc = sfera_dds_u32(data.data() + 84u);
+        const std::uint32_t bits = sfera_dds_u32(data.data() + 88u);
+        const std::uint32_t red = sfera_dds_u32(data.data() + 92u);
+        const std::uint32_t green = sfera_dds_u32(data.data() + 96u);
+        const std::uint32_t blue = sfera_dds_u32(data.data() + 100u);
+        const std::uint32_t alpha = sfera_dds_u32(data.data() + 104u);
+        if (width == 0u || height == 0u) return result;
+
+        D3DFORMAT format = D3DFMT_UNKNOWN;
+        std::uint32_t block_bytes = 0u;
+        std::uint32_t pixel_bytes = 0u;
+        bool rgb24 = false;
+        if ((flags & dds_fourcc) != 0u) {
+            if (fourcc == static_cast<std::uint32_t>(D3DFMT_DXT1)) {
+                format = D3DFMT_DXT1;
+                block_bytes = 8u;
+            } else if (fourcc == static_cast<std::uint32_t>(D3DFMT_DXT3)) {
+                format = D3DFMT_DXT3;
+                block_bytes = 16u;
+                result.has_alpha = true;
+            } else if (fourcc == static_cast<std::uint32_t>(D3DFMT_DXT5)) {
+                format = D3DFMT_DXT5;
+                block_bytes = 16u;
+                result.has_alpha = true;
+            }
+        } else if ((flags & dds_rgb) != 0u && bits == 32u && red == 0x00ff0000u &&
+            green == 0x0000ff00u && blue == 0x000000ffu && ((flags & dds_alpha) == 0u || alpha == 0xff000000u)) {
+            format = D3DFMT_A8R8G8B8;
+            pixel_bytes = 4u;
+            result.has_alpha = (flags & dds_alpha) != 0u && alpha == 0xff000000u;
+        } else if ((flags & dds_rgb) != 0u && bits == 16u && red == 0x0000f800u &&
+            green == 0x000007e0u && blue == 0x0000001fu && alpha == 0u) {
+            format = D3DFMT_R5G6B5;
+            pixel_bytes = 2u;
+        } else if ((flags & dds_rgb) != 0u && bits == 24u && red == 0x00ff0000u &&
+            green == 0x0000ff00u && blue == 0x000000ffu && alpha == 0u) {
+            format = D3DFMT_A8R8G8B8;
+            pixel_bytes = 3u;
+            rgb24 = true;
+        }
+        if (format == D3DFMT_UNKNOWN) return result;
+
+        result.status = device->CreateTexture(width, height, mip_count, 0u, format, D3DPOOL_MANAGED, &result.texture, nullptr);
+        if (FAILED(result.status) || result.texture == nullptr) return result;
+
+        std::size_t offset = header_size;
+        std::uint32_t level_width = width;
+        std::uint32_t level_height = height;
+        for (UINT level = 0u; level < mip_count; ++level) {
+            const std::size_t source_pitch = block_bytes != 0u ?
+                static_cast<std::size_t>((std::max)(1u, (level_width + 3u) / 4u)) * block_bytes :
+                static_cast<std::size_t>(level_width) * pixel_bytes;
+            const std::size_t rows = block_bytes != 0u ?
+                static_cast<std::size_t>((std::max)(1u, (level_height + 3u) / 4u)) : level_height;
+            const std::size_t level_size = source_pitch * rows;
+            if (offset > data.size() || level_size > data.size() - offset) {
+                result.status = D3DERR_INVALIDCALL;
+                result.texture->Release();
+                result.texture = nullptr;
+                return result;
+            }
+
+            D3DLOCKED_RECT locked{};
+            result.status = result.texture->LockRect(level, &locked, nullptr, 0u);
+            if (FAILED(result.status)) {
+                result.texture->Release();
+                result.texture = nullptr;
+                return result;
+            }
+            for (std::size_t row = 0u; row < rows; ++row) {
+                auto* destination = static_cast<std::uint8_t*>(locked.pBits) + row * locked.Pitch;
+                const auto* source = data.data() + offset + row * source_pitch;
+                if (rgb24) {
+                    for (std::size_t column = 0u; column < level_width; ++column) {
+                        destination[column * 4u] = source[column * 3u];
+                        destination[column * 4u + 1u] = source[column * 3u + 1u];
+                        destination[column * 4u + 2u] = source[column * 3u + 2u];
+                        destination[column * 4u + 3u] = 0xffu;
+                    }
+                } else {
+                    std::memcpy(destination, source, source_pitch);
+                }
+            }
+            result.status = result.texture->UnlockRect(level);
+            if (FAILED(result.status)) {
+                result.texture->Release();
+                result.texture = nullptr;
+                return result;
+            }
+            offset += level_size;
+            level_width = (std::max)(1u, level_width / 2u);
+            level_height = (std::max)(1u, level_height / 2u);
+        }
+        result.status = D3D_OK;
+        return result;
+    }
+}
+
 void SphereRender::TextureRepository::load(Entry& entry, std::span<const std::uint8_t> bytes) {
     if (g_sfera_graphics_runtime.d3d_runtime == nullptr) return;
     auto& runtime = *g_sfera_graphics_runtime.d3d_runtime;
-    auto* device = runtime.native_device;
-    if (device == nullptr || bytes.size() < DdsHeader::encodedSize || bytes.size() > UINT32_MAX) return;
-    const auto header = DdsHeader::decode(bytes.data());
-    if (header.signature != std::array<char, 4>{'D', 'D', 'S', ' '}) return;
-    const bool cube = header.isCubeMap();
-    entry.has_alpha = cube || header.encoding != static_cast<std::uint32_t>(D3DFMT_DXT1);
-    HRESULT result;
-    if (cube) {
-        IDirect3DCubeTexture9* texture = nullptr;
-        result = ::D3DXCreateCubeTextureFromFileInMemory(device, bytes.data(), static_cast<UINT>(bytes.size()), &texture);
-        if (SUCCEEDED(result)) entry.texture.reset(texture);
-    } else {
-        IDirect3DTexture9* texture = nullptr;
-        constexpr UINT from_file = UINT32_MAX - 2u;
-        result = ::D3DXCreateTextureFromFileInMemoryEx(device, bytes.data(), static_cast<UINT>(bytes.size()), 0u, 0u, from_file, 0u, static_cast<D3DFORMAT>(from_file), D3DPOOL_MANAGED, UINT32_MAX, UINT32_MAX, 0u, nullptr, nullptr, &texture);
-        if (SUCCEEDED(result)) entry.texture.reset(texture);
-    }
-    runtime.last_hresult = result;
+    const auto loaded = sfera_create_d3d9_texture_from_dds(runtime.native_device, bytes);
+    runtime.last_hresult = loaded.status;
+    entry.has_alpha = loaded.has_alpha;
+    if (SUCCEEDED(loaded.status)) entry.texture.reset(loaded.texture);
 }
 
 std::pair<bool, std::array<std::uint8_t, 8>> CShaderMgr::instanceCode(std::string_view filename, bool pixel) {
@@ -7645,11 +7286,11 @@ std::array<float, 512> CShaderMgr::makeWaveSamples() {
     return samples;
 }
 
-std::array<CShaderMgr::TexelOffset, 16> CShaderMgr::makeDownsampleOffsets(float width, float height) {
+std::array<SferaVec4F, 16> CShaderMgr::makeDownsampleOffsets(float width, float height) {
     if (width <= 0.0f || height <= 0.0f) throw std::invalid_argument("Shader sampling dimensions must be positive");
-    std::array<TexelOffset, 16> offsets{};
+    std::array<SferaVec4F, 16> offsets{};
     for (unsigned column = 0u; column < 4u; ++column) {
-        for (unsigned row = 0u; row < 4u; ++row) offsets[column * 4u + row] = {(1.5f - column) / width, (row - 1.5f) / height};
+        for (unsigned row = 0u; row < 4u; ++row) offsets[column * 4u + row] = {(1.5f - column) / width, (row - 1.5f) / height, 0.0f, 0.0f};
     }
     return offsets;
 }
@@ -7705,8 +7346,52 @@ CShaderMgr::CShaderMgr(CD3D9Device& owner, const char* vertex_path, const char* 
 }
 
 CShaderMgr::Variant::~Variant() {
-    if (constants) constants->Release();
     if (pixel_shader) pixel_shader->Release();
+}
+
+static std::unordered_map<std::string, int> sfera_shader_constants(std::span<const std::uint8_t> code) {
+    std::unordered_map<std::string, int> constants;
+    if (code.size() < 8u) return constants;
+
+    const auto read_u32 = [&](std::size_t offset) -> std::uint32_t {
+        return static_cast<std::uint32_t>(code[offset]) |
+            (static_cast<std::uint32_t>(code[offset + 1u]) << 8u) |
+            (static_cast<std::uint32_t>(code[offset + 2u]) << 16u) |
+            (static_cast<std::uint32_t>(code[offset + 3u]) << 24u);
+    };
+
+    std::size_t offset = 4u;
+    while (offset + 4u <= code.size()) {
+        const std::uint32_t token = read_u32(offset);
+        if (token == 0x0000ffffu) break;
+        if ((token & 0xffffu) == 0xfffeu) {
+            const std::uint32_t length = (token >> 16u) & 0x7fffu;
+            const std::size_t comment = offset + 4u;
+            if (comment + 4u <= code.size() && read_u32(comment) == 0x42415443u) {
+                const std::size_t table = comment + 4u;
+                if (table + 20u > code.size()) break;
+                const std::uint32_t count = read_u32(table + 12u);
+                const std::uint32_t info = read_u32(table + 16u);
+                for (std::uint32_t index = 0u; index < count; ++index) {
+                    const std::size_t entry = table + info + index * 20u;
+                    if (entry + 20u > code.size()) break;
+                    const std::uint32_t name_offset = read_u32(entry);
+                    const std::uint16_t register_set = static_cast<std::uint16_t>(code[entry + 4u] | (code[entry + 5u] << 8u));
+                    const std::uint16_t register_index = static_cast<std::uint16_t>(code[entry + 6u] | (code[entry + 7u] << 8u));
+                    if (register_set != 2u || table + name_offset >= code.size()) continue;
+                    std::string name;
+                    for (std::size_t position = table + name_offset; position < code.size() && code[position] != 0u; ++position) {
+                        name.push_back(static_cast<char>(code[position]));
+                    }
+                    constants[name] = register_index;
+                }
+            }
+            offset += 4u + static_cast<std::size_t>(length) * 4u;
+            continue;
+        }
+        offset += 4u + static_cast<std::size_t>((token >> 24u) & 0x0fu) * 4u;
+    }
+    return constants;
 }
 
 CShaderMgr::Variant& CShaderMgr::loadVariant(const std::pair<bool, std::array<std::uint8_t, 8>>& code) {
@@ -7717,26 +7402,29 @@ CShaderMgr::Variant& CShaderMgr::loadVariant(const std::pair<bool, std::array<st
     }
     Variant& variant = found->second;
     if (variant.pixel_shader) return variant;
+
     const std::string filename = (std::filesystem::path(pixel_directory) / variant.filename).string();
     SferaFileMap file(filename.c_str());
     if (!file.isOpen() || file.size() < sizeof(DWORD) || file.size() % sizeof(DWORD) != 0u) {
         CSphereError{}.write(("Invalid compiled shader: " + filename).c_str());
         throw std::runtime_error("Compiled shader could not be read");
     }
-    const DWORD* bytecode = reinterpret_cast<const DWORD*>(file.data());
-    device.checkResult(device.native_device->CreatePixelShader(bytecode, &variant.pixel_shader), "CreatePixelShader");
-    const HRESULT result = D3DXGetShaderConstantTable(bytecode, &variant.constants);
-    device.last_hresult = result;
-    if (result != S_OK) CSphereError{}.write(("Cannot read shader constants: " + filename).c_str());
-    return variant;
-}
 
-void CShaderMgr::Variant::setConstant(CD3D9Device& owner, const char* name, const void* data, std::uint32_t bytes) {
-    const char* handle = constants->GetConstantByName(nullptr, name);
-    if (!handle) CSphereError{}.write((std::string("Shader constant does not exist: ") + name).c_str());
-    const HRESULT result = constants->SetValue(owner.native_device, handle, data, bytes);
-    owner.last_hresult = result;
-    if (result != S_OK) CSphereError{}.write((std::string("Cannot set shader constant: ") + name).c_str());
+    device.checkResult(device.native_device->CreatePixelShader(
+        reinterpret_cast<const DWORD*>(file.data()), &variant.pixel_shader), "CreatePixelShader");
+
+    const auto constants = sfera_shader_constants(std::span<const std::uint8_t>(
+        reinterpret_cast<const std::uint8_t*>(file.data()), file.size()));
+    const auto resolve = [&](const char* name) {
+        const auto iterator = constants.find(name);
+        return iterator == constants.end() ? -1 : iterator->second;
+    };
+    variant.alpha_register = resolve("gAlpha");
+    variant.down_filter_register = resolve("gTexelCoordsDownFilter");
+    variant.water_gradient_register = resolve("gWaterGradientCoefficient");
+    variant.water_specular_register = resolve("gWaterSpecular");
+    variant.water_reflection_register = resolve("gWaterReflectCoefficient");
+    return variant;
 }
 
 void CShaderMgr::setPixelShader(std::uint32_t group) {
@@ -7745,6 +7433,7 @@ void CShaderMgr::setPixelShader(std::uint32_t group) {
         CSphereError{}.write(("Unknown pixel shader group: " + std::to_string(group)).c_str());
         return;
     }
+
     std::pair<bool, std::array<std::uint8_t, 8>> code{true, {static_cast<std::uint8_t>(group)}};
     if (group == 0u) {
         code.second[1] = g_sfera_alpha_material_runtime.option_c;
@@ -7752,15 +7441,28 @@ void CShaderMgr::setPixelShader(std::uint32_t group) {
         code.second[3] = g_sfera_alpha_material_runtime.selected_slot != -1;
         code.second[4] = g_sfera_alpha_material_runtime.option_b;
     }
+
     Variant& variant = loadVariant(code);
     device.checkResult(device.native_device->SetPixelShader(variant.pixel_shader), "SetPixelShader");
-    if (group == 3u) variant.setConstant(device, "gAlpha", &g_sfera_alpha_material_runtime.alpha[0], sizeof(float));
-    if (group == 6u) variant.setConstant(device, "gTexelCoordsDownFilter", downsample_offsets.data(), static_cast<std::uint32_t>(sizeof(downsample_offsets)));
+    const auto set_float = [&](int shader_register, float value) {
+        if (shader_register < 0) return;
+        const float data[4] = {value, 0.0f, 0.0f, 0.0f};
+        device.checkResult(device.native_device->SetPixelShaderConstantF(
+            static_cast<UINT>(shader_register), data, 1u), "SetPixelShaderConstantF");
+    };
+
+    if (group == 3u) set_float(variant.alpha_register, g_sfera_alpha_material_runtime.alpha[0]);
+    if (group == 6u && variant.down_filter_register >= 0) {
+        device.checkResult(device.native_device->SetPixelShaderConstantF(
+            static_cast<UINT>(variant.down_filter_register), reinterpret_cast<const float*>(downsample_offsets.data()),
+            static_cast<UINT>(downsample_offsets.size())), "SetPixelShaderConstantF");
+    }
     if (group == 1u) {
-        const WaterParameters water = waterParameters(g_sfera_graphics_runtime.environment_factor, g_sfera_view_spatial_runtime.position_offset.y);
-        variant.setConstant(device, "gWaterGradientCoefficient", &water.gradient, sizeof(float));
-        variant.setConstant(device, "gWaterSpecular", &water.specular, sizeof(float));
-        variant.setConstant(device, "gWaterReflectCoefficient", &water.reflection, sizeof(float));
+        const WaterParameters water = waterParameters(
+            g_sfera_graphics_runtime.environment_factor, g_sfera_view_spatial_runtime.position_offset.y);
+        set_float(variant.water_gradient_register, water.gradient);
+        set_float(variant.water_specular_register, water.specular);
+        set_float(variant.water_reflection_register, water.reflection);
     }
 }
 
@@ -8174,11 +7876,11 @@ void UnmanagedResourceIB::restoreResource() {
     if (native_buffer == nullptr && device != nullptr && device->native_device != nullptr) device->last_hresult = device->native_device->CreateIndexBuffer(static_cast<UINT>(length), usage, format, pool, &native_buffer, nullptr);
 }
 
-UnmanagedResourceTexture::UnmanagedResourceTexture(CD3D9Device& device, std::uint32_t width, std::uint32_t height, std::uint32_t levels, std::uint32_t usage, D3DFORMAT format, D3DPOOL pool) : UnmanagedResourceBase(device, pool), width(width), height(height), levels(levels), usage(usage), format(format), pool(pool) { restoreResource(); device.checkResult(device.last_hresult, "D3DXCreateTexture"); restore_marker = false; }
+UnmanagedResourceTexture::UnmanagedResourceTexture(CD3D9Device& device, std::uint32_t width, std::uint32_t height, std::uint32_t levels, std::uint32_t usage, D3DFORMAT format, D3DPOOL pool) : UnmanagedResourceBase(device, pool), width(width), height(height), levels(levels), usage(usage), format(format), pool(pool) { restoreResource(); device.checkResult(device.last_hresult, "CreateTexture"); restore_marker = false; }
 UnmanagedResourceTexture::~UnmanagedResourceTexture() { releaseResource(); }
 void UnmanagedResourceTexture::releaseResource() { if (native_texture != nullptr) { native_texture->Release(); native_texture = nullptr; } }
 void UnmanagedResourceTexture::restoreResource() {
-    if (native_texture == nullptr && device != nullptr && device->native_device != nullptr) device->last_hresult = D3DXCreateTexture(device->native_device, width, height, levels, usage, format, pool, &native_texture);
+    if (native_texture == nullptr && device != nullptr && device->native_device != nullptr) device->last_hresult = device->native_device->CreateTexture(width, height, levels, usage, format, pool, &native_texture, nullptr);
     if (pool != D3DPOOL_MANAGED) restore_marker = true;
 }
 
@@ -11706,8 +11408,24 @@ SferaVec3F* ModelPose::neckPosition(SferaVec3F& output) {
 
 namespace SphereRender {
 namespace {
-SferaMatrix4x4F characterMultiply(const SferaMatrix4x4F& first, const SferaMatrix4x4F& second) { SferaMatrix4x4F result; ::D3DXMatrixMultiply(reinterpret_cast<D3DXMATRIX*>(&result), reinterpret_cast<const D3DXMATRIX*>(&first), reinterpret_cast<const D3DXMATRIX*>(&second)); return result; }
-SferaMatrix4x4F characterPoseMatrix(const CharacterPose& pose) { SferaMatrix4x4F result; ::D3DXMatrixRotationQuaternion(reinterpret_cast<D3DXMATRIX*>(&result), reinterpret_cast<const D3DXQUATERNION*>(&pose.rotation)); result.m[3][0] = pose.translation.x; result.m[3][1] = pose.translation.y; result.m[3][2] = pose.translation.z; return result; }
+SferaMatrix4x4F characterMultiply(const SferaMatrix4x4F& first, const SferaMatrix4x4F& second) {
+    return first.multiplied(second);
+}
+
+SferaMatrix4x4F characterPoseMatrix(const CharacterPose& pose) {
+    const auto basis = SferaQuaternionF{
+        pose.rotation.w, pose.rotation.x, pose.rotation.y, pose.rotation.z}.rotationMatrix();
+    auto result = SferaMatrix4x4F::identity();
+    for (std::size_t row = 0u; row < 3u; ++row) {
+        for (std::size_t column = 0u; column < 3u; ++column) {
+            result.m[row][column] = basis.m[column][row];
+        }
+    }
+    result.m[3][0] = pose.translation.x;
+    result.m[3][1] = pose.translation.y;
+    result.m[3][2] = pose.translation.z;
+    return result;
+}
 template<class T> T characterRead(std::span<const std::uint8_t> bytes, std::size_t offset) { if (offset > bytes.size() || sizeof(T) > bytes.size() - offset) WorldDiagnostics::fail("Truncated character model"); T value; std::memcpy(&value, bytes.data() + offset, sizeof(value)); return value; }
 std::span<const std::uint8_t> characterRange(std::span<const std::uint8_t> bytes, std::size_t offset, std::size_t length) { if (offset > bytes.size() || length > bytes.size() - offset) WorldDiagnostics::fail("Truncated character model"); return bytes.subspan(offset, length); }
 void characterDisableLights(std::uint32_t line) { for (std::size_t index = 0; index < g_sfera_light_runtime.candidate_count; ++index) if (g_sfera_light_runtime.render_candidate_active[index]) g_sfera_light_runtime.setActive(g_sfera_light_runtime.render_candidate_indices[index], false, line); }
@@ -12025,14 +11743,38 @@ void GameCamera::setupViewport(std::uint32_t x, std::uint32_t y, std::uint32_t w
     const auto* camera = g_sfera_world_objects.object(1u);
     const auto target = camera->position + forward;
     auto& matrices = g_sfera_d3d9_semantic_state;
-    ::D3DXMatrixLookAtRH(reinterpret_cast<D3DXMATRIX*>(&matrices.view_matrix), reinterpret_cast<const D3DXVECTOR3*>(&camera->position), reinterpret_cast<const D3DXVECTOR3*>(&target), reinterpret_cast<const D3DXVECTOR3*>(&up));
+    auto view_z = camera->position - target;
+    view_z.normalize();
+    auto view_x = up.cross(view_z);
+    view_x.normalize();
+    const auto view_y = view_z.cross(view_x);
+    matrices.view_matrix = SferaMatrix4x4F::identity();
+    matrices.view_matrix.m[0][0] = view_x.x;
+    matrices.view_matrix.m[0][1] = view_y.x;
+    matrices.view_matrix.m[0][2] = view_z.x;
+    matrices.view_matrix.m[1][0] = view_x.y;
+    matrices.view_matrix.m[1][1] = view_y.y;
+    matrices.view_matrix.m[1][2] = view_z.y;
+    matrices.view_matrix.m[2][0] = view_x.z;
+    matrices.view_matrix.m[2][1] = view_y.z;
+    matrices.view_matrix.m[2][2] = view_z.z;
+    matrices.view_matrix.m[3][0] = -view_x.dot(camera->position);
+    matrices.view_matrix.m[3][1] = -view_y.dot(camera->position);
+    matrices.view_matrix.m[3][2] = -view_z.dot(camera->position);
     const float width_value = static_cast<std::int32_t>(width), height_value = static_cast<std::int32_t>(height);
     const float aspect = double(width_value) / height_value;
     const float half_angle = double(settings.z) * 0.5;
     const float tangent = std::tan(double(half_angle));
     const float vertical_tangent = double(tangent) / aspect;
     const float vertical_angle = double(static_cast<float>(std::atan(double(vertical_tangent)))) * 2.0;
-    ::D3DXMatrixPerspectiveFovRH(reinterpret_cast<D3DXMATRIX*>(&matrices.projection_matrix), vertical_angle, aspect, settings.x, settings.y);
+    const float projection_y = 1.0f / std::tan(vertical_angle * 0.5f);
+    const float depth_range = settings.x - settings.y;
+    matrices.projection_matrix = {};
+    matrices.projection_matrix.m[0][0] = projection_y / aspect;
+    matrices.projection_matrix.m[1][1] = projection_y;
+    matrices.projection_matrix.m[2][2] = settings.y / depth_range;
+    matrices.projection_matrix.m[2][3] = -1.0f;
+    matrices.projection_matrix.m[3][2] = settings.x * settings.y / depth_range;
     g_sfera_model_transform_scratch_matrix = SferaMatrix4x4F::fromEuler(camera->position, camera->rotation);
     g_sfera_camera.setPerspective(settings.x, settings.y, settings.z);
     g_sfera_camera.setTransform(g_sfera_model_transform_scratch_matrix.multiplied(g_sfera_model_coordinate_matrix));
@@ -12658,7 +12400,7 @@ void ShadowMap::createTextures() {
         auto*& texture = textures[index];
         if (texture != nullptr) { texture->Release(); texture = nullptr; }
         auto& device = *g_sfera_graphics_runtime.d3d_runtime;
-        device.checkResult(D3DXCreateTexture(device.native_device, 256u >> index, 256u >> index, 1u, 0u, D3DFMT_R5G6B5, D3DPOOL_MANAGED, &texture), "D3DXCreateTexture");
+        device.checkResult(device.native_device->CreateTexture(256u >> index, 256u >> index, 1u, 0u, D3DFMT_R5G6B5, D3DPOOL_MANAGED, &texture, nullptr), "CreateTexture");
     }
     spot_texture = g_sfera_textures.find("shadspot");
     for (auto* texture : textures) if (texture != nullptr) { D3DSURFACE_DESC description{}; D3DLOCKED_RECT rectangle{}; texture->LockRect(0u, &rectangle, nullptr, D3DLOCK_DISCARD); texture->GetLevelDesc(0u, &description); std::memset(rectangle.pBits, 255, description.Width * description.Height * 2u); texture->UnlockRect(0u); }
@@ -12859,46 +12601,6 @@ void ShadowMap::drawObject(ExtendedWorldObject& object, float width, float exten
     shadows.restore();
 }
 
-SoundEffectRegistry::SoundEffectRegistry() { definitions.reserve(100); }
-SoundEffectRegistry::~SoundEffectRegistry() { clear(); }
-void SoundEffectRegistry::clear() { for (auto* effect : definitions) { effect->destroy(); delete effect; } definitions.clear(); }
-CSoundEffect* SoundEffectRegistry::add() {
-    auto effect = std::make_unique<CSoundEffect>();
-    effect->initialize();
-    definitions.push_back(effect.get());
-    return effect.release();
-}
-CSoundEffect* SoundEffectRegistry::find(std::uint32_t id) const {
-    const auto found = std::lower_bound(definitions.begin(), definitions.end(), id, [](const CSoundEffect* effect, std::uint32_t number) { return effect->effect_number < number; });
-    return found != definitions.end() && (*found)->effect_number == id ? *found : nullptr;
-}
-bool SoundEffectRegistry::load() {
-    WIN32_FIND_DATAA found{};
-    HANDLE search = ::FindFirstFileA("Sounds\\*.def", &found);
-    if (search != INVALID_HANDLE_VALUE) {
-        do {
-            if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0u) continue;
-            SferaSimpleParser parser;
-            parser.initialize();
-            parser.load((std::string("Sounds\\") + found.cFileName).c_str());
-            parser.setBlockRange(nullptr);
-            SferaParserRange range{};
-            while (parser.nextBlock("soundeffect", &range)) {
-                SferaParserRange continuation{};
-                parser.getBlockRange(&continuation);
-                auto* effect = add();
-                if (!effect->loadDefinition(parser, range)) { definitions.pop_back(); effect->destroy(); delete effect; }
-                parser.setBlockRange(&continuation);
-            }
-            parser.release();
-        } while (::FindNextFileA(search, &found));
-        ::FindClose(search);
-    }
-    std::sort(definitions.begin(), definitions.end(), [](const auto* first, const auto* second) { return first->effect_number < second->effect_number; });
-    return true;
-}
-void SferaSoundRuntime::loadDefinitions() { if (effect_manager == nullptr) { auto* registry = new SoundEffectRegistry; effect_manager = registry; registry->load(); } }
-void SferaSoundRuntime::clearDefinitions() { delete effect_manager; effect_manager = nullptr; }
 namespace {
     float environmentBlend(float first, float second, float fraction) { return (static_cast<double>(second) - first) * fraction + first; }
     SferaVec3F environmentBlend(const SferaVec3F& first, const SferaVec3F& second, float fraction) { return {environmentBlend(first.x, second.x, fraction), environmentBlend(first.y, second.y, fraction), environmentBlend(first.z, second.z, fraction)}; }
@@ -12964,194 +12666,6 @@ namespace {
 }
 void SferaNatureManager::updateRain() { updateNatureWeather(g_sfera_weather_runtime.current.rain, g_sfera_frame_runtime.rain_enabled, &SferaNatureManager::startRain, &SferaNatureManager::stopRain, &SferaNatureManager::setRainIntensity); }
 void SferaNatureManager::updateLightning() { updateNatureWeather(g_sfera_weather_runtime.current.lightning, g_sfera_frame_runtime.lightning_enabled, &SferaNatureManager::startLighting, &SferaNatureManager::stopLighting, &SferaNatureManager::setLightingLevel); }
-
-// Sound and environment implementation.
-bool SferaSoundPlaybackState::queueEvent(SoundEventRecord event, float signal, std::uint32_t position) noexcept {
-    event.signal = signal; event.position = position;
-    try { event_queue.push_back(event); return true; } catch (const std::bad_alloc&) { return false; }
-}
-std::optional<SoundEventRecord> SferaSoundPlaybackState::popEvent() noexcept {
-    if (event_queue.empty()) return std::nullopt;
-    const auto event = event_queue.front(); event_queue.pop_front(); return event;
-}
-SoundEventRecord SferaSoundPlaybackState::nextEvent() noexcept {
-    for (;;) {
-        auto* list = current_list;
-        if (!list || list->group_index >= list->groups.size() || list->item_index >= list->groups[list->group_index].size()) return {};
-        const auto& events = list->groups[list->group_index];
-        const auto event = events[list->item_index++];
-        if (event.type != SoundEventType::playlist) return event;
-        if (event.argument == 0u || event.argument > playlists.size()) return {SoundEventType::none};
-        current_list = &playlists[event.argument - 1u];
-        if (current_list->groups.size() == 0u) return {};
-        current_list->item_index = 0u;
-        current_list->group_index = static_cast<std::size_t>(std::rand()) % current_list->groups.size();
-    }
-}
-
-void SferaSoundEventList::parseGroup(std::size_t group, const char* text) {
-    if (text == nullptr || *text == '\0') return;
-    const std::string_view line(text);
-    auto& events = groups.at(group); events.assign(std::count(line.begin(), line.end(), ',') + 1, SoundEventRecord{});
-    std::size_t begin = 0;
-    for (std::size_t index = 0; index < events.size(); ++index) {
-        const auto end = line.find(',', begin);
-        const std::string token(line.substr(begin, end == std::string_view::npos ? end : end - begin));
-        SoundEventRecord event;
-        if (SferaSimpleParser::equalsIgnoreCase(token.c_str(), "STP")) event.type = SoundEventType::stop;
-        else if (!token.empty()) {
-            auto digits = std::string_view(token).substr(1);
-            while (!digits.empty() && std::isspace(static_cast<unsigned char>(digits.front()))) digits.remove_prefix(1);
-            if (!digits.empty() && digits.front() == '+') digits.remove_prefix(1);
-            std::size_t argument = 0;
-            const auto result = std::from_chars(digits.data(), digits.data() + digits.size(), argument);
-            if (result.ec == std::errc{}) { event.argument = argument; if (token[0] == 'p') event.type = SoundEventType::seek; else if (token[0] == 's') event.type = SoundEventType::wait; else if (token[0] == 'j') event.type = SoundEventType::playlist; }
-        }
-        events[index] = event;
-        begin = end == std::string_view::npos ? line.size() : end + 1;
-    }
-}
-SferaSoundPlaybackState::SferaSoundPlaybackState() : playing(false), wait_seconds(0), wait_started_at(UINT64_MAX), play_signal(0.0f), current_list(nullptr), playlist_index(0), stream(nullptr), source(nullptr), finished(false), stopped(true), volume_scale(1), force_stop(false) {}
-SferaSoundPlaybackState::~SferaSoundPlaybackState() { clear(); }
-float SferaSoundPlaybackState::parseTime(const char* text) { if (text == nullptr) return 0.0f; const std::string_view token(text); const auto colon = token.find(':'); const auto prefixSize = std::min<std::size_t>(15, colon == std::string_view::npos ? token.size() : colon); if (prefixSize >= token.size()) return 0.0f; return std::atoi(std::string(token.substr(0, prefixSize)).c_str()) * 60.0 + std::atof(text + prefixSize + 1); }
-bool SferaSoundPlaybackState::load(const char* filename) {
-    SferaSimpleParser parser;
-    parser.initialize();
-    struct Release { SferaSimpleParser& parser; ~Release() { parser.release(); } } release{parser};
-    parser.load(filename);
-    SferaParserRange track{}, block{};
-    char text[1024]{};
-    if (!parser.findBlock("soundtrack", &track, nullptr, 1) || !parser.findValue("audio_file", &track) || parser.readQuotedString(0u, text) == nullptr) return false;
-    auto* filenameCopy = new char[std::strlen(text) + 1];
-    std::copy_n(text, std::strlen(text) + 1, filenameCopy);
-    delete[] source; source = filenameCopy;
-    if (parser.findValue("volume", &track)) volume_scale = std::trunc(parser.readFloat(0u));
-
-    auto countRecords = [&](const char* name) { parser.setScanRange(&block); std::size_t count = 0; while (parser.nextValue(name)) ++count; return count; };
-    if (!parser.findBlock("samples", &block, &track, 1)) return false;
-    const auto sampleCount = countRecords("sample");
-    if (sampleCount == 0u) return false;
-    timings.assign(sampleCount, {});
-    parser.setScanRange(&block);
-    while (parser.nextValue("sample")) { const auto index = parser.readInt(0u); if (index <= 0 || std::cmp_greater(index, timings.size())) return false; char start[128]{}, end[128]{}; parser.readString(1u, start); parser.readString(2u, end); timings[index - 1] = {parseTime(start), parseTime(end)}; }
-    parser.clearScanRange();
-    if (!parser.findBlock("patterns", &block, &track, 1)) return false;
-    const auto patternCount = countRecords("pattern");
-    if (patternCount == 0u) return false;
-    current_list = nullptr; playlists.assign(patternCount, {});
-    parser.setScanRange(&block);
-    while (parser.nextValue("pattern")) {
-        const auto tokenCount = parser.tokenCount();
-        if (tokenCount == 0u) continue;
-        const auto index = parser.readInt(0u);
-        if (index <= 0 || std::cmp_greater(index, playlists.size())) return false;
-        auto& pattern = playlists[index - 1];
-        pattern.groups.resize(tokenCount > 2u ? (tokenCount - 1u) / 2u + 1u : 1u);
-        std::size_t group = 0u;
-        for (std::size_t token = 1u; token < tokenCount; token += 2u) if (parser.readString(token, text) != nullptr) pattern.parseGroup(group++, text);
-    }
-    parser.clearScanRange();
-    const int starting_pattern = parser.findValue("start_pattern", &block) ? parser.readInt(0) : 1;
-    if (starting_pattern <= 0 || std::cmp_greater(starting_pattern, playlists.size())) return false;
-    playlist_index = starting_pattern - 1;
-    return true;
-}
-bool SferaSoundPlaybackState::start() {
-    if (playlist_index >= playlists.size() || playlists[playlist_index].groups.empty() || source == nullptr) { current_list = nullptr; return false; }
-    current_list = nullptr;
-    if (stream == nullptr) stream = SI_StreamCreateFile(source, 1u);
-    if (stream == nullptr) return false;
-    stream->decode_callback = &sfera_sound_decode_callback;
-    stream->decode_state = this;
-    stream->play_callback = &sfera_sound_play_callback;
-    stream->play_state = this;
-    stream->stream_gain = volume_scale;
-    playing = false;
-    current_list = &playlists[playlist_index];
-    current_list->item_index = 0u;
-    current_list->group_index = static_cast<std::size_t>(std::rand()) % current_list->groups.size();
-    event_queue.clear();
-    stopped = false;
-    return true;
-}
-void SferaSoundPlaybackState::stop() { if (stream != nullptr) { if (stream->IsStreamPlaying()) stream->Stop(); stream->decode_event_position = stream->play_event_position = UINT32_MAX; stopped = true; } }
-void SferaSoundPlaybackState::clear() { if (stream != nullptr) SI_StreamFree(stream); stream = nullptr; delete[] source; source = nullptr; current_list = nullptr; playlists.clear(); timings.clear(); event_queue.clear(); finished = playing = false; wait_seconds = 0; stopped = true; playlist_index = 0; }
-void SferaSoundPlaybackState::update() {
-    if (playing || stream == nullptr || stream->decoder_state != 0u || stopped) return;
-    if (finished || force_stop) { stop(); return; }
-    if (wait_seconds != 0u) { const auto now = WorldClock::nowTicks(); if (wait_started_at == UINT64_MAX) { wait_started_at = now; return; } const auto begin = wait_started_at; if (now >= begin && (now - begin) / 10000 >= wait_seconds) wait_seconds = 0u; return; }
-    const auto event = nextEvent();
-    if (event.type == SoundEventType::end) { stop(); return; }
-    const auto index = event.argument;
-    if (event.type == SoundEventType::seek && index > 0u && index <= timings.size()) { if (stream->IsStreamPlaying()) stream->Stop(); const auto& timing = timings[index - 1]; play_signal = timing.signal; stream->SetDecodeSignal(timing.signal); stream->SetPlaySignal(play_signal); stream->PlayEx(timing.seek_time, 0); playing = true; }
-    else if (event.type == SoundEventType::wait) { if (stream->IsStreamPlaying()) stream->Stop(); stream->decode_event_position = stream->play_event_position = UINT32_MAX; wait_seconds = index; wait_started_at = UINT64_MAX; }
-    else if (event.type == SoundEventType::stop) stop();
-}
-SferaSoundPlaybackState* SferaSoundRuntime::loadTrack(const char* filename) { if (!interfaceAvailable()) return nullptr; auto track = std::make_unique<SferaSoundPlaybackState>(); if (!track->load(filename)) return nullptr; auto* result = track.get(); tracks.push_back(std::move(track)); return result; }
-bool SferaSoundRuntime::deleteTrack(SferaSoundPlaybackState* track) { if (track == nullptr) return false; if (!track->stopped) track->stop(); const auto found = std::find_if(tracks.begin(), tracks.end(), [track](const auto& item) { return item.get() == track; }); if (found != tracks.end()) tracks.erase(found); return true; }
-void SferaSoundRuntime::clearTracks() { for (auto& track : tracks) if (!track->stopped) track->stop(); tracks.clear(); g_sfera_music_runtime.current_stream = nullptr; }
-bool SferaSoundRuntime::updateTracks() { if (!interfaceAvailable()) return false; for (auto& track : tracks) track->update(); auto* current = g_sfera_music_runtime.current_stream; if (current != nullptr && current->stopped) { deleteTrack(current); g_sfera_music_runtime.current_stream = nullptr; if (g_sfera_music_runtime.requested_path[0] != 0u) { current = loadTrack(g_sfera_music_runtime.requested_path); g_sfera_music_runtime.current_stream = current; if (current != nullptr) current->start(); g_sfera_music_runtime.requested_path[0] = 0u; } } return true; }
-void SferaSoundRuntime::requestTrack(const char* filename) { auto* current = g_sfera_music_runtime.current_stream; if (filename == nullptr) { g_sfera_music_runtime.requested_path[0] = 0u; if (current != nullptr && !current->stopped) current->force_stop = true; return; } const std::string path = std::string("Sounds\\Music\\") + filename + ".sst"; const auto length = std::min(path.size(), std::size(g_sfera_music_runtime.requested_path) - 1); std::copy_n(path.begin(), length, g_sfera_music_runtime.requested_path); g_sfera_music_runtime.requested_path[length] = 0u; if (current != nullptr && !current->stopped) { current->force_stop = true; return; } current = loadTrack(g_sfera_music_runtime.requested_path); g_sfera_music_runtime.current_stream = current; if (current != nullptr) current->start(); }
-
-void CSoundManager::detach(CSound& sound) { if (count != 0u) --count; if (sound.cache_previous == nullptr && sound.cache_next == nullptr) { first = last = nullptr; return; } if (last == &sound) { last = sound.cache_previous; last->cache_next = nullptr; } else if (first == &sound) { first = sound.cache_next; first->cache_previous = nullptr; } else { sound.cache_previous->cache_next = sound.cache_next; sound.cache_next->cache_previous = sound.cache_previous; } }
-void CSoundManager::setVolume(std::int32_t percent) { volume = std::clamp(percent, 0, 100) / 100.0; for (auto* sound = first; sound != nullptr; sound = sound->cache_next) sound->SetVolume(volume); for (auto& entry : semantic_sound_cache()) if (entry.sound != nullptr) entry.sound->SetVolume(volume); }
-void CSoundManager::update() {
-    for (auto* sound = first; sound != nullptr;) {
-        auto* next = sound->cache_next;
-        if (!sound->IsSoundPlaying()) sound->playback_finished = 1u;
-        if (sound->playback_finished != 0u && sound->cache_available != 0u && sound->cache_lifetime_seconds >= 0) {
-            bool expired = sound->cache_lifetime_seconds == 0;
-            if (!expired) { const auto now = WorldClock::nowTicks(); if (sound->cache_idle_since_low == UINT32_MAX && sound->cache_idle_since_high == UINT32_MAX) { sound->cache_idle_since_low = now; sound->cache_idle_since_high = now >> 32u; } else { const auto since = static_cast<std::uint64_t>(sound->cache_idle_since_low) | (static_cast<std::uint64_t>(sound->cache_idle_since_high) << 32u); expired = static_cast<std::int32_t>(static_cast<std::int64_t>(now - since) / 10000) >= sound->cache_lifetime_seconds; } }
-            if (expired) { detach(*sound); sound->~CSound(); WorldMemory::release(sound); }
-        }
-        sound = next;
-    }
-    service_semantic_sound_cache();
-    if (auto* Interface = SI_GetInterface()) Interface->UpdateSettings();
-}
-void CSoundManager::clear() { for (auto* sound = first; sound != nullptr;) { auto* next = sound->cache_next; sound->~CSound(); WorldMemory::release(sound); sound = next; } first = last = nullptr; for (auto& entry : semantic_sound_cache()) destroy_semantic_sound(entry.sound); semantic_sound_cache().clear(); }
-bool SferaSoundRuntime::initialize() {
-    SI_SetLogFile(nullptr);
-    if (SI_CreateInterface(main_window_handle(), -1, 44100u, 0u) == nullptr) return false;
-    auto* activeManager = ensureManager();
-    if (activeManager != nullptr) {
-        activeManager->enabled = interfaceAvailable() ? 1u : 0u;
-        if (!activeManager->enabled) {
-            for (auto* sound = activeManager->first; sound != nullptr; sound = sound->cache_next) sound->Stop();
-            activeManager->clear();
-        }
-    }
-    int soundVolume = 100, musicVolume = 100, hardwareMixing = 0;
-    SphereUI::InterfaceConfiguration::open("config.cfg");
-    soundVolume = SphereUI::InterfaceConfiguration::readInteger("SNDVOL", soundVolume);
-    musicVolume = SphereUI::InterfaceConfiguration::readInteger("MUSVOL", musicVolume);
-    hardwareMixing = SphereUI::InterfaceConfiguration::readInteger("HWMIX", hardwareMixing);
-    SI_SetHardwareMixing(hardwareMixing != 0u);
-    loadDefinitions();
-    SI_SetStreamVolume(musicVolume);
-    if (activeManager != nullptr) activeManager->setVolume(soundVolume);
-    return true;
-}
-
-CSoundManager* SferaSoundRuntime::ensureManager() { if (sound_manager != nullptr) return sound_manager; if (!interfaceAvailable()) return nullptr; sound_manager = new (WorldMemory::allocate(sizeof(CSoundManager))) CSoundManager{nullptr, nullptr, 1.0f, false, 0u}; return sound_manager; }
-void SferaSoundRuntime::update() {
-    auto* Interface = SI_GetInterface();
-    if (Interface == nullptr) return;
-    auto* listener = Interface->listener;
-    g_sfera_world_objects.recalculateBasis(1u);
-    const auto* camera = static_cast<const ExtendedWorldObject*>(g_sfera_world_objects.object(1u));
-    const SferaVec3F position = camera->position;
-    const SferaVec3F velocity{position.x - listener->position.x, position.y - listener->position.y, position.z - listener->position.z};
-    D3DVECTOR forward{}, up{};
-    listener->GetOrientation(&forward, &up);
-    const D3DVECTOR nextForward{camera->orientation_basis[0].x, camera->orientation_basis[0].y, camera->orientation_basis[0].z};
-    const D3DVECTOR nextUp{-camera->orientation_basis[1].x, -camera->orientation_basis[1].y, -camera->orientation_basis[1].z};
-    if (std::bit_cast<std::uint32_t>(velocity.x) != 0u || std::bit_cast<std::uint32_t>(velocity.y) != 0u || std::bit_cast<std::uint32_t>(velocity.z) != 0u) { listener->SetPosition(position.x, position.y, position.z, 0); listener->SetVelocity(velocity.x, velocity.y, velocity.z, 0); }
-    if (std::memcmp(&forward, &nextForward, sizeof(forward)) != 0 || std::memcmp(&up, &nextUp, sizeof(up)) != 0) listener->SetOrientation(nextForward, nextUp, 0);
-    updateTracks();
-    if (sound_manager != nullptr) sound_manager->update();
-}
-void SferaSoundRuntime::shutdown() { clearDefinitions(); if (sound_manager != nullptr) { sound_manager->clear(); sound_manager->~CSoundManager(); WorldMemory::release(sound_manager); sound_manager = nullptr; } clearTracks(); SI_Close(); }
 
 float EnvironmentZone::weight(float x, float z) const { const float left = static_cast<double>(x) - (static_cast<double>(originX) + minimumX); if (left < 0.0f) return 0.0f; const float top = static_cast<double>(z) - (static_cast<double>(originZ) + minimumZ); if (top < 0.0f) return 0.0f; const float right = static_cast<double>(originX) + maximumX - x; if (right < 0.0f) return 0.0f; const float bottom = static_cast<double>(originZ) + maximumZ - z; if (bottom < 0.0f) return 0.0f; const float distance = std::min(std::min(left, top), std::min(right, bottom)); return borderFade <= distance ? 1.0f : distance / borderFade; }
 PathZones::~PathZones() { WorldMemory::release(cells); }
@@ -14537,9 +14051,9 @@ void GameFontAtlas::load(int font, const char* filename, std::int32_t outline, s
     auto& graphics = *g_sfera_graphics_runtime.d3d_runtime;
     const auto upload = [&]() {
         IDirect3DTexture9* resource = nullptr;
-        const auto status = ::D3DXCreateTexture(graphics.native_device, atlasWidth, atlasWidth, 1, 0, D3DFMT_A4R4G4B4, D3DPOOL_MANAGED, &resource);
+        const auto status = graphics.native_device->CreateTexture(atlasWidth, atlasWidth, 1u, 0u, D3DFMT_A4R4G4B4, D3DPOOL_MANAGED, &resource, nullptr);
         Texture texture(resource, [](IDirect3DTexture9* value) { if (value != nullptr) value->Release(); });
-        graphics.checkResult(status, "D3DXCreateTexture");
+        graphics.checkResult(status, "CreateTexture");
         if (FAILED(status) || resource == nullptr) WorldDiagnostics::fail("Could not create font texture");
         D3DLOCKED_RECT region{};
         const auto lockStatus = resource->LockRect(0, &region, nullptr, 0);
@@ -15629,7 +15143,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             pushInteger(active_tag); break;
         }
         case Builtin::LinkProcess: { const auto name = nextSliceReference().base; if (name == 0) g_sfera_warning_log_runtime.append("NULL-pointer dereferencing: ffprc_link\n", false); active_tag = linkProcess(textAt(name)); pushInteger(active_tag); break; }
-        case Builtin::Connect: { const auto host = nextSliceReference().base; nextSliceReference(); const auto mode = argument_count > 2 ? static_cast<std::uint32_t>(nextInteger()) : 0; pushInteger(g_sfera_network_runtime.initialize(textAt(host), mode)); break; }
+        case Builtin::Connect: { const auto host = nextSliceReference().base; nextSliceReference(); const auto mode = argument_count > 2 ? static_cast<std::uint32_t>(nextInteger()) : 3u; pushInteger(g_sfera_network_runtime.initialize(textAt(host), mode)); break; }
         case Builtin::Disconnect: g_sfera_network_runtime.shutdown(); break;
         case Builtin::Send: buildRegion(); break;
         case Builtin::FormatText: case Builtin::BoundedFormatText: formatText(builtin == Builtin::BoundedFormatText); break;
@@ -18032,7 +17546,6 @@ void SferaNetworkProbeRuntime::start(const char* hostname) {
     DWORD identifier = 0;
     thread_handle = ::CreateThread(nullptr, 0, &sfera_network_probe_thread, nullptr, 0, &identifier);
     if (thread_handle == nullptr) {
-        ::DeleteCriticalSection(&critical_section);
         char message[128];
         std::snprintf(message, sizeof(message), "CreateThread error: %d\n", static_cast<int>(::GetLastError()));
         CSphereError error;
@@ -18042,13 +17555,8 @@ void SferaNetworkProbeRuntime::start(const char* hostname) {
 
 void SferaNetworkProbeRuntime::stop(bool preserveErrorLog) {
     stop_requested = 1;
-    DWORD state = 0;
-    for (unsigned attempt = 0; attempt < 40 && thread_handle != nullptr; ++attempt) {
-        if (!::GetExitCodeThread(thread_handle, &state) || state != STILL_ACTIVE) break;
-        ::Sleep(7);
-    }
     if (thread_handle != nullptr) {
-        if (::GetExitCodeThread(thread_handle, &state) && state == STILL_ACTIVE) ::TerminateThread(thread_handle, 0);
+        ::WaitForSingleObject(thread_handle, INFINITE);
         ::CloseHandle(thread_handle);
         thread_handle = nullptr;
     }
@@ -18056,109 +17564,35 @@ void SferaNetworkProbeRuntime::stop(bool preserveErrorLog) {
     if (preserveErrorLog) std::rename("Net.log", "NetError.log");
 }
 
-void SferaNetworkConnectionCheckerRuntime::start() {
-    DWORD state = 0;
-    if (thread != nullptr && ::GetExitCodeThread(thread, &state) && state == STILL_ACTIVE) return;
-    if (thread != nullptr) ::CloseHandle(thread);
-    DWORD identifier = 0;
-    thread = ::CreateThread(nullptr, 0, &sfera_directplay_heartbeat_thread, nullptr, 0, &identifier);
-    if (thread == nullptr) {
-        auto& log = g_sfera_log_runtime.files[0];
-        log.write("CClNetworkConnectionChecker::Start(): CreateThread error: ");
-        log.write(static_cast<std::int32_t>(::GetLastError()));
-        log.write("\n");
-    }
-}
-
-void SferaNetworkConnectionCheckerRuntime::stop() {
-    if (thread == nullptr) return;
-    DWORD state = 0;
-    if (::GetExitCodeThread(thread, &state) && state == STILL_ACTIVE) ::TerminateThread(thread, 0);
-    ::CloseHandle(thread);
-    thread = nullptr;
-}
-
 void SferaNetworkRuntime::updateProbe() {
-    if (g_sfera_client_config_runtime.connect_type_enabled || initialized == 0) return;
+    if (initialized == 0) return;
     auto& probe = g_sfera_network_probe_runtime;
     if (static_cast<std::int32_t>(error_budget) < 50) {
-        if (g_sfera_directplay_runtime.transport.transport_flag != 0) {
-            if (!network_error_active) { network_error_active = net_log_has_error = true; probe.writeLog("-- N\n"); }
+        if (transport.connection_lost) {
+            if (!network_error_active) {
+                network_error_active = net_log_has_error = true;
+                probe.writeLog("-- N\n");
+            }
             error_budget += probe.writeSamples();
-        } else network_error_active = false;
-    }
-    if (timeout_marker_pending) { probe.writeLog("-- T\n"); timeout_marker_pending = false; }
-    if (auto* peer = g_sfera_directplay_runtime.peer) {
-        SferaDpnConnectionInfoRuntime information{};
-        information.size = sizeof(information);
-        if (peer->GetConnectionInfo(&information, 0) == 0) {
-            probe.context_a = information.bytes_received_guaranteed;
-            probe.context_b = information.size;
-            probe.context_c = information.bytes_received_non_guaranteed;
+        } else {
+            network_error_active = false;
         }
     }
-}
-
-void SferaNetworkRuntime::updateDirectPlayStatistics() {
-    auto* peer = g_sfera_directplay_runtime.peer;
-    if (peer == nullptr) return;
-    auto& information = g_sfera_directplay_runtime.connection_info;
-    auto& previous = g_sfera_recovered_static_runtime;
-    information.size = sizeof(information);
-    peer->GetConnectionInfo(&information, 0);
-    const auto sent = information.bytes_sent_guaranteed + information.bytes_sent_non_guaranteed;
-    const auto received = information.bytes_received_guaranteed + information.bytes_received_non_guaranteed;
-    bytes_sent_delta = sent - previous.network_bytes_received_snapshot;
-    bytes_retried_delta = information.bytes_retried - previous.network_bytes_retried_snapshot;
-    bytes_received_delta = received - previous.network_bytes_sent_snapshot;
-    previous.network_bytes_received_snapshot = sent;
-    previous.network_bytes_retried_snapshot = information.bytes_retried;
-    previous.network_bytes_sent_snapshot = received;
+    probe.context_a = static_cast<std::uint32_t>(transport.received_bytes);
+    probe.context_b = connection_info.round_trip_latency_ms;
+    probe.context_c = static_cast<std::uint32_t>(transport.sent_bytes);
 }
 
 void SferaNetworkRuntime::updateTcpStatistics() {
     const auto* connection = g_sfera_client_config_runtime.tcp_connection;
     if (connection == nullptr) return;
-    auto& information = g_sfera_directplay_runtime.connection_info;
-    information.size = sizeof(information);
     ::EnterCriticalSection(&g_sfera_window_runtime.timing_critical_section);
-    information.round_trip_latency_ms = connection->round_trip_ms;
+    connection_info.round_trip_latency_ms = connection->round_trip_ms;
     ::LeaveCriticalSection(&g_sfera_window_runtime.timing_critical_section);
     bytes_sent_delta = connection->sent_bytes_per_second;
     bytes_retried_delta = 0;
     bytes_received_delta = connection->received_bytes_per_second;
-}
-
-std::uint32_t SferaNetworkRuntime::findLocalPort() {
-    constexpr std::uint32_t firstPort = 26858;
-    constexpr std::uint32_t lastPort = 26860;
-    for (unsigned attempt = 0; attempt < 3; ++attempt) {
-        if (++local_port_candidate > lastPort) local_port_candidate = firstPort;
-        WSADATA data{};
-        if (::WSAStartup(MAKEWORD(2, 2), &data) != 0) continue;
-        bool available = false;
-        addrinfo hints{};
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_DGRAM;
-        hints.ai_protocol = IPPROTO_UDP;
-        addrinfo* addresses = nullptr;
-        if (::getaddrinfo("", nullptr, &hints, &addresses) == 0) {
-            if (addresses != nullptr && addresses->ai_family == AF_INET && addresses->ai_addr != nullptr && addresses->ai_addrlen >= sizeof(sockaddr_in)) {
-                sockaddr_in address{};
-                std::memcpy(&address, addresses->ai_addr, sizeof(address));
-                address.sin_port = ::htons(static_cast<u_short>(local_port_candidate));
-                const auto socket = ::socket(AF_INET, SOCK_DGRAM, 0);
-                if (socket != INVALID_SOCKET) {
-                    available = ::bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
-                    ::closesocket(socket);
-                }
-            }
-            if (addresses != nullptr) ::freeaddrinfo(addresses);
-        }
-        ::WSACleanup();
-        if (available) return local_port_candidate;
-    }
-    return firstPort;
+    connection_info.throughput_bps = bytes_sent_delta + bytes_received_delta;
 }
 
 bool SferaStringLookupRuntime::matchesWildcard(const char* text, const char* pattern) {
@@ -18934,6 +18368,7 @@ void SferaTcpConnectionContext::writeLog(const char* suffix, const char* message
     if (!suffix || !message) {
         return;
     }
+    ::CreateDirectoryA("logs", nullptr);
     char path[260]{};
     std::snprintf(path, sizeof(path), "logs\\%u%s", g_sfera_recovered_static_runtime.server_number, suffix);
     FILE* file = nullptr;
@@ -18960,21 +18395,32 @@ void SferaTcpConnectionContext::writeLog(const char* suffix, const char* message
 }
 
 void SferaTcpConnectionContext::sendPending() noexcept {
-    if (!connected || !send_buffer) {
-        return;
-    }
+    if (!connected || !send_buffer) return;
     auto* critical_section = &g_sfera_network_send_runtime.critical_section;
     ::EnterCriticalSection(critical_section);
-    if (send_size != 0u) {
-        const int sent = ::send(socket, reinterpret_cast<const char*>(send_buffer), static_cast<int>(send_size), 0);
-        if (sent >= 0) {
-            if (static_cast<std::uint32_t>(sent) < send_size) {
-                std::memmove(send_buffer, send_buffer + sent, send_size - static_cast<std::uint32_t>(sent));
-            }
-            send_size -= static_cast<std::uint32_t>(sent);
-            sent_bytes_window += static_cast<std::uint32_t>(sent);
-        }
+    if (send_size == 0u) {
+        ::LeaveCriticalSection(critical_section);
+        return;
     }
+
+    const int sent = ::send(socket, reinterpret_cast<const char*>(send_buffer), static_cast<int>(send_size), 0);
+    if (sent == SOCKET_ERROR) {
+        const int error = ::WSAGetLastError();
+        char message[128]{};
+        std::snprintf(message, sizeof(message), "-------------------------SEND ERROR, err=%d\n", error);
+        writeLog("tcp_ip_connect.log", message);
+        connected = 0u;
+        g_sfera_network_runtime.transport.connection_lost = true;
+        g_sfera_network_runtime.initialization_result = UINT32_MAX;
+        ::LeaveCriticalSection(critical_section);
+        return;
+    }
+
+    if (static_cast<std::uint32_t>(sent) < send_size) {
+        std::memmove(send_buffer, send_buffer + sent, send_size - static_cast<std::uint32_t>(sent));
+    }
+    send_size -= static_cast<std::uint32_t>(sent);
+    sent_bytes_window += static_cast<std::uint32_t>(sent);
     ::LeaveCriticalSection(critical_section);
 }
 
@@ -18985,11 +18431,8 @@ bool SferaTcpConnectionContext::queuePacket(std::uint32_t payloadSize, TcpMessag
     if (!send_buffer || payloadSize > UINT16_MAX - SferaTcpOutgoingHeader::encodedSize || send_size > sendCapacity || sendCapacity - send_size < packet_size || (payloadSize != 0 && payload == nullptr)) {
         writeLog("tcp_ip_connect.log", "-------------------------ERROR: send buffer overload\n");
         g_sfera_network_runtime.initialization_result = UINT32_MAX;
-        if (socket != 0u && socket != INVALID_SOCKET) {
-            ::closesocket(socket);
-        }
-        ::WSACleanup();
         connected = 0u;
+        g_sfera_network_runtime.transport.connection_lost = true;
         ::LeaveCriticalSection(critical_section);
         return false;
     }
@@ -19013,23 +18456,19 @@ bool SferaTcpConnectionContext::queuePacket(std::uint32_t payloadSize, TcpMessag
     return true;
 }
 
-void SferaNetworkRuntime::sendPacket(std::uint32_t flags, std::span<std::uint8_t> payload) {
-    if (initialization_result != 1) return;
-    auto& transport = g_sfera_directplay_runtime.transport;
-    ++transport.received_packet_count;
-    const std::uint32_t length = payload.size();
-    transport.received_bytes += length;
-    const auto timeout = flags == 8 ? 180000u : 60000u;
-    const auto sendFlags = flags | SferaDirectPlay::highPriority | (flags == SferaDirectPlay::guaranteed ? 0u : SferaDirectPlay::nonSequential);
-    encodePayload(payload.data(), static_cast<std::int32_t>(length));
-    std::vector<std::uint8_t> message(payload.size() + 1);
-    std::copy(payload.begin(), payload.end(), message.begin() + 1);
-    if (g_sfera_client_config_runtime.connect_type_enabled) {
-        if (auto* connection = g_sfera_client_config_runtime.tcp_connection) connection->queuePacket(static_cast<std::uint32_t>(message.size()), TcpMessage::payload, message.data());
-    } else if (auto* peer = g_sfera_directplay_runtime.peer) {
-        const SferaDpnBufferDescRuntime buffer{static_cast<std::uint32_t>(message.size()), message.data()};
-        peer->Send(&buffer, 1, timeout, nullptr, &g_sfera_directplay_runtime.send_async_handle, sendFlags | SferaDirectPlay::noLoopback);
-    }
+bool SferaNetworkRuntime::sendPacket(std::uint32_t flags, std::span<const std::uint8_t> payload) {
+    if (initialization_result != 1u) return false;
+    auto* connection = g_sfera_client_config_runtime.tcp_connection;
+    if (connection == nullptr || !connection->connected) return false;
+
+    std::vector<std::uint8_t> message(payload.size() + 1u);
+    message[0] = static_cast<std::uint8_t>(flags);
+    std::copy(payload.begin(), payload.end(), message.begin() + 1u);
+    encodePayload(message.data() + 1u, static_cast<std::int32_t>(payload.size()));
+    if (!connection->queuePacket(static_cast<std::uint32_t>(message.size()), TcpMessage::payload, message.data())) return false;
+
+    transport.sent_bytes += payload.size();
+    return true;
 }
 
 std::size_t WorldMemory::payloadSize(void* memory) {
@@ -19155,13 +18594,15 @@ void SferaMbcRuntime::receiveRegion() {
     for (std::int32_t field = 0; field < description.field_count; ++field) {
         const auto format = description.formats[field];
         if (format == 'e' || format == 'f') {
-            const auto count = stream.read(format == 'e' ? 4 : 8);
-            if (!stream.valid()) { wrongData(); return; }
+            const auto encodedCount = stream.read(format == 'e' ? 4 : 8);
+            if (!stream.valid() || field + 1 >= description.field_count) { wrongData(); return; }
+            const auto count = mbc_array_count(encodedCount, format, description.formats[field + 1], stream.remaining());
             const auto* countOutput = nextOutput();
             if (countOutput == nullptr || !store(*countOutput, count)) return;
             const auto* array = nextOutput();
             if (array == nullptr) return;
-            if (!array->isPointer() || ++field >= description.field_count) { wrongData(); return; }
+            if (!array->isPointer()) { wrongData(); return; }
+            ++field;
             const auto elementSize = array->elementSize();
             if (elementSize > sizeof(std::uint32_t)) { wrongData(); return; }
             auto* destination = memoryAt(array->value.base);
@@ -19213,7 +18654,7 @@ void SferaMbcRuntime::sendRegion(std::int32_t slotIndex, std::uint32_t region, s
     if (!coordinatesValid) { regionBuffer.fill(0); regionBits = 0; return; }
     if (!encoded.valid() || bitCount > payload.size() * 8) { reportError("Too long data for region"); return; }
     if (bitCount != 0 && bitCount + regionBits + 37 > 1600) {
-        g_sfera_network_runtime.sendPacket(reliable ? 8 : 0, payload.first((bitCount + 7) / 8));
+        if (!g_sfera_network_runtime.sendPacket(reliable ? 8 : 0, payload.first((bitCount + 7) / 8))) return;
         lastProcess = UINT32_MAX;
         bitCount = 0;
         std::fill(payload.begin(), payload.end(), std::uint8_t{});
@@ -19585,8 +19026,10 @@ bool SferaMbcBitStream::skipRegion(const SferaMbcRegionRecord& region) {
         auto format = std::abs(int(region.formats[field]));
         std::uint32_t count = 1;
         if (format == 'e' || format == 'f') {
-            count = read(format == 'e' ? 4 : 8);
-            if (++field >= region.field_count) return false;
+            const auto countFormat = static_cast<std::int8_t>(format);
+            const auto encodedCount = read(format == 'e' ? 4 : 8);
+            if (!valid_ || ++field >= region.field_count) return false;
+            count = mbc_array_count(encodedCount, countFormat, region.formats[field], remaining());
             format = std::abs(int(region.formats[field]));
         }
         for (std::uint32_t element = 0; element < count && valid_; ++element) {
@@ -19679,61 +19122,43 @@ void SferaNetworkRuntime::receiveEvents(std::span<const std::uint8_t> payload) {
     }
 }
 
-void SferaNetworkRuntime::sendDiagnosticFile(const char* path, std::uint8_t kind, std::size_t packetSize) {
-    if (g_sfera_directplay_runtime.peer == nullptr || packetSize < 133) return;
-    FILE* file = nullptr;
-    ::fopen_s(&file, path, "r");
-    if (file == nullptr) return;
-    std::vector<std::uint8_t> packet(packetSize);
-    packet[0] = kind;
-    const auto* identity = reinterpret_cast<const char*>(g_sfera_error_log_runtime.user_name);
-    const auto* end = std::find(identity, identity + std::min<std::size_t>(128, sizeof(g_sfera_error_log_runtime.user_name)), '\0');
-    std::copy(identity, end, packet.begin() + 1);
-    const std::uint32_t bytes = std::fread(packet.data() + 133, 1, packetSize - 133, file);
-    std::fclose(file);
-    std::memcpy(packet.data() + 129, &bytes, sizeof(bytes));
-    DWORD asyncHandle = 0;
-    const SferaDpnBufferDescRuntime buffer{static_cast<std::uint32_t>(packet.size()), packet.data()};
-    g_sfera_directplay_runtime.peer->Send(&buffer, 1, 180000, nullptr, &asyncHandle, SferaDirectPlay::heartbeatFlags);
-    std::remove(path);
-}
-
 void SferaNetworkRuntime::receiveMessage(SferaNetworkMessageSlot& message) {
-    const bool directPlay = !g_sfera_client_config_runtime.connect_type_enabled;
-    if (message.message == 3 && directPlay) {
-        if (message.buffer_handle >= std::size(g_sfera_world_slot_table_runtime.slots) || message.data_size > std::size(message.data)) return;
-        auto* process = g_sfera_mbc_runtime->findProcess(g_sfera_world_slot_table_runtime.slots[message.buffer_handle].linked_handle);
-        if (process == nullptr) return;
-        g_sfera_mbc_runtime->active_process = process;
-        const std::int32_t origin[3]{};
-        process->queueRegion(62, message.data_size, origin, {message.data, message.data_size}, 0, message.data_size * 8, false);
-    } else if (message.message == SferaDirectPlay::receive) {
-        if (directPlay && message.data_size == 1 && message.data[0] == 2) { sendDiagnosticFile("client-Crash.1", 3, 2048); sendDiagnosticFile("NetError.log", 4, 4096); return; }
-        if (message.data_size == 0 || message.data_size > std::size(message.data)) return;
-        std::array<std::uint8_t, 401> payload{};
-        std::copy_n(message.data + 1, message.data_size - 1, payload.begin());
-        receiveEvents(std::span<const std::uint8_t>(payload.data(), message.data_size));
-    }
+    if (message.data_size <= 1u || message.data_size > std::size(message.data)) return;
+    const std::size_t payload_size = message.data_size - 1u;
+    std::array<std::uint8_t, 400> payload{};
+    std::copy_n(message.data + 1, payload_size, payload.begin());
+    receiveEvents(std::span<const std::uint8_t>(payload.data(), payload_size));
 }
 
 void SferaNetworkRuntime::receiveMessages() {
-    auto& transport = g_sfera_directplay_runtime.transport;
-    if (transport.receive_corrupted) { transport.receive_corrupted = 0; g_sfera_log_runtime.writeScript("logs\\directplay", "receive_netdata(): DATA CORRUPTION\n"); }
     if (initialization_result != 1) return;
-    auto& criticalSection = g_sfera_directplay_runtime.critical_section;
-    ::EnterCriticalSection(&criticalSection);
-    try {
-        while (transport.receive_read_index != transport.receive_write_index) {
-            auto& message = message_slots[transport.receive_read_index];
-            receiveMessage(message);
-            message.message = 0;
-            transport.receive_read_index = (transport.receive_read_index + 1) % kSferaNetworkMessageSlotCount;
-            ::LeaveCriticalSection(&criticalSection);
-            ::EnterCriticalSection(&criticalSection);
+
+    for (;;) {
+        SferaNetworkMessageSlot message{};
+        bool corrupted = false;
+        ::EnterCriticalSection(&receive_critical_section);
+        corrupted = transport.receive_corrupted;
+        transport.receive_corrupted = false;
+        if (transport.receive_read_index == transport.receive_write_index) {
+            transport.receive_busy = false;
+            ::LeaveCriticalSection(&receive_critical_section);
+            if (corrupted) {
+                g_sfera_log_runtime.writeScript("logs\\tcp", "receive_netdata(): DATA CORRUPTION\n");
+            }
+            break;
         }
-        transport.receive_busy = 0;
-    } catch (...) { ::LeaveCriticalSection(&criticalSection); throw; }
-    ::LeaveCriticalSection(&criticalSection);
+
+        auto& queued = message_slots[transport.receive_read_index];
+        message = queued;
+        queued.data_size = 0u;
+        transport.receive_read_index = (transport.receive_read_index + 1u) % kSferaNetworkMessageSlotCount;
+        ::LeaveCriticalSection(&receive_critical_section);
+
+        if (corrupted) {
+            g_sfera_log_runtime.writeScript("logs\\tcp", "receive_netdata(): DATA CORRUPTION\n");
+        }
+        receiveMessage(message);
+    }
 }
 
 SferaTcpConnectionContext::SferaTcpConnectionContext() : receive_buffer{}, receive_size(0), socket(0), remote_id(0), workers{}, stop_requested(0), received_bytes_window(0), sent_bytes_window(0), sent_bytes_per_second(0), received_bytes_per_second(0), send_buffer(static_cast<std::uint8_t*>(WorldMemory::allocate(sendCapacity))), send_size(0), initialized(0), connected(0), round_trip_ms(0), keepalive_started_at(0), keepalive_answered(0), sequence(0), checksum_seed(0), packet_counter(0) {
@@ -19747,22 +19172,36 @@ void SferaTcpConnectionContext::shutdown() noexcept {
     if (initialized != 1) return;
     writeLog("tcp_ip_connect.log", "Deinit TCP-IP manager(1)\n");
     stop_requested = 1;
+    connected = 0;
+
+    const SOCKET active_socket = socket;
+    if (active_socket != 0 && active_socket != INVALID_SOCKET) {
+        ::shutdown(active_socket, SD_BOTH);
+        ::closesocket(active_socket);
+    }
+
     for (auto& worker : workers) {
         if (worker.handle == nullptr) continue;
-        if (::WaitForSingleObject(worker.handle, 100) != WAIT_OBJECT_0) ::TerminateThread(worker.handle, 0);
+        ::WaitForSingleObject(worker.handle, INFINITE);
         ::CloseHandle(worker.handle);
         worker = {};
     }
+
     writeLog("tcp_ip_connect.log", "Deinit TCP-IP manager(2)\n");
-    if (socket != 0 && socket != INVALID_SOCKET) ::closesocket(socket);
     socket = 0;
+    remote_id = 0u;
+    receive_size = 0u;
+    send_size = 0u;
+    packet_counter = 0u;
+    sequence = 0u;
+    checksum_seed = 0u;
     ::WSACleanup();
-    initialized = connected = 0;
+    initialized = 0;
     writeLog("tcp_ip_connect.log", "Deinit TCP-IP manager(3)\n");
 }
 
 int SferaTcpConnectionContext::initialize(const char* hostname, std::uint16_t port) {
-    if (!g_sfera_client_config_runtime.connect_type_enabled || hostname == nullptr) return -1;
+    if (hostname == nullptr) return -1;
     if (initialized == 1) { writeLog("tcp_ip_connect.log", "-------------------------ERROR: ALREADY Init TCP-IP manager\n"); return 0; }
     WSADATA data{};
     const int startup = ::WSAStartup(MAKEWORD(2, 1), &data);
@@ -19816,104 +19255,75 @@ std::uint32_t SferaGameCalendar::fromUnixTime(std::int64_t timestamp) {
     return pack(epochYear + static_cast<std::uint32_t>(elapsedYears), month, date, static_cast<std::uint32_t>(time / quartersPerHour), static_cast<std::uint32_t>(time % quartersPerHour / quartersPerMinute), static_cast<std::uint32_t>(time % quartersPerMinute));
 }
 
-int SferaNetworkRuntime::initialize(const char* hostname, std::uint32_t port) {
-    auto& directPlay = g_sfera_directplay_runtime;
-    auto& transport = directPlay.transport;
-    const auto connectionType = g_sfera_client_config_runtime.connect_type_enabled;
-    if (!connectionType) { directPlay.caps.size = sizeof(directPlay.caps); directplay_caps.size = sizeof(directplay_caps); }
-    transport.mode = 3;
-    if (port != 0) server_port = port;
+int SferaNetworkRuntime::initialize(const char* hostname, std::uint32_t mode) {
+    transport.client_mode = mode;
+    if (transport.connection_lost && (initialized != 0u || g_sfera_client_config_runtime.tcp_connection != nullptr)) {
+        shutdown();
+    }
     if (static_cast<std::int32_t>(initialization_result) >= 0) return initialization_result;
     if (hostname == nullptr) return 0;
-    transport.receive_read_index = transport.receive_write_index = 0;
-    ::InitializeCriticalSection(&directPlay.critical_section);
-    const auto fail = [this]() { g_sfera_log_runtime.files[0].write("Network initialize error! \n\n"); initialization_result = UINT32_MAX; return 0; };
-    if (!connectionType) {
-        GUID clientIid{}, clientClsid{}, addressClsid{}, addressIid{}, provider{};
-        struct ApplicationDescription { DWORD size; DWORD flags; GUID instance; GUID application; DWORD maximumPlayers; DWORD currentPlayers; const wchar_t* session; const wchar_t* password; const void* reserved; DWORD reservedSize; const void* applicationData; DWORD applicationDataSize; };
-        ApplicationDescription application{};
-        application.size = sizeof(application);
-        const std::pair<const wchar_t*, GUID*> identities[]{
-            {L"{5102DACD-241B-11D3-AEA7-006097B01411}", &clientIid},
-            {L"{743F1DC6-5ABA-429F-8BDF-C54D03253DC2}", &clientClsid},
-            {L"{934A9523-A3CA-4BC5-ADA0-D6D95D979421}", &addressClsid},
-            {L"{83783300-4063-4C8A-9DB3-82830A7FEB31}", &addressIid},
-            {L"{EBFE7BA0-628D-11D2-AE0F-006097B01411}", &provider},
-            {L"{231B9780-1577-11D5-8E5D-888F8F05AA76}", &application.application}
-        };
-        for (const auto& [text, identity] : identities) if (FAILED(::CLSIDFromString(text, identity))) return fail();
-        if (FAILED(::CoCreateInstance(clientClsid, nullptr, CLSCTX_INPROC_SERVER, clientIid, reinterpret_cast<void**>(&directPlay.peer)))) return fail();
-        for (auto** address : {&transport.primary_address, &transport.secondary_address}) {
-            if (*address != nullptr) { (*address)->Release(); *address = nullptr; }
-            if (FAILED(::CoCreateInstance(addressClsid, nullptr, CLSCTX_ALL, addressIid, reinterpret_cast<void**>(address)))) return fail();
-        }
-        g_sfera_network_probe_runtime.writeLog("Initialize\n", true);
-        if (FAILED(directPlay.peer->Initialize(nullptr, &sfera_directplay_message_handler, 0))) return fail();
-        auto* local = transport.primary_address;
-        auto* remote = transport.secondary_address;
-        if (FAILED(local->SetSP(&provider))) return fail();
-        const auto localPort = findLocalPort();
-        const std::uint32_t traversalMode = 2;
-        if (FAILED(local->AddComponent(L"port", &localPort, sizeof(localPort), 2)) || FAILED(local->AddComponent(L"traversalmode", &traversalMode, sizeof(traversalMode), 2))) return fail();
-        if (FAILED(remote->SetSP(&provider))) return fail();
-        const auto characters = ::MultiByteToWideChar(CP_ACP, 0, hostname, -1, nullptr, 0);
-        if (characters == 0) return fail();
-        std::vector<wchar_t> wideHost(characters);
-        if (::MultiByteToWideChar(CP_ACP, 0, hostname, -1, wideHost.data(), characters) == 0) return fail();
-        if (FAILED(remote->AddComponent(L"hostname", wideHost.data(), static_cast<DWORD>(wideHost.size() * sizeof(wchar_t)), 1)) || FAILED(remote->AddComponent(L"port", &server_port, sizeof(server_port), 2))) return fail();
-        directPlay.peer->GetCaps(&directplay_caps, 0);
-        directplay_caps.drop_threshold_rate = 100;
-        directplay_caps.throttle_rate = 0;
-        directPlay.peer->SetCaps(&directplay_caps, 0);
-        g_sfera_network_probe_runtime.writeLog("Connect\n");
-        if (FAILED(directPlay.peer->Connect(&application, remote, local, nullptr, nullptr, &transport.mode, sizeof(transport.mode), nullptr, &message_call_scratch, 0))) return fail();
-        service_provider_caps.size = sizeof(service_provider_caps);
-        directPlay.peer->GetSPCaps(&provider, &service_provider_caps, 0);
-        service_provider_caps.buffers_per_thread = 4;
-        service_provider_caps.system_buffer_size = 64 * 1024;
-        directPlay.peer->SetSPCaps(&provider, &service_provider_caps, 0);
+    if (initialized != 0u || g_sfera_client_config_runtime.tcp_connection != nullptr) {
+        shutdown();
     }
-    initialization_result = 0;
-    timeout_marker_pending = network_error_active = net_log_has_error = false;
-    error_budget = 0;
-    initialized = 1;
-    transport.transport_flag = 0;
+
+    transport.connection_lost = false;
+    transport.receive_busy = false;
+    transport.receive_corrupted = false;
+    transport.sent_bytes = 0u;
+    transport.received_bytes = 0u;
+    transport.receive_read_index = 0u;
+    transport.receive_write_index = 0u;
+    connection_info = {};
+    ::InitializeCriticalSection(&receive_critical_section);
+
+    initialization_result = 0u;
+    network_error_active = false;
+    net_log_has_error = false;
+    error_budget = 0u;
+
+    auto*& connection = g_sfera_client_config_runtime.tcp_connection;
+    if (connection != nullptr) {
+        std::destroy_at(connection);
+        WorldMemory::release(connection);
+        connection = nullptr;
+    }
+    connection = new (WorldMemory::allocate(sizeof(SferaTcpConnectionContext))) SferaTcpConnectionContext;
+    if (connection->initialize(hostname, static_cast<std::uint16_t>(server_port)) != 0) {
+        std::destroy_at(connection);
+        WorldMemory::release(connection);
+        connection = nullptr;
+        initialization_result = UINT32_MAX;
+        ::DeleteCriticalSection(&receive_critical_section);
+        g_sfera_log_runtime.files[0].write("Network initialize error! \n\n");
+        return 0;
+    }
+
     g_sfera_network_probe_runtime.start(hostname);
-    if (!connectionType) g_sfera_network_connection_checker.start();
-    if (connectionType) {
-        auto*& connection = g_sfera_client_config_runtime.tcp_connection;
-        if (connection != nullptr) { connection->~SferaTcpConnectionContext(); WorldMemory::release(connection); }
-        connection = new (WorldMemory::allocate(sizeof(SferaTcpConnectionContext))) SferaTcpConnectionContext;
-        if (connection->initialize(hostname, static_cast<std::uint16_t>(server_port)) != 0) return fail();
-    }
+    initialized = 1u;
     return 1;
 }
 
 void SferaNetworkRuntime::shutdown() {
-    auto& directPlay = g_sfera_directplay_runtime;
-    const auto connectionType = g_sfera_client_config_runtime.connect_type_enabled;
-    if (!connectionType) {
-        if (directPlay.peer == nullptr) return;
-        if (timeout_marker_pending) { g_sfera_network_probe_runtime.writeLog("-- T\n"); timeout_marker_pending = false; }
-        g_sfera_network_probe_runtime.writeLog("Release\n");
+    auto*& connection = g_sfera_client_config_runtime.tcp_connection;
+    if (connection == nullptr && initialized == 0u) return;
+
+    if (initialized != 0u) {
         g_sfera_network_probe_runtime.stop(net_log_has_error);
-        initialized = 0;
-        g_sfera_network_connection_checker.stop();
-        directPlay.caps.connect_timeout_ms = 50;
-        directPlay.caps.connect_retries = 1;
-        directPlay.caps.timeout_until_keepalive_ms = 1000;
-        directPlay.peer->SetCaps(&directPlay.caps, 0);
-        directPlay.peer->Close(directPlay.transport.transport_flag == 0 ? 0 : 1);
-        directPlay.peer->Release();
-        directPlay.peer = nullptr;
-    } else if (connectionType) {
-        if (g_sfera_client_config_runtime.tcp_connection == nullptr) return;
-        g_sfera_client_config_runtime.tcp_connection->shutdown();
-        initialized = 0;
+    }
+    if (connection != nullptr) {
+        connection->shutdown();
+        std::destroy_at(connection);
+        WorldMemory::release(connection);
+        connection = nullptr;
         SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "Deinit TCP-IP manager = OK\n");
-    } else return;
+    }
+
+    initialized = 0u;
     initialization_result = UINT32_MAX;
-    ::DeleteCriticalSection(&directPlay.critical_section);
+    connection_slot = UINT32_MAX;
+    active_slot = UINT32_MAX;
+    reset_pending_network_regions();
+    ::DeleteCriticalSection(&receive_critical_section);
 }
 
 std::int64_t SferaMbcValue::truncateReal(double number) {
@@ -20230,8 +19640,8 @@ void SferaMbcRuntime::systemCommand() {
         case 21: { const auto handle = nextInteger(); if (!execution_failed) { const auto search = nativeResource<std::intptr_t>(static_cast<std::uint32_t>(handle)); if (search != -1) { ::_findclose(search); forgetNativeResource(search); } active_process->unregisterResource(handle, ResourceKind::fileSearch); } return; }
         case 22: instruction_step_count = 0; return;
         case 23: nextInteger(); return;
-        case 24: pushInteger(g_sfera_directplay_runtime.connection_info.round_trip_latency_ms); return;
-        case 25: pushInteger(g_sfera_directplay_runtime.connection_info.throughput_bps); return;
+        case 24: pushInteger(g_sfera_network_runtime.connection_info.round_trip_latency_ms); return;
+        case 25: pushInteger(g_sfera_network_runtime.connection_info.throughput_bps); return;
         case 26: pushInteger(g_sfera_network_runtime.bytes_sent_delta); return;
         case 27: pushInteger(g_sfera_network_runtime.bytes_received_delta); return;
         case 28: pushInteger(g_sfera_network_runtime.bytes_retried_delta); return;
@@ -20421,7 +19831,7 @@ void SferaMbcRuntime::systemCommand() {
         case 133: case 134: case 138: pushInteger(0); return;
         case 136: { const auto path = nextInteger(); if (execution_failed) return; _finddata64i32_t information{}; const auto handle = ::_findfirst64i32(text(path), &information); if (handle == -1) pushInteger(errno == ENOENT ? 0 : UINT32_MAX); else { ::_findclose(handle); pushInteger((information.attrib & _A_SUBDIR) != 0); } return; }
         case 140: { const auto name = address("SYS_SET_USER_NAME, 1"); SferaStringLookupRuntime::copyString(g_sfera_error_log_runtime.user_name, text(name), sizeof(g_sfera_error_log_runtime.user_name)); pushInteger(1); return; }
-        case 150: { const bool lost = nextInteger() != 0; g_sfera_directplay_runtime.transport.transport_flag = lost; if (lost && g_sfera_client_config_runtime.connect_type_enabled) SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------CONNECTION_LOST_NOTIFICATION\n"); pushInteger(0); return; }
+        case 150: { const bool lost = nextInteger() != 0; g_sfera_network_runtime.transport.connection_lost = lost; if (lost) SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------CONNECTION_LOST_NOTIFICATION\n"); pushInteger(0); return; }
         case 152: g_sfera_interface.initializeResources(); return;
         case 206: g_sfera_map_generator_runtime.begin("WorldMap.bmp"); pushInteger(0); return;
         case 207: trace_steps_remaining = 25; pushInteger(0); return;
@@ -20525,7 +19935,7 @@ void SferaMbcRuntime::tick() {
     if (static_cast<std::int32_t>(g_sfera_network_runtime.active_slot) >= 0) return;
     ++g_sfera_recovered_static_runtime.simulation_tick;
     if (static_cast<std::int32_t>(++g_sfera_interpreter_scratch_runtime.network_poll_counter) >= 192) {
-        if (g_sfera_client_config_runtime.connect_type_enabled) g_sfera_network_runtime.updateTcpStatistics(); else g_sfera_network_runtime.updateDirectPlayStatistics();
+        g_sfera_network_runtime.updateTcpStatistics();
         g_sfera_interpreter_scratch_runtime.network_poll_counter = 0;
     }
     if (halt_state != SferaMbcRuntime::HaltState::Running) {
@@ -20608,7 +20018,14 @@ void SferaMbcRuntime::tick() {
         g_sfera_network_runtime.receiveMessages();
         for (std::int32_t index = g_sfera_world_slot_table_runtime.active_limit; index >= 0;) {
             auto& slot = g_sfera_world_slot_table_runtime.slots[index]; index = slot.primary_state;
-            const auto flush = [&](std::uint32_t& bits, auto& payload, std::uint32_t& owner, std::uint32_t flags) { if (static_cast<std::int32_t>(bits) <= 0) return; g_sfera_network_runtime.sendPacket(flags, std::span<std::uint8_t>(payload, (bits + 7) >> 3)); bits = 0; std::fill(std::begin(payload), std::end(payload), 0); owner = UINT32_MAX; };
+            const auto flush = [&](std::uint32_t& bits, auto& payload, std::uint32_t& owner, std::uint32_t flags) {
+                if (static_cast<std::int32_t>(bits) <= 0) return;
+                const auto bytes = (bits + 7) >> 3;
+                if (!g_sfera_network_runtime.sendPacket(flags, std::span<const std::uint8_t>(payload, bytes))) return;
+                bits = 0;
+                std::fill(std::begin(payload), std::end(payload), 0);
+                owner = UINT32_MAX;
+            };
             flush(slot.reliable_bit_count, slot.reliable_payload, slot.reliable_process, 8); flush(slot.unreliable_bit_count, slot.unreliable_payload, slot.unreliable_process, 0);
         }
     }
@@ -20708,10 +20125,6 @@ int SferaClientApplication::run(HINSTANCE instance, int showCommand) {
             ::MessageBoxA(nullptr, "\307\340\357\363\361\352 \357\360\356\350\347\342\356\344\350\362\361\377 \357\360\356\343\360\340\354\354\356\351 launchpoint.exe.", "\316\370\350\341\352\340 \347\340\357\363\361\352\340", MB_ICONERROR);
             SferaCrtStartupRuntime::releaseContainers();
             return 0;
-        }
-        if (g_sfera_config_text_runtime.load("connect.cfg")) {
-            std::int32_t connectionType = 0;
-            g_sfera_client_config_runtime.connect_type_enabled = g_sfera_config_text_runtime.readInteger("CONNECT_TYPE", connectionType) && connectionType == 1;
         }
         g_sfera_file_runtime.beginCrashReport();
         ::InitializeCriticalSection(&g_sfera_network_send_runtime.critical_section);
@@ -20880,7 +20293,7 @@ void TerrainTextureCache::initialize() {
     auto& device = *g_sfera_graphics_runtime.d3d_runtime;
     for (auto& entry : g_sfera_texture_cache_runtime.entries) {
         entry.resource = nullptr;
-        device.checkResult(::D3DXCreateTexture(device.native_device, 256, 256, 1, 0, D3DFMT_A4R4G4B4, D3DPOOL_MANAGED, &entry.resource), "D3DXCreateTexture");
+        device.checkResult(device.native_device->CreateTexture(256u, 256u, 1u, 0u, D3DFMT_A4R4G4B4, D3DPOOL_MANAGED, &entry.resource, nullptr), "CreateTexture");
         if (entry.resource == nullptr) SferaClientApplication::terminateWithError("CreateTexture for landscape cash failed");
     }
     auto& lookup = g_sfera_static_render_lookup_runtime;
@@ -21072,7 +20485,7 @@ void SferaClientApplication::renderFrame() {
         if (weather != nullptr) weather->update(static_cast<std::int32_t>(WorldClock::calendarTicks()), g_sfera_graphics_runtime.environment_factor, g_sfera_weather_runtime.current, SphereWorld::Vegetation::alternatePatterns());
         if (config.volume_refresh_active) {
             const bool increase = static_cast<std::int32_t>(config.volume_refresh_direction) > 0;
-            ::SI_SetStreamVolume(::SI_GetStreamVolume() + (increase ? 1 : -1));
+            g_sfera_sound_runtime.adjustMusicVolume(increase ? 1 : -1);
             config.volume_refresh_direction = increase ? 0 : 1;
             config.volume_refresh_frames = static_cast<double>(config.volume_refresh_frames) + 1.0;
             if (config.volume_refresh_frames > 50.0f) config.volume_refresh_active = false;
@@ -21167,8 +20580,7 @@ void SferaClientApplication::shutdown() {
     auto*& vegetation = g_sfera_world_render_runtime.world_spatial_index;
     if (vegetation != nullptr) { std::destroy_at(vegetation); WorldMemory::release(vegetation); vegetation = nullptr; }
     if (g_sfera_client_config_runtime.interpreter_initialized) { g_sfera_mbc_runtime->halt_state = SferaMbcRuntime::HaltState::Requested; g_sfera_mbc_runtime->tick(); }
-    auto*& connection = g_sfera_client_config_runtime.tcp_connection;
-    if (g_sfera_client_config_runtime.connect_type_enabled && connection != nullptr) { std::destroy_at(connection); WorldMemory::release(connection); connection = nullptr; }
+    g_sfera_network_runtime.shutdown();
     g_sfera_warning_log_runtime.flush(); g_sfera_sound_runtime.shutdown();
     auto*& download = g_sfera_inter_scalar_runtime.update_download;
     if (download != nullptr) { std::destroy_at(download); WorldMemory::release(download); download = nullptr; }

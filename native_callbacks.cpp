@@ -1,10 +1,7 @@
 #include "native_callbacks.h"
 #include "semantic_static.h"
-#include "import_bridge.h"
 
 #include <exception>
-#include <exdisp.h>
-#include <mshtml.h>
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -34,304 +31,9 @@ constexpr ULONG_PTR kMsvcCppExceptionMagic19930521 = 0x19930521u;
 constexpr ULONG_PTR kMsvcCppExceptionMagic19930522 = 0x19930522u;
 constexpr ULONG_PTR kMsvcCppExceptionMagicPure = 0x01994000u;
 
-constexpr DWORD kDirectPlayHeartbeatTimeoutMs = 180000u;
-
 FILE* open_file(const char* path, const char* mode) noexcept {
     FILE* file = nullptr;
     return path && mode && ::fopen_s(&file, path, mode) == 0 ? file : nullptr;
-}
-
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::Storage::QueryInterface(REFIID iid, void** output) {
-    if (!output) {
-        return E_POINTER;
-    }
-    *output = nullptr;
-    if (InlineIsEqualGUID(iid, __uuidof(IUnknown)) || InlineIsEqualGUID(iid, __uuidof(IStorage))) {
-        *output = static_cast<IStorage*>(this);
-    } else {
-        return E_NOINTERFACE;
-    }
-    AddRef();
-    return S_OK;
-}
-
-SferaBrowserHost::SferaBrowserHost(HWND window) noexcept : window_(window) {
-}
-
-SferaBrowserHost::~SferaBrowserHost() {
-    if (!object_) {
-        return;
-    }
-    object_->Close(OLECLOSE_NOSAVE);
-    object_->Release();
-}
-
-HRESULT SferaBrowserHost::create() noexcept {
-    HRESULT result = ::OleCreate(CLSID_WebBrowser, __uuidof(IOleObject), OLERENDER_DRAW, nullptr, static_cast<IOleClientSite*>(this), &storage_, reinterpret_cast<void**>(&object_));
-    if (FAILED(result) || !object_) {
-        return FAILED(result) ? result : E_FAIL;
-    }
-    object_->SetHostNames(L"My Host Name", nullptr);
-    RECT bounds{};
-    ::GetClientRect(window_, &bounds);
-    result = ::OleSetContainedObject(object_, TRUE);
-    if (SUCCEEDED(result)) {
-        result = object_->DoVerb(OLEIVERB_SHOW, nullptr, static_cast<IOleClientSite*>(this), -1, window_, &bounds);
-    }
-    if (FAILED(result)) {
-        return result;
-    }
-    IWebBrowser2* browser = nullptr;
-    result = object_->QueryInterface(__uuidof(IWebBrowser2), reinterpret_cast<void**>(&browser));
-    if (FAILED(result) || !browser) {
-        return FAILED(result) ? result : E_NOINTERFACE;
-    }
-    browser->put_Left(0);
-    browser->put_Top(0);
-    browser->put_Width(bounds.right);
-    browser->put_Height(bounds.bottom);
-    browser->Release();
-    return S_OK;
-}
-
-void SferaBrowserHost::resize(LONG width, LONG height) noexcept {
-    if (!object_) {
-        return;
-    }
-    IWebBrowser2* browser = nullptr;
-    if (SUCCEEDED(object_->QueryInterface(__uuidof(IWebBrowser2), reinterpret_cast<void**>(&browser))) && browser) {
-        browser->put_Width(width);
-        browser->put_Height(height);
-        browser->Release();
-    }
-}
-
-HWND SferaBrowserHost::documentWindow() noexcept {
-    if (!object_) {
-        return nullptr;
-    }
-    IWebBrowser2* browser = nullptr;
-    if (FAILED(object_->QueryInterface(__uuidof(IWebBrowser2), reinterpret_cast<void**>(&browser))) || !browser) {
-        return nullptr;
-    }
-    IDispatch* document = nullptr;
-    const HRESULT document_result = browser->get_Document(&document);
-    browser->Release();
-    if (FAILED(document_result) || !document) {
-        return nullptr;
-    }
-    IHTMLDocument2* html_document = nullptr;
-    const HRESULT html_result = document->QueryInterface(__uuidof(IHTMLDocument2), reinterpret_cast<void**>(&html_document));
-    document->Release();
-    if (FAILED(html_result) || !html_document) {
-        return nullptr;
-    }
-    IOleWindow* ole_window = nullptr;
-    const HRESULT window_result = html_document->QueryInterface(__uuidof(IOleWindow), reinterpret_cast<void**>(&ole_window));
-    html_document->Release();
-    if (FAILED(window_result) || !ole_window) {
-        return nullptr;
-    }
-    HWND result = nullptr;
-    ole_window->GetWindow(&result);
-    ole_window->Release();
-    return result;
-}
-
-void SferaBrowserHost::refresh() noexcept {
-    if (!object_) {
-        return;
-    }
-    IWebBrowser2* browser = nullptr;
-    if (SUCCEEDED(object_->QueryInterface(__uuidof(IWebBrowser2), reinterpret_cast<void**>(&browser))) && browser) {
-        browser->Refresh();
-        browser->Release();
-    }
-}
-
-HRESULT SferaBrowserHost::draw(HDC target, LONG width, LONG height) noexcept {
-    if (!object_) {
-        return E_FAIL;
-    }
-    IViewObject2* view = nullptr;
-    const HRESULT query_result = object_->QueryInterface(__uuidof(IViewObject2), reinterpret_cast<void**>(&view));
-    if (FAILED(query_result) || !view) {
-        return FAILED(query_result) ? query_result : E_NOINTERFACE;
-    }
-    const RECTL bounds{0, 0, width, height};
-    const HRESULT result = view->Draw(DVASPECT_CONTENT, -1, nullptr, nullptr, nullptr, target, &bounds, nullptr, nullptr, 0u);
-    view->Release();
-    return result;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::QueryInterface(REFIID iid, void** output) {
-    if (!output) {
-        return E_POINTER;
-    }
-    *output = nullptr;
-    if (InlineIsEqualGUID(iid, __uuidof(IUnknown)) || InlineIsEqualGUID(iid, __uuidof(IOleClientSite))) {
-        *output = static_cast<IOleClientSite*>(this);
-    } else if (InlineIsEqualGUID(iid, __uuidof(IOleWindow)) || InlineIsEqualGUID(iid, __uuidof(IOleInPlaceSite))) {
-        *output = static_cast<IOleInPlaceSite*>(this);
-    } else if (InlineIsEqualGUID(iid, __uuidof(IOleInPlaceUIWindow)) || InlineIsEqualGUID(iid, __uuidof(IOleInPlaceFrame))) {
-        *output = static_cast<IOleInPlaceFrame*>(this);
-    } else if (InlineIsEqualGUID(iid, __uuidof(IDocHostUIHandler))) {
-        *output = static_cast<IDocHostUIHandler*>(this);
-    } else {
-        return E_NOINTERFACE;
-    }
-    AddRef();
-    return S_OK;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::GetContainer(IOleContainer** output) {
-    if (output) {
-        *output = nullptr;
-    }
-    return E_NOINTERFACE;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::GetWindow(HWND* output) {
-    if (!output) {
-        return E_POINTER;
-    }
-    *output = window_;
-    return S_OK;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::GetWindowContext(IOleInPlaceFrame** frame, IOleInPlaceUIWindow** document, LPRECT, LPRECT, LPOLEINPLACEFRAMEINFO info) {
-    if (frame) {
-        *frame = static_cast<IOleInPlaceFrame*>(this);
-    }
-    if (document) {
-        *document = nullptr;
-    }
-    if (info) {
-        info->cb = sizeof(*info);
-        info->fMDIApp = FALSE;
-        info->hwndFrame = window_;
-        info->haccel = nullptr;
-        info->cAccelEntries = 0u;
-    }
-    return S_OK;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::OnPosRectChange(LPCRECT rect) {
-    if (!object_ || !rect) {
-        return S_OK;
-    }
-    IOleInPlaceObject* inplace = nullptr;
-    if (SUCCEEDED(object_->QueryInterface(__uuidof(IOleInPlaceObject), reinterpret_cast<void**>(&inplace))) && inplace) {
-        inplace->SetObjectRects(rect, rect);
-        inplace->Release();
-    }
-    return S_OK;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::GetHostInfo(DOCHOSTUIINFO* info) {
-    if (!info) {
-        return E_POINTER;
-    }
-    info->cbSize = sizeof(*info);
-    info->dwFlags = DOCHOSTUIFLAG_NO3DBORDER;
-    info->dwDoubleClick = DOCHOSTUIDBLCLK_DEFAULT;
-    return S_OK;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::GetOptionKeyPath(LPOLESTR* output, DWORD) {
-    if (output) {
-        *output = nullptr;
-    }
-    return S_FALSE;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::GetDropTarget(IDropTarget*, IDropTarget** output) {
-    if (output) {
-        *output = nullptr;
-    }
-    return S_FALSE;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::GetExternal(IDispatch** output) {
-    if (output) {
-        *output = nullptr;
-    }
-    return S_FALSE;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::TranslateUrl(DWORD, OLECHAR*, OLECHAR** output) {
-    if (output) {
-        *output = nullptr;
-    }
-    return S_FALSE;
-}
-
-HRESULT STDMETHODCALLTYPE SferaBrowserHost::FilterDataObject(IDataObject*, IDataObject** output) {
-    if (output) {
-        *output = nullptr;
-    }
-    return S_FALSE;
-}
-
-namespace {
-
-void append_net_log(const char* message) noexcept {
-    if (!message) {
-        return;
-    }
-    FILE* file = open_file("Net.log", "at");
-    if (!file) {
-        return;
-    }
-    __time64_t now = 0;
-    _time64(&now);
-    tm local{};
-    char timestamp[128]{};
-    if (_localtime64_s(&local, &now) == 0) {
-        std::strftime(timestamp, sizeof(timestamp), "%d/%m %H:%M:%S ", &local);
-    }
-    std::fputs(timestamp, file);
-    std::fputs(message, file);
-    std::fclose(file);
-}
-
-void log_directplay_message(DWORD message) noexcept {
-    switch (message) {
-    case SferaDirectPlay::connectComplete:
-    case SferaDirectPlay::terminateSession:
-    case SferaDirectPlay::destroyPlayer:
-    case SferaDirectPlay::indicateConnect:
-    case SferaDirectPlay::connectAborted:
-    case SferaDirectPlay::createPlayer:
-        break;
-    default:
-        return;
-    }
-    char text[36]{};
-    std::snprintf(text, sizeof(text), "MessID: %u\n", static_cast<unsigned>(LOWORD(message)));
-    append_net_log(text);
-}
-
-SferaNetworkMessageSlot* acquire_directplay_receive_slot() noexcept {
-    auto* critical_section = &g_sfera_directplay_runtime.critical_section;
-    ::EnterCriticalSection(critical_section);
-    auto& transport = g_sfera_directplay_runtime.transport;
-    const std::uint32_t write_index = transport.receive_write_index;
-    if (transport.receive_busy != 0u) {
-        transport.receive_corrupted = 1u;
-        if (write_index != transport.receive_read_index) {
-            transport.receive_corrupted = 0u;
-        }
-    } else {
-        transport.receive_corrupted = 0u;
-    }
-    auto* slot = &g_sfera_network_runtime.message_slots[write_index];
-    transport.receive_write_index = write_index + 1u < kSferaNetworkMessageSlotCount ? write_index + 1u : 0u;
-    transport.receive_busy = 1u;
-    ::LeaveCriticalSection(critical_section);
-    return slot;
 }
 
 }
@@ -340,72 +42,11 @@ int __cdecl sfera_compare_record_key(const void* left, const void* right) noexce
     return static_cast<int>(*static_cast<const std::uint32_t*>(left) - *static_cast<const std::uint32_t*>(right));
 }
 
-static std::int32_t create_browser_control(HWND window) noexcept {
-    auto* host = new (std::nothrow) SferaBrowserHost(window);
-    if (!host) {
-        return -1;
-    }
-    const HRESULT result = host->create();
-    if (FAILED(result)) {
-        delete host;
-        return -2;
-    }
-    ::SetWindowLongPtrA(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(host));
-    return 0;
-}
-static void resize_browser_control(HWND window, LONG width, LONG height) noexcept {
-    auto* host = reinterpret_cast<SferaBrowserHost*>(::GetWindowLongPtrA(window, GWLP_USERDATA));
-    if (host) {
-        host->resize(width, height);
-    }
-}
-static void destroy_browser_control(HWND window) noexcept {
-    auto* host = reinterpret_cast<SferaBrowserHost*>(::GetWindowLongPtrA(window, GWLP_USERDATA));
-    ::SetWindowLongPtrA(window, GWLP_USERDATA, 0);
-    delete host;
-}
-HWND sfera_browser_document_window(HWND window) noexcept {
-    auto* host = reinterpret_cast<SferaBrowserHost*>(::GetWindowLongPtrA(window, GWLP_USERDATA));
-    return host ? host->documentWindow() : nullptr;
-}
-void sfera_browser_refresh(HWND window) noexcept {
-    auto* host = reinterpret_cast<SferaBrowserHost*>(::GetWindowLongPtrA(window, GWLP_USERDATA));
-    if (host) {
-        host->refresh();
-    }
-}
-HRESULT sfera_browser_draw(HWND window, HDC target, LONG width, LONG height) noexcept {
-    auto* host = reinterpret_cast<SferaBrowserHost*>(::GetWindowLongPtrA(window, GWLP_USERDATA));
-    return host ? host->draw(target, width, height) : E_FAIL;
-}
-
-LRESULT CALLBACK sfera_browser_host_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
-    switch (message) {
-    case WM_CREATE: return create_browser_control(window) == 0 ? 0 : -1;
-    case WM_DESTROY: destroy_browser_control(window); return 1;
-    case WM_SIZE: resize_browser_control(window, LOWORD(lparam), HIWORD(lparam)); return 0;
-    default: return ::DefWindowProcA(window, message, wparam, lparam);
-    }
-}
-
-LRESULT CALLBACK sfera_browser_subclass_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
-    if (message == WM_LBUTTONDOWN || message == WM_LBUTTONUP) {
-        return 0;
-    }
-    if ((message == WM_KEYDOWN || message == WM_KEYUP) && wparam == VK_ESCAPE) {
-        ::SendMessageA(g_sfera_window_runtime.main_window_handle, message, wparam, lparam);
-    }
-    if (g_sfera_browser_window_runtime.original_window_proc) {
-        return ::CallWindowProcA(g_sfera_browser_window_runtime.original_window_proc, window, message, wparam, lparam);
-    }
-    return ::DefWindowProcA(window, message, wparam, lparam);
-}
-
 LRESULT CALLBACK sfera_main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
     switch (message) {
     case WM_ACTIVATEAPP:
         g_sfera_texture_cache_runtime.cache_enabled = (g_sfera_window_runtime.windowed && g_sfera_client_config_runtime.refresh_rate != 0u) || wparam != 0;
-        ::SI_SetStreamVolume(::SI_GetStreamVolume());
+        g_sfera_sound_runtime.refreshMusicVolume();
         g_sfera_client_config_runtime.volume_refresh_frames = 0.0;
         g_sfera_client_config_runtime.volume_refresh_active = true;
         return 0;
@@ -498,18 +139,33 @@ LONG WINAPI sfera_cpp_exception_filter(EXCEPTION_POINTERS* exception) noexcept {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-static void enqueue_directplay_receive(const SferaDirectPlayReceivePayload& payload) noexcept {
-    SferaNetworkMessageSlot* slot = acquire_directplay_receive_slot();
-    auto& transport = g_sfera_directplay_runtime.transport;
-    ++transport.sent_packet_count;
-    slot->message = SferaDirectPlay::receive;
-    slot->sender = payload.sender;
-    slot->buffer_handle = UINT32_MAX;
-    transport.sent_bytes += payload.data_size;
-    slot->data_size = std::min<std::uint32_t>(payload.data_size, static_cast<std::uint32_t>(sizeof(slot->data) - 1u));
-    if (slot->data_size != 0u && payload.data) {
-        std::memcpy(slot->data, payload.data, slot->data_size);
+static void enqueue_tcp_payload(const std::uint8_t* data, std::uint32_t size) noexcept {
+    auto& network = g_sfera_network_runtime;
+    auto& transport = network.transport;
+    auto* critical_section = &network.receive_critical_section;
+    ::EnterCriticalSection(critical_section);
+
+    const std::uint32_t write_index = transport.receive_write_index;
+    if (transport.receive_busy && write_index == transport.receive_read_index) {
+        transport.receive_corrupted = true;
+        ::LeaveCriticalSection(critical_section);
+        return;
     }
+
+    auto& slot = network.message_slots[write_index];
+    if (size > sizeof(slot.data)) {
+        transport.receive_corrupted = true;
+        ::LeaveCriticalSection(critical_section);
+        return;
+    }
+    slot.data_size = size;
+    if (slot.data_size != 0u && data != nullptr) {
+        std::memcpy(slot.data, data, slot.data_size);
+    }
+    transport.received_bytes += size;
+    transport.receive_write_index = write_index + 1u < kSferaNetworkMessageSlotCount ? write_index + 1u : 0u;
+    transport.receive_busy = true;
+    ::LeaveCriticalSection(critical_section);
 }
 
 static void dispatch_tcp_receive_packets(SferaTcpConnectionContext& context) noexcept {
@@ -519,15 +175,21 @@ static void dispatch_tcp_receive_packets(SferaTcpConnectionContext& context) noe
         const bool has_header = context.receive_size >= SferaTcpIncomingHeader::encodedSize;
         const auto header = has_header ? SferaTcpIncomingHeader::decode(context.receive_buffer) : SferaTcpIncomingHeader{};
         const std::uint16_t packet_size = header.size;
-        if (has_header && (packet_size < SferaTcpIncomingHeader::encodedSize || packet_size > kTcpReceiveBufferCapacity)) { context.receive_size = 0; g_sfera_network_runtime.initialization_result = UINT32_MAX; ::LeaveCriticalSection(critical_section); return; }
+        if (has_header && (packet_size < SferaTcpIncomingHeader::encodedSize || packet_size > kTcpReceiveBufferCapacity)) {
+            context.receive_size = 0u;
+            context.connected = 0u;
+            g_sfera_network_runtime.transport.connection_lost = true;
+            g_sfera_network_runtime.initialization_result = UINT32_MAX;
+            ::LeaveCriticalSection(critical_section);
+            return;
+        }
         const bool complete = has_header && context.receive_size >= packet_size;
         ::LeaveCriticalSection(critical_section);
         if (!complete) {
             return;
         }
         if (header.message == static_cast<std::uint16_t>(TcpMessage::payload)) {
-            const SferaDirectPlayReceivePayload payload{sizeof(SferaDirectPlayReceivePayload), context.remote_id, nullptr, context.receive_buffer + SferaTcpIncomingHeader::encodedSize, packet_size - SferaTcpIncomingHeader::encodedSize, UINT32_MAX};
-            enqueue_directplay_receive(payload);
+            enqueue_tcp_payload(context.receive_buffer + SferaTcpIncomingHeader::encodedSize, packet_size - SferaTcpIncomingHeader::encodedSize);
         }
         ::EnterCriticalSection(critical_section);
         std::memmove(context.receive_buffer, context.receive_buffer + packet_size, context.receive_size - packet_size);
@@ -552,14 +214,25 @@ static std::int32_t run_network_probe() noexcept {
     if (!::CreateProcessA(nullptr, command_line.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process)) {
         return -1;
     }
-    const DWORD wait_result = ::WaitForSingleObject(process.hProcess, 30000u);
-    if (wait_result == WAIT_TIMEOUT) {
-        ::TerminateProcess(process.hProcess, 1u);
+    DWORD wait_result = WAIT_TIMEOUT;
+    while (wait_result == WAIT_TIMEOUT) {
+        wait_result = ::WaitForSingleObject(process.hProcess, 100u);
+        if (wait_result == WAIT_TIMEOUT && (g_sfera_network_probe_runtime.stop_requested != 0u || ::timeGetTime() - started_at >= 30000u)) {
+            ::TerminateProcess(process.hProcess, 1u);
+            ::WaitForSingleObject(process.hProcess, INFINITE);
+            ::CloseHandle(process.hThread);
+            ::CloseHandle(process.hProcess);
+            return -1;
+        }
+    }
+    if (wait_result != WAIT_OBJECT_0) {
+        ::CloseHandle(process.hThread);
         ::CloseHandle(process.hProcess);
         return -1;
     }
     DWORD exit_code = 0u;
     const BOOL read_exit_code = ::GetExitCodeProcess(process.hProcess, &exit_code);
+    ::CloseHandle(process.hThread);
     ::CloseHandle(process.hProcess);
     if (!read_exit_code) {
         return -1;
@@ -584,13 +257,31 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
     std::vector<std::uint8_t> local_buffer(kTcpReceiveBufferCapacity);
     std::uint32_t buffered = 0u;
     DWORD stats_tick = ::GetTickCount();
+    DWORD handshake_started_at = 0u;
+    constexpr DWORD handshake_timeout_ms = 15000u;
     bool local_overload_reported = false;
     bool shared_overload_reported = false;
     bool terminate = false;
     while (!context->stop_requested && !terminate) {
         if (!context->connected) {
+            handshake_started_at = 0u;
             ::Sleep(10u);
             continue;
+        }
+
+        if (context->remote_id == 0u) {
+            const DWORD now = ::GetTickCount();
+            if (handshake_started_at == 0u) {
+                handshake_started_at = now;
+            } else if (now - handshake_started_at >= handshake_timeout_ms) {
+                SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------ERROR: handshake timeout\n");
+                context->connected = 0u;
+                g_sfera_network_runtime.transport.connection_lost = true;
+                g_sfera_network_runtime.initialization_result = UINT32_MAX;
+                break;
+            }
+        } else {
+            handshake_started_at = 0u;
         }
         const std::uint32_t free_space = static_cast<std::uint32_t>(kTcpReceiveBufferCapacity) - buffered;
         if (free_space == 0u) {
@@ -604,7 +295,9 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
             timeval timeout{0, 10000};
             const int selected = ::select(0, &readable, nullptr, nullptr, &timeout);
             if (selected == SOCKET_ERROR) {
+                if (context->stop_requested) break;
                 tcp_log_error("-------------------------ERROR: select, err=%d\n", ::WSAGetLastError());
+                g_sfera_network_runtime.transport.connection_lost = true;
                 g_sfera_network_runtime.initialization_result = UINT32_MAX;
                 break;
             }
@@ -613,13 +306,16 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
                 const int socket_error = ::WSAGetLastError();
                 if (received == SOCKET_ERROR) {
                     context->connected = 0u;
+                    if (context->stop_requested) break;
                     tcp_log_error("-------------------------LOST CONNECTION, err=%d\n", socket_error);
+                    g_sfera_network_runtime.transport.connection_lost = true;
                     g_sfera_network_runtime.initialization_result = UINT32_MAX;
                     break;
                 }
                 if (received == 0) {
                     context->connected = 0u;
                     tcp_log_error("-------------------------CLOSE CONNECTION, err=%d\n", socket_error);
+                    g_sfera_network_runtime.transport.connection_lost = true;
                     g_sfera_network_runtime.initialization_result = UINT32_MAX;
                     break;
                 }
@@ -632,6 +328,7 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
             const std::uint16_t packet_size = header.size;
             if (packet_size < SferaTcpIncomingHeader::encodedSize || packet_size > kTcpReceiveBufferCapacity) {
                 SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------ERROR: invalid packet size\n");
+                g_sfera_network_runtime.transport.connection_lost = true;
                 g_sfera_network_runtime.initialization_result = UINT32_MAX;
                 context->connected = 0u;
                 buffered = 0u;
@@ -644,20 +341,43 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
             const auto message = static_cast<TcpMessage>(header.message);
             if (message == TcpMessage::connection_limit) {
                 SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------IN(ERROR): (limit connections)\n");
+                g_sfera_network_runtime.transport.connection_lost = true;
                 g_sfera_network_runtime.initialization_result = UINT32_MAX;
                 context->connected = 0u;
                 buffered = 0u;
                 terminate = true;
                 break;
             }
-            if (message == TcpMessage::handshake && packet_size >= SferaTcpHandshakePacket::encodedSize) {
+            if (message == TcpMessage::handshake) {
+                if (packet_size < SferaTcpHandshakePacket::encodedSize) {
+                    SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------ERROR: invalid handshake packet\n");
+                    context->connected = 0u;
+                    g_sfera_network_runtime.transport.connection_lost = true;
+                    g_sfera_network_runtime.initialization_result = UINT32_MAX;
+                    buffered = 0u;
+                    terminate = true;
+                    break;
+                }
+
                 const auto handshake = SferaTcpHandshakePacket::decode(local_buffer.data());
                 context->checksum_seed = handshake.checksum_seed;
                 context->remote_id = handshake.remote_id;
-                const std::uint32_t mode = g_sfera_directplay_runtime.transport.mode;
-                context->queuePacket(sizeof(mode), TcpMessage::client_mode, &mode);
-                g_sfera_network_runtime.initialization_result = 1u;
                 context->sequence = static_cast<std::uint16_t>(std::rand() % 1000 + 1);
+                const std::uint32_t mode = g_sfera_network_runtime.transport.client_mode;
+                if (!context->queuePacket(sizeof(mode), TcpMessage::client_mode, &mode)) {
+                    buffered = 0u;
+                    terminate = true;
+                    break;
+                }
+                while (context->connected && context->send_size != 0u) {
+                    context->sendPending();
+                }
+                if (!context->connected) {
+                    buffered = 0u;
+                    terminate = true;
+                    break;
+                }
+                g_sfera_network_runtime.initialization_result = 1u;
                 char text[96]{};
                 std::snprintf(text, sizeof(text), "Create connection: socket=%u\n", context->remote_id);
                 SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", text);
@@ -691,14 +411,10 @@ DWORD WINAPI sfera_tcp_socket_receive_thread(void* parameter) noexcept {
         ::Sleep(15u);
     }
     SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "Rcv Thread exit\n");
+    context->connected = 0u;
     context->sent_bytes_per_second = 0u;
     context->received_bytes_per_second = 0u;
     g_sfera_network_runtime.initialization_result = UINT32_MAX;
-    if (context->socket != 0u && context->socket != INVALID_SOCKET) {
-        ::closesocket(context->socket);
-    }
-    context->socket = 0u;
-    ::WSACleanup();
     return 0u;
 }
 
@@ -929,8 +645,8 @@ DWORD WINAPI sfera_tcp_receive_dispatch_thread(void* parameter) noexcept {
     while (!context->stop_requested) {
         if (context->connected && context->remote_id != 0u) {
             if (context->receive_size != 0u) {
-            dispatch_tcp_receive_packets(*context);
-        }
+                dispatch_tcp_receive_packets(*context);
+            }
             ::Sleep(6u);
         } else {
             ::Sleep(10u);
@@ -951,7 +667,7 @@ DWORD WINAPI sfera_tcp_send_maintenance_thread(void* parameter) noexcept {
     DWORD send_tick = ::GetTickCount();
     DWORD random_interval = static_cast<DWORD>(std::rand() % 5000 + 2000);
     while (!context->stop_requested) {
-        if (!context->connected) {
+        if (!context->connected || g_sfera_network_runtime.initialization_result != 1u || context->remote_id == 0u) {
             ::Sleep(10u);
             continue;
         }
@@ -969,9 +685,9 @@ DWORD WINAPI sfera_tcp_send_maintenance_thread(void* parameter) noexcept {
             send_tick = now;
             context->sendPending();
             if (context->sequence > 50000u) {
-            context->sequence = 1u;
-            context->queuePacket(0u, TcpMessage::sequence_reset, nullptr);
-        }
+                context->sequence = 1u;
+                context->queuePacket(0u, TcpMessage::sequence_reset, nullptr);
+            }
         }
         now = ::GetTickCount();
         if (now - keepalive_tick > 3000u) {
@@ -980,8 +696,8 @@ DWORD WINAPI sfera_tcp_send_maintenance_thread(void* parameter) noexcept {
             ::EnterCriticalSection(timing);
             context->keepalive_started_at = ::GetTickCount();
             if (!context->keepalive_answered) {
-            context->round_trip_ms += 3000u;
-        }
+                context->round_trip_ms += 3000u;
+            }
             context->keepalive_answered = 0u;
             ::LeaveCriticalSection(timing);
             context->queuePacket(0u, TcpMessage::keepalive, nullptr);
@@ -997,100 +713,6 @@ DWORD WINAPI sfera_tcp_send_maintenance_thread(void* parameter) noexcept {
     }
     SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "Snd Thread exit\n");
     return 0u;
-}
-
-std::uint32_t __fastcall sfera_sound_decode_callback(CSoundStream* sound_stream, void* state) noexcept {
-    auto* playback = static_cast<SferaSoundPlaybackState*>(state);
-    if (!playback) {
-        return 0u;
-    }
-    const auto event = playback->nextEvent();
-    if (event.type == SoundEventType::end) {
-        if (sound_stream) {
-            sound_stream->Stop();
-        }
-        playback->finished = 1u;
-        playback->playing = 0u;
-        return 0u;
-    }
-    const auto type = event.type;
-    const std::size_t index = event.argument;
-    if (playback->force_stop) {
-        playback->queueEvent(event, -1.0f, UINT32_MAX);
-        if (sound_stream) {
-            sound_stream->decode_event_position = UINT32_MAX;
-        }
-        if (sound_stream) {
-            sound_stream->SetPlaySignal(playback->play_signal - 1.0f);
-        }
-        return 1u;
-    }
-    if (type == SoundEventType::seek && index != 0u) {
-        const auto* format = sound_stream ? sound_stream->Format() : nullptr;
-        if (index <= playback->timings.size() && format) {
-            const SferaSoundTiming& timing = playback->timings[index - 1u];
-            const std::uint32_t byte_position = static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(static_cast<double>(format->nSamplesPerSec) * timing.seek_time))) * format->nBlockAlign;
-            playback->queueEvent(event, timing.signal, byte_position);
-            if (sound_stream) {
-            sound_stream->SeekToTime(timing.seek_time);
-            sound_stream->SetDecodeSignal(timing.signal);
-        }
-        }
-        return 1u;
-    }
-    if (type == SoundEventType::stop || (type == SoundEventType::wait && index != 0u)) {
-        playback->queueEvent(event, -1.0f, UINT32_MAX);
-        if (sound_stream) {
-            sound_stream->decode_event_position = UINT32_MAX;
-        }
-    }
-    return 1u;
-}
-
-std::uint32_t __fastcall sfera_sound_play_callback(CSoundStream* sound_stream, void* state) noexcept {
-    auto* playback = static_cast<SferaSoundPlaybackState*>(state);
-    if (!playback) {
-        return 0u;
-    }
-    const auto queued = playback->popEvent();
-    if (!queued) {
-        if (sound_stream) {
-            sound_stream->play_event_position = UINT32_MAX;
-        }
-        return 1u;
-    }
-    const auto& record = *queued;
-    const auto* format = sound_stream ? sound_stream->Format() : nullptr;
-    if (sound_stream && record.position != UINT32_MAX && format) {
-        const std::uint32_t signal_position = static_cast<std::uint32_t>(static_cast<std::int32_t>(std::trunc(static_cast<double>(format->nSamplesPerSec) * playback->play_signal))) * format->nBlockAlign;
-        sound_stream->playback_position_adjustment += record.position - signal_position;
-    }
-    if (record.signal != -1.0f) {
-        playback->play_signal = record.signal;
-        if (sound_stream) {
-            sound_stream->SetPlaySignal(record.signal);
-        }
-    } else if (sound_stream) {
-        sound_stream->play_event_position = UINT32_MAX;
-    }
-    const auto type = record.type;
-    if (type == SoundEventType::wait && !playback->force_stop) {
-        if (sound_stream) {
-            sound_stream->Stop();
-        }
-        playback->wait_seconds = record.argument;
-        playback->wait_started_at = UINT64_MAX;
-        playback->playing = 0u;
-        return 1u;
-    }
-    if (type == SoundEventType::stop || playback->force_stop) {
-        if (sound_stream) {
-            sound_stream->Stop();
-        }
-        playback->finished = 1u;
-        playback->playing = 0u;
-    }
-    return 1u;
 }
 
 DWORD WINAPI sfera_network_probe_thread(void*) noexcept {
@@ -1120,39 +742,6 @@ DWORD WINAPI sfera_network_probe_thread(void*) noexcept {
     }
 }
 
-DWORD WINAPI sfera_directplay_heartbeat_thread(void*) noexcept {
-    for (;;) {
-        auto* client = g_sfera_directplay_runtime.peer;
-        if (client) {
-            std::uint8_t payload = 5u;
-            DWORD async_handle = 0u;
-            const SferaDpnBufferDescRuntime buffer{1u, &payload};
-            client->Send(&buffer, 1u, kDirectPlayHeartbeatTimeoutMs, nullptr, &async_handle, SferaDirectPlay::heartbeatFlags);
-        }
-        ::Sleep(2000u);
-    }
-}
-
-HRESULT WINAPI sfera_directplay_message_handler(void*, DWORD message, void* payload) noexcept {
-    if (g_sfera_client_config_runtime.connect_type_enabled == 1u) {
-        return S_OK;
-    }
-    log_directplay_message(message);
-    if (message == SferaDirectPlay::terminateSession) {
-        g_sfera_network_runtime.initialization_result = UINT32_MAX;
-        g_sfera_network_runtime.timeout_marker_pending = true;
-        return S_OK;
-    }
-    if (message == SferaDirectPlay::connectComplete) {
-        const auto* result = static_cast<const SferaDirectPlayConnectResult*>(payload);
-        g_sfera_network_runtime.initialization_result = result && SUCCEEDED(result->result) ? 1u : UINT32_MAX;
-        return S_OK;
-    }
-    if (message == SferaDirectPlay::receive && payload) {
-        enqueue_directplay_receive(*static_cast<const SferaDirectPlayReceivePayload*>(payload));
-    }
-    return S_OK;
-}
 
 std::uint32_t __fastcall sfera_client_critical_error(const char* message, std::uint32_t critical) noexcept {
     const int result = ::MessageBoxA(g_sfera_window_runtime.main_window_handle, message, critical ? "Critical" : "Error", critical ? MB_ICONERROR : (MB_ICONERROR | MB_OKCANCEL));

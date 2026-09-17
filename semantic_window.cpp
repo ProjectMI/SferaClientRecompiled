@@ -2,7 +2,7 @@
 #include "semantic_classes.h"
 #include "native_callbacks.h"
 #include "semantic_static.h"
-#include "import_bridge.h"
+#include <shellapi.h>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -24,7 +24,6 @@
 #include <type_traits>
 #include <utility>
 #include <climits>
-#include <exdisp.h>
 #include <sys/stat.h>
 namespace {
     constexpr std::uint32_t invalidIndex = UINT32_MAX;
@@ -32,7 +31,6 @@ namespace {
     constexpr auto anyControlKind = SphereUI::UiControlKind::any;
     constexpr std::uint32_t maximumScrollOffset = INT32_MAX;
     constexpr std::uint32_t missingConfigValue = UINT32_MAX;
-    constexpr std::uint32_t noSoundIdleTimestamp = UINT32_MAX;
     constexpr std::uint32_t dragDropStateMask = 255u;
     using UiControlKind = SphereUI::UiControlKind;
 
@@ -81,30 +79,6 @@ namespace {
     }
 
     namespace MouseInput = SphereUI::MouseInput;
-}
-
-namespace SphereUI {
-    struct BrowserSurface {
-        UnmanagedResourceTexture* texture_resource;
-        int width;
-        int height;
-        int texture_size;
-        HDC device_context;
-        HBITMAP bitmap;
-        HGDIOBJ previous_bitmap;
-    };
-
-    struct BrowserSession {
-        UiString url;
-        HWND host_window;
-        HWND document_window;
-        std::uint8_t subclassed;
-        int mouse_x;
-        int mouse_y;
-        int width;
-        int height;
-        std::uint32_t buttons;
-    };
 }
 
 namespace SphereUI::detail {
@@ -159,16 +133,6 @@ namespace SphereUI::Runtime {
 
     Window* makeControl(SphereUI::UiControlKind kind);
     static std::uint32_t keyCode(const char* name);
-    static BrowserSurface* createBrowserSurface(int width, int height);
-    static void destroyBrowserSurface(BrowserSurface* surface);
-    static BrowserSession* createBrowserSession(const char* url, int width, int height);
-    static void destroyBrowserSession(BrowserSession* session);
-    static void browserNavigate(BrowserSession& session, const char* url);
-    static void browserRefresh(BrowserSession& session);
-    static void browserLocation(BrowserSession& session, char* buffer, std::uint32_t capacity);
-    static void browserMouse(BrowserSession& session, std::uint32_t message, int x, int y, int wheel = 0);
-    static void browserPaint(BrowserSession& session, BrowserSurface& surface);
-    static void focusMainWindow();
 
     void broadcastMessage(Window* root, int group, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second, SphereUI::UiControlKind kind);
     void* allocate(std::size_t size);
@@ -266,7 +230,7 @@ namespace SphereUI::detail {
     SphereUI::UiControlKind controlKind(const char* name) {
         constexpr NamedValue<UiControlKind> values[] = { {
             "BUTTON", UiControlKind::button
-        }, {"TEXT", UiControlKind::text}, {"IMAGE", UiControlKind::image}, {"PROGRESS_BAR", UiControlKind::progressBar}, {"SCROLL_BAR", UiControlKind::scrollBar}, {"HYPER_TEXT", UiControlKind::hyperText}, {"CHECKBOX", UiControlKind::checkBox}, {"RADIOBUTTON", UiControlKind::radioButton}, {"TEXTLIST", UiControlKind::textList}, {"SLIDER", UiControlKind::slider}, {"LISTITEM", UiControlKind::listItem}, {"EDIT", UiControlKind::edit}, {"SLOT", UiControlKind::slot}, {"SPINBUTTON", UiControlKind::spinButton}, {"RICHEDIT", UiControlKind::richEdit}, {"FILTERLISTCTRL", UiControlKind::filteredList}, {"WEBBROWSER", UiControlKind::webBrowser}, {"MINIMAP", UiControlKind::minimap}, {"MENULISTCTRL", UiControlKind::menu}, {"HTCHATLISTCTRL", UiControlKind::hyperTextChat}, {"HTEDIT", UiControlKind::hyperTextEdit}, {"FONTPICKER", UiControlKind::fontPicker}, {"COLORPICKER", UiControlKind::colorPicker}};
+        }, {"TEXT", UiControlKind::text}, {"IMAGE", UiControlKind::image}, {"PROGRESS_BAR", UiControlKind::progressBar}, {"SCROLL_BAR", UiControlKind::scrollBar}, {"HYPER_TEXT", UiControlKind::hyperText}, {"CHECKBOX", UiControlKind::checkBox}, {"RADIOBUTTON", UiControlKind::radioButton}, {"TEXTLIST", UiControlKind::textList}, {"SLIDER", UiControlKind::slider}, {"LISTITEM", UiControlKind::listItem}, {"EDIT", UiControlKind::edit}, {"SLOT", UiControlKind::slot}, {"SPINBUTTON", UiControlKind::spinButton}, {"RICHEDIT", UiControlKind::richEdit}, {"FILTERLISTCTRL", UiControlKind::filteredList}, {"MINIMAP", UiControlKind::minimap}, {"MENULISTCTRL", UiControlKind::menu}, {"HTCHATLISTCTRL", UiControlKind::hyperTextChat}, {"HTEDIT", UiControlKind::hyperTextEdit}, {"FONTPICKER", UiControlKind::fontPicker}, {"COLORPICKER", UiControlKind::colorPicker}};
         return lookup(name, values, anyControlKind);
     }
 
@@ -1374,63 +1338,19 @@ namespace {
     }
 
     std::uint32_t soundVolume() {
-        const auto* manager = g_sfera_sound_runtime.sound_manager;
-        return manager == nullptr ? 0u : static_cast<std::uint32_t>(static_cast<int>(std::trunc(manager->volume * 100.0)));
+        return g_sfera_sound_runtime.soundVolume();
     }
 
     void setSoundVolume(std::uint32_t value) {
-        auto* manager = g_sfera_sound_runtime.sound_manager;
-        if (manager == nullptr) return;
-        manager->volume = std::clamp(static_cast<int>(value), 0, 100) / 100.0;
-        for (auto* sound = manager->first; sound != nullptr; sound = sound->cache_next) sound->SetVolume(manager->volume);
+        g_sfera_sound_runtime.setSoundVolume(value);
     }
 
     void setMusicVolume(std::uint32_t value) {
-        SI_SetStreamVolume(static_cast<int>(value));
+        g_sfera_sound_runtime.setMusicVolume(value);
     }
 
     void playUiSound(const char* filename) {
-        auto* manager = g_sfera_sound_runtime.sound_manager;
-        if (!g_sfera_interface_runtime.sounds_enabled || filename == nullptr || SI_GetInterface() == nullptr || manager == nullptr || !manager->enabled) return;
-        CSound* sound = nullptr;
-        for (auto* candidate = manager->first; candidate != nullptr; candidate = candidate->cache_next) if (SferaSimpleParser::equalsIgnoreCase(candidate->filename, filename) && candidate->IsSoundPlaying() == 0) {
-            if (candidate->cache_available != 0u) sound = candidate;
-            break;
-        }
-        if (sound == nullptr) {
-            FILE* source = nullptr;
-            if (fopen_s(&source, filename, "rb") != 0 || source == nullptr) return;
-            std::fclose(source);
-            void* storage = SphereUI::Runtime::allocate(sizeof(CSound));
-            if (storage == nullptr) return;
-            try {
-                sound = ::new (storage) CSound();
-                sound->cache_idle_since_low = sound->cache_idle_since_high = noSoundIdleTimestamp;
-                sound->cache_lifetime_seconds = 0;
-                sound->cache_next = sound->cache_previous = nullptr;
-                sound->cache_available = sound->playback_finished = 1u;
-                if (sound->LoadSound(filename, 8ul) == 0) {
-                    sound->~CSound();
-                    SphereUI::Runtime::deallocate(sound);
-                    return;
-                }
-            } catch (...) {
-                SphereUI::Runtime::deallocate(storage);
-                throw;
-            }
-            sound->cache_previous = manager->last;
-            if (manager->last != nullptr) manager->last->cache_next = sound;
-            else manager->first = sound;
-            manager->last = sound;
-            ++manager->count;
-        }
-        sound->cache_lifetime_seconds = 4;
-        sound->SetVolume(manager->volume);
-        sound->SetPlayTimepos(0.0f);
-        if (sound->CSound::Play(0) != 0) {
-            sound->cache_idle_since_low = sound->cache_idle_since_high = noSoundIdleTimestamp;
-            sound->playback_finished = 0u;
-        }
+        g_sfera_sound_runtime.playUiSound(filename);
     }
 }
 
@@ -1541,248 +1461,6 @@ void SphereUI::Runtime::clipboardText(UiString& result) {
     }
     if (text != nullptr) ::GlobalUnlock(handle);
     ::CloseClipboard();
-}
-
-namespace {
-
-    SferaBrowserHost* uiBrowserHost(const SphereUI::BrowserSession& session) {
-        const HWND window = session.host_window;
-        return window == nullptr ? nullptr : reinterpret_cast<SferaBrowserHost*>(::GetWindowLongPtrA(window, GWLP_USERDATA));
-    }
-
-    IWebBrowser2* uiBrowserInterface(IOleObject* object) {
-        IWebBrowser2* browser = nullptr;
-        if (object != nullptr) object->QueryInterface(__uuidof(IWebBrowser2), reinterpret_cast<void**>(&browser));
-        return browser;
-    }
-
-    void uiUploadBrowserSurface(SphereUI::BrowserSurface& surface) {
-        const auto* resource = surface.texture_resource;
-        auto* texture = resource == nullptr ? nullptr : resource->native_texture;
-        if (texture == nullptr) return;
-        D3DSURFACE_DESC description{};
-        if (FAILED(texture->GetLevelDesc(0u, &description)) || description.Width != static_cast<UINT>(surface.texture_size) || description.Height != static_cast<UINT>(surface.texture_size)) return;
-        D3DLOCKED_RECT locked{};
-        if (FAILED(texture->LockRect(0u, &locked, nullptr, D3DLOCK_NOSYSLOCK))) return;
-        if (locked.pBits != nullptr) {
-            BITMAPINFO bitmap_info{};
-            bitmap_info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-            bitmap_info.bmiHeader.biWidth = surface.width;
-            bitmap_info.bmiHeader.biHeight = -surface.height;
-            bitmap_info.bmiHeader.biPlanes = 1u;
-            bitmap_info.bmiHeader.biBitCount = 32u;
-            bitmap_info.bmiHeader.biCompression = BI_RGB;
-            bitmap_info.bmiHeader.biSizeImage = static_cast<DWORD>(surface.width) * surface.height * 4u;
-            const HDC context = surface.device_context;
-            const auto bitmap = surface.bitmap;
-            ::SelectObject(context, surface.previous_bitmap);
-            auto* destination = static_cast<std::byte*>(locked.pBits);
-            for (int row = surface.height; row-- > 0;) {
-                ::GetDIBits(context, bitmap, static_cast<UINT>(row), 1u, destination, &bitmap_info, DIB_RGB_COLORS);
-                destination += locked.Pitch;
-            }
-            ::SelectObject(context, bitmap);
-        }
-        texture->UnlockRect(0u);
-    }
-
-    std::uint32_t uiBrowserNoiseChannel() {
-        return std::rand() * 255u / RAND_MAX;
-    }
-
-    void uiInitializeBrowserBitmap(SphereUI::BrowserSurface& surface) {
-        const HDC context = surface.device_context;
-        for (int row = 0; row < surface.height; ++row) for (int column = 0; column < surface.width; ++column) {
-            const auto blue = uiBrowserNoiseChannel(), green = uiBrowserNoiseChannel(), red = uiBrowserNoiseChannel();
-            ::SetPixel(context, column, row, RGB(red, green, blue));
-        }
-    }
-
-    HWND uiBrowserDocumentWindow(SphereUI::BrowserSession& session) {
-        if (session.document_window == nullptr) session.document_window = sfera_browser_document_window(session.host_window);
-        const HWND document = session.document_window;
-        if (document != nullptr && session.subclassed == 0u) {
-            const auto previous = reinterpret_cast<WNDPROC>(::SetWindowLongPtrA(document, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&sfera_browser_subclass_proc)));
-            if (previous != nullptr) {
-                g_sfera_browser_window_runtime.original_window_proc = previous;
-                session.subclassed = 1u;
-            }
-        }
-        return document;
-    }
-}
-
-HRESULT SferaBrowserHost::navigate(const char* url) noexcept {
-    if (url == nullptr) return E_INVALIDARG;
-    auto* browser = uiBrowserInterface(object_);
-    if (browser == nullptr) return E_NOINTERFACE;
-    const int length = ::MultiByteToWideChar(CP_ACP, 0u, url, -1, nullptr, 0);
-    VARIANT location{};
-    location.vt = VT_BSTR;
-    location.bstrVal = length > 0 ? ::SysAllocStringLen(nullptr, static_cast<UINT>(length - 1)) : nullptr;
-    HRESULT result = E_OUTOFMEMORY;
-    if (location.bstrVal != nullptr && ::MultiByteToWideChar(CP_ACP, 0u, url, -1, location.bstrVal, length) != 0) result = browser->Navigate2(&location, nullptr, nullptr, nullptr, nullptr);
-    ::VariantClear(&location);
-    browser->Release();
-    return result;
-}
-
-void SferaBrowserHost::location(char* buffer, std::uint32_t capacity) noexcept {
-    if (buffer == nullptr || capacity == 0u) return;
-    buffer[0] = '\0';
-    auto* browser = uiBrowserInterface(object_);
-    if (browser == nullptr) return;
-    BSTR address = nullptr;
-    if (SUCCEEDED(browser->get_LocationURL(&address)) && address != nullptr) ::WideCharToMultiByte(CP_ACP, 0u, address, -1, buffer, static_cast<int>(std::min<std::uint32_t>(capacity, INT_MAX)), nullptr, nullptr);
-    ::SysFreeString(address);
-    browser->Release();
-    buffer[capacity - 1u] = '\0';
-}
-
-SphereUI::BrowserSurface* SphereUI::Runtime::createBrowserSurface(int width, int height) {
-    if (width <= 0 || height <= 0) throw std::invalid_argument("Browser surface dimensions must be positive");
-    auto* surface = static_cast<BrowserSurface*>(allocate(sizeof(BrowserSurface)));
-    if (surface == nullptr) throw std::bad_alloc();
-    *surface = {};
-    surface->width = std::min(width, 1024);
-    surface->height = std::min(height, 1024);
-    surface->texture_size = 32;
-    HDC screen = nullptr;
-    try {
-        while (surface->texture_size < std::max(width, height)) {
-            if (surface->texture_size > INT_MAX / 2) throw std::length_error("Browser texture is too large");
-            surface->texture_size *= 2;
-        }
-        screen = ::GetDC(nullptr);
-        if (screen == nullptr) throw std::runtime_error("Unable to acquire browser screen context");
-        surface->device_context = ::CreateCompatibleDC(screen);
-        if (surface->device_context == nullptr) throw std::runtime_error("Unable to create browser device context");
-        surface->bitmap = ::CreateCompatibleBitmap(screen, surface->width, surface->height);
-        if (surface->bitmap == nullptr) throw std::runtime_error("Unable to create browser bitmap");
-        ::ReleaseDC(nullptr, screen);
-        screen = nullptr;
-        auto* texture = new UnmanagedResourceTexture(*g_sfera_graphics_runtime.d3d_runtime, static_cast<std::uint32_t>(surface->texture_size), static_cast<std::uint32_t>(surface->texture_size), 1u, D3DUSAGE_DYNAMIC, D3DFMT_X8R8G8B8, D3DPOOL_DEFAULT);
-        surface->texture_resource = texture;
-
-        const auto previous = ::SelectObject(surface->device_context, surface->bitmap);
-        if (previous == nullptr || previous == HGDI_ERROR) throw std::runtime_error("Unable to select browser bitmap");
-        surface->previous_bitmap = previous;
-        uiInitializeBrowserBitmap(*surface);
-        uiUploadBrowserSurface(*surface);
-    } catch (...) {
-        if (screen != nullptr) ::ReleaseDC(nullptr, screen);
-        destroyBrowserSurface(surface);
-        throw;
-    }
-    return surface;
-}
-
-void SphereUI::Runtime::destroyBrowserSurface(BrowserSurface* surface) {
-    if (surface == nullptr) return;
-    const HDC context = surface->device_context;
-    if (context != nullptr) {
-        if (surface->previous_bitmap != nullptr) ::SelectObject(context, surface->previous_bitmap);
-        ::DeleteDC(context);
-    }
-    if (surface->bitmap != nullptr) ::DeleteObject(surface->bitmap);
-    if (surface->texture_resource != nullptr) {
-        delete surface->texture_resource;
-
-    }
-    deallocate(surface);
-}
-
-SphereUI::BrowserSession* SphereUI::Runtime::createBrowserSession(const char* url, int width, int height) {
-    auto* session = static_cast<BrowserSession*>(allocate(sizeof(BrowserSession)));
-    if (session == nullptr) throw std::bad_alloc();
-    *session = {};
-    session->url.capacity = 15u;
-    session->width = width;
-    session->height = height;
-    try {
-        const HINSTANCE instance = ::GetModuleHandleA(nullptr);
-        if (!g_sfera_browser_window_runtime.class_registered) {
-            WNDCLASSEXA window_class{};
-            window_class.cbSize = sizeof(window_class);
-            window_class.lpfnWndProc = &sfera_browser_host_window_proc;
-            window_class.hInstance = instance;
-            window_class.lpszClassName = "Browser Example";
-            if (::RegisterClassExA(&window_class) == 0u && ::GetLastError() != ERROR_CLASS_ALREADY_EXISTS) throw std::runtime_error("Unable to register browser window class");
-            g_sfera_browser_window_runtime.class_registered = true;
-        }
-        session->host_window = ::CreateWindowExA(0u, "Browser Example", "", WS_CHILD, 0, 0, width, height, g_sfera_window_runtime.main_window_handle, nullptr, instance, nullptr);
-        if (session->host_window == nullptr) throw std::runtime_error("Unable to create browser host window");
-        browserNavigate(*session, url == nullptr ? "" : url);
-    } catch (...) {
-        destroyBrowserSession(session);
-        throw;
-    }
-    return session;
-}
-
-void SphereUI::Runtime::destroyBrowserSession(BrowserSession* session) {
-    if (session == nullptr) return;
-    focusMainWindow();
-    if (session->host_window != nullptr) ::DestroyWindow(session->host_window);
-    session->url.release();
-    deallocate(session);
-}
-
-void SphereUI::Runtime::browserNavigate(BrowserSession& session, const char* url) {
-    if (url == nullptr) return;
-    session.url.assign(url);
-    if (auto* host = uiBrowserHost(session)) host->navigate(session.url.data());
-}
-
-void SphereUI::Runtime::browserRefresh(BrowserSession& session) {
-    sfera_browser_refresh(session.host_window);
-}
-
-void SphereUI::Runtime::browserLocation(BrowserSession& session, char* buffer, std::uint32_t capacity) {
-    if (buffer == nullptr || capacity == 0u) return;
-    buffer[0] = '\0';
-    if (auto* host = uiBrowserHost(session)) host->location(buffer, capacity);
-    buffer[capacity - 1u] = '\0';
-}
-
-void SphereUI::Runtime::browserMouse(BrowserSession& session, std::uint32_t message, int x, int y, int wheel) {
-    WPARAM buttons = 0u;
-    switch (message) {
-        case WM_MOUSEMOVE:
-            if (session.mouse_x == x && session.mouse_y == y) return;
-            break;
-        case WM_LBUTTONDOWN:
-            session.buttons |= MK_LBUTTON;
-            buttons = session.buttons;
-            break;
-        case WM_LBUTTONUP:
-            session.buttons &= ~static_cast<std::uint32_t>(MK_LBUTTON);
-            buttons = session.buttons;
-            break;
-        case WM_MOUSEWHEEL:
-            buttons = MAKEWPARAM(0, static_cast<std::uint32_t>(wheel) * WHEEL_DELTA);
-            break;
-        default:
-            return;
-    }
-    session.mouse_x = x;
-    session.mouse_y = y;
-    POINT position{x, y};
-    if (message == WM_MOUSEWHEEL) ::ClientToScreen(g_sfera_window_runtime.main_window_handle, &position);
-    const HWND document = uiBrowserDocumentWindow(session);
-    if (document == nullptr) return;
-    const LPARAM coordinates = MAKELPARAM(position.x, position.y);
-    if (g_sfera_browser_window_runtime.original_window_proc != nullptr) ::CallWindowProcA(g_sfera_browser_window_runtime.original_window_proc, document, message, buttons, coordinates);
-    else ::SendMessageA(document, message, buttons, coordinates);
-}
-
-void SphereUI::Runtime::browserPaint(BrowserSession& session, BrowserSurface& surface) {
-    sfera_browser_draw(session.host_window, surface.device_context, session.width, session.height);
-    uiUploadBrowserSurface(surface);
-}
-
-void SphereUI::Runtime::focusMainWindow() {
-    ::SetFocus(g_sfera_window_runtime.main_window_handle);
 }
 
 namespace {
@@ -1901,13 +1579,13 @@ namespace {
         auto& saved_sound = g_sfera_options_dialog_runtime.audio_settings;
         auto& values = g_sfera_graphics_options_runtime.graphics_values;
         if (show) {
-            saved_music = SI_GetStreamVolume();
+            saved_music = g_sfera_sound_runtime.musicVolume();
             saved_sound = soundVolume();
             optionMessage(window, 7u, UiMessage::setScrollRange, 0u, 100u);
             optionMessage(window, 8u, UiMessage::setScrollRange, 0u, 100u);
             optionMessage(window, 7u, UiMessage::setScrollValue, saved_music);
             optionMessage(window, 8u, UiMessage::setScrollValue, saved_sound);
-            values[7] = SI_GetHardwareMixing();
+            values[7] = g_sfera_sound_runtime.hardwareMixing();
             values[12] = values[7];
             optionLabel(window, 9u, values[12] != 0u ? "UISTR_WT_OPT34" : "UISTR_WT_OPT33");
             return;
@@ -1915,7 +1593,7 @@ namespace {
         setMusicVolume(saved_music);
         setSoundVolume(saved_sound);
         setOptionsVisible(true);
-        SI_SetHardwareMixing(values[7] != 0u);
+        g_sfera_sound_runtime.setHardwareMixing(values[7] != 0u);
         InterfaceConfiguration::open("config.cfg");
         InterfaceConfiguration::writeInteger("SNDVOL", saved_sound);
         InterfaceConfiguration::writeInteger("MUSVOL", saved_music);
@@ -5811,145 +5489,6 @@ void SphereUI::CMenuListControl::destroy(bool free_storage) {
     Window::destroy(free_storage);
 }
 
-void SphereUI::CWebBrowserControl::initialize() {
-    Window::initialize();
-    url = {};
-    url.capacity = 15u;
-    surface = nullptr;
-    browser = nullptr;
-    mouse_pressed = false;
-
-    hidden = false;
-    control_kind = UiControlKind::webBrowser;
-}
-
-void SphereUI::CWebBrowserControl::copyBrowserState(const CWebBrowserControl& source) {
-    if (this == &source) return;
-    BrowserSurface* new_surface = nullptr;
-    BrowserSession* new_browser = nullptr;
-    try {
-        if (const auto* image = source.surface) {
-            new_surface = Runtime::createBrowserSurface(image->width, image->height);
-            if (new_surface == nullptr) throw std::bad_alloc();
-        }
-        if (const auto* session = source.browser) {
-            new_browser = Runtime::createBrowserSession(session->url.data(), session->width, session->height);
-            if (new_browser == nullptr) throw std::bad_alloc();
-        }
-        url.assign(source.url.data());
-    } catch (...) {
-        Runtime::destroyBrowserSurface(new_surface);
-        Runtime::destroyBrowserSession(new_browser);
-        throw;
-    }
-    Runtime::destroyBrowserSurface(surface);
-    Runtime::destroyBrowserSession(browser);
-    surface = new_surface;
-    browser = new_browser;
-    mouse_pressed = false;
-}
-
-bool SphereUI::CWebBrowserControl::loadUi(const char*, SferaSimpleParser& parser, const SferaParserRange& range) {
-    UiReader reader(parser, range);
-    if (const auto* value = reader.string("URL", true)) url.assign(value);
-    return true;
-}
-
-SphereUI::Window* SphereUI::CWebBrowserControl::clone() {
-    return cloneControl(*this, [](auto& destination, const auto& source) {
-        destination.copyBrowserState(source);
-    });
-}
-
-bool SphereUI::CWebBrowserControl::open(const char* address) {
-    if (width <= 0 || height <= 0) return true;
-    if (address != nullptr) url.assign(address);
-    if (surface == nullptr) surface = Runtime::createBrowserSurface(width, height);
-    if (browser == nullptr) browser = Runtime::createBrowserSession(url.data(), width, height);
-    return true;
-}
-
-bool SphereUI::CWebBrowserControl::navigate(const char* address) {
-    if (auto* session = browser; session != nullptr && address != nullptr) {
-        url.assign(address);
-        Runtime::browserNavigate(*session, url.data());
-    }
-    return true;
-}
-
-bool SphereUI::CWebBrowserControl::updateBrowser() {
-    auto* image = surface;
-    auto* session = browser;
-    if (image == nullptr || session == nullptr) return true;
-    const auto position = CCursorManager::instance().position();
-    if (containsPoint(position.x, position.y)) {
-        const auto bounds = windowBounds(*this);
-        Runtime::browserMouse(*session, WM_MOUSEMOVE, position.x - bounds.left, position.y - bounds.top);
-    }
-    Runtime::browserPaint(*session, *image);
-    return true;
-}
-
-std::uint32_t SphereUI::CWebBrowserControl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
-    switch (message) {
-        case UiMessage::openBrowser:
-            return open(reinterpret_cast<const char*>(first));
-        case UiMessage::updateBrowser:
-            return updateBrowser();
-        case UiMessage::navigateBrowser:
-            return navigate(reinterpret_cast<const char*>(first));
-        case UiMessage::refreshBrowser:
-            if (auto* session = browser) Runtime::browserRefresh(*session);
-            return 1u;
-        case UiMessage::getBrowserLocation:
-            if (auto* session = browser) Runtime::browserLocation(*session, reinterpret_cast<char*>(first), second);
-            return 1u;
-        default:
-            return Window::handleMessage(message, first, second);
-    }
-}
-
-void SphereUI::CWebBrowserControl::draw() {
-    if (hidden) return;
-    const auto* image = surface;
-    if (image == nullptr || image->texture_size <= 0 || image->texture_resource == 0u) return;
-    const auto bounds = windowBounds(*this);
-    const auto* resource = image->texture_resource;
-    InterfaceRenderer::drawTexture(resource->native_texture, static_cast<float>(bounds.left), static_cast<float>(bounds.top), static_cast<float>(bounds.left + image->width), static_cast<float>(bounds.top + image->height), SferaColor::rgba(255u, 255u, 255u, alpha).argb(), static_cast<float>(image->width) / image->texture_size, static_cast<float>(image->height) / image->texture_size);
-}
-
-void SphereUI::CWebBrowserControl::handleInput(const WindowInput& input) {
-    auto* session = browser;
-    if (session == nullptr) return;
-    if (!containsPoint(input.mouse_x, input.mouse_y)) {
-        if ((input.mouse_flags & MouseInput::leftPress) != 0u) {
-            input_enabled = false;
-            Runtime::focusMainWindow();
-        }
-        return;
-    }
-    const auto bounds = windowBounds(*this);
-    const auto local_x = input.mouse_x - bounds.left, local_y = input.mouse_y - bounds.top;
-    if ((input.mouse_flags & MouseInput::leftPress) != 0u && !mouse_pressed) {
-        mouse_pressed = input_enabled = true;
-        Runtime::browserMouse(*session, WM_LBUTTONDOWN, local_x, local_y);
-    } else if ((input.mouse_flags & MouseInput::leftRelease) != 0u && mouse_pressed) {
-        mouse_pressed = false;
-        Runtime::browserMouse(*session, WM_LBUTTONUP, local_x, local_y);
-    }
-    if (input.wheel_delta != 0) Runtime::browserMouse(*session, WM_MOUSEWHEEL, local_x, local_y, input.wheel_delta);
-}
-
-void SphereUI::CWebBrowserControl::destroy(bool free_storage) {
-    Runtime::destroyBrowserSurface(surface);
-    Runtime::destroyBrowserSession(browser);
-    surface = nullptr;
-    browser = nullptr;
-    mouse_pressed = false;
-    url.release();
-    Window::destroy(free_storage);
-}
-
 void SphereUI::SlotCtrl::initialize() {
     Window::initialize();
     full_sprite = {};
@@ -7829,8 +7368,6 @@ SphereUI::Window* SphereUI::Runtime::makeControl(SphereUI::UiControlKind kind) {
             return createInitialized<RichEditCtrl>();
         case UiControlKind::filteredList:
             return createInitialized<FilterListCtrl>();
-        case UiControlKind::webBrowser:
-            return createInitialized<CWebBrowserControl>();
         case UiControlKind::minimap:
             return createInitialized<CMinimapControl>();
         case UiControlKind::menu:
