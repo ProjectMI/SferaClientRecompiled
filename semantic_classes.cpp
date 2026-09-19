@@ -1,22 +1,10 @@
 #include "semantic_classes.h"
 #include "zlib.h"
 #include "semantic_static.h"
-#include "native_callbacks.h"
-#include <tlhelp32.h>
 #include <commctrl.h>
 #include <dinput.h>
-#include <dbghelp.h>
 #include <objbase.h>
-#include <direct.h>
-#include <process.h>
-#include <shellapi.h>
 
-#ifdef Process32First
-#undef Process32First
-#endif
-#ifdef Process32Next
-#undef Process32Next
-#endif
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -75,6 +63,18 @@ namespace {
         if (elementBits == 0u || encodedCount <= remainingBits / elementBits) return encodedCount;
         const auto compactCount = encodedCount & 0x3Fu;
         return compactCount <= remainingBits / elementBits ? compactCount : encodedCount;
+    }
+
+    void dispatch_application_messages() {
+        MSG message{};
+        while (::PeekMessageA(&message, nullptr, 0, 0, PM_REMOVE)) {
+            if (message.message == WM_QUIT) {
+                g_sfera_render_lookup_runtime.quit_requested = true;
+                return;
+            }
+            ::TranslateMessage(&message);
+            ::DispatchMessageA(&message);
+        }
     }
 
     HWND main_window_handle() { return g_sfera_window_runtime.main_window_handle; }
@@ -1093,7 +1093,7 @@ bool CScriptedEffect::loadScript(const char* filename) {
     if (parser.findValue("effect_timelimit", &effect_range)) cycle_length = parser.readInt(0u);
     if (parser.findValue("updvisible_only", &effect_range)) {
         update_visible_only = parser.readBool(0u) ? 1u : 0u;
-        if (!update_visible_only) g_sfera_effect_manager.reportError("SphereReport::Assertion failed -> File ..\\ShareClientSeverCode\\EffectManager.cpp, Line 2445");
+        if (!update_visible_only) g_sfera_effect_manager.reportError("Effect manager assertion failed");
     }
     if (parser.findValue("boundbox", &effect_range)) {
         float bounds[6]{};
@@ -2048,7 +2048,6 @@ std::int32_t CItemListCommonItem::initialize(std::int32_t minimum, std::int32_t,
     item_count = 0u;
     list_mode = mode;
     item_parameter = parameter;
-    diagnostics_mode = 0u;
     std::memset(name, 0, sizeof(name));
     if (list_name != nullptr) std::memcpy(name, list_name, std::min<std::size_t>(std::strlen(list_name), sizeof(name) - 1u));
     item_index.clear();
@@ -2062,7 +2061,6 @@ std::int32_t CBaseManagerCommonItem::initialize(std::int32_t minimum, std::int32
     item_count = 0u;
     list_mode = mode;
     item_parameter = parameter;
-    diagnostics_mode = 0u;
     std::memset(name, 0, sizeof(name));
     if (list_name != nullptr) std::memcpy(name, list_name, std::min<std::size_t>(std::strlen(list_name), sizeof(name) - 1u));
     item_index.clear();
@@ -2322,39 +2320,33 @@ void CSoftwareCursor::setCursorKind(std::uint32_t new_kind) {
 }
 namespace SphereUI::Memory {
 struct alignas(std::max_align_t) AllocationHeader {
-    static constexpr std::array<std::uint8_t, 4> guardPattern{100, 200, 204, 97};
-    std::array<std::uint8_t, alignof(std::max_align_t)> guard;
-    bool prefixIntact() const { for (std::size_t index = 0; index < guard.size(); ++index) if (guard[index] != guardPattern[index % guardPattern.size()]) return false; return true; }
-    std::span<std::byte> payloadWithFooter(std::size_t size) { return {reinterpret_cast<std::byte*>(this + 1), size + guardPattern.size()}; }
-    void initializeGuards(std::size_t size) {
-        for (std::size_t index = 0; index < guard.size(); ++index) guard[index] = guardPattern[index % guardPattern.size()];
-        const auto footer = payloadWithFooter(size).last(guardPattern.size());
-        std::memcpy(footer.data(), guardPattern.data(), guardPattern.size());
-    }
+    std::size_t size = 0u;
 };
 }
 
 void* StdAllocator::allocate(std::size_t size, std::uint32_t) {
     using Header = SphereUI::Memory::AllocationHeader;
-    constexpr auto overhead = sizeof(Header) + Header::guardPattern.size();
-    if (size == 0u || size > std::numeric_limits<std::size_t>::max() - overhead) return nullptr;
-    auto* allocation = static_cast<Header*>(std::malloc(size + overhead));
+    if (size == 0u || size > std::numeric_limits<std::size_t>::max() - sizeof(Header)) return nullptr;
+    auto* allocation = static_cast<Header*>(std::malloc(sizeof(Header) + size));
     if (allocation == nullptr) return nullptr;
-    allocation->initializeGuards(size);
+    allocation->size = size;
     return allocation + 1;
 }
 void* StdAllocator::reallocate(void* memory, std::size_t size, std::uint32_t flags) {
     if (memory == nullptr) return allocate(size, flags);
     if (size == 0u) { deallocate(memory); return nullptr; }
     using Header = SphereUI::Memory::AllocationHeader;
-    constexpr auto overhead = sizeof(Header) + Header::guardPattern.size();
-    if (size > std::numeric_limits<std::size_t>::max() - overhead) return nullptr;
-    auto* allocation = static_cast<Header*>(std::realloc(static_cast<Header*>(memory) - 1, size + overhead));
+    if (size > std::numeric_limits<std::size_t>::max() - sizeof(Header)) return nullptr;
+    auto* allocation = static_cast<Header*>(std::realloc(static_cast<Header*>(memory) - 1, sizeof(Header) + size));
     if (allocation == nullptr) return nullptr;
-    allocation->initializeGuards(size);
+    allocation->size = size;
     return allocation + 1;
 }
-void StdAllocator::deallocate(void* memory) { if (memory == nullptr) return; g_sfera_interface.unbindEventHandler(memory); std::free(static_cast<SphereUI::Memory::AllocationHeader*>(memory) - 1); }
+void StdAllocator::deallocate(void* memory) {
+    if (memory == nullptr) return;
+    g_sfera_interface.unbindEventHandler(memory);
+    std::free(static_cast<SphereUI::Memory::AllocationHeader*>(memory) - 1);
+}
 
 namespace {
 std::uint32_t effect_flag(const char* token) {
@@ -3604,30 +3596,30 @@ bool SferaFileMap::isOpen() const noexcept {
     return mapped_view != nullptr;
 }
 
-void SferaFileMap::reportError(const char* format, bool fatal) const noexcept {
+void SferaFileMap::reportError(const char* format) const noexcept {
     char message[160];
     std::snprintf(message, sizeof(message), format, filename);
     std::fprintf(stderr, "%s\n", message);
     ::OutputDebugStringA(message);
-    if (fatal) {
-        sfera_client_critical_error(message, 1u);
-        ::TerminateProcess(::GetCurrentProcess(), 0u);
-    }
 }
 
 std::size_t SferaFileMap::size() const noexcept {
     if (isOpen()) return file_size;
-    reportError(filename[0] == '\0' ? "FileMap::size: file is not opened" : "FileMap::size: open file %s error", false);
+    reportError(filename[0] == '\0' ? "FileMap::size: file is not opened" : "FileMap::size: open file %s error");
     return 0u;
 }
 
 const std::byte* SferaFileMap::data() const noexcept {
-    if (!isOpen()) reportError(filename[0] == '\0' ? "FileMap::get_ptr: file is not opened" : "FileMap::get_ptr: open file %s error", true);
+    if (!isOpen()) {
+        reportError(filename[0] == '\0' ? "FileMap::get_ptr: file is not opened" : "FileMap::get_ptr: open file %s error");
+        ::TerminateProcess(::GetCurrentProcess(), 0u);
+        return nullptr;
+    }
     return mapped_view;
 }
 
 void SferaFileMap::close() noexcept {
-    if (mapped_view && !::UnmapViewOfFile(mapped_view)) reportError("Error unmapping file %s", false);
+    if (mapped_view && !::UnmapViewOfFile(mapped_view)) reportError("Error unmapping file %s");
     mapped_view = nullptr;
     file_size = 0u;
     filename[0] = '\0';
@@ -7092,25 +7084,11 @@ void SphereRender::ModelRepository::evictUnused(std::chrono::steady_clock::time_
 void SphereRender::ModelRepository::clear() {
     entries.clear();
     names.clear();
-    request_counts.clear();
     parameters.clear();
     requests_since_scan = 0u;
     scan_index = 0u;
 }
 
-void SphereRender::ModelRepository::recordRequest(std::string_view name) {
-    ++request_counts[std::string(name)];
-}
-
-void SphereRender::ModelRepository::writeRequestStatistics() const {
-    if (request_counts.empty()) return;
-    auto& log = g_sfera_log_runtime.files[0];
-    std::FILE* output = log.open();
-    if (output == nullptr) return;
-    for (const auto& [name, count] : request_counts) std::fprintf(output, "%s\t%zu\n", name.c_str(), count);
-    std::fclose(output);
-    log.has_written = true;
-}
 
 namespace {
     struct SferaD3D9TextureLoadResult {
@@ -7435,12 +7413,7 @@ void CShaderMgr::setPixelShader(std::uint32_t group) {
     }
 
     std::pair<bool, std::array<std::uint8_t, 8>> code{true, {static_cast<std::uint8_t>(group)}};
-    if (group == 0u) {
-        code.second[1] = g_sfera_alpha_material_runtime.option_c;
-        code.second[2] = g_sfera_alpha_material_runtime.option_a;
-        code.second[3] = g_sfera_alpha_material_runtime.selected_slot != -1;
-        code.second[4] = g_sfera_alpha_material_runtime.option_b;
-    }
+    if (group == 0u) code.second[3] = 1u;
 
     Variant& variant = loadVariant(code);
     device.checkResult(device.native_device->SetPixelShader(variant.pixel_shader), "SetPixelShader");
@@ -7451,7 +7424,7 @@ void CShaderMgr::setPixelShader(std::uint32_t group) {
             static_cast<UINT>(shader_register), data, 1u), "SetPixelShaderConstantF");
     };
 
-    if (group == 3u) set_float(variant.alpha_register, g_sfera_alpha_material_runtime.alpha[0]);
+    if (group == 3u) set_float(variant.alpha_register, 0.0f);
     if (group == 6u && variant.down_filter_register >= 0) {
         device.checkResult(device.native_device->SetPixelShaderConstantF(
             static_cast<UINT>(variant.down_filter_register), reinterpret_cast<const float*>(downsample_offsets.data()),
@@ -7935,25 +7908,18 @@ void SferaLightRuntime::disableActiveLights() {
     for (std::uint32_t index = 1; index < active_lights.size(); ++index) setActive(index, false, __LINE__);
 }
 
-std::FILE* SferaLogFileRuntime::open() const {
-    std::FILE* file = nullptr;
-    const bool named = path.text[0] != '\0';
-    const char* mode = named && truncate_on_first_write && !has_written ? "wt" : "at";
-#if defined(_MSC_VER)
-    if (fopen_s(&file, named ? path.text : "ErrorTest.log", mode) != 0) return nullptr;
-#else
-    file = std::fopen(named ? path.text : "ErrorTest.log", mode);
-#endif
-    return file;
-}
-
 void SferaLogFileRuntime::write(const char* text) {
-    if (std::FILE* file = open()) {
-        std::fputs(text, file);
-        std::fflush(file);
-        std::fclose(file);
-        has_written = true;
-    }
+    if (path.text[0] == '\0' || text == nullptr) return;
+    std::FILE* file = nullptr;
+#if defined(_MSC_VER)
+    if (fopen_s(&file, path.text, "at") != 0 || file == nullptr) return;
+#else
+    file = std::fopen(path.text, "at");
+    if (file == nullptr) return;
+#endif
+    std::fputs(text, file);
+    std::fflush(file);
+    std::fclose(file);
 }
 
 void SferaLogFileRuntime::write(std::int32_t number) {
@@ -7981,10 +7947,6 @@ void SferaGraphicsRuntime::initialize() {
         device.post_effects->setEnabled(true);
     }
     g_sfera_textures.initialize();
-    g_sfera_files.setErrorReporting(false);
-    const bool debug_assets = g_sfera_files.fileSize("__debug.mbc") != -1;
-    g_sfera_files.setErrorReporting(true);
-    if (debug_assets) g_sfera_textures.addFolder("debug\\pics\\");
     g_sfera_textures.addFolder("landscape\\");
     if (g_sfera_client_config_runtime.high_resolution_assets) g_sfera_textures.addFolder("landscape_hr\\");
     if (g_sfera_client_config_runtime.alternate_ph_assets) g_sfera_textures.addFolder("landscape_ph\\");
@@ -8024,298 +7986,30 @@ void SferaGraphicsRuntime::initialize() {
     device.shaders = std::make_unique<CShaderMgr>(device, "Shaders\\Vertex\\", "Shaders\\Pixel\\");
 }
 
-namespace SphereUI::Memory {
-    struct AllocationRecord {
-        std::size_t hash_next;
-        AllocationHeader* allocation;
-
-        std::size_t size;
-        std::size_t newer;
-        std::size_t older;
-        unsigned int source_line;
-        std::size_t source_index;
-    };
-
-    struct AllocationSource {
-        const char* source_name;
-
-        std::size_t next;
-    };
-}
-
-namespace {
-    using UiAllocationHeader = SphereUI::Memory::AllocationHeader;
-    using UiAllocationRecord = SphereUI::Memory::AllocationRecord;
-    using UiAllocationSource = SphereUI::Memory::AllocationSource;
-    constexpr auto uiAllocationGuard = UiAllocationHeader::guardPattern;
-    constexpr auto uiAllocationListEnd = std::numeric_limits<std::size_t>::max();
-    constexpr std::size_t uiAllocationHashEnd = std::numeric_limits<std::size_t>::max();
-    constexpr std::size_t uiAllocationSourceEnd = std::numeric_limits<std::size_t>::max();
-    constexpr unsigned uiAllocationHashShift = 9u;
-    constexpr unsigned uiAllocationSourceHashShift = 4u;
-    class UiMemoryLock {
-        CRITICAL_SECTION& lock = g_sfera_memory_runtime.critical_section;
-    public:
-        UiMemoryLock() {
-            if (!g_sfera_memory_runtime.lock_initialized) {
-                ::InitializeCriticalSection(&lock);
-                g_sfera_memory_runtime.lock_initialized = true;
-            }
-            ::EnterCriticalSection(&lock);
-            g_sfera_memory_runtime.lock_held = true;
-        }
-
-        ~UiMemoryLock() {
-            g_sfera_memory_runtime.lock_held = false;
-            ::LeaveCriticalSection(&lock);
-        }
-
-        UiMemoryLock(const UiMemoryLock&) = delete;
-        UiMemoryLock& operator=(const UiMemoryLock&) = delete;
-    };
-
-}
-
-void SferaAllocationHashRuntime::grow() {
-    auto& hash = *this;
-    const auto previous = hash.capacity;
-    const auto count = previous == 0u ? 5000u : previous + std::max(previous / 3u, std::size_t{50});
-    if (count <= previous || count >= uiAllocationListEnd || count > std::numeric_limits<std::size_t>::max() / sizeof(UiAllocationRecord)) throw std::bad_alloc();
-    auto* records = static_cast<UiAllocationRecord*>(std::realloc(hash.allocation_records, count * sizeof(UiAllocationRecord)));
-    if (records == nullptr) throw std::bad_alloc();
-    for (auto index = previous; index < count; ++index) records[index].hash_next = index + 1u == count ? uiAllocationHashEnd : index + 1u;
-    hash.allocation_records = records;
-    hash.capacity = count;
-    hash.free_index = previous;
-    if (previous == 0u) std::fill(std::begin(hash.bucket_heads), std::end(hash.bucket_heads), uiAllocationHashEnd);
-}
-
-void SferaMemorySourceHashRuntime::grow() {
-    auto& hash = *this;
-    const auto previous = hash.capacity;
-    const auto count = previous == 0u ? 50u : previous + std::max(previous / 3u, std::size_t{50});
-    if (count <= previous || count > std::numeric_limits<std::size_t>::max() / sizeof(UiAllocationSource)) throw std::bad_alloc();
-    auto* sources = static_cast<UiAllocationSource*>(std::realloc(hash.source_entries, count * sizeof(UiAllocationSource)));
-    if (sources == nullptr) throw std::bad_alloc();
-    for (auto index = previous; index < count; ++index) sources[index] = {nullptr, index + 1u == count ? uiAllocationSourceEnd : index + 1u};
-    hash.source_entries = sources;
-    hash.capacity = count;
-    hash.free_index = previous;
-    if (previous == 0u) std::fill(std::begin(hash.bucket_heads), std::end(hash.bucket_heads), uiAllocationSourceEnd);
-}
-
-std::size_t SferaMemorySourceHashRuntime::findOrInsert(const char* name) {
-    auto& hash = *this;
-    if (hash.capacity == 0u) grow();
-    auto* sources = hash.source_entries;
-    const auto address_hash = std::hash<const char*>{}(name) >> uiAllocationSourceHashShift;
-    auto& bucket = hash.bucket_heads[address_hash & (std::size(hash.bucket_heads) - 1u)];
-    for (auto index = bucket; index != uiAllocationSourceEnd; index = sources[index].next) {
-        if (sources[index].source_name == name) return index;
-    }
-    if (hash.free_index == uiAllocationSourceEnd) {
-        grow();
-        sources = hash.source_entries;
-    }
-    const auto index = hash.free_index;
-    hash.free_index = sources[index].next;
-    sources[index].source_name = name;
-    sources[index].next = bucket;
-    bucket = index;
-    return index;
-}
-
-void WorldMemory::validateAllocation(const UiAllocationRecord& record, const char* source, unsigned int line) {
-    auto& allocation = *record.allocation;
-    auto footer = allocation.payloadWithFooter(record.size).last(sizeof(uiAllocationGuard));
-    std::array<std::uint8_t, UiAllocationHeader::guardPattern.size()> last{};
-    std::memcpy(last.data(), footer.data(), last.size());
-    const bool underflow = !allocation.prefixIntact();
-    const bool overflow = last != uiAllocationGuard;
-    if (!underflow && !overflow) return;
-    allocation.initializeGuards(record.size);
-    g_sfera_memory_runtime.diagnostics_dirty = true;
-    const auto& sources = g_sfera_memory_source_hash_runtime;
-    const auto* allocatedAt = record.source_index < sources.capacity ? sources.source_entries[record.source_index].source_name : nullptr;
-    auto& context = g_sfera_critical_diagnostics_runtime.allocation_context;
-    if (allocatedAt == nullptr || *allocatedAt == '\0') std::snprintf(context, sizeof(context), "alloced: <Source info is corrupted>");
-    else std::snprintf(context, sizeof(context), "alloced: %s %u", SferaStringLookupRuntime::fileName(allocatedAt), record.source_line);
-    auto& log = g_sfera_log_memory_object;
-    for (unsigned boundary = 0u; boundary != 2u; ++boundary) {
-        if (boundary == 0u ? !underflow : !overflow) continue;
-        const char* damage = boundary == 0u ? " (underflow). " : " (overflow). ";
-        ::OutputDebugStringA(boundary == 0u ? "UI allocation underflow\n" : "UI allocation overflow\n");
-        log.append("test_ptr0: MEM CORRUPTED! ").append(damage).append(context).append(". ").append(SferaStringLookupRuntime::fileName(source)).append(" ").append(static_cast<std::int32_t>(line)).append("\n");
-        log.flush();
-    }
-}
-
-void WorldMemory::validateRecent(const char* source, unsigned int line) {
-    auto* records = g_sfera_allocation_hash_runtime.allocation_records;
-    auto& state = g_sfera_memory_runtime;
-    auto recent = state.tracker_primary;
-    for (unsigned index = 0u; index < 5u && recent != uiAllocationListEnd; ++index) {
-        validateAllocation(records[recent], source, line);
-        recent = records[recent].older;
-    }
-    for (unsigned index = 0u; index < 5u; ++index) {
-        if (state.tracker_floor == uiAllocationListEnd || state.validation_pass_count >= 1000u) {
-            state.tracker_floor = state.tracker_primary;
-            state.validation_pass_count = 0u;
-        }
-        if (state.tracker_floor == uiAllocationListEnd) break;
-        validateAllocation(records[state.tracker_floor], source, line);
-        state.tracker_floor = records[state.tracker_floor].older;
-        ++state.validation_pass_count;
-    }
-    for (unsigned index = 0u; index < 10u; ++index) {
-        if (state.tracker_ceiling == uiAllocationListEnd) state.tracker_ceiling = state.tracker_primary;
-        if (state.tracker_ceiling == uiAllocationListEnd) break;
-        validateAllocation(records[state.tracker_ceiling], source, line);
-        state.tracker_ceiling = records[state.tracker_ceiling].older;
-    }
-    if (state.diagnostics_dirty) {
-        auto remaining = state.tracker_primary;
-        for (std::size_t index = 0u; index < state.live_allocation_count && remaining != uiAllocationListEnd; ++index) {
-            validateAllocation(records[remaining], source, line);
-            remaining = records[remaining].older;
-        }
-        state.diagnostics_dirty = false;
-        WorldDiagnostics::fail("Memory corruption!");
-    }
-}
-
-void WorldMemory::resetSource() {
-    g_sfera_memory_runtime.allocation_source_name = "Unknown";
-    g_sfera_memory_runtime.allocation_source_line = 0u;
-}
-
-void WorldMemory::registerAllocation(SphereUI::Memory::AllocationHeader* allocation, std::size_t size, std::size_t source, unsigned int line) {
-    auto& hash = g_sfera_allocation_hash_runtime;
-    auto& state = g_sfera_memory_runtime;
-    auto* records = hash.allocation_records;
-    const auto index = hash.free_index;
-    auto& record = records[index];
-    const auto address_hash = std::hash<UiAllocationHeader*>{}(allocation) >> uiAllocationHashShift;
-    auto& bucket = hash.bucket_heads[address_hash & (std::size(hash.bucket_heads) - 1u)];
-    hash.free_index = record.hash_next;
-    record = {bucket, allocation, size, uiAllocationListEnd, state.tracker_primary, line, source};
-    bucket = index;
-    if (state.tracker_primary != uiAllocationListEnd) records[state.tracker_primary].newer = index;
-    else state.tracker_auxiliary = index;
-    state.tracker_primary = index;
-    state.bucket_bytes[source & (std::size(state.bucket_bytes) - 1u)] += size;
-    ++state.bucket_allocations[source & (std::size(state.bucket_allocations) - 1u)];
-    ++state.live_allocation_count;
-}
-
-void WorldMemory::unregisterAllocation(std::size_t index, std::size_t& hashLink) {
-    auto& hash = g_sfera_allocation_hash_runtime;
-    auto& state = g_sfera_memory_runtime;
-    auto* records = hash.allocation_records;
-    auto& record = records[index];
-    hashLink = record.hash_next;
-    record.hash_next = hash.free_index;
-    hash.free_index = index;
-    if (state.tracker_floor == index) state.tracker_floor = record.older;
-    if (state.tracker_ceiling == index) state.tracker_ceiling = record.older;
-    if (record.newer != uiAllocationListEnd) records[record.newer].older = record.older;
-    else state.tracker_primary = record.older;
-    if (record.older != uiAllocationListEnd) records[record.older].newer = record.newer;
-    else state.tracker_auxiliary = record.newer;
-    state.bucket_bytes[record.source_index & (std::size(state.bucket_bytes) - 1u)] -= record.size;
-    --state.bucket_allocations[record.source_index & (std::size(state.bucket_allocations) - 1u)];
-    --state.live_allocation_count;
-}
-
-void* WorldMemory::allocate(std::size_t size, const char* source, unsigned int line, bool zeroed) {
-    if (size > std::numeric_limits<std::size_t>::max() - sizeof(UiAllocationHeader) - sizeof(uiAllocationGuard)) throw std::bad_alloc();
-    UiMemoryLock lock;
-    auto& hash = g_sfera_allocation_hash_runtime;
-    auto& state = g_sfera_memory_runtime;
-    if (hash.capacity == 0u || hash.free_index == uiAllocationHashEnd) g_sfera_allocation_hash_runtime.grow();
-    const auto source_index = g_sfera_memory_source_hash_runtime.findOrInsert(source == nullptr ? state.allocation_source_name : source);
-    const auto source_line = source == nullptr ? state.allocation_source_line : line;
-    if (state.tracking_initialized) validateRecent(source == nullptr ? state.allocation_source_name : source, source == nullptr ? state.allocation_source_line : line);
-    state.tracking_initialized = true;
-    const auto bytes = size + sizeof(UiAllocationHeader) + sizeof(uiAllocationGuard);
-    auto* allocation = static_cast<UiAllocationHeader*>(zeroed ? std::calloc(bytes, 1u) : std::malloc(bytes));
+void* WorldMemory::allocate(std::size_t size, bool zeroed) {
+    using Header = SphereUI::Memory::AllocationHeader;
+    if (size == 0u || size > std::numeric_limits<std::size_t>::max() - sizeof(Header)) throw std::bad_alloc();
+    const auto bytes = sizeof(Header) + size;
+    auto* allocation = static_cast<Header*>(zeroed ? std::calloc(bytes, 1u) : std::malloc(bytes));
     if (allocation == nullptr) throw std::bad_alloc();
-    allocation->initializeGuards(size);
-    registerAllocation(allocation, size, source_index, source_line);
-    resetSource();
+    allocation->size = size;
     return allocation + 1;
 }
 
-void* WorldMemory::reallocate(void* memory, std::size_t size, const char* source, unsigned int line) {
-    if (memory == nullptr) return allocate(size, source, line, false);
-    if (size == 0 || size > std::numeric_limits<std::size_t>::max() - sizeof(UiAllocationHeader) - sizeof(uiAllocationGuard)) throw std::bad_alloc();
-    UiMemoryLock lock;
-    auto& hash = g_sfera_allocation_hash_runtime;
-    auto& state = g_sfera_memory_runtime;
-    auto* allocation = static_cast<UiAllocationHeader*>(memory) - 1;
-    if (!state.tracking_initialized) throw std::logic_error("UI allocator is not initialized");
-    auto* link = hash.findLink(allocation);
-    if (*link == uiAllocationHashEnd) throw std::logic_error("UI realloc of unregistered memory");
-    const auto index = *link;
-    const auto source_index = g_sfera_memory_source_hash_runtime.findOrInsert(source == nullptr ? state.allocation_source_name : source);
-    const auto source_line = source == nullptr ? state.allocation_source_line : line;
-    validateRecent(source == nullptr ? state.allocation_source_name : source, source == nullptr ? state.allocation_source_line : line);
-    validateAllocation(hash.allocation_records[index], source == nullptr ? state.allocation_source_name : source, source == nullptr ? state.allocation_source_line : line);
-    if (state.diagnostics_dirty) validateRecent(source, line);
-    auto* resized = static_cast<UiAllocationHeader*>(std::realloc(allocation, size + sizeof(UiAllocationHeader) + sizeof(uiAllocationGuard)));
-    if (resized == nullptr) throw std::bad_alloc();
-    unregisterAllocation(index, *link);
-    resized->initializeGuards(size);
-    registerAllocation(resized, size, source_index, source_line);
-    resetSource();
-    return resized + 1;
+void* WorldMemory::reallocate(void* memory, std::size_t size) {
+    if (memory == nullptr) return allocate(size, false);
+    if (size == 0u || size > std::numeric_limits<std::size_t>::max() - sizeof(SphereUI::Memory::AllocationHeader)) throw std::bad_alloc();
+    using Header = SphereUI::Memory::AllocationHeader;
+    auto* allocation = static_cast<Header*>(std::realloc(static_cast<Header*>(memory) - 1, sizeof(Header) + size));
+    if (allocation == nullptr) throw std::bad_alloc();
+    allocation->size = size;
+    return allocation + 1;
 }
 
-void WorldMemory::release(void* memory, const char* source, unsigned int line) {
+void WorldMemory::release(void* memory) {
     if (memory == nullptr) return;
-    UiMemoryLock lock;
-    auto& hash = g_sfera_allocation_hash_runtime;
-    auto& state = g_sfera_memory_runtime;
-    auto* allocation = static_cast<UiAllocationHeader*>(memory) - 1;
-    if (!state.tracking_initialized) throw std::logic_error("UI allocator is not initialized");
-    auto* link = hash.findLink(allocation);
-    if (*link == uiAllocationHashEnd) throw std::logic_error("UI free of unregistered memory");
-    validateRecent(source == nullptr ? state.allocation_source_name : source, source == nullptr ? state.allocation_source_line : line);
-    const auto index = *link;
-    validateAllocation(hash.allocation_records[index], source == nullptr ? state.allocation_source_name : source, source == nullptr ? state.allocation_source_line : line);
-    if (state.diagnostics_dirty) validateRecent(source, line);
     g_sfera_interface.unbindEventHandler(memory);
-    unregisterAllocation(index, *link);
-    std::free(allocation);
-    resetSource();
-}
-
-void WorldMemory::validateBeforeTermination() {
-    auto& state = g_sfera_memory_runtime;
-    if (!state.lock_initialized) return;
-    if (::TryEnterCriticalSection(&state.critical_section) == 0) return;
-    try {
-        if (!state.lock_held) {
-            auto index = state.tracker_primary;
-            for (std::size_t count = 0u; count < state.live_allocation_count && index != uiAllocationListEnd; ++count) {
-                const auto& record = g_sfera_allocation_hash_runtime.allocation_records[index];
-                validateAllocation(record, state.allocation_source_name, state.allocation_source_line);
-                index = record.older;
-            }
-        }
-    } catch (...) {
-        ::LeaveCriticalSection(&state.critical_section);
-        throw;
-    }
-    ::LeaveCriticalSection(&state.critical_section);
-}
-
-std::size_t* SferaAllocationHashRuntime::findLink(SphereUI::Memory::AllocationHeader* allocation) {
-    const auto hash = std::hash<SphereUI::Memory::AllocationHeader*>{}(allocation) >> uiAllocationHashShift;
-    auto* link = &bucket_heads[hash & (std::size(bucket_heads) - 1u)];
-    while (*link != uiAllocationHashEnd && allocation_records[*link].allocation != allocation) link = &allocation_records[*link].hash_next;
-    return link;
+    std::free(static_cast<SphereUI::Memory::AllocationHeader*>(memory) - 1);
 }
 
 WorldObject* WorldObjects::effectObject(std::uint32_t handle) const {
@@ -8399,28 +8093,8 @@ SferaVec3F SferaVec3F::normalized(std::int32_t diagnosticCode) const {
 void WorldDiagnostics::report(const char* message) { SphereUI::InterfaceRenderer::reportError(message == nullptr ? "" : message); }
 [[noreturn]] void WorldDiagnostics::fail(const char* message) { report(message); throw std::runtime_error(message == nullptr ? "World operation failed" : message); }
 void WorldDiagnostics::warning(const char* message) {
-    const std::int32_t server = g_sfera_recovered_static_runtime.server_number;
-    char filename[64]; std::snprintf(filename, sizeof(filename), "logs\\Warnings%02d.log", server);
-    FILE* output = nullptr;
-#ifdef _WIN32
-    output = _fsopen(filename, "at", _SH_DENYNO);
-#else
-    output = std::fopen(filename, "at");
-#endif
-    if (output == nullptr) return;
-    if (g_sfera_frame_runtime.warning_header_written == 0u) std::fputs("*************************************************************************\n", output);
-    const auto now = std::time(nullptr); std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &now);
-#else
-    localtime_r(&now, &local);
-#endif
-    char timestamp[128]; std::strftime(timestamp, sizeof(timestamp), "%A, %d %B %Y  %H:%M:%S\n", &local);
-    std::fputs(timestamp, output); std::fputs(message == nullptr ? "" : message, output); std::fputs("\n\n", output); std::fflush(output); std::fclose(output);
-    g_sfera_frame_runtime.warning_header_written = 1u;
-#ifdef _WIN32
-    ::MessageBeep(UINT32_MAX);
-#endif
+    ::OutputDebugStringA(message == nullptr ? "" : message);
+    ::OutputDebugStringA("\n");
 }
 
 WorldObject* WorldObjects::object(std::uint32_t handle, const char* operation) const {
@@ -8438,21 +8112,12 @@ ExtendedWorldObject* WorldObjects::extendedObject(std::uint32_t handle) const {
     return static_cast<ExtendedWorldObject*>(result);
 }
 SphereRender::Model* WorldObjects::model(const WorldObject& object) const { return object.owns_model ? object.generated_model : g_sfera_models.model(object.model_id); }
-void WorldObjects::recordSlotStatistics() const {
-    for (std::uint32_t handle = 490000u; handle < 500000u; ++handle) {
-        const auto* item = object(handle); const auto* resource = item == nullptr ? nullptr : model(*item);
-        g_sfera_models.recordRequest(item == nullptr ? "<empty slot>" : resource == nullptr ? "<none>" : resource->name);
-    }
-}
 std::uint32_t WorldObjects::create(const char* name, SferaMbcProcessRecord* process, std::uint32_t kind, bool dynamic) {
     const auto modelHandle = g_sfera_models.find(name);
     if (modelHandle < 0) { WorldDiagnostics::warning((std::string("CreateObject: no model with such name: ") + (name == nullptr ? "" : name)).c_str()); return UINT32_MAX; }
     auto handle = g_sfera_client_main_scalar_runtime.mode_02;
-    g_sfera_models.request_counts.clear();
     while (handle < object_handles.capacity && object(handle) != nullptr) ++handle;
-    if (handle >= 500000u) recordSlotStatistics();
     if (handle >= object_handles.capacity) WorldDiagnostics::fail("CreateObject: object handle table is full");
-    g_sfera_models.writeRequestStatistics();
     std::size_t extendedIndex = ExtendedWorldObject::unregistered;
     if (kind != 0u) {
         auto* handles = extended_object_handles.data; extendedIndex = 0u;
@@ -8499,9 +8164,8 @@ void WorldObjects::moveLocal(std::uint32_t handle, const SferaVec3F& displacemen
     recalculateBasis(handle);
     SferaVec3F delta{};
     for (std::size_t axis = 0u; axis < 3u; ++axis) delta.setComponent(axis, static_cast<float>(double(item->orientation_basis[0].component(axis)) * displacement.z - double(item->orientation_basis[1].component(axis)) * displacement.y + double(item->orientation_basis[2].component(axis)) * displacement.x));
-    g_sfera_scene_vector_runtime.object_position_delta = {delta.x, delta.y, delta.z};
     item->position = item->position + delta;
-    if (handle == controlled_object_handle && g_sfera_graphics_runtime.render_mode_enabled) { g_sfera_scene_control_runtime.camera_x = item->position.x + 333.0f; g_sfera_scene_control_runtime.camera_y = item->position.y + 333.0f; g_sfera_main_input_state_runtime.motion_accumulator = item->position.z + 333.0f; }
+    if (handle == controlled_object_handle) { g_sfera_scene_control_runtime.camera_x = item->position.x + 333.0f; g_sfera_scene_control_runtime.camera_y = item->position.y + 333.0f; g_sfera_main_input_state_runtime.motion_accumulator = item->position.z + 333.0f; }
 }
 void WorldObjects::alignReferenceOrientation() {
     auto* item = extendedObject(0u);
@@ -8625,18 +8289,6 @@ std::uint32_t SferaGameCalendar::ticks(std::uint32_t calendar) {
     return minutes * quartersPerMinute + component(calendar, Quarter);
 }
 
-void SferaProfilerRuntime::begin(std::size_t index) {
-    if (index >= std::size(active) || call_count[index] == UINT32_MAX) return;
-    if (active[index]) { call_count[index] = UINT32_MAX; return; }
-    active[index] = true; start_time_us[index] = WorldClock::microseconds();
-}
-void SferaProfilerRuntime::end(std::size_t index) {
-    if (index >= std::size(active) || call_count[index] == UINT32_MAX) return;
-    if (!active[index]) { call_count[index] = UINT32_MAX; return; }
-    active[index] = false;
-    const auto now = WorldClock::microseconds(); report_clock_snapshot = now;
-    accumulated_ticks[index] = accumulated_ticks[index] + now - start_time_us[index];
-}
 void SferaLightRuntime::setActive(std::uint32_t index, bool enabled, std::uint32_t sourceLine) {
     if (index >= active_lights.size()) WorldDiagnostics::fail("Light slot is outside the device light table");
     auto& active = active_lights[index];
@@ -8757,8 +8409,8 @@ void TerrainPatch::rebuildSurfaceGroup(const TerrainCell& cell) { if (!surfaceGr
 void TerrainPatch::rebuildSurfaceGroups() { terrainGroupBuilder.vertices.clear(); terrainGroupBuilder.indices.clear(); if (!renderGroups) { renderGroups = terrainAllocate<TerrainSurfaceGroup>(144); std::fill_n(renderGroups, 144, TerrainSurfaceGroup{}); } for (const auto& cell : cells) rebuildSurfaceGroup(cell); terrainReplace(groupedVertices, terrainGroupBuilder.vertices); terrainReplace(groupedIndices, terrainGroupBuilder.indices); }
 bool TerrainPatch::validateEdge(const TerrainPatch& other, std::size_t side, std::size_t otherSide, int row, int column) const {
     const auto& first = edgeGroups.at(side); const auto& second = other.edgeGroups.at(otherSide); std::vector<bool> matched(second.size()); bool valid = true;
-    for (const auto& group : first) { const auto& point = vertices[group.front()].position; bool found = false; for (std::size_t i = 0; i < second.size(); ++i) { const auto& candidate = other.vertices[second[i].front()].position; if (candidate.y == point.y && (side < 2 ? candidate.x == point.x : candidate.z == point.z)) { matched[i] = true; found = true; break; } } if (!found) { TerrainAssets::markSmoothingError(D3DCOLOR_ARGB(0, 0, 0, 255), row * 100.0f + point.x, column * 100.0f + point.z); valid = false; } }
-    for (std::size_t i = 0; i < second.size(); ++i) if (!matched[i]) { const auto& point = other.vertices[second[i].front()].position; const float x = row * 100.0f + (side == 3 ? 100.0f : side == 2 ? -100.0f : 0.0f); const float z = column * 100.0f + (otherSide == 0 ? 100.0f : otherSide == 1 ? -100.0f : 0.0f); TerrainAssets::markSmoothingError(D3DCOLOR_ARGB(0, 0, 255, 0), x + point.x, z + point.z); valid = false; }
+    for (const auto& group : first) { const auto& point = vertices[group.front()].position; bool found = false; for (std::size_t i = 0; i < second.size(); ++i) { const auto& candidate = other.vertices[second[i].front()].position; if (candidate.y == point.y && (side < 2 ? candidate.x == point.x : candidate.z == point.z)) { matched[i] = true; found = true; break; } } if (!found) valid = false; }
+    for (std::size_t i = 0; i < second.size(); ++i) if (!matched[i]) { valid = false; }
     return valid;
 }
 bool TerrainPatch::smoothEdge(TerrainPatch& other, std::size_t side, std::size_t otherSide, int row, int column) { if (!validateEdge(other, side, otherSide, row, column)) return false; const auto& first = edgeGroups.at(side); const auto& second = other.edgeGroups.at(otherSide); if (first.size() != second.size()) throw std::runtime_error("Error of smoothing region's edge: numbers of vertex groups are differ"); for (std::size_t i = 0; i < first.size(); ++i) { std::vector<TerrainVertex*> group; for (auto index : first[i]) group.push_back(&vertices[index]); for (auto index : second[i]) group.push_back(&other.vertices[index]); terrainSmoothNormals(group); } return true; }
@@ -8893,12 +8545,6 @@ struct TgaHeader {
     }
 };
 }
-bool TerrainAssets::saveDebugImage(const char* filename, int size, const std::uint16_t* pixels) {
-    if (!filename || !pixels || size <= 0 || size > 65535) return false;
-    const auto header = TgaHeader{static_cast<std::uint16_t>(size), static_cast<std::uint16_t>(size), sizeof(*pixels) * std::numeric_limits<std::uint8_t>::digits, TgaHeader::topLeftOrigin}.encode();
-    std::ofstream output(filename, std::ios::binary); if (!output) return false; output.write(reinterpret_cast<const char*>(header.data()), header.size()); output.write(reinterpret_cast<const char*>(pixels), static_cast<std::streamsize>(size) * size * sizeof(std::uint16_t)); return output.good();
-}
-void TerrainAssets::markSmoothingError(std::uint32_t color, float x, float z) { const auto project = [](float value, bool invert) { const int integral = std::trunc(value); const int tile = static_cast<int>(std::trunc(static_cast<double>(value) / 400.0 + 1000.0)) - 1000; const int local = integral - tile * 400; return std::clamp(static_cast<int>(std::trunc((invert ? 400 - local : local) * 256.0 / 400.0)), 0, 255); }; auto* pixels = g_sfera_scene_build_runtime.landscape_debug_pixels; const int px = project(x, false); const int pz = project(z, true); pixels[pz * 256 + px] ^= static_cast<std::uint16_t>(color); saveDebugImage("lndbug.tga", 256, pixels); }
 namespace {
 bool terrainNamesEqual(const char* first, const char* second) { if (!first || !second) return first == second; while (*first && *second) { if (std::tolower(static_cast<unsigned char>(*first++)) != std::tolower(static_cast<unsigned char>(*second++))) return false; } return *first == *second; }
 void terrainCopyName(char* destination, std::size_t capacity, const char* name) { const auto length = std::strlen(name); if (length >= capacity) throw std::runtime_error("Landscape name is too long"); std::fill_n(destination, capacity, '\0'); std::copy_n(name, length, destination); }
@@ -8915,19 +8561,6 @@ void TerrainAssets::loadMap() {
     for (auto& record : g_sfera_landscape_map_runtime.records) { if (!std::memchr(record.material_name, '\0', sizeof(record.material_name))) throw std::runtime_error("Unterminated landscape map name"); if (!terrainFindRegion(record.material_name)) { terrainCopyName(record.material_name, sizeof(record.material_name), "FILL_EMPT"); record.tile_x = 0; record.tile_y = 0; } }
     terrainBindMap();
 }
-int TerrainAssets::loadDimensions(const char* name, std::int32_t* rows, std::int32_t* columns) {
-    if (!name || !rows || !columns) throw std::invalid_argument("Invalid landscape size request");
-    for (const auto* directory : {"landscape\\", "landscape_hr\\", "landscape_ph\\", "landscape_rd\\"}) { const auto data = terrainReadFile(std::string(directory) + name + ".siz", true); if (data.empty()) continue; if (data.size() < 8) throw std::runtime_error("Truncated landscape size file"); std::memcpy(rows, data.data(), 4); std::memcpy(columns, data.data() + 4, 4); if (*rows < 0 || *rows > 10 || *columns < 0 || *columns > 10) throw std::runtime_error("Invalid landscape dimensions"); return 0; }
-    throw std::runtime_error(std::string("Landscape size file is missing: ") + name);
-}
-void TerrainAssets::loadMapProbes(SferaLandscapeMapRecord* editorRecords) { if (!editorRecords) throw std::invalid_argument("Missing landscape editor map"); for (std::size_t row = 0; row < 80; ++row) for (std::size_t column = 0; column < 80; ++column) { const auto& source = g_sfera_landscape_map_runtime.records[row * 80 + column]; auto& target = editorRecords[column * 80 + row]; target = {}; if (source.tile_x || source.tile_y) continue; terrainCopyName(target.material_name, sizeof(target.material_name), source.material_name); std::int32_t rows = 0; std::int32_t columns = 0; loadDimensions(source.material_name, &rows, &columns); target.tile_x = rows; target.tile_y = columns; } }
-int TerrainAssets::saveMap(const SferaLandscapeMapRecord* editorRecords) {
-    if (!editorRecords) throw std::invalid_argument("Missing landscape editor map");
-    for (int row = 0; row < 80; ++row) for (int column = 0; column < 80; ++column) { const auto& source = editorRecords[column * 80 + row]; auto& target = g_sfera_landscape_map_runtime.records[row * 80 + column]; target.tile_x = 0; target.tile_y = 0; terrainCopyName(target.material_name, sizeof(target.material_name), source.material_name[0] ? source.material_name : "fill"); }
-    for (int row = 0; row < 80; ++row) for (int column = 0; column < 80; ++column) { const auto& source = editorRecords[column * 80 + row]; if ((source.tile_x == 1 && source.tile_y == 1) || !source.tile_x) continue; const auto name = std::string(g_sfera_landscape_map_runtime.records[row * 80 + column].material_name); for (int x = 0; x < source.tile_x; ++x) for (int z = 0; z < source.tile_y; ++z) { if (row + x >= 80 || column - z < 0) throw std::runtime_error("Landscape placement exceeds map bounds"); auto& target = g_sfera_landscape_map_runtime.records[(row + x) * 80 + column - z]; terrainCopyName(target.material_name, sizeof(target.material_name), name.c_str()); target.tile_x = x; target.tile_y = z; } }
-    terrainBindMap(); const int descriptor = g_sfera_files.create("landscape\\map.bin"); if (descriptor < 0) throw std::runtime_error("Unable to create landscape map"); const int result = g_sfera_files.write(descriptor, g_sfera_landscape_map_runtime.records, sizeof(g_sfera_landscape_map_runtime.records)); const int closed = g_sfera_files.close(descriptor); if (result != sizeof(g_sfera_landscape_map_runtime.records)) throw std::runtime_error("Unable to write landscape map"); return closed;
-}
-
 void Contour::updateBounds() {
     min_x = min_z = 1000000.0f;
     max_x = max_z = -1000000.0f;
@@ -8951,11 +8584,9 @@ bool Contour::contains(float point_x, float point_z) const {
 }
 
 Contours::Contours(std::int32_t first, std::int32_t last) : first_server_type(first), last_server_type(last) {}
-void Contours::clear() { records.clear(); server_map.clear(); invalidateGrid(); selected_contour = -1; }
+void Contours::clear() { records.clear(); server_map.clear(); invalidateGrid(); }
 void Contours::invalidateGrid() { grid_initialized = false; mask_server = -1; }
 bool Contours::isServerContour(const Contour& contour) const { return contour.type >= first_server_type && contour.type <= last_server_type; }
-void Contours::sort() { std::stable_sort(records.begin(), records.end(), [](const Contour& first, const Contour& second) { return first.type < second.type; }); invalidateGrid(); }
-
 void Contours::loadBytes(std::span<const std::uint8_t> bytes) {
     if (bytes.size() < sizeof(std::int32_t)) throw std::runtime_error("Contours: missing record count");
     std::int32_t count = 0;
@@ -8965,28 +8596,10 @@ void Contours::loadBytes(std::span<const std::uint8_t> bytes) {
     if (count != 0) std::memcpy(loaded.data(), bytes.data() + sizeof(count), loaded.size() * sizeof(Contour));
     for (const auto& contour : loaded) if (contour.vertex_count < 0 || contour.vertex_count > 64) throw std::runtime_error("Contours: invalid vertex count");
     records.swap(loaded);
-    selected_contour = -1;
     invalidateGrid();
 }
 
-std::vector<std::uint8_t> Contours::saveBytes() const {
-    if (records.size() > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())) throw std::length_error("Contours: too many records");
-    const std::int32_t count = records.size();
-    std::vector<std::uint8_t> bytes(sizeof(count) + records.size() * sizeof(Contour));
-    std::memcpy(bytes.data(), &count, sizeof(count));
-    if (count != 0) std::memcpy(bytes.data() + sizeof(count), records.data(), records.size() * sizeof(Contour));
-    return bytes;
-}
-
 void Contours::load() { loadBytes(g_sfera_files.readAll("landscape\\contours.bin")); }
-void Contours::save() {
-    const auto bytes = saveBytes();
-    const int file = g_sfera_files.create("landscape\\contours.bin");
-    if (file < 0) return;
-    g_sfera_files.write(file, bytes.data(), bytes.size());
-    g_sfera_files.close(file);
-}
-
 void Contours::typeRange(std::int32_t first, std::int32_t last, std::int32_t& start, std::int32_t& count) const {
     start = count = 0;
     const auto begin = std::find_if(records.begin(), records.end(), [first](const Contour& contour) { return contour.type >= first; });
@@ -8994,39 +8607,6 @@ void Contours::typeRange(std::int32_t first, std::int32_t last, std::int32_t& st
     const auto end = std::find_if(begin, records.end(), [last](const Contour& contour) { return contour.type > last; });
     start = begin - records.begin();
     count = end - begin;
-}
-
-Contour* Contours::at(std::int32_t index) { return &records.at(static_cast<std::size_t>(index)); }
-void Contours::setEditableRange(std::int32_t first, std::int32_t last) { if (first < 0 || last >= 10000 || first > last) throw std::out_of_range("Contours: invalid editable range"); first_editable_type = first; last_editable_type = last; selected_contour = -1; }
-void Contours::setBackgroundRange(std::int32_t first, std::int32_t last) { first_background_type = first; last_background_type = last; }
-
-void Contours::weldVertices(float tolerance) {
-    if (!(tolerance > 0.0f && tolerance < 200.0f)) throw std::out_of_range("Contours: invalid weld tolerance");
-    struct VertexReference { float* x; float* z; };
-    std::vector<VertexReference> vertices;
-    for (auto& contour : records) if (isServerContour(contour)) for (std::int32_t i = 0; i < contour.vertex_count; ++i) vertices.push_back({&contour.x[i], &contour.z[i]});
-    std::vector<bool> processed(vertices.size(), false);
-    const float threshold = double(tolerance) * tolerance;
-    for (std::size_t seed = 0; seed < vertices.size(); ++seed) {
-        if (processed[seed]) continue;
-        std::vector<std::size_t> group{seed};
-        float sum_x = *vertices[seed].x, sum_z = *vertices[seed].z;
-        processed[seed] = true;
-        for (std::size_t i = seed + 1; i < vertices.size(); ++i) {
-            if (processed[i]) continue;
-            const float dx = double(*vertices[seed].x) - *vertices[i].x, dz = double(*vertices[seed].z) - *vertices[i].z;
-            const float distance = double(dx) * dx + double(dz) * dz;
-            if (!(distance < threshold)) continue;
-            group.push_back(i);
-            processed[i] = true;
-            sum_x = double(sum_x) + *vertices[i].x;
-            sum_z = double(sum_z) + *vertices[i].z;
-        }
-        const float average_x = double(sum_x) / group.size(), average_z = double(sum_z) / group.size();
-        for (const auto i : group) { *vertices[i].x = average_x; *vertices[i].z = average_z; }
-    }
-    for (auto& contour : records) if (isServerContour(contour)) contour.updateBounds();
-    invalidateGrid();
 }
 
 bool Contours::sameEdge(std::int32_t first_contour, std::int32_t first_edge, std::int32_t second_contour, std::int32_t second_edge) const {
@@ -9152,158 +8732,7 @@ bool Contours::nearServer(float x, float z, std::int32_t server) {
     return server_mask[static_cast<std::int32_t>(cell_x) * 160 + static_cast<std::int32_t>(cell_z)] != 0;
 }
 
-void Contours::eraseSelected() {
-    records.erase(records.begin() + selected_contour);
-    selected_contour = -1;
-    invalidateGrid();
-}
-
-void Contours::sortSelected() {
-    const auto previous = selected_contour;
-    std::vector<std::size_t> order(records.size());
-    for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
-    std::stable_sort(order.begin(), order.end(), [&](std::size_t first, std::size_t second) { return records[first].type < records[second].type; });
-    std::vector<Contour> sorted;
-    sorted.reserve(records.size());
-    for (std::size_t i = 0; i < order.size(); ++i) { sorted.push_back(records[order[i]]); if (order[i] == static_cast<std::size_t>(previous)) selected_contour = i; }
-    records.swap(sorted);
-    invalidateGrid();
-}
-
-void Contours::processEvent(std::int32_t command, std::int32_t first, std::int32_t second) {
-    if (first <= -10000 || first >= 10000 || second <= -10000 || second >= 10000) throw std::out_of_range("Contours: invalid event coordinates");
-    Contour* selected = selected_contour < 0 ? nullptr : at(selected_contour);
-    switch (command) {
-    case 1: {
-        std::vector<std::int32_t> hits;
-        selected_contour = -1;
-        for (std::size_t i = 0; i < records.size(); ++i) if (records[i].type >= first_editable_type && records[i].type <= last_editable_type && records[i].contains(static_cast<float>(first), static_cast<float>(second))) hits.push_back(static_cast<std::int32_t>(i));
-        if (!hits.empty()) { selected_contour = hits[selection_counter++ % hits.size()]; selected_vertex = 0; }
-        break;
-    }
-    case 2: if (selected != nullptr && selected->vertex_count > 0) selected_vertex = (selected_vertex + 1) % selected->vertex_count; break;
-    case 3: if (selected != nullptr && selected->vertex_count > 0) selected_vertex = (selected_vertex + selected->vertex_count - 1) % selected->vertex_count; break;
-    case 4:
-        if (selected != nullptr && selected->vertex_count < 63) {
-            const auto insertion = selected_vertex + 1;
-            std::move_backward(selected->x.begin() + insertion, selected->x.begin() + selected->vertex_count, selected->x.begin() + selected->vertex_count + 1);
-            std::move_backward(selected->z.begin() + insertion, selected->z.begin() + selected->vertex_count, selected->z.begin() + selected->vertex_count + 1);
-            selected->x[insertion] = first;
-            selected->z[insertion] = second;
-            ++selected->vertex_count;
-            selected_vertex = insertion;
-            selected->updateBounds();
-        }
-        break;
-    case 5:
-        if (selected != nullptr && selected->vertex_count > 0) {
-            std::move(selected->x.begin() + selected_vertex + 1, selected->x.begin() + selected->vertex_count, selected->x.begin() + selected_vertex);
-            std::move(selected->z.begin() + selected_vertex + 1, selected->z.begin() + selected->vertex_count, selected->z.begin() + selected_vertex);
-            if (--selected->vertex_count == 0) eraseSelected();
-            else { selected->updateBounds(); selected_vertex = (selected_vertex + selected->vertex_count - 1) % selected->vertex_count; }
-        }
-        break;
-    case 6: if (selected != nullptr) { selected->x[selected_vertex] = first; selected->z[selected_vertex] = second; selected->updateBounds(); } break;
-    case 7: if (selected != nullptr) { selected->type = first; sortSelected(); } break;
-    case 8: {
-        Contour contour;
-        contour.type = first_editable_type;
-        contour.vertex_count = 1;
-        contour.x[0] = first;
-        contour.z[0] = second;
-        contour.neighbour_contour.fill(-1);
-        contour.neighbour_edge.fill(-1);
-        contour.updateBounds();
-        selected_contour = records.size();
-        records.push_back(contour);
-        sortSelected();
-        selected_vertex = 0;
-        break;
-    }
-    case 9: window_id = first; zoom_percent = second; selected_contour = -1; selected_vertex = 0; break;
-    case 10: std::erase_if(records, [](const Contour& contour) { return contour.vertex_count < 3; }); selected_contour = -1; save(); window_id = -1; break;
-    case 11: zoom_percent = second; break;
-    default: throw std::invalid_argument("process_contour_event: wrong type " + std::to_string(command));
-    }
-    if (first_editable_type == first_server_type && last_editable_type == last_server_type) weldVertices(100.0f);
-    invalidateGrid();
-    animation_frame = 0;
-}
-
 namespace {
-void drawContourLine(float x1, float y1, float x2, float y2, std::uint32_t color) {
-    auto* device = g_sfera_graphics_runtime.d3d_runtime.get();
-    if (device == nullptr || device->native_device == nullptr) return;
-    const std::array<SphereUI::SpriteVertex, 2> vertices{{{x1, y1, 0.0f, 1.0f, color, 0u, 0.0f, 0.0f}, {x2, y2, 0.0f, 1.0f, color, 0u, 0.0f, 0.0f}}};
-    device->checkResult(device->native_device->DrawPrimitiveUP(D3DPT_LINELIST, 1u, vertices.data(), sizeof(SphereUI::SpriteVertex)), "DrawPrimitiveUP");
-}
-}
-
-void Contours::drawContour(std::int32_t index, std::uint32_t color, std::int32_t origin_x, std::int32_t origin_y) {
-    auto* device = g_sfera_graphics_runtime.d3d_runtime.get();
-    if (device == nullptr || device->native_device == nullptr) return;
-    const auto& contour = records.at(static_cast<std::size_t>(index));
-    const float scale = double(zoom_percent) / 100.0;
-    const auto screen_x = [&](float value) { return (double(value) + 4000.0) * scale - origin_x; };
-    const auto screen_y = [&](float value) { return (4000.0 - value) * scale - origin_y; };
-    device->checkResult(device->native_device->SetTexture(0u, nullptr), "SetTexture");
-    std::uint32_t vertex_color = color;
-    for (std::int32_t i = 0; i < contour.vertex_count; ++i) {
-        const auto previous = i == 0 ? contour.vertex_count - 1 : i - 1;
-        vertex_color = index == selected_contour && previous == selected_vertex ? D3DCOLOR_ARGB(255, 120, 200, 170) : color;
-        drawContourLine(screen_x(contour.x[i]), screen_y(contour.z[i]), screen_x(contour.x[previous]), screen_y(contour.z[previous]), vertex_color);
-    }
-    for (std::int32_t i = 0; i < contour.vertex_count; ++i) {
-        if (index == selected_contour && i == selected_vertex) continue;
-        const auto x = screen_x(contour.x[i]), y = screen_y(contour.z[i]);
-        drawContourLine(x - 2.0f, y - 2.0f, x + 2.0f, y + 2.0f, vertex_color);
-        drawContourLine(x - 2.0f, y + 2.0f, x + 2.0f, y - 2.0f, vertex_color);
-    }
-    if (index == selected_contour && selected_vertex >= 0 && selected_vertex < contour.vertex_count) {
-        const float phase = (animation_frame % 10000u) * 0.10000000149011612;
-        const float cosine = std::cos(double(phase));
-        const std::uint32_t shade = (double(cosine) + 1.0) * 100.0 + 50.0;
-        const auto highlight = D3DCOLOR_XRGB(shade, shade, shade);
-        const auto x = screen_x(contour.x[selected_vertex]), y = screen_y(contour.z[selected_vertex]);
-        drawContourLine(x - 7.0f, y - 7.0f, x + 7.0f, y - 7.0f, highlight);
-        drawContourLine(x - 7.0f, y + 7.0f, x + 7.0f, y + 7.0f, highlight);
-        drawContourLine(x - 7.0f, y - 7.0f, x - 7.0f, y + 7.0f, highlight);
-        drawContourLine(x + 7.0f, y - 7.0f, x + 7.0f, y + 7.0f, highlight);
-    }
-    float label_x = (contour.min_x + contour.max_x) * 0.5f, label_z = contour.max_z;
-    std::int32_t label_offset = 23;
-    if ((double(contour.max_x) - contour.min_x) * scale > 30.0 && contour.vertex_count > 0) {
-        float total_x = 0.0f, total_z = 0.0f;
-        for (std::int32_t i = 0; i < contour.vertex_count; ++i) { total_x = double(total_x) + contour.x[i]; total_z = double(total_z) + contour.z[i]; }
-        label_x = double(total_x) / contour.vertex_count;
-        label_z = double(total_z) / contour.vertex_count;
-        label_offset = 15;
-    }
-    const auto text = std::to_string(g_sfera_direct_input_runtime.keyboard_state[DIK_LMENU] != 0 ? index : contour.type);
-    const SphereUI::UiRect clip{g_sfera_screen_clip_runtime.left, g_sfera_screen_clip_runtime.top, g_sfera_screen_clip_runtime.right, g_sfera_screen_clip_runtime.bottom};
-    SphereUI::InterfaceRenderer::drawText(text.c_str(), static_cast<std::int32_t>(screen_x(label_x)) - 10, static_cast<std::int32_t>(screen_y(label_z)) - label_offset, color, 1u, true, clip, false);
-}
-
-void Contours::drawEditor(std::int32_t origin_x, std::int32_t origin_y) {
-    if (window_id == -1) return;
-    auto* device = g_sfera_graphics_runtime.d3d_runtime.get();
-    if (device == nullptr || device->native_device == nullptr) return;
-    g_sfera_screen_clip_runtime.left = g_sfera_screen_clip_runtime.top = 0;
-    g_sfera_screen_clip_runtime.right = g_sfera_graphics_runtime.display_width;
-    g_sfera_screen_clip_runtime.bottom = g_sfera_graphics_runtime.display_height;
-    const float width = g_sfera_graphics_runtime.display_width, height = g_sfera_graphics_runtime.display_height;
-    const std::array<SphereUI::SpriteVertex, 4> background{{{0.0f, 0.0f, 0.0f, 1.0f, D3DCOLOR_ARGB(150, 0, 0, 0), 0u, 0.0f, 0.0f}, {width, 0.0f, 0.0f, 1.0f, D3DCOLOR_ARGB(150, 0, 0, 0), 0u, 0.0f, 0.0f}, {width, height, 0.0f, 1.0f, D3DCOLOR_ARGB(150, 0, 0, 0), 0u, 0.0f, 0.0f}, {0.0f, height, 0.0f, 1.0f, D3DCOLOR_ARGB(150, 0, 0, 0), 0u, 0.0f, 0.0f}}};
-    device->checkResult(device->native_device->SetTexture(0u, nullptr), "SetTexture");
-    device->setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA);
-    device->checkResult(device->native_device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, 2u, background.data(), sizeof(SphereUI::SpriteVertex)), "DrawPrimitiveUP");
-    device->native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
-    for (std::size_t i = 0; i < records.size(); ++i) {
-        const auto type = records[i].type;
-        if (type >= first_editable_type && type <= last_editable_type) drawContour(static_cast<std::int32_t>(i), D3DCOLOR_ARGB(255, 255, 50, 50), origin_x, origin_y);
-        else if (type >= first_background_type && type <= last_background_type) drawContour(static_cast<std::int32_t>(i), D3DCOLOR_ARGB(255, 0, 0, 100), origin_x, origin_y);
-    }
-    if (selected_contour != -1) drawContour(selected_contour, D3DCOLOR_XRGB(255, 255, 255), origin_x, origin_y);
-    ++animation_frame;
 }
 
 void SferaServerWall::clear() {
@@ -9830,35 +9259,6 @@ const VegetationPatterns::GrassPattern& VegetationPatterns::grass(std::uint32_t 
     return *found;
 }
 
-const VegetationPatterns::PlantingPattern* VegetationPatterns::planting(std::size_t index) const { return index < planting_patterns_.size() ? &planting_patterns_[index] : nullptr; }
-void VegetationPatterns::formatError(const char* section, const char* parameter) { vegetationError(std::string("wrong format of planting.txt\n") + section + ", " + parameter); }
-void VegetationPatterns::loadPlanting(const char* path) { SphereRender::ModelParameters parameters; parameters.load(path); decodePlanting(parameters); }
-
-void VegetationPatterns::decodePlanting(const SphereRender::ModelParameters& parameters) {
-    planting_patterns_.clear();
-    for (std::size_t pattern = 0;; ++pattern) {
-        char section[16];
-        std::snprintf(section, sizeof(section), "a%02u", pattern);
-        if (!parameters.hasModel(section)) break;
-        const auto spacing = parameters.intValue(section, "d");
-        if (!spacing) { formatError(section, "d"); return; }
-        PlantingPattern parsed{*spacing, {}};
-        for (std::size_t entry = 0;; ++entry) {
-            std::snprintf(section, sizeof(section), "a%02u_%02u", pattern, entry);
-            if (!parameters.hasModel(section)) break;
-            if (entry >= 40u) { vegetationError("MAX_OBJS_IN_PATTERN exceeded"); return; }
-            const auto name = parameters.stringValue(section, "n");
-            if (!name) { formatError(section, "n"); return; }
-            const auto weight = parameters.intValue(section, "v");
-            if (!weight) { formatError(section, "v"); return; }
-            const auto radius = parameters.floatValue(section, "r");
-            if (!radius) { formatError(section, "r"); return; }
-            parsed.entries.push_back({std::string(*name), *weight, *radius});
-        }
-        planting_patterns_.push_back(std::move(parsed));
-    }
-}
-
 }
 
 void SphereWorld::VegetationPatterns::initializeGrass() {
@@ -10114,7 +9514,6 @@ void Vegetation::initialize() {
     std::uninitialized_value_construct_n(previous, side * side);
     std::fill_n(occupancy, side * side, std::array<std::uint32_t, 2>{});
     g_sfera_landscape_interpolation_runtime.subdivision_count = side;
-    g_sfera_landscape_render_runtime.grid_buffer_bytes = bytes;
     g_sfera_main_input_state_runtime.landscape_texture_base = cells;
     g_sfera_main_ui_state_runtime.ui_state_03 = previous;
     g_sfera_window_runtime.landscape_grid_records = occupancy;
@@ -10278,100 +9677,6 @@ void Vegetation::updateGrassView() {
     if (z >= 1) z -= 1;
     if (z < 0) z += 1;
     if (g_sfera_world_render_runtime.world_spatial_index && g_sfera_main_render_runtime.grass_depth_mode == 2) g_sfera_world_render_runtime.world_spatial_index->initializeWind();
-}
-
-std::uint32_t Vegetation::placeTree(const char* name, bool persistent, float x, float z, float radius) {
-    SferaVec3F angles{};
-    SferaPlaneF plane{};
-    float height = 0;
-    const auto placement = TerrainQueries::placementOrientation(x, z, angles, height, plane);
-    if (!placement || (placement == 2 && radius < 0)) return UINT32_MAX;
-    const auto create = [&](const char* model, bool dynamic, const SferaVec3F& position, const SferaVec3F& rotation) { const auto handle = g_sfera_world_objects.create(model, 0, 4, dynamic); auto* object = g_sfera_world_objects.object(handle); object->position = position; object->rotation = rotation; object->visible = false; g_sfera_world_objects.updateSpatialIndex(handle); return handle; };
-    const auto probe = [](std::uint32_t handle, bool reuse) { return g_sfera_contacts.testMovement(handle, reuse); };
-    const auto reject = [](std::uint32_t handle) { g_sfera_world_objects.destroy(handle); return UINT32_MAX; };
-    if (radius < 0) {
-        const auto handle = create(name, !persistent, {x, height, z}, angles);
-        auto* object = g_sfera_world_objects.object(handle);
-        probe(handle, false);
-        bool cleared = false;
-        for (std::uint32_t attempt = 0; attempt < 50; ++attempt) {
-            object->position.y = static_cast<double>(object->position.y) - 0.10000000149011612;
-            const auto result = probe(handle, true);
-            if (result >= 2) return reject(handle);
-            if (result == 0) { cleared = true; break; }
-        }
-        if (!cleared) return reject(handle);
-        for (std::uint32_t attempt = 0; attempt < 100; ++attempt) {
-            object->position.y = static_cast<double>(object->position.y) + 0.019999999552965164;
-            const auto result = probe(handle, true);
-            if (result >= 2) return reject(handle);
-            if (result == 1) return handle;
-        }
-        return reject(handle);
-    }
-    const auto temporary = create("treeput", true, {x, static_cast<float>(static_cast<double>(height) - 1), z}, {});
-    auto* probe_object = g_sfera_world_objects.object(temporary);
-    probe(temporary, false);
-    bool placed = false;
-    for (std::uint32_t attempt = 0; attempt < 100 && !placed; ++attempt) {
-        probe_object->position.y = static_cast<double>(probe_object->position.y) + 0.03999999910593033;
-        std::uint32_t contacts = 0;
-        for (std::uint32_t direction = 0; direction < 8; ++direction) {
-            const float angle = static_cast<double>(direction) * 3.1415929794311523 * 2 * 0.125;
-            const float cosine = std::cos(static_cast<double>(angle)), sine = std::sin(static_cast<double>(angle));
-            probe_object->position.x = static_cast<double>(cosine) * radius + x;
-            probe_object->position.z = static_cast<double>(sine) * radius + z;
-            g_sfera_world_objects.updateSpatialIndex(temporary);
-            const auto result = probe(temporary, true);
-            if (result >= 2) return reject(temporary);
-            if (result == 1) ++contacts;
-        }
-        placed = contacts == 8;
-    }
-    if (!placed) return reject(temporary);
-    height = probe_object->position.y;
-    g_sfera_world_objects.destroy(temporary);
-    const auto handle = g_sfera_world_objects.create(name, 0, 4, !persistent);
-    auto* object = g_sfera_world_objects.object(handle);
-    object->position = {x, height, z};
-    object->visible = false;
-    object->rotation = {vegetationRandom(6.283185958862305), 0, 0};
-    g_sfera_world_objects.updateSpatialIndex(handle);
-    const std::array<std::uint32_t, 1> ignored{1};
-    g_sfera_contacts.setIgnoredObjects(ignored);
-    const auto collision = g_sfera_contacts.test(handle, 0, false);
-    g_sfera_contacts.setIgnoredObjects({});
-    return collision == 0 ? handle : reject(handle);
-}
-
-void Vegetation::plant(std::int32_t index) {
-    const auto* pattern = patterns.planting(static_cast<std::size_t>(index));
-    if (!pattern || g_sfera_world_objects.plantedObjects.size() >= 3500u) return;
-    const auto* contours = g_sfera_client_process_runtime.client_object;
-    for (const auto& contour : contours->records) {
-        if (contour.type != 999 || contour.vertex_count <= 0) continue;
-        const std::size_t count = contour.vertex_count;
-        const auto x_extents = std::minmax_element(contour.x.begin(), contour.x.begin() + count), z_extents = std::minmax_element(contour.z.begin(), contour.z.begin() + count);
-        const float step = pattern->spacing;
-        if (!(step > 0)) vegetationError("Invalid planting distance");
-        for (float z = *z_extents.first; z < *z_extents.second; z = static_cast<double>(z) + step) {
-            for (float x = *x_extents.first; x < *x_extents.second; x = static_cast<double>(x) + step) {
-                const float plant_x = vegetationRandom(step, x), plant_z = vegetationRandom(step, z);
-                if (!contour.contains(plant_x, plant_z)) continue;
-                std::uint32_t total = 0;
-                for (const auto& entry : pattern->entries) total += entry.weight;
-                const auto choice = vegetationChoice(total);
-                std::uint32_t cumulative = 0;
-                const VegetationPatterns::PlantingEntry* selected = nullptr;
-                for (const auto& entry : pattern->entries) { cumulative += entry.weight; if (static_cast<std::int32_t>(cumulative) > static_cast<std::int32_t>(choice)) { selected = &entry; break; } }
-                if (!selected) vegetationError("internal error 743827592");
-                const auto handle = placeTree(selected->name.c_str(), false, plant_x, plant_z, selected->radius);
-                if (handle == UINT32_MAX) continue;
-                g_sfera_world_objects.plantedObjects.push_back(handle);
-                if (g_sfera_world_objects.plantedObjects.size() >= 3500u) return;
-            }
-        }
-    }
 }
 
 }
@@ -10562,7 +9867,6 @@ bool TerrainRenderer::visibleBounds(const TerrainBounds& source, const SferaVec3
     std::copy(std::begin(source.corners), std::end(source.corners), local.corners);
     local.clipping_bounds = {source.scaledBounds[0], source.scaledBounds[1], source.scaledBounds[2], source.scaledBounds[3], source.scaledBounds[4], source.scaledBounds[5]};
     translated = local.translated(anchor);
-    g_sfera_view_projection_scratch_runtime = translated;
     g_sfera_view_geometry_runtime.clipping_bounds = translated.clipping_bounds;
     const auto& view = g_sfera_view_geometry_runtime.projected_bounds;
     const auto& bounds = translated.clipping_bounds;
@@ -10591,7 +9895,6 @@ bool TerrainRenderer::gatherCells(TerrainPatch& patch) {
             }
         }
     }
-    g_sfera_landscape_patch_lookup_runtime.visible_count = visibleCells.size();
     return true;
 }
 void TerrainRenderer::findReflectiveWater(TerrainPatch& patch) {
@@ -10649,46 +9952,10 @@ void TerrainRenderer::prepareAndDraw(TerrainPatch& patch) {
         if (water.material != 0u) { const int x = static_cast<int>((static_cast<double>(anchor.x) + 4.0) / 8.333333015441895 + 10000.0) + visible.cell->x - 10000, z = static_cast<int>((static_cast<double>(anchor.z) + 4.0) / 8.333333015441895 + 10000.0) + visible.cell->z - 10000; waterSurfaces.push_back({x, z, water.height, group.light_mask, water.material, visible.bounds}); }
     }
     g_sfera_main_ui_state_runtime.ui_state_04 = waterSurfaces.size();
-    if (g_sfera_client_config_runtime.render_options[0] != 0u) drawDebugCells(patch);
     int first = 0;
     std::uint32_t vertices = 0u;
     for (std::size_t index = 0; index < visibleCells.size(); ++index) { const auto& cell = *visibleCells[index].cell; const auto count = patch.surfaceGroups[cell.x + cell.z * 12].vertexCount; vertices += count; if (vertices > 30000u) { drawCells(patch, first, static_cast<int>(index) - 1); first = index; vertices = count; } }
     drawCells(patch, first, static_cast<int>(visibleCells.size()) - 1);
-}
-void TerrainRenderer::drawDebugCells(const TerrainPatch& patch) {
-    auto anchor = terrainAnchor();
-    anchor.y = static_cast<double>(anchor.y) - 0.05000000074505806;
-    const auto boundary = [](float first, float second) { const float a = (static_cast<double>(first) + 10000.0) / 8.333330154418945, b = (static_cast<double>(second) + 10000.0) / 8.333330154418945; const int nearest = static_cast<double>(a) + 0.5; const bool aligned = std::fabs(static_cast<float>(static_cast<double>(a) - nearest)) < 0.001f && std::fabs(static_cast<float>(static_cast<double>(b) - static_cast<int>(static_cast<double>(b) + 0.5))) < 0.001f && std::fabs(static_cast<float>(static_cast<double>(first) - second)) < 0.001f; return std::pair<bool, bool>{aligned, nearest % 12 == 0}; };
-    for (const auto& visible : visibleCells) {
-        for (std::size_t triangleIndex = 0; triangleIndex < visible.cell->triangleCount; ++triangleIndex) {
-            const auto& triangle = visible.cell->triangles[triangleIndex];
-            std::array<SferaVec3F, 3> points;
-            for (int corner = 0; corner < 3; ++corner) points[corner] = patch.vertices[triangle.indices[corner]].position + anchor;
-            for (int corner = 0; corner < 3; ++corner) { const auto& first = points[corner]; const auto& second = points[(corner + 1) % 3]; std::uint32_t color = D3DCOLOR_ARGB(255, 0, 255, 0); const auto x = boundary(first.x, second.x), z = boundary(first.z, second.z); if (x.first) color = x.second ? D3DCOLOR_ARGB(255, 255, 0, 255) : D3DCOLOR_ARGB(255, 0, 0, 255); if (z.first) color = z.second ? D3DCOLOR_ARGB(255, 255, 0, 255) : D3DCOLOR_ARGB(255, 255, 0, 0); WorldDebugDraw::line(color, -1, first, second); }
-        }
-        WorldDebugDraw::draw();
-        WorldDebugDraw::clear();
-    }
-}
-void TerrainRenderer::saveWater(std::size_t material, float height) {
-    if (material > std::numeric_limits<std::uint32_t>::max()) throw std::out_of_range("Water material cannot be encoded");
-    const auto& position = g_sfera_world_objects.object(1)->position;
-    const int cellX = static_cast<int>(static_cast<double>(position.x) / 8.333333015441895 + 12000.0) % 12, cellZ = static_cast<int>(static_cast<double>(position.z) / 8.333333015441895 + 12000.0) % 12;
-    int mapX = terrainPatchCoordinate(position.x) + 40, mapZ = 39 - terrainPatchCoordinate(position.z);
-    if (mapX < 0 || mapX >= 80) mapX = 0;
-    if (mapZ < 0 || mapZ >= 80) mapZ = 0;
-    const int mapIndex = mapX * 80 + mapZ;
-    auto& patch = terrainPatchAt(mapIndex);
-    patch.waters[cellX + cellZ * 12] = {height, material};
-    const auto& region = terrainRegionAt(mapIndex);
-    const auto& record = g_sfera_landscape_map_runtime.records[mapIndex];
-    const std::string filename = std::string("landscape\\") + region.name + '_' + static_cast<char>('0' + record.tile_x) + static_cast<char>('0' + record.tile_y) + ".wtr";
-    if (std::none_of(patch.waters, patch.waters + 144, [](const auto& water) { return water.material != 0u; })) { _unlink(filename.c_str()); return; }
-    const int descriptor = g_sfera_files.create(filename.c_str());
-    std::array<std::uint8_t, 144 * 8> encoded{};
-    for (std::size_t index = 0; index < 144; ++index) { auto* target = encoded.data() + index * 8; SferaBinary::writeLittleEndian(target, std::bit_cast<std::uint32_t>(patch.waters[index].height)); SferaBinary::writeLittleEndian(target + 4, static_cast<std::uint32_t>(patch.waters[index].material)); }
-    g_sfera_files.write(descriptor, encoded.data(), encoded.size());
-    g_sfera_files.close(descriptor);
 }
 namespace {
     struct TerrainLitVertex { SferaVec3F position; SferaVec3F normal; float u; float v; };
@@ -10734,7 +10001,7 @@ void TerrainRenderer::drawCells(TerrainPatch& patch, int first, int last) {
     std::size_t batchVertices = 0u, batchStart = 0u;
     std::uint16_t material = visibleCells.at(first).cell->baseMicrotexture;
     const auto append = [&](const TerrainCell& cell, const TerrainSurfaceGroup& group) { for (std::size_t index = 0; index < cell.triangleCount * 3; ++index) indices.push_back(static_cast<std::uint16_t>(patch.groupedIndices[group.firstIndex + index] + batchVertices)); batchVertices += group.vertexCount; };
-    const auto flushBase = [&]() { IDirect3DBaseTexture9* texture = nullptr; if (g_sfera_client_config_runtime.render_options[7] == 0u) texture = g_sfera_textures.resource(g_sfera_scene_control_runtime.microtextures[material].name); terrainSetTexture(0u, texture); if (g_sfera_client_config_runtime.render_options[7] == 0u) g_sfera_textures.hasAlpha(g_sfera_scene_control_runtime.microtextures[material].name); terrainSubmitIndices(device, indices, false, coloredBase + batchStart, batchVertices); batchStart += batchVertices; batchVertices = 0u; indices.clear(); };
+    const auto flushBase = [&]() { IDirect3DBaseTexture9* texture = g_sfera_textures.resource(g_sfera_scene_control_runtime.microtextures[material].name); terrainSetTexture(0u, texture); g_sfera_textures.hasAlpha(g_sfera_scene_control_runtime.microtextures[material].name); terrainSubmitIndices(device, indices, false, coloredBase + batchStart, batchVertices); batchStart += batchVertices; batchVertices = 0u; indices.clear(); };
     for (int index = first; index <= last; ++index) { const auto& cell = *visibleCells.at(index).cell; const auto& group = patch.surfaceGroups[cell.x + cell.z * 12]; if (cell.baseMicrotexture != material) { flushBase(); material = cell.baseMicrotexture; } append(cell, group); }
     if (!indices.empty()) flushBase();
     terrainSetState(D3DRS_ZWRITEENABLE, FALSE);
@@ -11082,7 +10349,6 @@ void Motion::moveGround(std::uint32_t handle, float yaw, float elapsed, bool con
 }
 void Motion::updateObjects(float elapsed) {
     g_sfera_grass_map_runtime.alternating_update_phase ^= 1u;
-    g_sfera_recovered_static_runtime.input_state_b = 1u;
     const auto object_count = g_sfera_world_objects.extended_object_count;
     std::size_t visited = 0u;
     for (std::size_t slot = 0u; slot < g_sfera_world_objects.extended_object_handles.capacity && visited < object_count; ++slot) {
@@ -11098,23 +10364,9 @@ void Motion::updateObjects(float elapsed) {
         const float yaw = double(object->angular_velocity) * interval;
         const auto velocity = motionAdd(object->physical_velocity, object->commanded_velocity);
         if (object->motion_state == 1u && yaw == 0.0f && velocity.x == 0.0f && velocity.y == 0.0f && velocity.z == 0.0f) continue;
-        ++g_sfera_recovered_static_runtime.input_state_b;
-        g_sfera_profiler_runtime.begin(5u);
-        g_sfera_contacts.test(handle, 4u, false);
-        for (std::uint32_t index = 0; index < g_sfera_main_input_state_runtime.landscape_state; ++index) {
-            const auto* contact = g_sfera_scene_array_runtime.clip_indices.element(index);
-            if (contact == nullptr || *contact != 1u) continue;
-            char timestamp[9]{};
-            _strtime_s(timestamp, sizeof(timestamp));
-            const auto* model = motionModel(*object);
-            char message[1024];
-            std::snprintf(message, sizeof(message), "%s = %s = %f %f %f = %u = %u = %u\n", timestamp, model == nullptr ? "<none>" : model->name, double(object->position.x), double(object->position.y), double(object->position.z), handle, g_sfera_recovered_static_runtime.simulation_tick, g_sfera_recovered_static_runtime.simulation_tick - object->last_simulation_tick);
-            g_sfera_log_runtime.files[1].write(message);
-        }
         if (!object->gravity_enabled) moveFree(handle, true, yaw, interval, false);
         else if (!object->airborne) moveGround(handle, yaw, interval, false);
         else { moveFree(handle, false, yaw, interval, false); if (g_sfera_world_objects.extendedObject(handle) != nullptr) fall(handle, interval, false); }
-        g_sfera_profiler_runtime.end(5u);
     }
 }
 void Motion::updateControlled(float elapsed) {
@@ -11124,7 +10376,7 @@ void Motion::updateControlled(float elapsed) {
     if (object == nullptr) return;
     float yaw = double(object->angular_velocity) * elapsed;
     if (yaw != 0.0f) { object->rotation.x = double(object->rotation.x) + yaw; yaw = 0.0f; }
-    if (g_sfera_client_config_runtime.flag_02 == 1u && g_sfera_graphics_runtime.render_mode_enabled) {
+    if (g_sfera_client_config_runtime.flag_02 == 1u) {
         g_sfera_scene_control_runtime.camera_x = double(g_sfera_scene_control_runtime.camera_x) - 333.0;
         g_sfera_scene_control_runtime.camera_y = double(g_sfera_scene_control_runtime.camera_y) - 333.0;
         g_sfera_main_input_state_runtime.motion_accumulator = double(g_sfera_main_input_state_runtime.motion_accumulator) - 333.0;
@@ -11137,7 +10389,7 @@ void Motion::updateControlled(float elapsed) {
     else if (!object->airborne) moveGround(handle, yaw, elapsed, true);
     else { moveFree(handle, false, yaw, elapsed, true); if (g_sfera_world_objects.extendedObject(handle) != nullptr) fall(handle, elapsed, true); }
     object = g_sfera_world_objects.extendedObject(handle);
-    if (object != nullptr && g_sfera_graphics_runtime.render_mode_enabled) { g_sfera_client_config_runtime.flag_02 = 1u; g_sfera_scene_control_runtime.camera_x = double(object->position.x) + 333.0; g_sfera_scene_control_runtime.camera_y = double(object->position.y) + 333.0; g_sfera_main_input_state_runtime.motion_accumulator = double(object->position.z) + 333.0; }
+    if (object != nullptr) { g_sfera_client_config_runtime.flag_02 = 1u; g_sfera_scene_control_runtime.camera_x = double(object->position.x) + 333.0; g_sfera_scene_control_runtime.camera_y = double(object->position.y) + 333.0; g_sfera_main_input_state_runtime.motion_accumulator = double(object->position.z) + 333.0; }
 }
 void Motion::updateOrientation() {
     auto* object = g_sfera_world_objects.extendedObject(0u);
@@ -11196,7 +10448,7 @@ std::uint32_t Motion::surfaceInteraction(std::uint32_t handle, std::uint32_t* ma
     return 1u;
 }
 std::uint32_t Motion::pick(float* distance, SferaVec3F* direction) {
-    if (g_sfera_client_config_runtime.render_options[1] != 0u || !g_sfera_client_config_runtime.resources_loaded) return UINT32_MAX;
+    if (!g_sfera_client_config_runtime.resources_loaded) return UINT32_MAX;
     auto* cursor = CCursorManager::instance().activeCursor();
     if (cursor == nullptr) return UINT32_MAX;
     SferaCursorPosition cursor_position{};
@@ -11281,44 +10533,8 @@ void WorldObjects::destroy(std::uint32_t handle) {
     } else removeSpatialIndex(handle);
     *object_handles.element(handle) = nullptr; WorldMemory::release(owned); --g_sfera_main_render_runtime.world_object_count;
 }
-void WorldObjects::destroyAll() { const auto limit = std::min<std::uint32_t>(500000, object_handles.capacity); for (std::uint32_t handle = 2; handle < limit; ++handle) if (object(handle)) destroy(handle); plantedObjects.clear(); }
+void WorldObjects::destroyAll() { const auto limit = std::min<std::uint32_t>(500000, object_handles.capacity); for (std::uint32_t handle = 2; handle < limit; ++handle) if (object(handle)) destroy(handle); }
 ExtendedWorldObject* WorldObjects::linkModel(std::uint32_t parentHandle, const char* name, std::uint32_t slot) { auto* parent = extendedObject(parentHandle); if (!parent || slot >= 5) { WorldDiagnostics::warning("Wrong handle: Link_object_to_object"); return nullptr; } if (parent->linked_objects[slot]) unlink(parentHandle, slot); const auto childHandle = create(name, 0, 0, true); if (childHandle == UINT32_MAX) return nullptr; auto* child = extendedObject(childHandle); parent = extendedObject(parentHandle); if (!parent || !child) { if (child) destroy(childHandle); return nullptr; } parent->linked_objects[slot] = childHandle; child->parent_object_handle = parentHandle; child->parent_link_slot = slot; return child; }
-
-std::uint32_t WorldDebugDraw::line(std::uint32_t color, std::uint32_t group, const SferaVec3F& from, const SferaVec3F& to) {
-    if (group == UINT32_MAX) group = lines_.size();
-    else if (group >= lines_.size()) WorldDiagnostics::fail("create_line: wrong handle");
-    lines_.push_back({from, to, color, group});
-    g_sfera_main_command_state_runtime.object_reference_count = lines_.size();
-    return group;
-}
-void WorldDebugDraw::clear() { lines_.clear(); g_sfera_main_command_state_runtime.object_reference_count = 0u; }
-std::array<WorldDebugDraw::Vertex, 4> WorldDebugDraw::ribbon(const Line& line, const SferaVec3F& camera) {
-    const auto direction = line.from - line.to;
-    const auto widthAt = [&direction, &camera](const SferaVec3F& endpoint) { const auto sight = endpoint - camera; const auto transverse = direction.cross(sight); const float cross_length = std::sqrt(static_cast<float>(transverse.dot(transverse))); const auto normal = transverse * static_cast<float>(1.0 / cross_length); const float distance = std::sqrt(static_cast<float>(sight.dot(sight))); return (normal * distance) * 0.0010000000474974513f; };
-    const auto first_width = widthAt(line.from), second_width = widthAt(line.to);
-    std::array<Vertex, 4> vertices{};
-    vertices[0].position = line.from + first_width; vertices[1].position = line.from - first_width; vertices[2].position = line.to - second_width; vertices[3].position = line.to + second_width;
-    for (auto& vertex : vertices) { vertex.diffuse = D3DCOLOR_XRGB(0, 0, 0); vertex.specular = line.color; }
-    return vertices;
-}
-void WorldDebugDraw::draw() {
-    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
-    device.checkResult(device.native_device->SetTexture(0u, nullptr), "SetTexture");
-    const auto identity = SferaMatrix4x4F::identity();
-    device.setTransform(D3DTS_WORLD, *reinterpret_cast<const D3DMATRIX*>(&identity));
-    const auto* camera = g_sfera_world_objects.object(1u);
-    for (const auto& line : lines_) { const auto delta = line.from - line.to; if (delta.x == 0.0f && delta.y == 0.0f && delta.z == 0.0f) continue; const auto vertices = ribbon(line, camera->position); device.checkResult(device.native_device->SetFVF(D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1), "SetFVF"); device.drawVertices(D3DPT_TRIANGLEFAN, 6u, vertices.data(), vertices.size(), nullptr, 0u, sizeof(Vertex)); }
-}
-void WorldDebugDraw::box(const SferaBoundsCornersRuntime& corners, std::uint32_t color) { for (std::size_t ring = 0; ring < 2; ++ring) for (std::size_t edge = 0; edge < 4; ++edge) line(color, UINT32_MAX, corners.corners[ring * 4 + edge], corners.corners[ring * 4 + (edge + 1) % 4]); for (std::size_t edge = 0; edge < 4; ++edge) line(color, UINT32_MAX, corners.corners[(edge + 3) % 4], corners.corners[edge + 4]); }
-void WorldDebugDraw::drawBounds(std::uint32_t handle) {
-    if (g_sfera_client_config_runtime.render_options[3] == 0u || handle == g_sfera_world_objects.controlled_object_handle) return;
-    SphereWorld::ContactQuery::updateBounds(handle);
-    const auto* object = g_sfera_world_objects.object(handle);
-    const auto* model = g_sfera_world_objects.model(*object);
-    if (model->collision_kind == SphereRender::CollisionKind::OrientedBounds || model->collision_kind == SphereRender::CollisionKind::Triangles) { SferaBoundsCornersRuntime corners; std::copy_n(object->bounds_corners, 8u, corners.corners); box(corners, model->collision_kind == SphereRender::CollisionKind::OrientedBounds ? D3DCOLOR_ARGB(255, 0, 255, 0) : D3DCOLOR_ARGB(255, 255, 0, 0)); }
-    else if (model->collision_kind == SphereRender::CollisionKind::AxisAlignedBounds) box(SferaBoundsCornersRuntime::fromExtents(object->bounds_minimum, object->bounds_maximum), D3DCOLOR_ARGB(255, 0, 0, 255));
-    draw(); clear();
-}
 
 namespace SphereRender {
 namespace { void poseWarning(const char* message) { g_sfera_window_runtime.diagnostic_message[0] = 0; WorldDiagnostics::appendScriptContext(message); WorldDiagnostics::flushScriptContext(); } }
@@ -11461,17 +10677,17 @@ const CharacterAppearance& CharacterModels::appearance(const ExtendedWorldObject
 std::int32_t CharacterModels::partAnimationLength(const ExtendedWorldObject& object, std::int32_t animation) const { const auto& skeleton = skeletons[appearance(object).sex]; return animation < 0 || std::cmp_greater_equal(animation, skeleton.animation_lengths.size()) ? -1 : static_cast<int>(skeleton.animation_lengths[animation]); }
 std::int32_t CharacterModels::usesSmallHelm(std::int32_t sex, std::int32_t code) const { return sex == 0 ? 0 : small_helm[code > '9' ? code - 'a' + 10 : code - '0']; }
 std::uint32_t* CharacterModels::parameter(SferaBoundCheckArray<std::uint32_t>& array, std::int32_t index) { auto* result = array.element(static_cast<std::size_t>(index)); if (result == nullptr) WorldDiagnostics::fail("Character parameter index is out of bounds"); return result; }
-ExtendedWorldObject* CharacterModels::checkedExtended(WorldObject* object, const char* source, std::uint32_t line) { if (object == nullptr || object->extended_pose_available) return static_cast<ExtendedWorldObject*>(object); const auto* model = g_sfera_world_objects.model(*object); const auto message = std::string("Try to get extended from superstatic: ") + (model == nullptr ? "<none>" : model->name) + ", " + source + ":" + std::to_string(line); WorldDiagnostics::fail(message.c_str()); }
+ExtendedWorldObject* CharacterModels::checkedExtended(WorldObject* object) { if (object == nullptr || object->extended_pose_available) return static_cast<ExtendedWorldObject*>(object); const auto* model = g_sfera_world_objects.model(*object); const auto message = std::string("Try to get extended from superstatic: ") + (model == nullptr ? "<none>" : model->name); WorldDiagnostics::fail(message.c_str()); }
 void CharacterModels::setAppearance(std::int32_t handle, const CharacterAppearance& value) {
     if (handle < 0) { g_sfera_log_runtime.files[0].write("Wrong handle: set_char_param\n"); return; }
-    auto* object = checkedExtended(g_sfera_world_objects.object(handle), "..\\ShareClientSeverCode\\CharMdl.cpp", 566u);
+    auto* object = checkedExtended(g_sfera_world_objects.object(handle));
     if (object->render_cache_handle > 0) WorldDiagnostics::fail("Character model has a non-character render cache");
     if (object->render_cache_handle >= 0) { auto slot = std::find_if(std::begin(instances), std::end(instances), [](const auto& entry) { return entry.owner == nullptr; }); if (slot == std::end(instances)) WorldDiagnostics::fail("Character model instance limit reached"); slot->owner = object; object->render_cache_handle = -1 - static_cast<std::int32_t>(slot - instances); }
     auto& current = instances[-1 - object->render_cache_handle].appearance;
     if (value.parts[12] != 0u) { const char name[]{'m', 's', static_cast<char>(value.parts[12]), '\0'}; g_sfera_world_objects.linkModel(handle, name, 3u); } else if (current.parts[12] != 0u) g_sfera_world_objects.unlink(handle, 3u);
     current = value;
 }
-bool CharacterModels::getAppearance(std::int32_t handle, CharacterAppearance& value) const { if (handle < 0) { g_sfera_log_runtime.files[0].write("Wrong handle: get_char_param\n"); return false; } const auto* object = checkedExtended(g_sfera_world_objects.object(handle), "..\\ShareClientSeverCode\\CharMdl.cpp", 618u); if (object->render_cache_handle >= 0) return false; value = appearance(*object); return true; }
+bool CharacterModels::getAppearance(std::int32_t handle, CharacterAppearance& value) const { if (handle < 0) { g_sfera_log_runtime.files[0].write("Wrong handle: get_char_param\n"); return false; } const auto* object = checkedExtended(g_sfera_world_objects.object(handle)); if (object->render_cache_handle >= 0) return false; value = appearance(*object); return true; }
 SferaVec3F CharacterModels::neckPosition(const ExtendedWorldObject& object) const { const auto world = SferaMatrix4x4F::fromEuler(object.position, object.rotation); const auto& skeleton = skeletons[appearance(object).sex]; std::vector<SferaMatrix4x4F> pose(skeleton.parents.size()); animate(skeleton, object.animation, object.frame, object.animation_secondary, object.frame_secondary, object.interpolation, pose.data(), true); const auto neck = skeleton.attachments[6]; const auto combined = characterMultiply(skeleton.initial_pose[neck], pose[neck]); return world.transformPoint({combined.m[3][0], combined.m[3][1], combined.m[3][2]}); }
 HRESULT CharacterModels::setMaterial(float opacity, float detail, const SferaVec3F& color) { const float intensity = double(detail) * 0.699999988079071 + 0.30000001192092896; D3DMATERIAL9 material{}; material.Diffuse = {intensity * color.x, intensity * color.y, intensity * color.z, opacity}; material.Ambient = {material.Diffuse.r, material.Diffuse.g, material.Diffuse.b, 0.0f}; auto& device = *g_sfera_graphics_runtime.d3d_runtime; return device.checkResult(device.native_device->SetMaterial(&material), "SetMaterial"); }
 std::int32_t CharacterModels::textureVariants(bool female, char part) { std::string path = "models\\textures\\wf00.dds"; path[16] = female ? 'w' : 'm'; path[17] = part; g_sfera_files.setErrorReporting(false); std::int32_t count = 0; for (;;) { path[18] = count <= 9 ? '0' + count : 'a' + count - 10; if (g_sfera_files.fileSize(path.c_str()) == -1) break; ++count; } g_sfera_files.setErrorReporting(true); return count; }
@@ -11599,14 +10815,14 @@ void CharacterModels::updateEffectFrames(ExtendedWorldObject& object, const Char
     auto& attached = pose[skeleton.attachments[0]]; object.effect_frame_position_c = world.transformPoint({attached.m[3][0], attached.m[3][1], attached.m[3][2]}); attached.m[3][0] = attached.m[3][1] = attached.m[3][2] = 0.0f; attached = attached.transposed(); auto attachmentFrame = characterMultiply(world, attached); attachmentFrame.m[0][3] = attachmentFrame.m[1][3] = attachmentFrame.m[2][3] = 0.0f; std::memcpy(object.effect_frame_transform_b, &attachmentFrame, sizeof(attachmentFrame)); std::memcpy(object.effect_frame_transform_c, &attachmentFrame, sizeof(attachmentFrame));
 }
 void CharacterModels::drawLowDetail(std::uint32_t handle) {
-    auto* object = checkedExtended(g_sfera_world_objects.object(handle), "..\\ShareClientSeverCode\\CharMdl.cpp", 1149u); if (!object->render_enabled) return;
+    auto* object = checkedExtended(g_sfera_world_objects.object(handle)); if (!object->render_enabled) return;
     const auto world = SferaMatrix4x4F::fromEuler(object->position, object->rotation); const auto visible = classify(world); if (visible == 0) return; const auto transform = world.transposed(); auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(transform));
     const auto& view = g_sfera_view_spatial_runtime; g_sfera_light_runtime.setDirectionalLight({-view.position_offset.x, -view.position_offset.y, -view.position_offset.z}, {view.basis[3].x, view.basis[3].y, view.basis[3].z}); SceneRenderer::activateObjectLights(handle); SceneRenderer::setAmbientColor();
     const auto& parameters = appearance(*object); const auto& skeleton = skeletons[parameters.sex]; std::vector<SferaMatrix4x4F> pose(skeleton.parents.size()); animate(skeleton, object->animation, object->frame, object->animation_secondary, object->frame_secondary, object->interpolation, pose.data(), true);
     setMaterial(object->scale, 0.0f, {1.0f, 1.0f, 1.0f}); if (object->scale != 1.0f) device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA); drawPart(parameters.sex, 'd' - 'a', '0', visible, skeleton, pose.data(), true, object->scale != 1.0f, '0', 1u); setMaterial(1.0f, 1.0f, {1.0f, 1.0f, 1.0f}); if (object->scale != 1.0f) device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE); characterDisableLights(1208u); updateEffectFrames(*object, skeleton, pose, world);
 }
 void CharacterModels::draw(std::uint32_t handle, std::uint32_t color) {
-    auto* object = checkedExtended(g_sfera_world_objects.object(handle), "..\\ShareClientSeverCode\\CharMdl.cpp", 946u); if (!object->render_enabled) return; const auto world = SferaMatrix4x4F::fromEuler(object->position, object->rotation); const auto visible = classify(world); if (visible == 0) return; ++rendered_count;
+    auto* object = checkedExtended(g_sfera_world_objects.object(handle)); if (!object->render_enabled) return; const auto world = SferaMatrix4x4F::fromEuler(object->position, object->rotation); const auto visible = classify(world); if (visible == 0) return; ++rendered_count;
     const float detail = !g_sfera_graphics_runtime.lods_enabled ? 1.0f : static_cast<float>(visibility(*object)); if (detail < 0.001f) { drawLowDetail(handle); return; }
     auto& device = *g_sfera_graphics_runtime.d3d_runtime; const auto transform = world.transposed(); device.setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(transform)); const auto& view = g_sfera_view_spatial_runtime; g_sfera_light_runtime.setDirectionalLight({-view.position_offset.x, -view.position_offset.y, -view.position_offset.z}, {view.basis[3].x, view.basis[3].y, view.basis[3].z}); SceneRenderer::activateObjectLights(handle); SceneRenderer::setAmbientColor();
     float shadowFade = 0.0f; ShadowMap::prepareObject(handle, *object, 1.0f, 1.0f, shadowFade);
@@ -11742,25 +10958,25 @@ void GameCamera::setupViewport(std::uint32_t x, std::uint32_t y, std::uint32_t w
     SferaVec3F forward, up; cameraAxes(forward, up);
     const auto* camera = g_sfera_world_objects.object(1u);
     const auto target = camera->position + forward;
-    auto& matrices = g_sfera_d3d9_semantic_state;
+    SferaMatrix4x4F view_matrix = SferaMatrix4x4F::identity();
+    SferaMatrix4x4F projection_matrix{};
     auto view_z = camera->position - target;
     view_z.normalize();
     auto view_x = up.cross(view_z);
     view_x.normalize();
     const auto view_y = view_z.cross(view_x);
-    matrices.view_matrix = SferaMatrix4x4F::identity();
-    matrices.view_matrix.m[0][0] = view_x.x;
-    matrices.view_matrix.m[0][1] = view_y.x;
-    matrices.view_matrix.m[0][2] = view_z.x;
-    matrices.view_matrix.m[1][0] = view_x.y;
-    matrices.view_matrix.m[1][1] = view_y.y;
-    matrices.view_matrix.m[1][2] = view_z.y;
-    matrices.view_matrix.m[2][0] = view_x.z;
-    matrices.view_matrix.m[2][1] = view_y.z;
-    matrices.view_matrix.m[2][2] = view_z.z;
-    matrices.view_matrix.m[3][0] = -view_x.dot(camera->position);
-    matrices.view_matrix.m[3][1] = -view_y.dot(camera->position);
-    matrices.view_matrix.m[3][2] = -view_z.dot(camera->position);
+    view_matrix.m[0][0] = view_x.x;
+    view_matrix.m[0][1] = view_y.x;
+    view_matrix.m[0][2] = view_z.x;
+    view_matrix.m[1][0] = view_x.y;
+    view_matrix.m[1][1] = view_y.y;
+    view_matrix.m[1][2] = view_z.y;
+    view_matrix.m[2][0] = view_x.z;
+    view_matrix.m[2][1] = view_y.z;
+    view_matrix.m[2][2] = view_z.z;
+    view_matrix.m[3][0] = -view_x.dot(camera->position);
+    view_matrix.m[3][1] = -view_y.dot(camera->position);
+    view_matrix.m[3][2] = -view_z.dot(camera->position);
     const float width_value = static_cast<std::int32_t>(width), height_value = static_cast<std::int32_t>(height);
     const float aspect = double(width_value) / height_value;
     const float half_angle = double(settings.z) * 0.5;
@@ -11769,12 +10985,12 @@ void GameCamera::setupViewport(std::uint32_t x, std::uint32_t y, std::uint32_t w
     const float vertical_angle = double(static_cast<float>(std::atan(double(vertical_tangent)))) * 2.0;
     const float projection_y = 1.0f / std::tan(vertical_angle * 0.5f);
     const float depth_range = settings.x - settings.y;
-    matrices.projection_matrix = {};
-    matrices.projection_matrix.m[0][0] = projection_y / aspect;
-    matrices.projection_matrix.m[1][1] = projection_y;
-    matrices.projection_matrix.m[2][2] = settings.y / depth_range;
-    matrices.projection_matrix.m[2][3] = -1.0f;
-    matrices.projection_matrix.m[3][2] = settings.x * settings.y / depth_range;
+    projection_matrix = {};
+    projection_matrix.m[0][0] = projection_y / aspect;
+    projection_matrix.m[1][1] = projection_y;
+    projection_matrix.m[2][2] = settings.y / depth_range;
+    projection_matrix.m[2][3] = -1.0f;
+    projection_matrix.m[3][2] = settings.x * settings.y / depth_range;
     g_sfera_model_transform_scratch_matrix = SferaMatrix4x4F::fromEuler(camera->position, camera->rotation);
     g_sfera_camera.setPerspective(settings.x, settings.y, settings.z);
     g_sfera_camera.setTransform(g_sfera_model_transform_scratch_matrix.multiplied(g_sfera_model_coordinate_matrix));
@@ -11783,7 +10999,7 @@ void GameCamera::setupViewport(std::uint32_t x, std::uint32_t y, std::uint32_t w
     const D3DVIEWPORT9 viewport{x, y, width, height, 0.0f, 1.0f};
     device.native_device->SetViewport(&viewport);
     const auto identity = SferaMatrix4x4F::identity();
-    device.setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(identity)); device.setTransform(D3DTS_VIEW, reinterpret_cast<const D3DMATRIX&>(matrices.view_matrix)); device.setTransform(D3DTS_PROJECTION, reinterpret_cast<const D3DMATRIX&>(matrices.projection_matrix));
+    device.setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(identity)); device.setTransform(D3DTS_VIEW, reinterpret_cast<const D3DMATRIX&>(view_matrix)); device.setTransform(D3DTS_PROJECTION, reinterpret_cast<const D3DMATRIX&>(projection_matrix));
     rebuildVisibleVolume(static_cast<std::int32_t>(x), static_cast<std::int32_t>(y), static_cast<std::int32_t>(width - 1u), static_cast<std::int32_t>(height - 1u));
 }
 
@@ -11804,12 +11020,12 @@ void GameCamera::beginFrame(std::uint32_t mode, bool reflection, float water_hei
     }
     const auto save_camera = [&] { g_sfera_camera.saved_camera_position_ = camera->position; g_sfera_camera.saved_camera_rotation_ = camera->rotation; };
     if (reflection) { save_camera(); camera->position.y = (double(water_height) + water_height) - camera->position.y; g_sfera_world_objects.reflectReferenceOrientation(); }
-    if (mode == 2u || g_sfera_client_config_runtime.render_options[1] != 0u) { save_camera(); if (controlled != nullptr) camera->position = controlled->position; camera->position.y = double(camera->position.y) - 1000.0; camera->rotation = {-4.7123894691467285f, 1.5707964897155762f, -1.5707964897155762f}; g_sfera_world_objects.recalculateBasis(1u); }
+    if (mode == 2u) { save_camera(); if (controlled != nullptr) camera->position = controlled->position; camera->position.y = double(camera->position.y) - 1000.0; camera->rotation = {-4.7123894691467285f, 1.5707964897155762f, -1.5707964897155762f}; g_sfera_world_objects.recalculateBasis(1u); }
 }
 
 void GameCamera::endFrame(std::uint32_t mode, bool reflection) {
     if (g_sfera_client_config_runtime.state_27 != 0u) if (auto* controlled = g_sfera_world_objects.object(g_sfera_world_objects.controlled_object_handle)) controlled->position = g_sfera_camera.saved_controlled_position_;
-    if (mode != 2u && g_sfera_client_config_runtime.render_options[1] == 0u && !reflection) return;
+    if (mode != 2u && !reflection) return;
     auto* camera = g_sfera_world_objects.object(1u);
     if (camera == nullptr) WorldDiagnostics::fail("Camera object is missing");
     camera->position = g_sfera_camera.saved_camera_position_; camera->rotation = g_sfera_camera.saved_camera_rotation_;
@@ -11969,7 +11185,7 @@ void SceneSky::drawLayers(const SceneSkyLayers& layers) {
 void SceneSky::orbit(float& x, float& y, std::uint32_t orbit) { const float angle = g_sfera_recovered_static_runtime.animation_phase * 3.1415929794311523 * 2.0 * static_cast<std::int32_t>(orbit + 1u); x = static_cast<double>(x) + static_cast<float>(static_cast<float>(std::cos(static_cast<double>(angle))) * 0.019999999552965164); y = static_cast<double>(y) + static_cast<float>(static_cast<float>(std::sin(static_cast<double>(angle))) * 0.019999999552965164); }
 float SceneSky::horizonFog(float elevation, float amount) { const float position = elevation < 0.0f ? 0.0f : elevation > 0.4000000059604645 ? 1.0f : static_cast<float>(static_cast<double>(elevation) / 0.4000000059604645); return static_cast<double>(position) * amount; }
 void SceneSky::sampleDirection(bool refresh, const SferaVec3F& direction) {
-    if (g_sfera_view_spatial_runtime.alternate_projection == 1u) { g_sfera_client_main_scalar_runtime.state_01 = 0u; g_sfera_main_aux_runtime.color_component = 0u; g_sfera_recovered_static_runtime.animation_result_b = 0u; g_sfera_recovered_static_runtime.render_state_09 = 0u; return; }
+    if (g_sfera_view_spatial_runtime.alternate_projection == 1u) { g_sfera_client_main_scalar_runtime.state_01 = 0u; g_sfera_main_aux_runtime.color_component = 0u; g_sfera_recovered_static_runtime.render_state_09 = 0u; return; }
     const float azimuth = std::atan2(static_cast<double>(direction.z), direction.x); const float cosine = std::cos(static_cast<double>(-azimuth)); const float sine = std::sin(static_cast<double>(-azimuth)); const float horizontal = static_cast<double>(cosine) * direction.x - static_cast<double>(sine) * direction.z; const float elevation = static_cast<float>(std::atan2(static_cast<double>(direction.y), horizontal)) + 1.5707964897155762; g_sfera_main_ui_state_runtime.scene_scale = azimuth; g_sfera_main_command_state_runtime.sky_blend_factor = elevation; const float latitude = elevation * 0.31830985316916194;
     float longitude = static_cast<float>(std::atan2(static_cast<double>(direction.y), direction.x)) - 1.5707964897155762; if (longitude < 0.0f) longitude = longitude + 6.283185958862305; longitude = longitude * 0.15915492658458097;
     if (refresh) { SkyState state; const auto environment = SphereWorld::Vegetation::alternatePatterns() ? g_sfera_main_aux_runtime.secondary_world_manager : g_sfera_primary_sky_environment; environment->sample(g_sfera_graphics_runtime.environment_factor, state); auto& interpolation = g_sfera_sky_interpolation_runtime; std::copy(std::begin(state.primaryColors), std::end(state.primaryColors), interpolation.primary_samples); std::copy(std::begin(state.primaryPositions), std::end(state.primaryPositions), interpolation.primary_key_positions); interpolation.primary_reference = state.reference; std::copy(std::begin(state.secondaryColors), std::end(state.secondaryColors), interpolation.secondary_samples); std::copy(std::begin(state.secondaryPositions), std::end(state.secondaryPositions), interpolation.secondary_key_positions); }
@@ -11977,14 +11193,21 @@ void SceneSky::sampleDirection(bool refresh, const SferaVec3F& direction) {
     const auto sun = SferaVec3F{g_sfera_view_spatial_runtime.position_offset.x, g_sfera_view_spatial_runtime.position_offset.y, g_sfera_view_spatial_runtime.position_offset.z}; float glow = direction.dot(sun) * inverse; if (glow < 0.0f) glow = 0.0f; else for (int square = 0; square < 6; ++square) glow = static_cast<double>(glow) * glow; g_sfera_scene_control_runtime.environment_parameter = glow;
     const auto overlay = skyPeriodicSample(samples.secondary_key_positions, samples.secondary_samples, latitude); const float amount = static_cast<double>(overlay.w) / 255.0; color.x = skyLerp(color.x, overlay.x, amount); color.y = skyLerp(color.y, overlay.y, amount); color.z = skyLerp(color.z, overlay.z, amount);
     const float fog = horizonFog(latitude, g_sfera_view_spatial_runtime.basis[0].x); color.x = skyLerp(color.x, g_sfera_view_spatial_runtime.basis[1].x, fog); color.y = skyLerp(color.y, g_sfera_view_spatial_runtime.basis[1].y, fog); color.z = skyLerp(color.z, g_sfera_view_spatial_runtime.basis[1].z, fog); const float opacity = static_cast<float>(overlay.w + static_cast<double>(color.w)) + fog * 255.0;
-    auto rounded = [](float value) { return std::min(static_cast<std::int32_t>(std::nearbyint(value)), 255); }; const auto red = rounded(color.x); const auto green = rounded(color.y); const auto blue = rounded(color.z); const auto alpha = rounded(opacity); g_sfera_client_main_scalar_runtime.state_01 = red; g_sfera_main_aux_runtime.color_component = green; g_sfera_recovered_static_runtime.animation_result_b = blue; g_sfera_render_lookup_runtime.alpha_component = 255u - alpha; g_sfera_recovered_static_runtime.render_state_09 = SferaColor::rgba(red, green, blue, 0).argb();
+    auto rounded = [](float value) { return std::min(static_cast<std::int32_t>(std::nearbyint(value)), 255); }; const auto red = rounded(color.x); const auto green = rounded(color.y); const auto alpha = rounded(opacity); g_sfera_client_main_scalar_runtime.state_01 = red; g_sfera_main_aux_runtime.color_component = green; g_sfera_render_lookup_runtime.alpha_component = 255u - alpha; g_sfera_recovered_static_runtime.render_state_09 = SferaColor::rgba(red, green, rounded(color.z), 0).argb();
 }
 namespace {
 SphereRender::GameCamera& skyCamera() { return g_sfera_camera; }
 void skyWrap(float& value, float period) { while (value < 0.0f) value = static_cast<double>(value) + period; while (value >= period) value = static_cast<double>(value) - period; }
 }
 double SceneSky::drawStars() {
-    auto& motion = g_sfera_view_motion_runtime; motion.update_serial |= 7u; const bool secondary = g_sfera_main_render_runtime.secondary_render_pass != 0u; const auto width = g_sfera_graphics_runtime.display_width; const auto height = g_sfera_graphics_runtime.display_height; auto& cellWidth = g_sfera_recovered_static_runtime.ui_cell_width; auto& cellHeight = g_sfera_main_ui_state_runtime.scene_factor; cellWidth = secondary ? 25.600000381469727f : static_cast<float>(static_cast<double>(width) / 10.0); cellHeight = secondary ? 32.0f : static_cast<float>(height * 0.125); g_sfera_static_render_lookup_runtime.projection_scale = width * 0.5; g_sfera_main_view_state_runtime.projection_scale = height * 0.5;
+    auto& motion = g_sfera_view_motion_runtime;
+    const bool secondary = g_sfera_main_render_runtime.secondary_render_pass != 0u;
+    const auto width = g_sfera_graphics_runtime.display_width;
+    const auto height = g_sfera_graphics_runtime.display_height;
+    const float cellWidth = secondary ? 25.600000381469727f : static_cast<float>(static_cast<double>(width) / 10.0);
+    const float cellHeight = secondary ? 32.0f : static_cast<float>(height * 0.125);
+    g_sfera_static_render_lookup_runtime.projection_scale = width * 0.5;
+    g_sfera_main_view_state_runtime.projection_scale = height * 0.5;
     const auto* corners = g_sfera_view_geometry_runtime.reference_points; const auto horizontal = corners[2] - corners[1]; const auto vertical = corners[4] - corners[1];
     if (!secondary) {
         const auto halfHorizontal = horizontal * 0.5f; const auto midpoint = corners[1] + (halfHorizontal + vertical * 0.5f); const auto center = corners[0] + (midpoint - corners[0]) * 0.10000000149011612f; const auto offset = center + halfHorizontal * 0.009999999776482582f;
@@ -12025,7 +11248,7 @@ namespace SphereRender {
 SferaVec3F& SceneRenderer::observerPosition(SferaVec3F& output) { const auto handle = g_sfera_client_config_runtime.state_27 != 0u && g_sfera_world_objects.controlled_object_handle != UINT32_MAX ? g_sfera_world_objects.controlled_object_handle : 1u; output = g_sfera_world_objects.object(handle)->position; return output; }
 void SceneRenderer::setupEnvironment(std::uint32_t mode, bool useDefault, float time, SferaViewSpatialRuntime& output) {
     for (auto& value : output.basis) value = {}; output.alternate_projection = 0u; output.position_offset = {}; output.scale = {}; output.world_anchor.x = 0.0f;
-    SferaVec3F position{}; observerPosition(position); const bool interior = !useDefault && position.y > 1000.0f && g_sfera_client_config_runtime.render_options[4] == 0u; output.alternate_projection = interior;
+    SferaVec3F position{}; observerPosition(position); const bool interior = !useDefault && position.y > 1000.0f; output.alternate_projection = interior;
     if (mode == 2u) output.scale.z = 0.03490658950558778f; else { const float tangent = std::tan(0.6000000238418579); const float aspect = static_cast<double>(g_sfera_graphics_runtime.display_height) / g_sfera_graphics_runtime.display_width; const float scaled = static_cast<double>(tangent) / (aspect / 0.75); const float angle = std::atan(static_cast<double>(scaled)); output.scale.z = angle * 2.0; }
     output.scale.x = mode == 2u ? 997.0f : 0.10000000149011612f;
     if (interior) {
@@ -12035,28 +11258,25 @@ void SceneRenderer::setupEnvironment(std::uint32_t mode, bool useDefault, float 
         const bool alternate = SphereWorld::Vegetation::alternatePatterns(); const auto& sky = *(alternate ? g_sfera_main_aux_runtime.secondary_world_manager : g_sfera_primary_sky_environment); SferaVec3F direction{}; sky.sunDirection(time, direction); output.position_offset.x = direction.x; output.position_offset.y = direction.y; output.position_offset.z = direction.z;
         auto& zones = *(alternate ? g_sfera_alternate_environment_zones : g_sfera_recovered_static_runtime.scene_state_08); EnvironmentLighting lighting{}; zones.calculate(useDefault, position.x, position.z, time, sky, lighting); const SferaVec3F* colors[] = {&lighting.fogParameters, &lighting.fogColor, &lighting.ambientColor, &lighting.sunColor}; for (std::size_t index = 0u; index < 4u; ++index) { output.basis[index].x = colors[index]->x; output.basis[index].y = colors[index]->y; output.basis[index].z = colors[index]->z; }
     }
-    if (g_sfera_client_config_runtime.render_options[1] != 0u) { output.basis[0].y = 1040.0f; output.basis[0].z = 1050.0f; output.scale.x = 100.0f; output.scale.y = 1050.0f; output.scale.z = 0.20000000298023224f; }
-    if (g_sfera_client_config_runtime.render_options[6] != 0u && mode != 2u) { output.basis[0].y = 180.0f; output.basis[0].z = 200.0f; output.scale.y = 200.0f; }
     if (output.basis[0].z > output.scale.y) { output.basis[0].z = output.scale.y; if (output.basis[0].y + 20.0 > output.basis[0].z) output.basis[0].y = std::max(0.0f, static_cast<float>(output.basis[0].z - 20.0)); }
 }
 namespace {
 std::size_t sceneAnimationFrame(Model& model, std::int32_t animation, std::int32_t frame) { if (animation < 0 || animation >= model.animation_count) { animation = 0; frame = 0; } std::size_t absolute = 0u; for (std::int32_t index = 0; index < animation; ++index) absolute += model.animation_lengths[index]; if (frame < 0 || frame >= model.animation_lengths[animation]) frame = 0; return absolute + static_cast<std::size_t>(frame); }
 }
 void SceneRenderer::drawObjects(bool updateVegetation) {
-    if (g_sfera_client_config_runtime.render_options[2] != 0u) return;
     if (g_sfera_shadows && g_sfera_view_spatial_runtime.alternate_projection == 0u) { const auto sun = g_sfera_view_spatial_runtime.position_offset; auto& fade = g_sfera_graphics_runtime.view_scale; fade = 0.0f; if (sun.y < 0.4000000059604645f) fade = std::fabs(static_cast<float>(sun.y - 0.4000000059604645)) / 1.399999976158142; const float half = fade * 0.5; fade = 1.0 - half; g_sfera_shadows->setDirection(sun, fade); g_sfera_shadows->save(); }
-    const auto savedGrassMode = g_sfera_main_render_runtime.grass_depth_mode; const auto controlled = g_sfera_world_objects.controlled_object_handle; if (controlled == UINT32_MAX || CharacterModels::checkedExtended(g_sfera_world_objects.object(controlled), "..\\ShareClientSeverCode\\main.cpp", __LINE__)->position.y > 1000.0f) g_sfera_main_render_runtime.grass_depth_mode = 0u;
+    const auto savedGrassMode = g_sfera_main_render_runtime.grass_depth_mode; const auto controlled = g_sfera_world_objects.controlled_object_handle; if (controlled == UINT32_MAX || CharacterModels::checkedExtended(g_sfera_world_objects.object(controlled))->position.y > 1000.0f) g_sfera_main_render_runtime.grass_depth_mode = 0u;
     auto* vegetation = g_sfera_world_render_runtime.world_spatial_index; if (updateVegetation && g_sfera_main_render_runtime.grass_depth_mode == 2u) { vegetation->acquire(); vegetation->setDepthMode(g_sfera_main_render_runtime.grass_depth_mode != 0u); } if (updateVegetation) g_sfera_vegetation.updateCells();
-    const auto center = g_sfera_world_objects.object(1u)->position; g_sfera_world_spatial.gatherObjects(center, g_sfera_client_config_runtime.render_options[1] != 0u ? 80.0f : g_sfera_main_input_state_runtime.motion_y); const auto count = g_sfera_landscape_patch_lookup_runtime.active_count; g_sfera_main_command_state_runtime.draw_selection_state = count; auto* entries = g_sfera_scene_array_runtime.object_positions.data;
+    const auto center = g_sfera_world_objects.object(1u)->position; g_sfera_world_spatial.gatherObjects(center, g_sfera_main_input_state_runtime.motion_y); const auto count = g_sfera_landscape_patch_lookup_runtime.active_count; auto* entries = g_sfera_scene_array_runtime.object_positions.data;
     for (std::uint32_t index = 0u; index < count; ++index) { const auto handle = *g_sfera_character_index_map.element(index); const auto& object = *g_sfera_world_objects.object(handle); const auto delta = object.position - center; entries[index] = {handle, object.owns_model ? g_sfera_models.count() + handle : static_cast<std::size_t>(object.model_id), std::sqrt(static_cast<float>(delta.dot(delta)))}; }
-    if (count > 0u) sortObjects(0, static_cast<std::int32_t>(count) - 1); if (updateVegetation && g_sfera_main_render_runtime.grass_depth_mode == 2u) vegetation->collectModels({entries, count}); sceneDevice().vertices32.position = 30000u; g_sfera_window_runtime.render_state_word = 1u;
+    if (count > 0u) sortObjects(0, static_cast<std::int32_t>(count) - 1); if (updateVegetation && g_sfera_main_render_runtime.grass_depth_mode == 2u) vegetation->collectModels({entries, count}); sceneDevice().vertices32.position = 30000u;
     if (g_sfera_main_render_runtime.secondary_render_pass == 0u || g_sfera_options_dialog_runtime.reflection_quality > 1u) for (std::uint32_t index = 0u; index < count; ++index) {
         const auto handle = entries[index].object; if (handle == 1u) continue; auto& object = *g_sfera_world_objects.object(handle); if (object.extended_pose_available && !static_cast<ExtendedWorldObject&>(object).render_enabled) continue; const auto* model = g_sfera_world_objects.model(object); if (model->animation_count != 0u) continue;
         if (object.owns_model) { const auto height = object.position.y; raiseDistantObject(handle); if (updateVegetation) drawModel(handle); object.position.y = height; } else drawModel(handle);
     }
     if (updateVegetation && g_sfera_main_render_runtime.grass_depth_mode == 2u) vegetation->update();
     if (g_sfera_main_render_runtime.secondary_render_pass == 0u || g_sfera_options_dialog_runtime.reflection_quality > 2u) for (std::uint32_t index = 0u; index < count; ++index) {
-        const auto handle = entries[index].object; if (handle == 1u) continue; auto* base = g_sfera_world_objects.object(handle); if (!base->extended_pose_available) continue; auto& object = *CharacterModels::checkedExtended(base, "..\\ShareClientSeverCode\\main.cpp", __LINE__); auto& model = *g_sfera_world_objects.model(object); if (model.animation_count == 0u || !object.render_enabled) continue;
+        const auto handle = entries[index].object; if (handle == 1u) continue; auto* base = g_sfera_world_objects.object(handle); if (!base->extended_pose_available) continue; auto& object = *CharacterModels::checkedExtended(base); auto& model = *g_sfera_world_objects.model(object); if (model.animation_count == 0u || !object.render_enabled) continue;
         if (object.render_cache_handle >= 0) { g_sfera_client_main_scalar_runtime.primary_animation_frame = sceneAnimationFrame(model, object.animation, object.frame); g_sfera_main_input_state_runtime.input_enabled = false; if (object.interpolation > 0.009999999776482582f) { g_sfera_main_input_state_runtime.input_enabled = true; g_sfera_sky_runtime.horizon_scale = object.interpolation; g_sfera_render_sample_runtime.secondary_animation_frame = sceneAnimationFrame(model, object.animation_secondary, object.frame_secondary); } }
         if (model.trace_distance > 0.0f && updateVegetation && g_sfera_main_render_runtime.grass_depth_mode == 2u) vegetation->addInfluence(object.position.x, object.position.z, model.trace_distance, handle);
         if (object.render_cache_handle >= 0) drawObject(handle); else { const auto shade = terrainShade(model.landscape_shadow_alpha, object.position.x, object.position.z); g_sfera_recovered_static_runtime.render_state_08->draw(handle, SferaColor::rgba(shade, shade, shade, 0).argb()); }
@@ -12108,10 +11328,10 @@ void SceneRenderer::drawReflection() {
 }
 void SceneRenderer::drawFrame() {
     if (!g_sfera_texture_cache_runtime.cache_enabled) { if (!g_sfera_window_runtime.windowed) return; ::Sleep(100u); }
-    const auto timestamp = WorldClock::nowTicks(); auto& previous = g_sfera_grass_map_runtime.last_frame_timestamp; g_sfera_main_command_state_runtime.lighting_state = static_cast<std::uint32_t>(timestamp) - static_cast<std::uint32_t>(previous); previous = timestamp; g_sfera_main_input_state_runtime.motion_y = g_sfera_client_config_runtime.auto_fog ? g_sfera_graphics_runtime.saved_fog_distance : g_sfera_graphics_runtime.fog_distance; if (!g_sfera_window_runtime.runtime_debug_enabled) g_sfera_graphics_runtime.environment_factor = g_sfera_graphics_runtime.view_parameter;
-    if (g_sfera_view_spatial_runtime.alternate_projection != 0u) drawMinimap(); setupEnvironment(0u, g_sfera_world_render_runtime.feature_toggle, g_sfera_graphics_runtime.environment_factor, g_sfera_view_spatial_runtime); if (g_sfera_options_dialog_runtime.reflection_quality > 0u && g_sfera_client_config_runtime.render_options[1] == 0u) drawReflection();
+    const auto timestamp = WorldClock::nowTicks(); auto& previous = g_sfera_grass_map_runtime.last_frame_timestamp; g_sfera_main_command_state_runtime.lighting_state = static_cast<std::uint32_t>(timestamp) - static_cast<std::uint32_t>(previous); previous = timestamp; g_sfera_main_input_state_runtime.motion_y = g_sfera_client_config_runtime.auto_fog ? g_sfera_graphics_runtime.saved_fog_distance : g_sfera_graphics_runtime.fog_distance;
+    if (g_sfera_view_spatial_runtime.alternate_projection != 0u) drawMinimap(); setupEnvironment(0u, g_sfera_world_render_runtime.feature_toggle, g_sfera_graphics_runtime.environment_factor, g_sfera_view_spatial_runtime); if (g_sfera_options_dialog_runtime.reflection_quality > 0u) drawReflection();
     auto& device = sceneDevice(); if (device.beginScene()) {
-        const bool postEffects = device.supports_post_effects && g_sfera_graphics_runtime.post_effects_enabled; if (postEffects) { device.post_effects->setEnabled(true); device.post_effects->beginCapture(); } g_sfera_world_render_runtime.scene_active = true; GameCamera::beginFrame(0u, false, 0.0f); drawPass(0u); GameInterface::setRenderState(); sceneRenderState(D3DRS_ZENABLE, TRUE); sceneRenderState(D3DRS_ZWRITEENABLE, TRUE); GameInterface::drawAll(); sceneRenderState(D3DRS_ZENABLE, FALSE); sceneRenderState(D3DRS_ZWRITEENABLE, FALSE); if (postEffects) device.post_effects->compose(); WorldDebugDraw::draw(); GameInterface::drawFullscreenOverlay(); GameInterface::drawFrame(); GameCamera::endFrame(0u, false); device.checkResult(device.native_device->EndScene(), "EndScene"); waitForGpu(); g_sfera_world_render_runtime.scene_active = false; device.checkResult(device.native_device->Present(nullptr, nullptr, nullptr, nullptr), "Present");
+        const bool postEffects = device.supports_post_effects && g_sfera_graphics_runtime.post_effects_enabled; if (postEffects) { device.post_effects->setEnabled(true); device.post_effects->beginCapture(); } g_sfera_world_render_runtime.scene_active = true; GameCamera::beginFrame(0u, false, 0.0f); drawPass(0u); GameInterface::setRenderState(); sceneRenderState(D3DRS_ZENABLE, TRUE); sceneRenderState(D3DRS_ZWRITEENABLE, TRUE); GameInterface::drawAll(); sceneRenderState(D3DRS_ZENABLE, FALSE); sceneRenderState(D3DRS_ZWRITEENABLE, FALSE); if (postEffects) device.post_effects->compose(); GameInterface::drawFullscreenOverlay(); GameInterface::drawFrame(); GameCamera::endFrame(0u, false); device.checkResult(device.native_device->EndScene(), "EndScene"); waitForGpu(); g_sfera_world_render_runtime.scene_active = false; device.checkResult(device.native_device->Present(nullptr, nullptr, nullptr, nullptr), "Present");
     }
     g_sfera_recovered_static_runtime.render_state_08->updateLodDistance();
 }
@@ -12121,7 +11341,9 @@ namespace {
 struct SceneModelVertex { SferaVec3F position; SferaVec3F normal; float u; float v; };
 void sceneWorldTransform(const SferaMatrix4x4F& world) { const auto transform = world.transposed(); sceneDevice().setTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX&>(transform)); }
 std::uint32_t sceneClassifyModel(const Model& model, const SferaMatrix4x4F& world) { std::array<SferaVec3F, 8> corners; for (std::size_t index = 0u; index < corners.size(); ++index) corners[index] = world.transformPoint(model.collision_corners.corners[index]); return g_sfera_main_ui_state_runtime.clip_frustum.classifyPoints(corners); }
-void sceneSetFrame(const SferaMatrix4x4F& world) { g_sfera_character_frame_matrix = world; g_sfera_character_rotation_matrix = world; g_sfera_character_rotation_matrix.m[0][3] = 0.0f; g_sfera_character_rotation_matrix.m[1][3] = 0.0f; g_sfera_character_rotation_matrix.m[2][3] = 0.0f; }
+void sceneSetFrame(const SferaMatrix4x4F& world) {
+    g_sfera_character_frame_matrix = world;
+}
 float sceneDistance(const SferaVec3F& first, const SferaVec3F& second) { const auto difference = first - second; return std::sqrt(static_cast<float>(difference.dot(difference))); }
 float sceneUpdateFade(WorldObject& object, bool animated) { if (object.render_fade == -1.0f) object.render_fade = 1.0f; else { const double speed = animated && object.render_fade < 0.009999999776482582 ? 7.999999797903001e-05 : 0.0007999999797903001; const float amount = static_cast<std::int32_t>(g_sfera_main_command_state_runtime.lighting_state) * speed; object.render_fade = amount < 1.0f ? static_cast<float>(amount * (1.0 - object.render_fade) + object.render_fade) : 1.0f; } return object.render_fade; }
 void sceneScaleSun(float amount) { auto& sun = g_sfera_view_spatial_runtime.basis[3]; sun.x = static_cast<double>(sun.x) * amount; sun.y = static_cast<double>(sun.y) * amount; sun.z = static_cast<double>(sun.z) * amount; }
@@ -12140,22 +11362,22 @@ void sceneDrawSubmesh(const Model& model, const Submesh& part, DynamicIndexStrea
 }
 void SceneRenderer::drawModel(std::uint32_t handle) {
     if (g_sfera_recovered_static_runtime.scene_state_09 != 0u) g_sfera_recovered_static_runtime.scene_state_09 = SphereWorld::ContactQuery::lineOfSight(handle); auto& object = *g_sfera_world_objects.object(handle); auto& model = *g_sfera_world_objects.model(object); g_sfera_world_render_runtime.active_model = &model; if (object.extended_pose_available && !static_cast<ExtendedWorldObject&>(object).render_enabled) return; const bool linked = object.extended_pose_available && static_cast<ExtendedWorldObject&>(object).parent_object_handle != 0u;
-    sceneSetFrame(linked ? *g_sfera_scene_array_runtime.character_matrices.element(static_cast<ExtendedWorldObject&>(object).parent_link_slot) : SferaMatrix4x4F::fromEuler(object.position, object.rotation)); g_sfera_client_main_scalar_runtime.mode_01 = sceneClassifyModel(model, g_sfera_character_frame_matrix); if (g_sfera_client_main_scalar_runtime.mode_01 == 0u) return; const auto camera = g_sfera_character_frame_matrix.inverseTransformPoint(g_sfera_world_objects.object(1u)->position); WorldDebugDraw::drawBounds(handle); const auto savedSun = g_sfera_view_spatial_runtime.basis[3];
+    sceneSetFrame(linked ? *g_sfera_scene_array_runtime.character_matrices.element(static_cast<ExtendedWorldObject&>(object).parent_link_slot) : SferaMatrix4x4F::fromEuler(object.position, object.rotation)); g_sfera_client_main_scalar_runtime.mode_01 = sceneClassifyModel(model, g_sfera_character_frame_matrix); if (g_sfera_client_main_scalar_runtime.mode_01 == 0u) return; const auto camera = g_sfera_character_frame_matrix.inverseTransformPoint(g_sfera_world_objects.object(1u)->position); const auto savedSun = g_sfera_view_spatial_runtime.basis[3];
     if (!linked) { sceneScaleSun(sceneUpdateFade(object, false)); sceneDirectionalLight(); activateObjectLights(handle); for (std::size_t index = 0u; index < g_sfera_light_runtime.candidate_count; ++index) { auto& light = g_sfera_collision_scratch_runtime.light_candidates[index]; light.position = g_sfera_character_frame_matrix.inverseTransformPoint(light.position); const SferaVec3F radius{light.radius, light.radius, light.radius}; light.bounds_min = light.position - radius; light.bounds_max = light.position + radius; } }
     classifyBone(model.root_bone); sceneWorldTransform(g_sfera_character_frame_matrix); const auto distance = sceneDistance(object.position, g_sfera_view_geometry_runtime.reference_points[0]); float fade = 0.0f, remaining = 0.0f; modelFade(static_cast<float>(static_cast<double>(model.radius) / distance * model.lod_distance), model.lod_power, fade, remaining); if (object.lighting_color == 0u) { const auto tint = SferaColor::fromArgb(Material::randomColor(model.color_variation)); object.lighting_color = tint.withAlpha(tint.alpha() | terrainShade(model.landscape_shadow_alpha, object.position.x, object.position.z)).argb(); } std::uint32_t lastTexture = 0u;
     for (std::size_t index = 0u; index < model.submesh_count; ++index) {
         const auto& part = model.submeshes[index]; const auto& visible = g_sfera_render_lookup_runtime.entries[part.bone_index]; if (visible.resource == 0u) continue; const float opacity = part.inverted_fade ? remaining : fade; const bool fading = opacity > 9.99999993922529e-09 && 1.0 - opacity > 9.99999993922529e-09; if (opacity < 9.99999993922529e-09) continue;
         if (g_sfera_client_config_runtime.state_03 != 0u) g_sfera_shadows->projectModel(model, index, &g_sfera_character_frame_matrix); const auto& bone = model.bones[part.bone_index]; const bool pulled = bone.name[0] == '_' && bone.name[1] == 'z'; const bool alphaTest = bone.name[0] == '_' && (bone.name[1] == 's' || bone.name[1] == 'u' || bone.name[1] == 'c'); const auto* material = part.material; if (!material) throw std::out_of_range("Model material index"); sceneMaterialAmbient(*material);
         const auto lighting = SferaColor::fromArgb(object.lighting_color); const auto shade = lighting.alpha(); if (material->hasColorVariation || object.owns_model) { const auto shaded = lighting.scaledRgb(shade, 256u); setMaterialColor(shaded.red(), shaded.green(), shaded.blue()); } else setMaterialColor(shade, shade, shade); sceneSelectLights(visible.mask); const std::uint32_t texture = material->textures.at(0u); if (texture != lastTexture) { bindTexture(texture); lastTexture = texture; }
-        if (!sceneModelVertices(model, part, pulled ? &camera : nullptr, true)) return; g_sfera_texture_cache_runtime.upload_serial = part.vertex_count; std::uint32_t flags = CD3D9Device::lighting | (g_sfera_main_render_runtime.secondary_render_pass == 0u && visible.resource == 2u ? 1u : 0u) | (alphaTest ? 4u : 0u); if (fading) sceneRenderState(D3DRS_ALPHAREF, static_cast<std::uint32_t>(static_cast<std::int64_t>((1.0 - opacity) * 127.0)) + 128u); else if (alphaTest) sceneRenderState(D3DRS_ALPHAREF, 128u); sceneDrawSubmesh(model, part, sceneDevice().indices_primary, flags); if (fading || alphaTest) sceneRenderState(D3DRS_ALPHAREF, 1u);
+        if (!sceneModelVertices(model, part, pulled ? &camera : nullptr, true)) return; std::uint32_t flags = CD3D9Device::lighting | (g_sfera_main_render_runtime.secondary_render_pass == 0u && visible.resource == 2u ? 1u : 0u) | (alphaTest ? 4u : 0u); if (fading) sceneRenderState(D3DRS_ALPHAREF, static_cast<std::uint32_t>(static_cast<std::int64_t>((1.0 - opacity) * 127.0)) + 128u); else if (alphaTest) sceneRenderState(D3DRS_ALPHAREF, 128u); sceneDrawSubmesh(model, part, sceneDevice().indices_primary, flags); if (fading || alphaTest) sceneRenderState(D3DRS_ALPHAREF, 1u);
     }
     setMaterialColor(255, 255, 255); if (!linked) { g_sfera_view_spatial_runtime.basis[3] = savedSun; sceneDisableLights(__LINE__); }
 }
 }
 namespace SphereRender {
 void SceneRenderer::drawObject(std::uint32_t handle) {
-    if (g_sfera_recovered_static_runtime.scene_state_09 != 0u && handle != g_sfera_world_objects.controlled_object_handle) g_sfera_recovered_static_runtime.scene_state_09 = SphereWorld::ContactQuery::lineOfSight(handle); auto& object = *CharacterModels::checkedExtended(g_sfera_world_objects.object(handle), "..\\ShareClientSeverCode\\main.cpp", __LINE__); auto& model = *g_sfera_world_objects.model(object); g_sfera_world_render_runtime.active_model = &model; if (!object.render_enabled) return;
-    sceneSetFrame(SferaMatrix4x4F::fromEuler(object.position, object.rotation)); g_sfera_client_main_scalar_runtime.mode_01 = sceneClassifyModel(model, g_sfera_character_frame_matrix); if (g_sfera_client_main_scalar_runtime.mode_01 == 0u) return; WorldDebugDraw::drawBounds(handle); const auto distance = sceneDistance(object.position, g_sfera_view_geometry_runtime.reference_points[0]); g_sfera_main_command_state_runtime.lighting_enabled = static_cast<double>(model.radius) / distance * model.lod_distance < 0.20000000298023224;
+    if (g_sfera_recovered_static_runtime.scene_state_09 != 0u && handle != g_sfera_world_objects.controlled_object_handle) g_sfera_recovered_static_runtime.scene_state_09 = SphereWorld::ContactQuery::lineOfSight(handle); auto& object = *CharacterModels::checkedExtended(g_sfera_world_objects.object(handle)); auto& model = *g_sfera_world_objects.model(object); g_sfera_world_render_runtime.active_model = &model; if (!object.render_enabled) return;
+    sceneSetFrame(SferaMatrix4x4F::fromEuler(object.position, object.rotation)); g_sfera_client_main_scalar_runtime.mode_01 = sceneClassifyModel(model, g_sfera_character_frame_matrix); if (g_sfera_client_main_scalar_runtime.mode_01 == 0u) return; const auto distance = sceneDistance(object.position, g_sfera_view_geometry_runtime.reference_points[0]); g_sfera_main_command_state_runtime.lighting_enabled = static_cast<double>(model.radius) / distance * model.lod_distance < 0.20000000298023224;
     const auto savedSun = g_sfera_view_spatial_runtime.basis[3]; const auto savedDirection = g_sfera_view_spatial_runtime.position_offset; const float fade = sceneUpdateFade(object, true); sceneScaleSun(fade); if (fade < 0.009999999776482582) { auto& direction = g_sfera_view_spatial_runtime.position_offset; direction.x = 1.0f; direction.y = 0.0f; direction.z = 0.0f; SferaVec3F::rotatePair(direction.x, direction.z, static_cast<float>(object.rotation.x + 1.1693706972350526)); const float fallback = 45.0 - fade * 4500.0; auto& color = g_sfera_view_spatial_runtime.basis[3]; color.x = fallback; color.y = fallback; color.z = fallback; }
     sceneDirectionalLight(); activateObjectLights(handle); const bool shadow = handle != g_sfera_world_objects.controlled_object_handle && g_sfera_shadows->quality < 4u && object.scale == 1.0f; if (shadow) g_sfera_shadows->selectObjectLight(object); ModelPose::updateBone(g_sfera_character_frame_matrix, model.root_bone); object.effect_frame_position_a = g_sfera_scene_vector_runtime.transform_scratch; object.effect_frame_position_b = g_sfera_scene_vector_runtime.frame_101_position;
     float extension = 0.0f; const float originalShadowScale = model.shadow_scale;
@@ -12668,16 +11890,7 @@ void SferaNatureManager::updateRain() { updateNatureWeather(g_sfera_weather_runt
 void SferaNatureManager::updateLightning() { updateNatureWeather(g_sfera_weather_runtime.current.lightning, g_sfera_frame_runtime.lightning_enabled, &SferaNatureManager::startLighting, &SferaNatureManager::stopLighting, &SferaNatureManager::setLightingLevel); }
 
 float EnvironmentZone::weight(float x, float z) const { const float left = static_cast<double>(x) - (static_cast<double>(originX) + minimumX); if (left < 0.0f) return 0.0f; const float top = static_cast<double>(z) - (static_cast<double>(originZ) + minimumZ); if (top < 0.0f) return 0.0f; const float right = static_cast<double>(originX) + maximumX - x; if (right < 0.0f) return 0.0f; const float bottom = static_cast<double>(originZ) + maximumZ - z; if (bottom < 0.0f) return 0.0f; const float distance = std::min(std::min(left, top), std::min(right, bottom)); return borderFade <= distance ? 1.0f : distance / borderFade; }
-PathZones::~PathZones() { WorldMemory::release(cells); }
 
-bool PathZones::contains(float x, float z) const {
-    if (cells == nullptr || !std::isfinite(x) || !std::isfinite(z)) return false;
-    const double column = std::trunc((double(x) + 4000.0) / 10.0);
-    const double row = std::trunc((double(z) + 4000.0) / 10.0);
-    if (column < 0.0 || row < 0.0 || column >= side || row >= side) return false;
-    const auto cell = static_cast<std::size_t>(row) * side + static_cast<std::size_t>(column);
-    return (cells[cell / 8u] & (1u << (cell % 8u))) != 0u;
-}
 
 void EnvironmentZones::interval(float time, std::int32_t& first, std::int32_t& second, float& fraction) { constexpr float positions[]{0.0f, 0.19f, 0.27f, 0.34f, 0.50f, 0.66f, 0.73f, 0.81f, 1.0f}; first = second = 0; fraction = 0.0f; for (std::int32_t index = 0; index < 8; ++index) if (positions[index] <= time && positions[index + 1] >= time) { first = index; second = (index + 1) % 8; fraction = (static_cast<double>(time) - positions[index]) / (static_cast<double>(positions[index + 1]) - positions[index]); return; } }
 void EnvironmentZone::sample(std::int32_t first, std::int32_t second, float fraction, EnvironmentLighting& output) const { output.fogParameters = fogParameters; output.fogColor = environmentBlend(fogColors[first], fogColors[second], fraction); output.ambientColor = environmentBlend(ambientColors[first], ambientColors[second], fraction); output.sunColor = environmentBlend(sunColors[first], sunColors[second], fraction); }
@@ -12717,21 +11930,6 @@ void EnvironmentZones::load(const char* filename) {
         }
         zones.push_back(zone);
     }
-}
-
-SnowField::SnowField(const char* filename) : particles(7000), vertices(28000), indices(42000) {
-    for (auto& particle : particles) { auto coordinate = [] { return static_cast<float>(std::rand() * 10.0 / 32767.0 - 5.0); }; particle.position = {coordinate(), coordinate(), coordinate()}; particle.phase = std::rand() * 7000 / 32767; }
-    const float u[]{0.0f, 1.0f, 1.0f, 0.0f};
-    const float v[]{0.0f, 0.0f, 1.0f, 1.0f};
-    for (std::size_t index = 0; index < vertices.size(); ++index) { auto& vertex = vertices[index]; vertex.z = 0.0f; vertex.reciprocalW = 1.0f; vertex.specular = 0u; vertex.u = u[index % 4]; vertex.v = v[index % 4]; }
-    for (std::size_t index = 0; index < particles.size(); ++index) { const std::uint16_t first = index * 4; const std::uint16_t quad[]{first, static_cast<std::uint16_t>(first + 1), static_cast<std::uint16_t>(first + 2), first, static_cast<std::uint16_t>(first + 2), static_cast<std::uint16_t>(first + 3)}; std::copy(std::begin(quad), std::end(quad), indices.begin() + index * 6); }
-    const auto byteCount = g_sfera_files.fileSize(filename);
-    if (byteCount < 0 || std::cmp_greater(byteCount, std::numeric_limits<std::ptrdiff_t>::max())) return;
-    path.resize(static_cast<std::size_t>(byteCount) / sizeof(PathPoint));
-    const auto descriptor = g_sfera_files.open(filename, 0);
-    if (descriptor < 0) return;
-    g_sfera_files.read(descriptor, path.data(), path.size() * sizeof(PathPoint));
-    g_sfera_files.close(descriptor);
 }
 
 namespace {
@@ -13339,39 +12537,10 @@ void GameInterface::restoreRenderState() {
     device.checkResult(device.native_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW), "SetRenderState");
 }
 
-void GameInterface::drawFrameRate() {
-    auto& frame = g_sfera_frame_runtime;
-    const std::int32_t elapsed = static_cast<std::uint32_t>(WorldClock::nowTicks()) - g_sfera_client_main_scalar_runtime.counter_04;
-    ++frame.fps_sample_count;
-    if (elapsed > 10000) {
-        frame.fps = static_cast<double>(static_cast<std::int32_t>(frame.fps_sample_count)) * 10000.0 / elapsed;
-        frame.fps_sample_count = 0;
-        const auto now = WorldClock::nowTicks();
-        g_sfera_client_main_scalar_runtime.counter_04 = now;
-        frame.fps_anchor = now;
-    }
-    if (!g_sfera_landscape_map_runtime.show_fps) return;
-    g_sfera_screen_clip_runtime = {0, 0, g_sfera_graphics_runtime.display_width - 1, g_sfera_graphics_runtime.display_height - 1};
-    char text[108];
-    std::snprintf(text, sizeof(text), "FPS: %4.1f", frame.fps);
-    drawAtlasText(text, 0, 0, D3DCOLOR_XRGB(255, 255, 255), 1, 0, 0.0f);
-}
 
 void GameInterface::drawFrame() {
     setRenderState();
     g_sfera_interface.draw();
-    if (auto* contours = g_sfera_client_process_runtime.client_object) {
-        std::int32_t x = 0, y = 0;
-        const auto window = contours->editorWindowId();
-        if (window >= 0) {
-            const auto* editor = GameInterface::window(static_cast<std::uint32_t>(window));
-            if (!editor) throw std::out_of_range("Contours: invalid editor window");
-            x = editor->scrollX;
-            y = editor->scrollY;
-        }
-        contours->drawEditor(x, y);
-    }
-    drawFrameRate();
     auto& frame = g_sfera_frame_runtime;
     const std::int32_t elapsed = static_cast<std::uint32_t>(WorldClock::nowTicks()) - static_cast<std::uint32_t>(frame.frame_anchor);
     ++frame.frame_sample_count;
@@ -13929,78 +13098,6 @@ void GameInterface::updateInput() {
     g_sfera_recovered_static_runtime.interaction_input_flags = buttons;
 }
 
-SferaDialogState::~SferaDialogState() {
-    if (owner == nullptr) return;
-    ::SetWindowLongPtrA(owner, GWLP_USERDATA, 0);
-    ::DestroyWindow(owner);
-}
-
-void SferaDialogState::recordMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
-    if (eventCount == events.size()) { firstEvent = 0; eventCount = 0; }
-    auto& event = events[(firstEvent + eventCount) % events.size()];
-    event = {};
-    event.dialog = this;
-    if (message == WM_COMMAND) {
-        event.control_id = LOWORD(wparam);
-        event.message = HIWORD(wparam);
-    } else {
-        event.control_id = owner == window ? 0u : static_cast<std::uint32_t>(::GetDlgCtrlID(window));
-        event.message = message;
-        event.wparam = wparam;
-        event.lparam = lparam;
-    }
-    ++eventCount;
-}
-
-bool SferaDialogState::takeEvent(SferaDialogEvent& event) noexcept {
-    if (eventCount == 0) return false;
-    event = events[firstEvent];
-    --eventCount;
-    firstEvent = eventCount == 0 ? 0 : (firstEvent + 1) % events.size();
-    return true;
-}
-
-SferaDialogState* Win32Dialogs::create(HINSTANCE instance, std::uint32_t resource) {
-    if (resource == 0) return nullptr;
-    auto dialog = std::make_unique<SferaDialogState>();
-    dialog->owner = ::CreateDialogParamA(instance, MAKEINTRESOURCEA(static_cast<WORD>(resource)), nullptr, &sfera_dialog_proc, 0);
-    if (dialog->owner == nullptr) return nullptr;
-    auto* result = dialog.get();
-    ::SetWindowLongPtrA(result->owner, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(result));
-    ::SetClassLongPtrA(result->owner, GCLP_HICON, reinterpret_cast<LONG_PTR>(::LoadIconA(instance, MAKEINTRESOURCEA(113))));
-    dialogs.emplace(result, std::move(dialog));
-    return result;
-}
-
-void Win32Dialogs::destroy(SferaDialogState* dialog) {
-    if (dialog != nullptr) {
-        std::vector<HWND> controls;
-        for (const auto& [handle, resource] : g_sfera_mbc_runtime->native_resources) if (const auto* window = std::get_if<HWND>(&resource); window != nullptr && (*window == dialog->owner || ::IsChild(dialog->owner, *window))) controls.push_back(*window);
-        for (const auto window : controls) g_sfera_mbc_runtime->forgetNativeResource(window);
-        g_sfera_mbc_runtime->forgetNativeResource(dialog);
-    }
-    dialogs.erase(dialog);
-}
-
-
-
-LRESULT Win32Dialogs::sendMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) const {
-    if (message == WM_ENABLE) { ::EnableWindow(window, static_cast<BOOL>(wparam)); return 0; }
-    if (message == WM_SETFOCUS) { ::SetFocus(window); return 0; }
-    return ::SendMessageA(window, message, wparam, lparam);
-}
-
-void Win32Dialogs::pumpMessages(bool dialogKeys) const {
-    MSG message{};
-    while (::PeekMessageA(&message, nullptr, 0, 0, PM_REMOVE)) {
-        if (message.message == WM_QUIT) { g_sfera_render_lookup_runtime.quit_requested = true; return; }
-        std::vector<HWND> windows;
-        windows.reserve(dialogs.size());
-        for (const auto& entry : dialogs) windows.push_back(entry.second->owner);
-        const bool handled = dialogKeys && std::any_of(windows.begin(), windows.end(), [&](HWND window) { return ::IsDialogMessageA(window, &message) != FALSE; });
-        if (!handled) { ::TranslateMessage(&message); ::DispatchMessageA(&message); }
-    }
-}
 
 GameFontAtlas::~GameFontAtlas() { clear(); }
 
@@ -14117,28 +13214,6 @@ void GameFontAtlas::load(int font, const char* filename, std::int32_t outline, s
     layout.code_base[font] = spacing;
 }
 
-bool WorldObjects::takePlantedObject(std::span<char> name, SferaVec3F& position, SferaVec3F& rotation) {
-    while (!plantedObjects.empty()) {
-        const auto handle = plantedObjects.back();
-        plantedObjects.pop_back();
-        const auto* item = object(handle);
-        if (item == nullptr) continue;
-        const auto* resource = model(*item);
-        if (resource == nullptr) WorldDiagnostics::fail("Planted object has no model");
-        const std::string_view modelName(resource->name, std::size(resource->name));
-        const auto length = modelName.find('\0');
-        if (length == std::string_view::npos) WorldDiagnostics::fail("Planted object model name is not terminated");
-        if (length >= name.size()) WorldDiagnostics::fail("Planted object name buffer is too small");
-        std::ranges::copy(modelName.substr(0, length), name.begin());
-        name[length] = '\0';
-        position = item->position;
-        rotation = item->rotation;
-        destroy(handle);
-        return true;
-    }
-    return false;
-}
-
 void CBaseManagerCommonItem::resetItem() {
     auto* lists = list_storage.data();
     if (lists != nullptr) for (std::size_t index = 0; index < capacity; ++index) if (lists[index].active != 0u) lists[index].resetItem();
@@ -14205,11 +13280,67 @@ SferaMouseInputState SferaInputDevices::pollMouse() {
     return {state.lX, state.lY, buttons, state.lZ / WHEEL_DELTA};
 }
 
+namespace {
+    constexpr WPARAM kSystemCommandMask = 0xFFF0u;
+
+LRESULT CALLBACK main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
+    switch (message) {
+    case WM_ACTIVATEAPP:
+        g_sfera_texture_cache_runtime.cache_enabled = wparam != 0;
+        g_sfera_sound_runtime.refreshMusicVolume();
+        g_sfera_client_config_runtime.volume_refresh_frames = 0.0;
+        g_sfera_client_config_runtime.volume_refresh_active = true;
+        return 0;
+    case WM_QUERYENDSESSION:
+        ::PostQuitMessage(0);
+        return 0;
+    case WM_CLOSE:
+        ::PostQuitMessage(0);
+        return 0;
+    case WM_SETCURSOR:
+        if (CCursorManager::hasActiveCursor()) {
+            return TRUE;
+        }
+        return 0;
+    case WM_KEYDOWN:
+        if (g_sfera_client_process_runtime.ui_bridge != 0u) {
+            g_sfera_main_command_state_runtime.command_state = static_cast<std::uint32_t>(wparam);
+            return 0;
+        }
+        if (g_sfera_texture_cache_runtime.render_gate != 0u) {
+            const std::uint32_t key = static_cast<std::uint32_t>(wparam);
+            if (key < 256u && g_sfera_font_runtime.glyphs[key].defined != 0u && g_sfera_static_render_lookup_runtime.glyph_presence[key] == 0u) {
+                return 0;
+            }
+        }
+        if (g_sfera_scene_control_runtime.context_count < 30u) {
+            g_sfera_scene_control_runtime.context_queue[g_sfera_scene_control_runtime.context_count++] = static_cast<std::uint32_t>(wparam);
+        }
+        return 0;
+    case WM_CHAR: {
+        const std::uint32_t ch = static_cast<std::uint32_t>(wparam);
+        if (ch < 256u && g_sfera_font_runtime.glyphs[ch].defined == 1u && g_sfera_pending_key_runtime.count < 30u) {
+            g_sfera_pending_key_runtime.key_codes[g_sfera_pending_key_runtime.count++] = ch;
+        }
+        return 0;
+    }
+    case WM_SYSCOMMAND: {
+        const WPARAM command = wparam & kSystemCommandMask;
+        if (command == SC_SCREENSAVE || command == SC_MONITORPOWER) {
+            return 0;
+        }
+        return ::DefWindowProcA(window, message, wparam, lparam);
+    }
+    default: return ::DefWindowProcA(window, message, wparam, lparam);
+    }
+}
+}
+
 void GameInterface::registerNativeWindowClass() {
     WNDCLASSEXA windowClass{};
     windowClass.cbSize = sizeof(windowClass);
     windowClass.style = CS_HREDRAW | CS_VREDRAW;
-    windowClass.lpfnWndProc = &sfera_main_window_proc;
+    windowClass.lpfnWndProc = &main_window_proc;
     windowClass.hInstance = g_sfera_main_ui_state_runtime.active_ui_object;
     windowClass.hIcon = ::LoadIconA(windowClass.hInstance, MAKEINTRESOURCEA(113));
     windowClass.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
@@ -14258,8 +13389,6 @@ void GameInterface::createNativeWindow() {
 void SferaCrtStartupRuntime::releaseContainers() {
     if (!g_sfera_crt_startup_runtime.initialized) return;
     g_sfera_crt_startup_runtime.initialized = false;
-    g_sfera_execution_monitor_runtime.clear();
-    g_sfera_crash_report_runtime.clear();
     g_sfera_options_dialog_runtime.edited_chat_fonts.release();
     g_sfera_options_dialog_runtime.saved_chat_fonts.release();
     g_sfera_sound_effect_items.clear();
@@ -14289,276 +13418,9 @@ void SferaCrtStartupRuntime::releaseContainers() {
     g_sfera_landscape_runtime.file_records.clear();
 
     g_sfera_effect_manager.render_slots.clear();
-    g_sfera_log_errors_object.close();
-    g_sfera_log_warnings_object.close();
-    g_sfera_log_memory_object.close();
     g_sfera_error_log_runtime.clear();
 }
 
-void SferaAntifloodQueueRuntime::initialize(std::size_t capacity, bool enabled) {
-    for (std::size_t index = 0u; index < messages.size(); ++index) {
-        messages[index].clear();
-        keys[index].clear();
-        if (enabled) { messages[index].reserve(capacity); keys[index].reserve(capacity); }
-    }
-    repetitions.fill(0u);
-    timestamps.fill(0);
-    written.fill(false);
-    count = write_index = read_index = 0u;
-}
-
-bool SferaAntifloodQueueRuntime::merge(std::string_view key) {
-    std::uint32_t occurrences = 0u;
-    auto pending = messages.size();
-    for (std::size_t offset = 0u; offset < count; ++offset) {
-        const auto index = (read_index + offset) % messages.size();
-        if (keys[index] != key) continue;
-        occurrences += repetitions[index];
-        if (!written[index]) pending = index;
-    }
-    if (pending == messages.size() || occurrences < 10u) return false;
-    ++repetitions[pending];
-    timestamps[pending] = std::time(nullptr);
-    return true;
-}
-
-std::size_t SferaAntifloodQueueRuntime::push(std::string_view message, std::string_view key) {
-    if (count == messages.size()) throw std::overflow_error("AntifloodQueue::push_record: queue overflow");
-    const auto index = write_index;
-    messages[index].assign(message);
-    keys[index].assign(key);
-    repetitions[index] = 1u;
-    timestamps[index] = std::time(nullptr);
-    written[index] = false;
-    write_index = (write_index + 1u) % messages.size();
-    ++count;
-    std::size_t matching = 0u;
-    std::size_t pending = 0u;
-    for (std::size_t offset = 0u; offset < count; ++offset) {
-        const auto slot = (read_index + offset) % messages.size();
-        if (keys[slot] == key) ++matching;
-        if (!written[slot]) ++pending;
-    }
-    return matching < 10u && pending == 1u ? index : messages.size();
-}
-
-std::size_t SferaAntifloodQueueRuntime::pop() {
-    if (count == 0u) throw std::underflow_error("AntifloodQueue::pop_record: queue underflow");
-    const auto index = read_index;
-    read_index = (read_index + 1u) % messages.size();
-    --count;
-    return index;
-}
-
-void SferaDiagnosticLogObjectRuntime::initialize(const char* path, const char* linePrefix, std::uint32_t options, std::uint32_t sizeLimit, bool withSerial, std::size_t capacity) {
-    if (path == nullptr || *path == '\0') throw std::invalid_argument("Log: empty file name");
-    if (sizeLimit != 0u && (options & DailyFiles) != 0u) throw std::invalid_argument("Log: size limit and daily files cannot be combined");
-    close();
-    file_path = path;
-    prefix = linePrefix == nullptr ? "" : linePrefix;
-    flags = options;
-    size_limit = sizeLimit;
-    serial_enabled = withSerial;
-    write_count = 500u;
-    buffer.reserve(capacity);
-    if ((flags & SuppressRepeats) != 0u) match_key.reserve(capacity);
-    antiflood_queue.initialize(capacity, (flags & SuppressRepeats) != 0u);
-    next = g_sfera_critical_diagnostics_runtime.log_chain_head;
-    previous = nullptr;
-    if (next != nullptr) next->previous = this;
-    g_sfera_critical_diagnostics_runtime.log_chain_head = this;
-    initialized = true;
-}
-
-void SferaDiagnosticLogObjectRuntime::appendPrefix() {
-    const auto now = std::time(nullptr);
-    std::tm local{};
-    ::localtime_s(&local, &now);
-    std::array<char, 32> text{};
-    for (std::size_t offset = 0u; offset < prefix.size(); ++offset) {
-        if (prefix[offset] != '$') { buffer += prefix[offset]; continue; }
-        if (++offset == prefix.size()) break;
-        switch (prefix[offset]) {
-            case 'd': std::strftime(text.data(), text.size(), "%d/%m/%y", &local); buffer += text.data(); break;
-            case 't': std::strftime(text.data(), text.size(), "%H:%M:%S", &local); buffer += text.data(); break;
-            case 'u': if (serial_enabled) { buffer += std::to_string(g_sfera_critical_diagnostics_runtime.serial_number); buffer += ' '; } break;
-            default: break;
-        }
-    }
-}
-
-SferaDiagnosticLogObjectRuntime& SferaDiagnosticLogObjectRuntime::append(const char* text) {
-    if (!initialized || text == nullptr) return *this;
-    if (buffer.empty()) appendPrefix();
-    buffer += text;
-    if ((flags & SuppressRepeats) != 0u) match_key += text;
-    if (buffer.size() >= 2048u) flush();
-    return *this;
-}
-
-SferaDiagnosticLogObjectRuntime& SferaDiagnosticLogObjectRuntime::append(std::int32_t number) {
-    if (!initialized) return *this;
-    if (buffer.empty()) appendPrefix();
-    buffer += std::to_string(number);
-    if (buffer.size() >= 2048u) flush();
-    return *this;
-}
-
-void SferaDiagnosticLogObjectRuntime::writeLine(const char* key, const char* text) {
-    if (!initialized) return;
-    flush();
-    appendPrefix();
-    if (text != nullptr) buffer += text;
-    if ((flags & SuppressRepeats) != 0u && key != nullptr) match_key += key;
-    flush();
-}
-
-void SferaDiagnosticLogObjectRuntime::writeRecord(std::size_t index) {
-    auto& queue = antiflood_queue;
-    if (queue.written[index]) return;
-    queue.written[index] = true;
-    if (queue.repetitions[index] == 1u) write(queue.messages[index]);
-    else write("[" + std::to_string(queue.repetitions[index]) + "] " + queue.messages[index]);
-}
-
-void SferaDiagnosticLogObjectRuntime::flush() {
-    if (!initialized || buffer.empty()) return;
-    auto& queue = antiflood_queue;
-    if ((flags & SuppressRepeats) == 0u) write(buffer);
-    else if (!queue.merge(match_key)) {
-        if (queue.count == queue.messages.size()) writeRecord(queue.pop());
-        const auto index = queue.push(buffer, match_key);
-        if (index != queue.messages.size()) writeRecord(index);
-    }
-    buffer.clear();
-    match_key.clear();
-}
-
-void SferaDiagnosticLogObjectRuntime::write(const std::string& text) {
-    auto path = file_path;
-    if ((flags & DailyFiles) != 0u) {
-        const auto now = std::time(nullptr);
-        std::tm local{};
-        ::localtime_s(&local, &now);
-        std::array<char, 32> suffix{};
-        std::strftime(suffix.data(), suffix.size(), "_%y%m%d", &local);
-        const auto dot = path.find('.');
-        path.insert(dot == std::string::npos ? path.size() : dot, suffix.data());
-    }
-    std::ofstream output(path, std::ios::app);
-    if (!output) return;
-    output << text;
-    if ((flags & ImmediateFlush) != 0u) output.flush();
-    if (size_limit == 0u || ++write_count < 500u) return;
-    write_count = 0u;
-    const auto length = output.tellp();
-    output.close();
-    if (length > static_cast<std::streamoff>(size_limit)) rotate();
-}
-
-void SferaDiagnosticLogObjectRuntime::rotate() {
-    if (file_path.empty()) return;
-    auto backup = file_path;
-    backup.back() = '$';
-    ::_chmod(backup.c_str(), _S_IREAD | _S_IWRITE);
-    std::remove(backup.c_str());
-    std::rename(file_path.c_str(), backup.c_str());
-}
-
-bool SferaDiagnosticLogObjectRuntime::copyRange(std::istream& input, std::ostream& output, std::streamoff offset, std::streamoff size) {
-    if (offset < 0 || size < 0) return false;
-    input.clear();
-    input.seekg(offset);
-    std::array<char, 8192> block;
-    while (size > 0 && input && output) {
-        const auto count = static_cast<std::streamsize>(std::min<std::streamoff>(size, block.size()));
-        input.read(block.data(), count);
-        if (input.gcount() != count) return false;
-        output.write(block.data(), count);
-        size -= count;
-    }
-    return size == 0 && output;
-}
-
-void SferaDiagnosticLogObjectRuntime::compact() {
-    if (size_limit == 0u || file_path.size() < 2u) return;
-    auto backup = file_path;
-    backup.back() = '$';
-    std::ifstream current(file_path, std::ios::binary | std::ios::ate);
-    std::ifstream old(backup, std::ios::binary | std::ios::ate);
-    if (!current) {
-        if (old) { old.close(); std::rename(backup.c_str(), file_path.c_str()); }
-        return;
-    }
-    const auto current_size = static_cast<std::streamoff>(current.tellg());
-    const auto old_size = old ? static_cast<std::streamoff>(old.tellg()) : 0;
-    if (current_size < 0 || old_size < 0) return;
-    if (!old && current_size <= static_cast<std::streamoff>(size_limit)) return;
-    current.close();
-    auto temporary = file_path;
-    std::fill(temporary.end() - 2, temporary.end(), '$');
-    if (std::rename(file_path.c_str(), temporary.c_str()) != 0) return;
-    current.open(temporary, std::ios::binary);
-    std::ofstream output(file_path, std::ios::binary | std::ios::trunc);
-    bool success = current && output;
-    const auto current_bytes = std::min<std::streamoff>(current_size, size_limit);
-    const auto old_bytes = std::min<std::streamoff>(old_size, size_limit - current_bytes);
-    if (success && old_bytes != 0) success = copyRange(old, output, old_size - old_bytes, old_bytes);
-    if (success) success = copyRange(current, output, current_size - current_bytes, current_bytes);
-    output.flush();
-    success = success && output;
-    output.close();
-    current.close();
-    old.close();
-    if (!success) {
-        std::remove(file_path.c_str());
-        std::rename(temporary.c_str(), file_path.c_str());
-        return;
-    }
-    std::remove(temporary.c_str());
-    std::remove(backup.c_str());
-}
-
-void SferaDiagnosticLogObjectRuntime::drainAll() {
-    for (auto* log = g_sfera_critical_diagnostics_runtime.log_chain_head; log != nullptr; log = log->next) {
-        while (log->antiflood_queue.count != 0u) log->writeRecord(log->antiflood_queue.pop());
-    }
-}
-
-void SferaDiagnosticLogObjectRuntime::appendScriptContext() {
-    if (static_cast<std::int32_t>(g_sfera_network_runtime.active_slot) < 0) return;
-    WorldDiagnostics::describeScript(true);
-    append(g_sfera_mbc_runtime->diagnostic_context);
-    flush();
-}
-
-void SferaDiagnosticLogObjectRuntime::close() {
-    if (!initialized) return;
-    if (previous != nullptr) previous->next = next;
-    else g_sfera_critical_diagnostics_runtime.log_chain_head = next;
-    if (next != nullptr) next->previous = previous;
-    previous = next = nullptr;
-    flush();
-    if ((flags & SessionMarkers) != 0u) {
-        const auto now = std::time(nullptr);
-        std::tm local{};
-        ::localtime_s(&local, &now);
-        std::array<char, 32> timestamp{};
-        std::strftime(timestamp.data(), timestamp.size(), "%d/%m/%y %H:%M:%S", &local);
-        buffer = "***** Quit  " + std::string(timestamp.data()) + " *****\n";
-        match_key = "***** Quit   *****\n";
-        flush();
-    }
-    while (antiflood_queue.count != 0u) writeRecord(antiflood_queue.pop());
-    compact();
-    initialized = false;
-    std::string{}.swap(file_path);
-    std::string{}.swap(prefix);
-    std::string{}.swap(buffer);
-    std::string{}.swap(match_key);
-    for (auto& text : antiflood_queue.messages) std::string{}.swap(text);
-    for (auto& text : antiflood_queue.keys) std::string{}.swap(text);
-}
 
 void SferaStringLookupRuntime::initialize() {
     if (initialized) return;
@@ -14665,10 +13527,6 @@ void SferaMbcRuntime::forgetNativeResource(const NativeResource& resource) {
     native_resource_ids.erase(entry);
 }
 
-HWND SferaMbcRuntime::dialogWindow(std::uint32_t handle) const {
-    if (const auto* dialog = nativeResource<SferaDialogState*>(handle)) return dialog->owner;
-    return nativeResource<HWND>(handle);
-}
 
 bool SferaSliceReference32::contains(std::uint32_t length, bool allowNull) const { return (allowNull || (base >= 4 && base < UINT32_MAX - 3)) && (begin == 0 || (base >= begin && base <= end && (length == 0 || length - 1 <= end - base))); }
 void SferaSliceReference32::diagnoseRange(std::uint32_t length) {
@@ -14815,7 +13673,6 @@ bool SferaMbcRuntime::executeInstruction(Instruction instruction) {
     auto& stack = g_sfera_mbc_interpreter_storage.value_stack.entries;
     switch (instruction) {
         case Instruction::InvokeBuiltin: {
-            g_sfera_execution_monitor_runtime.setCurrent(process_index, static_cast<std::uint32_t>(current_instruction_address - bytecode_base));
             const auto function = readOperand<Builtin>();
             argument_end = value_stack_size; value_stack_size -= argument_count; argument_cursor = value_stack_size;
             if (!executeBuiltin(function)) throw std::runtime_error("unsupported MBInter bytecode opcode");
@@ -15133,16 +13990,16 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
         }
         case Builtin::LoadProcess: {
             const auto name = nextSliceReference().base; const auto index = argument_count > 1 ? static_cast<std::uint32_t>(nextInteger()) : UINT32_MAX; if (execution_failed) break;
-            if (name == 0) g_sfera_warning_log_runtime.append("NULL-pointer dereferencing: ffprc_load\n", false);
+            if (name == 0) ::OutputDebugStringA("NULL-pointer dereferencing: ffprc_load\n");
             active_tag = loadProcess(textAt(name), index); pushInteger(active_tag); break;
         }
         case Builtin::UnloadProcess: {
             const std::uint32_t requested = nextInteger(); const auto* process = findProcess(requested); const auto index = process == nullptr ? UINT32_MAX : requested; if (execution_failed) break;
             if (index == process_index) active_tag = UINT32_MAX;
-            else { if (index == 0) g_sfera_log_runtime.files[0].write("Unloading _main: ..\\ShareClientSeverCode\\Inter.cpp:6722"); active_tag = unloadProcess(index); }
+            else active_tag = unloadProcess(index);
             pushInteger(active_tag); break;
         }
-        case Builtin::LinkProcess: { const auto name = nextSliceReference().base; if (name == 0) g_sfera_warning_log_runtime.append("NULL-pointer dereferencing: ffprc_link\n", false); active_tag = linkProcess(textAt(name)); pushInteger(active_tag); break; }
+        case Builtin::LinkProcess: { const auto name = nextSliceReference().base; if (name == 0) ::OutputDebugStringA("NULL-pointer dereferencing: ffprc_link\n"); active_tag = linkProcess(textAt(name)); pushInteger(active_tag); break; }
         case Builtin::Connect: { const auto host = nextSliceReference().base; nextSliceReference(); const auto mode = argument_count > 2 ? static_cast<std::uint32_t>(nextInteger()) : 3u; pushInteger(g_sfera_network_runtime.initialize(textAt(host), mode)); break; }
         case Builtin::Disconnect: g_sfera_network_runtime.shutdown(); break;
         case Builtin::Send: buildRegion(); break;
@@ -15214,7 +14071,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                     } else if (type == SferaMbcValue::BytePointer) result = config.readString(key, textAt(destination.base), capacity);
                     else {
                         const auto message = std::string("wrong parameter in cfg_get, '") + key + "'\n";
-                        g_sfera_warning_log_runtime.append(message.c_str(), false);
+                        ::OutputDebugStringA(message.c_str());
                     }
                     pushInteger(result ? 0u : UINT32_MAX);
                     break;
@@ -15245,7 +14102,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                     auto* commands = active_process->owned_block_b;
                     if (commands == nullptr) { pushInteger(UINT32_MAX); break; }
                     config.copyText(commands, std::strlen(commands), config.parser_path);
-                    WorldMemory::release(commands, __FILE__, __LINE__);
+                    WorldMemory::release(commands);
                     active_process->owned_block_b = nullptr;
                     pushInteger(0);
                     break;
@@ -15406,7 +14263,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             const auto handle = nextInteger();
             if (handle < 0) break;
             const auto enabled = nextInteger();
-            if (!execution_failed) SphereRender::CharacterModels::checkedExtended(g_sfera_world_objects.object(handle, "GetObjectPointer"), __FILE__, __LINE__)->render_enabled = enabled != 0;
+            if (!execution_failed) SphereRender::CharacterModels::checkedExtended(g_sfera_world_objects.object(handle, "GetObjectPointer"))->render_enabled = enabled != 0;
             break;
         }
         case Builtin::CreateObject: {
@@ -15440,7 +14297,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             if (execution_failed) break;
             if (builtin == Builtin::SetPosition) object->position = position;
             else object->position = object->position + position;
-            if (static_cast<std::uint32_t>(handle) == g_sfera_world_objects.controlled_object_handle && g_sfera_graphics_runtime.render_mode_enabled) {
+            if (static_cast<std::uint32_t>(handle) == g_sfera_world_objects.controlled_object_handle) {
                 g_sfera_scene_control_runtime.camera_x = object->position.x + 333.0f;
                 g_sfera_scene_control_runtime.camera_y = object->position.y + 333.0f;
                 g_sfera_main_input_state_runtime.motion_accumulator = object->position.z + 333.0f;
@@ -15459,7 +14316,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             auto* object = g_sfera_inter_scalar_runtime.current_object = g_sfera_world_objects.object(handle, "GetObjectPointer");
             if (object == nullptr) { active_tag = UINT32_MAX; break; }
             if (execution_failed) break;
-            auto* extended = SphereRender::CharacterModels::checkedExtended(object, __FILE__, __LINE__);
+            auto* extended = SphereRender::CharacterModels::checkedExtended(object);
             extended->commanded_velocity.x = x;
             if (argument_count == 4) { const auto z = nextReal(); extended->commanded_velocity.y = second; extended->commanded_velocity.z = z; }
             else extended->commanded_velocity.z = second;
@@ -15474,7 +14331,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             if (object == nullptr) { active_tag = UINT32_MAX; break; }
             if (builtin == Builtin::VerticalVelocity) value = argument_count == 3 ? static_cast<float>(g_sfera_motion.responseValue(nextInteger())) : nextReal();
             if (!execution_failed) {
-                auto* extended = SphereRender::CharacterModels::checkedExtended(object, __FILE__, __LINE__);
+                auto* extended = SphereRender::CharacterModels::checkedExtended(object);
                 if (builtin == Builtin::VerticalVelocity) extended->physical_velocity.y = value;
                 else extended->angular_velocity = value;
             }
@@ -15487,7 +14344,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             if (object == nullptr) { active_tag = UINT32_MAX; break; }
             if (execution_failed) break;
             const auto command = nextInteger();
-            auto* extended = SphereRender::CharacterModels::checkedExtended(object, __FILE__, __LINE__);
+            auto* extended = SphereRender::CharacterModels::checkedExtended(object);
             if (command == -1) pushInteger(extended->airborne);
             else { extended->airborne = true; pushInteger(0); }
             break;
@@ -15507,7 +14364,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                 const auto destination = nextInteger();
                 if (execution_failed) break;
                 if (builtin == Builtin::ObjectBasis) {
-                    const auto* extended = SphereRender::CharacterModels::checkedExtended(object, __FILE__, __LINE__);
+                    const auto* extended = SphereRender::CharacterModels::checkedExtended(object);
                     g_sfera_world_objects.recalculateBasis(handle);
                     if (destination == 0) WorldDiagnostics::warning("NULL-pointer dereferencing: ffg_norm\n");
                     writeMemory(destination, extended->orientation_basis[0]);
@@ -15520,16 +14377,13 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
         }
         case Builtin::EditorPick: {
             if (nextInteger() != 0) break;
-            const auto distanceOffset = nextInteger();
-            const auto positionOffset = nextInteger();
-            if (distanceOffset == 0 || positionOffset == 0) WorldDiagnostics::warning("NULL-pointer dereferencing: ffeditor, EDSC_GETCLICKPOINT\n");
-            if (execution_failed) break;
-            float distance = 0;
-            SferaVec3F position{};
-            const auto handle = g_sfera_motion.pick(&distance, &position);
-            writeMemory(positionOffset, position);
-            if (handle >= 0) writeMemory(distanceOffset, distance);
-            pushInteger(handle);
+            const auto distance = nextInteger();
+            const auto position = nextInteger();
+            if (!execution_failed) {
+                if (distance != 0) writeMemory(distance, 0.0f);
+                if (position != 0) writeMemory(position, SferaVec3F{});
+                pushInteger(UINT32_MAX);
+            }
             break;
         }
 
@@ -15549,19 +14403,17 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             if (builtin == Builtin::AllocateDynamic) {
                 std::uint32_t offset = 0;
                 if (size > 0) {
-                    auto* memory = WorldMemory::allocate(static_cast<std::uint32_t>(size), __FILE__, __LINE__, false);
+                    auto* memory = WorldMemory::allocate(static_cast<std::uint32_t>(size), false);
                     try { offset = mapMemory(memory, static_cast<std::size_t>(size), memory); active_process->registerResource(reference.base, ResourceKind::dynamicArray); }
-                    catch (...) { forgetMemory(memory); WorldMemory::release(memory, __FILE__, __LINE__); throw; }
-                    if (static_cast<std::int32_t>(active_process->module_tag) > 0) g_sfera_mbc_module_memory_stats[active_process->module_tag].dynamic_memory_bytes += WorldMemory::allocatedBytes(memory);
+                    catch (...) { forgetMemory(memory); WorldMemory::release(memory); throw; }
                 }
-                if (slice.base != 0) g_sfera_warning_log_runtime.append("ffdmalloc: ptr != NULL", false);
+                if (slice.base != 0) ::OutputDebugStringA("ffdmalloc: ptr != NULL");
                 slice = {offset, offset, offset + static_cast<std::uint32_t>(size) - 1};
                 writeMemory(reference.base, slice);
             } else if (slice.base != 0) {
                 auto* memory = memoryAt(slice.base);
-                if (static_cast<std::int32_t>(active_process->module_tag) > 0) g_sfera_mbc_module_memory_stats[active_process->module_tag].dynamic_memory_bytes -= WorldMemory::allocatedBytes(memory);
                 forgetMemory(memory);
-                WorldMemory::release(memory, __FILE__, __LINE__);
+                WorldMemory::release(memory);
                 writeMemory(reference.base, SferaSliceReference32{});
                 active_process->unregisterResource(reference.base, ResourceKind::dynamicArray);
             }
@@ -15593,7 +14445,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
         case Builtin::CopyProcessMemory: case Builtin::CopyProcessString: {
             const std::uint32_t destinationProcess = nextInteger();
             auto& destination = nextSliceReference();
-            if (destination.base == 0) { g_sfera_warning_log_runtime.append("NULL-pointer dereferencing: ffmempcpy\n", false); break; }
+            if (destination.base == 0) { ::OutputDebugStringA("NULL-pointer dereferencing: ffmempcpy\n"); break; }
             const std::uint32_t sourceProcess = nextInteger();
             const auto& source = nextSliceReference();
             const auto count = builtin == Builtin::CopyProcessMemory || argument_count == 5 ? nextInteger() : 0;
@@ -15679,7 +14531,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                 if (handle == 0) reportError("Effect attached to zero handle!", "");
                 created = g_sfera_effect_manager.createActiveEffect(textAt(effect), handle);
             } else {
-                if (handle <= 0) { char message[256]; std::snprintf(message, sizeof(message), "Wrong Handler for Effect %s\n", active_process->name); g_sfera_warning_log_runtime.append(message, false); pushInteger(UINT32_MAX); break; }
+                if (handle <= 0) { char message[256]; std::snprintf(message, sizeof(message), "Wrong Handler for Effect %s\n", active_process->name); ::OutputDebugStringA(message); pushInteger(UINT32_MAX); break; }
                 if (argument_count >= 3 && parameter != 0) { const SferaEffectParameter value{static_cast<std::uint32_t>(effect), memoryAt(parameter)}; pushInteger(g_sfera_effect_manager.setEffectParameters(handle, &value, 1)); break; }
                 if (argument_count >= 3 && static_cast<std::uint32_t>(handle) == g_sfera_world_objects.controlled_object_handle) { pushInteger(UINT32_MAX); break; }
                 created = g_sfera_effect_manager.createActiveEffect(static_cast<std::uint32_t>(effect), handle);
@@ -15697,7 +14549,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             auto* object = g_sfera_world_objects.object(handle, "GetObjectPointer");
             g_sfera_inter_scalar_runtime.current_object = object;
             if (object == nullptr) { active_tag = UINT32_MAX; break; }
-            auto* extended = SphereRender::CharacterModels::checkedExtended(object, __FILE__, __LINE__);
+            auto* extended = SphereRender::CharacterModels::checkedExtended(object);
             pushInteger(extended->movement_blocked ? 0 : UINT32_MAX);
             extended->movement_blocked = false;
             if (argument_count == 5) {
@@ -15706,15 +14558,18 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             }
             break;
         }
-        case Builtin::FileChecksum: { const auto offset = nextInteger(); if (!execution_failed) pushInteger(checksumDirectory(textAt(offset))); break; }
+        case Builtin::FileChecksum: {
+            nextInteger();
+            if (!execution_failed) pushInteger(0);
+            break;
+        }
         case Builtin::MemoryChecksum: {
-            const auto seed = nextInteger();
+            nextInteger();
             auto& slice = nextSliceReference();
             const std::uint32_t size = nextInteger();
             if (execution_failed) break;
             if (!slice.contains(size)) slice.diagnoseRange(size);
-            file_crc32 = file_crc.calculate(memoryAt(slice.base), size, static_cast<std::uint32_t>(seed));
-            pushInteger(file_crc32);
+            pushInteger(0);
             break;
         }
         case Builtin::CompareMemory: {
@@ -15891,15 +14746,14 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             pushInteger(magnitude > 14400 ? static_cast<std::uint32_t>(difference) + (difference < 0 ? 32768u : 0u - 32768u) : static_cast<std::uint32_t>(difference));
             break;
         }
-        case Builtin::ProfileValue: { const auto index = nextInteger(); if (!execution_failed) pushInteger(index < 0 ? g_sfera_mbc_static_runtime.profile_fallback : 0); break; }
-        case Builtin::ProcessFlag: pushInteger(active_process->flags & SferaMbcProcessRecord::unloadAfterExecution); break;
-        case Builtin::NextDefaultValue: {
-            auto& cursor = g_sfera_recovered_static_runtime.mbc_stack_table_cursor;
-            const auto value = g_sfera_mbc_static_runtime.stack_default_values[cursor];
-            if (value != 0) ++cursor;
-            pushInteger(value);
+        case Builtin::ProfileValue:
+            nextInteger();
+            if (!execution_failed) pushInteger(0);
             break;
-        }
+        case Builtin::ProcessFlag: pushInteger(active_process->flags & SferaMbcProcessRecord::unloadAfterExecution); break;
+        case Builtin::NextDefaultValue:
+            pushInteger(0);
+            break;
         case Builtin::CallerProcess: pushInteger(static_cast<std::int32_t>(execution_context_depth) > 0 ? execution_context_stack[execution_context_depth - 1].process_id : UINT32_MAX); break;
         case Builtin::DiscardArgument: { const auto& argument = g_sfera_mbc_interpreter_storage.value_stack.entries[argument_cursor]; if (!argument.isPointer() && argument.type == SferaMbcValue::Real) nextReal(); else nextInteger(); break; }
         case Builtin::StopInterpreter: {
@@ -16201,10 +15055,10 @@ void SferaScriptContainer::Content<C, Hashed>::erase(typename C::iterator positi
 
 SferaScriptContainer* SferaScriptContainer::create(Kind kind, ValueType type, ValueType keyType) {
     const auto construct = [&]<class C, bool Hashed = false>() -> SferaScriptContainer* {
-        void* storage = WorldMemory::allocate(sizeof(SferaScriptContainer), __FILE__, __LINE__, false);
+        void* storage = WorldMemory::allocate(sizeof(SferaScriptContainer), false);
         if (storage == nullptr) throw std::bad_alloc();
         try { return std::construct_at(static_cast<SferaScriptContainer*>(storage), kind, type, std::in_place_type<Content<C, Hashed>>, keyType); }
-        catch (...) { WorldMemory::release(storage, __FILE__, __LINE__); throw; }
+        catch (...) { WorldMemory::release(storage); throw; }
     };
     const auto select = [&]<class T>() -> SferaScriptContainer* {
         if constexpr (!std::is_same_v<T, std::uint8_t>) if (kind == Kind::Map) {
@@ -16237,7 +15091,7 @@ void SferaScriptContainer::destroy() {
     g_sfera_mbc_runtime->forgetNativeResource(this);
     g_sfera_mbc_runtime->forgetMemory(this);
     std::destroy_at(this);
-    WorldMemory::release(this, __FILE__, __LINE__);
+    WorldMemory::release(this);
 }
 
 void SferaMbcRuntime::exportSlice(SferaSliceReference32& destination, const void* data, std::size_t size, const void* owner) {
@@ -16421,7 +15275,7 @@ void SferaMbcProcessRecord::registerResource(std::uint32_t handle, ResourceKind 
         const auto capacity = cleanup_entries == nullptr ? (process_id == 0 ? 50000u : 10u) : cleanup_capacity + (process_id == 0 ? 10000u : 10u);
         if ((cleanup_entries != nullptr && capacity < cleanup_capacity) || capacity > std::numeric_limits<std::size_t>::max() / sizeof(CleanupEntry)) throw std::bad_alloc();
         const auto size = capacity * sizeof(CleanupEntry);
-        auto* entries = static_cast<CleanupEntry*>(cleanup_entries == nullptr ? WorldMemory::allocate(size, __FILE__, __LINE__, false) : WorldMemory::reallocate(cleanup_entries, size, __FILE__, __LINE__));
+        auto* entries = static_cast<CleanupEntry*>(cleanup_entries == nullptr ? WorldMemory::allocate(size, false) : WorldMemory::reallocate(cleanup_entries, size));
         if (entries == nullptr) throw std::bad_alloc();
         cleanup_entries = entries;
         cleanup_capacity = capacity;
@@ -16546,14 +15400,14 @@ bool SferaConfigTextRuntime::writeFile(const char* path, const void* data, std::
 void SferaErrorLogRuntime::initialize(IOutputDevice* error, IOutputDevice* log) {
     clear();
     if (error == nullptr) {
-        auto* memory = static_cast<CSphereError*>(WorldMemory::allocate(sizeof(CSphereError), __FILE__, __LINE__));
+        auto* memory = static_cast<CSphereError*>(WorldMemory::allocate(sizeof(CSphereError)));
         if (memory == nullptr) throw std::bad_alloc();
         try { owned_error = std::construct_at(memory); } catch (...) { WorldMemory::release(memory); throw; }
         error = owned_error;
     }
     outputs[0] = error;
     if (log == nullptr) {
-        auto* memory = static_cast<COutputLogDevice*>(WorldMemory::allocate(sizeof(COutputLogDevice), __FILE__, __LINE__));
+        auto* memory = static_cast<COutputLogDevice*>(WorldMemory::allocate(sizeof(COutputLogDevice)));
         if (memory == nullptr) throw std::bad_alloc();
         try { owned_log = std::construct_at(memory); } catch (...) { WorldMemory::release(memory); throw; }
         owned_log->setFilename("sphere.log");
@@ -16570,57 +15424,6 @@ void SferaErrorLogRuntime::clear() {
     if (owned_error != nullptr) { std::destroy_at(owned_error); WorldMemory::release(owned_error); owned_error = nullptr; }
 }
 
-void SferaExecutionMonitorRuntime::initialize() {
-    if (initialized) return;
-    ::InitializeCriticalSection(&critical_section);
-    initialized = true;
-    constexpr char path[] = "logs\\CurrentExecuting.log";
-    std::copy_n(path, sizeof(path), log_path);
-    ::SymSetOptions(SYMOPT_DEFERRED_LOADS);
-    ::SymInitialize(::GetCurrentProcess(), nullptr, TRUE);
-}
-
-void SferaExecutionMonitorRuntime::setCurrent(std::uint32_t first, std::uint32_t second) {
-    if (!enabled || !initialized) return;
-    ::EnterCriticalSection(&critical_section);
-    current_value_a = first;
-    current_value_b = second;
-    ::LeaveCriticalSection(&critical_section);
-}
-
-void SferaExecutionMonitorRuntime::clear() {
-    if (!initialized) return;
-    enabled = false;
-    if (thread_handle != nullptr) {
-        stop_requested = true;
-        if (::WaitForSingleObject(thread_handle, 100u) == WAIT_TIMEOUT) ::TerminateThread(thread_handle, 0u);
-        ::CloseHandle(thread_handle);
-        thread_handle = nullptr;
-    }
-    ::DeleteCriticalSection(&critical_section);
-    initialized = false;
-}
-
-void SferaCrashReportRuntime::initialize() {
-    if (installed) return;
-    previous_exception_filter = ::SetUnhandledExceptionFilter(&sfera_unhandled_exception_filter);
-    installed = true;
-    const auto length = ::GetModuleFileNameA(nullptr, error_log_path, static_cast<DWORD>(sizeof(error_log_path)));
-    if (length == 0u || length >= sizeof(error_log_path)) error_log_path[0] = '\0';
-    char* filename = std::strrchr(error_log_path, '\\');
-    filename = filename == nullptr ? error_log_path : filename + 1;
-    constexpr char reportName[] = "ERRORLOG.TXT";
-    if (sizeof(reportName) > sizeof(error_log_path) - static_cast<std::size_t>(filename - error_log_path)) filename = error_log_path;
-    std::copy_n(reportName, sizeof(reportName), filename);
-    process_handle = ::GetCurrentProcess();
-}
-
-void SferaCrashReportRuntime::clear() {
-    if (!installed) return;
-    ::SetUnhandledExceptionFilter(previous_exception_filter);
-    previous_exception_filter = nullptr;
-    installed = false;
-}
 
 void SferaFileManager::keepTail(const char* filename, std::size_t size) {
     const auto length = fileSize(filename);
@@ -16633,211 +15436,6 @@ void SferaFileManager::keepTail(const char* filename, std::size_t size) {
     close(descriptor);
 }
 
-void SferaWarningLogRuntime::initialize() {
-    records = {};
-    for (std::uint32_t server = 0; server < 20u; ++server) {
-        char path[32];
-        std::snprintf(path, sizeof(path), "Warnings%02u.log", server);
-        g_sfera_files.keepTail(path, 1000000u);
-    }
-}
-
-void SferaWarningLogRuntime::writeRecord(std::size_t index) const {
-    const auto& record = records.at(index);
-    char path[] = "Warnings00.log";
-    const std::int32_t server = g_sfera_recovered_static_runtime.server_number;
-    path[8] = '0' + server / 10;
-    path[9] = '0' + server % 10;
-    std::FILE* file = nullptr;
-    if (::fopen_s(&file, path, "at") != 0 || file == nullptr) return;
-    if (record.repetitions == 1u) std::fprintf(file, "%s %s\n%s\n%s\n\n", record.date.c_str(), record.time.c_str(), record.message.c_str(), record.context.c_str());
-    else std::fprintf(file, "%s %s\n(%d) %s\n%s\n\n", record.date.c_str(), record.time.c_str(), static_cast<std::int32_t>(record.repetitions), record.message.c_str(), record.context.c_str());
-    if (record.immediate) std::fflush(file);
-    std::fclose(file);
-}
-
-void SferaWarningLogRuntime::flush() {
-    for (std::size_t index = 0; index < records.size(); ++index) {
-        if (records[index].timestamp == 0u) continue;
-        writeRecord(index);
-        records[index].timestamp = 0u;
-    }
-}
-
-void SferaWarningLogRuntime::append(const char* message, bool immediate) {
-    if (message == nullptr) message = "";
-    for (auto& record : records) {
-        if (record.timestamp == 0u || ::_stricmp(record.message.c_str(), message) != 0) continue;
-        ++record.repetitions;
-        record.timestamp = WorldClock::nowTicks();
-        return;
-    }
-    // The script-visible warning history always evicts the oldest slot, including an inactive slot.
-    writeRecord(0u);
-    std::move(records.begin() + 1, records.end(), records.begin());
-    auto& record = records.back();
-    record = {};
-    record.timestamp = WorldClock::nowTicks() + 1u;
-    record.repetitions = 1u;
-    record.immediate = immediate;
-    record.message = message;
-    if (record.message.size() >= 1024u) WorldDiagnostics::fail("Warning message is too long");
-    if (const auto* context = WorldDiagnostics::scriptContext()) record.context = context;
-    if (record.context.size() >= 1024u) WorldDiagnostics::fail("Warning script context is too long");
-    const auto now = std::time(nullptr);
-    std::tm local{};
-    if (::localtime_s(&local, &now) == 0) {
-        char date[32]{};
-        char time[32]{};
-        std::strftime(date, sizeof(date), "%A, %d %B %Y", &local);
-        std::strftime(time, sizeof(time), "%H:%M:%S", &local);
-        record.date = date;
-        record.time = time;
-    }
-}
-
-void SferaWarningLogRuntime::appendFormatted(bool immediate, const char* format, std::va_list arguments) {
-    char message[1024]{};
-    const auto length = std::vsnprintf(message, sizeof(message), format, arguments);
-    if (length < 0 || static_cast<std::size_t>(length) >= sizeof(message)) WorldDiagnostics::fail("Formatted warning message is too long");
-    append(message, immediate);
-    if (immediate) flush();
-}
-
-void SferaDebugScriptArrays::initialize() {
-    for (auto& module : modules) { module.enabled = false; module.ranges.clear(); }
-    current_process = -1;
-    current_code_range = current_array = 0;
-    loaded = false;
-}
-
-void SferaDebugScriptArrays::load() {
-    if (loaded) return;
-    initialize();
-    const auto& records = g_sfera_mbc_interpreter_storage.module_records;
-    for (std::size_t index = 0; index < modules.size(); ++index) {
-        if (records[index].name[0] == '\0') continue;
-        const auto path = std::string("mbc\\") + records[index].name + ".adb";
-        g_sfera_files.setErrorReporting(false);
-        const auto size = g_sfera_files.fileSize(path.c_str());
-        g_sfera_files.setErrorReporting(true);
-        if (size <= 0) continue;
-        if (std::cmp_greater(size, std::numeric_limits<std::ptrdiff_t>::max()) || size % sizeof(Range) != 0) throw std::runtime_error("Invalid script array descriptor size");
-        auto& module = modules[index];
-        module.ranges.resize(static_cast<std::size_t>(size) / sizeof(Range));
-        const auto file = g_sfera_files.open(path.c_str(), 0);
-        const auto read = g_sfera_files.read(file, module.ranges.data(), size);
-        g_sfera_files.close(file);
-        if (read != size) throw std::runtime_error("Incomplete script array descriptor");
-        module.enabled = true;
-        loaded = true;
-    }
-}
-
-void SferaDebugScriptArrays::start() {
-    if (!modules[g_sfera_mbc_runtime->processes[0].code_range_ids[0]].enabled) return;
-    current_process = 0;
-    current_code_range = current_array = 0;
-}
-
-void SferaDebugScriptArrays::stop() { current_process = -1; }
-void SferaDebugScriptArrays::processUnloaded(std::int32_t index) { if (index == current_process) { stop(); start(); } }
-
-void SferaDebugScriptArrays::discardModule(std::uint32_t tag) {
-    modules.at(tag).enabled = false;
-    if (current_process < 0) return;
-    const auto& process = g_sfera_mbc_runtime->processes[current_process];
-    if (process.code_range_ids[current_code_range] == tag) { stop(); start(); }
-}
-
-void SferaDebugScriptArrays::verifyFiles() {
-    const auto& records = g_sfera_mbc_interpreter_storage.module_records;
-    for (std::uint32_t index = 0; index < modules.size(); ++index) {
-        auto& module = modules[index];
-        if (!module.enabled || records[index].name[0] == '\0') continue;
-        const auto path = std::string("mbc\\") + records[index].name + ".adb";
-        g_sfera_files.setErrorReporting(false);
-        const auto size = g_sfera_files.fileSize(path.c_str());
-        g_sfera_files.setErrorReporting(true);
-        if (size <= 0 || !std::cmp_equal(size, module.ranges.size() * sizeof(Range))) { discardModule(index); continue; }
-        std::vector<Range> contents(module.ranges.size());
-        const auto file = g_sfera_files.open(path.c_str(), 0);
-        const auto read = g_sfera_files.read(file, contents.data(), size);
-        g_sfera_files.close(file);
-        if (read != size || contents != module.ranges) discardModule(index);
-    }
-}
-
-bool SferaDebugScriptArrays::checkRange(const SferaMbcProcessRecord& process, std::uint32_t codeRange, const Range& range) {
-    auto* memory = process.process_memory_base + process.code_range_memory_offset[codeRange];
-    const std::span<std::uint8_t, begin_guard.size()> prefix{memory + range.begin, begin_guard.size()};
-    bool corrupted = false;
-    const auto report = [&](const char* format) {
-        char message[256];
-        std::snprintf(message, sizeof(message), format, process.code_range_ids[codeRange], range.begin, range.end);
-        g_sfera_warning_log_runtime.append(message, true);
-        g_sfera_warning_log_runtime.flush();
-        corrupted = true;
-    };
-    if (!std::equal(prefix.begin(), prefix.end(), begin_guard.begin())) { std::copy(begin_guard.begin(), begin_guard.end(), prefix.begin()); report("Start of script array corrupted. ModuleTag=%d, ArrayOffsBeg=%d, ArrayOffsEnd=%d"); }
-    if (memory[range.end] != end_guard) { memory[range.end] = end_guard; report("End of script array corrupted. ModuleTag=%d, ArrayOffsBeg=%d, ArrayOffsEnd=%d"); }
-    return corrupted;
-}
-
-void SferaDebugScriptArrays::finishCheck(bool corrupted) {
-    if (!corrupted || g_sfera_recovered_static_runtime.memory_warning_as_error == 0) return;
-    g_sfera_warning_log_runtime.flush();
-    WorldDiagnostics::debugMessage("Memory Error! See at Warnings.log");
-    ::ExitProcess(0);
-}
-
-void SferaDebugScriptArrays::checkProcess(const SferaMbcProcessRecord& process) {
-    if (process.bytecode_base == nullptr || process.module_tag == 3) return;
-    bool corrupted = false;
-    for (std::uint32_t index = 0; index < process.code_range_count; ++index) {
-        const auto& module = modules.at(process.code_range_ids[index]);
-        if (!module.enabled) continue;
-        for (const auto& range : module.ranges) corrupted = checkRange(process, index, range) || corrupted;
-    }
-    finishCheck(corrupted);
-}
-
-bool SferaDebugScriptArrays::advance() {
-    auto& runtime = *g_sfera_mbc_runtime;
-    const auto firstProcess = current_process;
-    const auto firstRange = current_code_range;
-    std::uint32_t begin = current_code_range + 1;
-    for (std::size_t visited = 0; visited <= std::size(runtime.processes); ++visited) {
-        if (current_process < 0 || static_cast<std::size_t>(current_process) >= std::size(runtime.processes)) return false;
-        const auto& process = runtime.processes[current_process];
-        std::uint32_t end = process.code_range_count;
-        const bool wrapped = visited != 0 && current_process == firstProcess;
-        if (wrapped) end = std::min(end, firstRange + 1);
-        if (process.module_tag != 3) for (auto index = begin; index < end; ++index) {
-            const auto& module = modules.at(process.code_range_ids[index]);
-            if (module.enabled && !module.ranges.empty()) { current_code_range = index; return true; }
-        }
-        if (wrapped) return false;
-        current_process = current_process == runtime.process_chain_last ? runtime.process_chain_first : process.chain_next_index;
-        begin = 0;
-    }
-    return false;
-}
-
-void SferaDebugScriptArrays::checkStep(std::uint32_t count) {
-    if (current_process < 0 || count == 0) return;
-    bool corrupted = false;
-    while (count != 0) {
-        const auto& process = g_sfera_mbc_runtime->processes[current_process];
-        if (current_code_range >= process.code_range_count) { current_array = 0; if (!advance()) { stop(); break; } continue; }
-        const auto& module = modules.at(process.code_range_ids[current_code_range]);
-        if (process.module_tag == 3 || !module.enabled || current_array >= module.ranges.size()) { current_array = 0; if (!advance()) { stop(); break; } continue; }
-        corrupted = checkRange(process, current_code_range, module.ranges[current_array]) || corrupted;
-        --count;
-        if (++current_array == module.ranges.size()) { current_array = 0; if (!advance()) { stop(); break; } }
-    }
-    finishCheck(corrupted);
-}
 
 const char* SferaCrtStartupRuntime::commandLineArguments(const char* commandLine) {
     if (commandLine == nullptr) return "";
@@ -16857,350 +15455,40 @@ void SferaCrtStartupRuntime::initialize() {
     unsigned int control = 0u;
     if (::_controlfp_s(&control, _PC_53, _MCW_PC) != 0) throw std::runtime_error("Cannot initialize floating-point precision");
     ::HeapSetInformation(nullptr, HeapEnableTerminationOnCorruption, nullptr, 0u);
-    ::SetUnhandledExceptionFilter(&sfera_cpp_exception_filter);
     g_sfera_crt_startup_runtime.initialized = true;
-    g_sfera_execution_monitor_runtime.initialize();
     g_sfera_effect_manager.clearListeners();
     g_sfera_error_log_runtime.initialize();
-    g_sfera_recovered_static_runtime.debug_script_arrays.initialize();
     g_sfera_config_text_runtime.parser_path[0] = '\0';
     g_sfera_recovered_static_runtime.inverse_40 = 1.0f / 40.0f;
     g_sfera_camera = SphereRender::GameCamera{};
-    g_sfera_warning_log_runtime.initialize();
-    g_sfera_effect_manager.render_slots.initialize(10000u, "..\\ShareClientSeverCode\\EffectManager.cpp", 125u);
+    g_sfera_effect_manager.render_slots.initialize(10000u);
 
-    g_sfera_landscape_runtime.file_records.initialize(300u, "..\\ShareClientSeverCode\\main.cpp", 369u);
-    g_sfera_interface_runtime.window_handle_table.initialize(7000u, "..\\ShareClientSeverCode\\main.cpp", 403u);
-    g_sfera_world_objects.object_handles.initialize(500000u, "..\\ShareClientSeverCode\\main.cpp", 418u);
-    g_sfera_world_objects.extended_object_handles.initialize(30000u, "..\\ShareClientSeverCode\\main.cpp", 421u);
-    g_sfera_interface_runtime.windows.initialize(100u, "..\\ShareClientSeverCode\\main.cpp", 425u);
-    g_sfera_character_index_map.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 447u);
-    g_sfera_scene_array_runtime.object_visibility_indices.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 448u);
-    g_sfera_scene_array_runtime.object_sort_keys.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 451u);
-    g_sfera_scene_array_runtime.object_sort_indices.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 452u);
-    g_sfera_scene_array_runtime.object_draw_indices.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 453u);
-    g_sfera_collision_runtime.candidate_handles.initialize(20000u, "..\\ShareClientSeverCode\\main.cpp", 454u);
-    g_sfera_scene_array_runtime.scene_points.initialize(900u, "..\\ShareClientSeverCode\\main.cpp", 828u);
-    g_sfera_light_runtime.handles.initialize(1000u, "..\\ShareClientSeverCode\\main.cpp", 4734u);
-    g_sfera_light_runtime.visible_handles.initialize(500u, "..\\ShareClientSeverCode\\main.cpp", 4736u);
+    g_sfera_landscape_runtime.file_records.initialize(300u);
+    g_sfera_interface_runtime.window_handle_table.initialize(7000u);
+    g_sfera_world_objects.object_handles.initialize(500000u);
+    g_sfera_world_objects.extended_object_handles.initialize(30000u);
+    g_sfera_interface_runtime.windows.initialize(100u);
+    g_sfera_character_index_map.initialize(20000u);
+    g_sfera_scene_array_runtime.object_visibility_indices.initialize(20000u);
+    g_sfera_scene_array_runtime.object_sort_keys.initialize(20000u);
+    g_sfera_scene_array_runtime.object_sort_indices.initialize(20000u);
+    g_sfera_scene_array_runtime.object_draw_indices.initialize(20000u);
+    g_sfera_collision_runtime.candidate_handles.initialize(20000u);
+    g_sfera_scene_array_runtime.scene_points.initialize(900u);
+    g_sfera_light_runtime.handles.initialize(1000u);
+    g_sfera_light_runtime.visible_handles.initialize(500u);
     g_sfera_light_runtime.invalidateActiveLights();
-    g_sfera_scene_array_runtime.model_matrices.initialize(256u, "..\\ShareClientSeverCode\\main.cpp", 9451u);
-    g_sfera_scene_array_runtime.character_matrices.initialize(5u, "..\\ShareClientSeverCode\\main.cpp", 9457u);
-    g_sfera_scene_array_runtime.object_positions.initialize(10000u, "..\\ShareClientSeverCode\\main.cpp", 9529u);
-    g_sfera_scene_array_runtime.clip_vectors.initialize(200u, "..\\ShareClientSeverCode\\main.cpp", 10865u);
-    g_sfera_scene_array_runtime.clip_indices.initialize(200u, "..\\ShareClientSeverCode\\main.cpp", 10871u);
-    g_sfera_scene_array_runtime.clip_points.initialize(40u, "..\\ShareClientSeverCode\\main.cpp", 10884u);
-    g_sfera_collision_runtime.near_result_handles.initialize(20u, "..\\ShareClientSeverCode\\main.cpp", 10886u);
-    g_sfera_scene_array_runtime.render_pass_slots.initialize(12u, __FILE__, __LINE__);
-    g_sfera_crash_report_runtime.initialize();
-    g_sfera_log_memory_object.initialize("LogMemory.log", "$d $t ", SferaDiagnosticLogObjectRuntime::ImmediateFlush | SferaDiagnosticLogObjectRuntime::SuppressRepeats, 1000000u, false, 512u);
-    g_sfera_log_warnings_object.initialize("Warnings.log", "$d $t $u", 0u, 1000000u, true, 2112u);
-    g_sfera_log_errors_object.initialize("Errors.log", "$d $t $u", SferaDiagnosticLogObjectRuntime::SessionMarkers | SferaDiagnosticLogObjectRuntime::ImmediateFlush | SferaDiagnosticLogObjectRuntime::SuppressRepeats, 1000000u, true, 2112u);
+    g_sfera_scene_array_runtime.model_matrices.initialize(256u);
+    g_sfera_scene_array_runtime.character_matrices.initialize(5u);
+    g_sfera_scene_array_runtime.object_positions.initialize(10000u);
+    g_sfera_scene_array_runtime.clip_vectors.initialize(200u);
+    g_sfera_scene_array_runtime.clip_indices.initialize(200u);
+    g_sfera_scene_array_runtime.clip_points.initialize(40u);
+    g_sfera_collision_runtime.near_result_handles.initialize(20u);
+    g_sfera_scene_array_runtime.render_pass_slots.initialize(12u);
 }
 
-void SferaCrc32Runtime::initialize() { table = makeTable(); }
 
-std::uint32_t SferaCrc32Runtime::calculate(const void* data, std::size_t size, std::uint32_t seed, bool signedShift) const {
-    const auto* bytes = static_cast<const std::uint8_t*>(data);
-    for (std::size_t index = 0u; index < size; ++index) {
-        const std::uint8_t slot = seed ^ bytes[index];
-        seed = (signedShift ? static_cast<std::uint32_t>(static_cast<std::int32_t>(seed) >> CHAR_BIT) : seed >> CHAR_BIT) ^ table[slot];
-    }
-    return seed;
-}
-
-SferaCheckFilesContext::SferaCheckFilesContext() { crc.initialize(); }
-SferaCheckFilesContext::~SferaCheckFilesContext() { stop(); }
-
-void SferaCheckFilesContext::stop() {
-    stop_requested.store(1);
-    if (thread == nullptr) return;
-    ::WaitForSingleObject(thread, INFINITE);
-    ::CloseHandle(thread);
-    thread = nullptr;
-}
-
-int SferaCheckFilesContext::reset() {
-    stop();
-    crc.current = 0u;
-    record_count = throttle = 0;
-    state = 1;
-    stop_requested.store(-1);
-    running = false;
-    return 0;
-}
-
-int SferaCheckFilesContext::add(const char* directory, const char* masks) {
-    if (record_count < 0 || static_cast<std::size_t>(record_count) >= records.size() || directory == nullptr || masks == nullptr) return -1;
-    auto& record = records[record_count];
-    if (std::strlen(directory) >= sizeof(record.directory) || std::strlen(masks) >= sizeof(record.masks)) return -1;
-    std::copy_n(directory, std::strlen(directory) + 1u, record.directory);
-    std::copy_n(masks, std::strlen(masks) + 1u, record.masks);
-    ++record_count;
-    return 0;
-}
-
-std::uint32_t SferaCheckFilesContext::fileChecksum(const char* path, std::uint32_t limit, bool signedShift) {
-    if (!signedShift) crc.current = 0u;
-    std::FILE* file = nullptr;
-    if (::fopen_s(&file, path, "rb") != 0 || file == nullptr) return 0u;
-    const std::unique_ptr<std::FILE, decltype(&std::fclose)> input(file, &std::fclose);
-    std::vector<std::uint8_t> bytes(limit);
-    const auto size = std::fread(bytes.data(), 1u, bytes.size(), input.get());
-    const bool failed = std::ferror(file) != 0;
-    if (failed) return 0u;
-    const auto value = crc.calculate(bytes.data(), size, 0u, signedShift);
-    if (!signedShift) crc.current = value;
-    return value;
-}
-
-void SferaCheckFilesContext::collect(const char* directory, const char* mask, std::vector<CheckFileRecord>& files, std::uint32_t& throttleCount, bool updateRunning) {
-    if (stop_requested.load() > 0 || mask == nullptr || *mask == '\0') return;
-    const std::string prefix = directory == nullptr ? "" : directory;
-    const auto search = prefix + mask;
-    _finddata64i32_t data{};
-    const auto handle = ::_findfirst64i32(search.c_str(), &data);
-    if (updateRunning) running = true;
-    if (handle == -1) return;
-    if (updateRunning) throttleCount = 0u;
-    try {
-        do {
-            if ((data.attrib & _A_SUBDIR) != 0u || ::_stricmp(data.name, "filelist.dat") == 0) continue;
-            const auto path = prefix + data.name;
-            const bool model = path.size() > 4u && ::_stricmp(path.c_str() + path.size() - 4u, ".mdl") == 0;
-            files.push_back(CheckFileRecord{data.name, fileChecksum(path.c_str(), model ? 1024u : 65536u), static_cast<std::uint32_t>(data.size)});
-            if (throttle > 0 && ++throttleCount >= static_cast<std::uint32_t>(throttle)) { ::Sleep(1000u); throttleCount = 0u; }
-        } while (stop_requested.load() <= 0 && ::_findnext64i32(handle, &data) == 0);
-    } catch (...) { ::_findclose(handle); throw; }
-    ::_findclose(handle);
-}
-
-std::uint32_t SferaCheckFilesContext::directoryChecksum(const char* directory, const char* mask) {
-    const std::string prefix = directory == nullptr ? "" : directory;
-    const auto search = prefix + (mask == nullptr ? "" : mask);
-    _finddata64i32_t data{};
-    const auto handle = ::_findfirst64i32(search.c_str(), &data);
-    if (handle == -1) return 0u;
-    std::uint32_t result = 0u;
-    try {
-        do {
-            if ((data.attrib & _A_SUBDIR) == 0u && ::_stricmp(data.name, "filelist.dat") != 0) result += fileChecksum((prefix + data.name).c_str(), 65536u, true);
-        } while (::_findnext64i32(handle, &data) == 0);
-    } catch (...) { ::_findclose(handle); throw; }
-    ::_findclose(handle);
-    return result;
-}
-
-std::uint32_t SferaCheckFilesContext::calculateRecord(SferaCheckFileSpec& spec, bool synchronous) {
-    if (stop_requested.load() > 0) return crc.current;
-    std::vector<CheckFileRecord> files;
-    std::uint32_t throttleCount = 0u;
-    if (std::strncmp(spec.directory, "xupdate", 7u) == 0) {
-        spec.directory[0] = '\0';
-        collect(spec.directory, "sphere.exe", files, throttleCount, synchronous);
-        collect(spec.directory, "sphereclient.exe", files, throttleCount, synchronous);
-    } else {
-        std::string_view masks(spec.masks);
-        while (!masks.empty() && stop_requested.load() <= 0) {
-            const auto end = masks.find(';');
-            const std::string mask(masks.substr(0u, end));
-            collect(spec.directory, mask.c_str(), files, throttleCount, synchronous);
-            if (end == std::string_view::npos) break;
-            masks.remove_prefix(end + 1u);
-            if (synchronous) std::memmove(spec.masks, masks.data(), masks.size() + 1u);
-            if (synchronous) masks = spec.masks;
-        }
-    }
-    std::stable_sort(files.begin(), files.end(), [](const CheckFileRecord& first, const CheckFileRecord& second) { return ::_stricmp(first.name.c_str(), second.name.c_str()) < 0; });
-    crc.current = 0u;
-    for (const auto& file : files) {
-        std::string name = synchronous ? file.name.substr(0u, 254u) : file.name;
-        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char value) { return std::tolower(value); });
-        crc.current = crc.calculate(name.c_str(), name.size() + 1u, crc.current);
-        crc.current = crc.calculate(&file.crc, sizeof(file.crc), crc.current);
-        crc.current = crc.calculate(&file.size, sizeof(file.size), crc.current);
-        if (stop_requested.load() > 0) break;
-    }
-    return crc.current;
-}
-
-int SferaCheckFilesContext::threadStatus() const {
-    if (thread == nullptr) return -1;
-    DWORD exitCode = STILL_ACTIVE;
-    if (!::GetExitCodeThread(thread, &exitCode)) return -1;
-    return exitCode == STILL_ACTIVE ? 0 : 1;
-}
-
-int SferaCheckFilesContext::readResults(std::uint32_t* destination, std::int32_t* capacity) {
-    if (state < 0 || thread == nullptr || capacity == nullptr) return -1;
-    const auto status = threadStatus();
-    if (status <= 0) return status;
-    const auto count = record_count;
-    record_count = std::min(record_count, *capacity);
-    *capacity = count;
-    for (std::int32_t index = 0; index < record_count; ++index) destination[index] = records[index].crc;
-    return 1;
-}
-
-int SferaCheckFilesContext::calculateResults(std::uint32_t* destination, std::int32_t* capacity) {
-    if (state < 0 || capacity == nullptr) return -1;
-    throttle = 0;
-    const auto count = record_count;
-    record_count = std::min(record_count, *capacity);
-    *capacity = count;
-    for (std::int32_t index = 0; index < record_count; ++index) destination[index] = calculateRecord(records[index], true);
-    return 0;
-}
-
-int SferaCheckFilesContext::start() {
-    if (thread != nullptr) {
-        if (threadStatus() == 0) return 0;
-        ::CloseHandle(thread);
-        thread = nullptr;
-    }
-    thread = ::CreateThread(nullptr, 0u, &sfera_check_files_thread, this, 0u, nullptr);
-    if (thread == nullptr) return 2;
-    ::SetThreadPriority(thread, THREAD_PRIORITY_BELOW_NORMAL);
-    return 0;
-}
-
-void SferaCheckFilesContext::run() {
-    const auto count = std::min<std::size_t>(std::max(record_count, 0), records.size());
-    for (std::size_t index = 0u; index < count && stop_requested.load() <= 0; ++index) {
-        records[index].crc = calculateRecord(records[index], false);
-        if (!running) break;
-    }
-}
-
-void SferaLogRuntime::writeScript(const char* path, const char* text, bool primary) {
-    std::FILE* file = nullptr;
-    if (::fopen_s(&file, path, script_first_write ? "wt" : "at") != 0 || file == nullptr) return;
-    if (primary) script_first_write = false;
-    std::fputs(text, file);
-    std::fclose(file);
-}
-
-void SferaLogRuntime::writeScript(const char* path, float value, bool primary) {
-    char text[128];
-    std::snprintf(text, sizeof(text), "%f", value);
-    writeScript(path, text, primary);
-}
-
-void SferaLogRuntime::datedPath(char* destination, const char* path) {
-    const std::string name(path);
-    const auto dot = name.rfind('.');
-    const auto split = dot == std::string::npos ? name.size() : dot;
-    SYSTEMTIME time{};
-    ::GetLocalTime(&time);
-    char date[40];
-    std::snprintf(date, sizeof(date), "_%02d.%02d.%02d", static_cast<int>(time.wYear) - 2000, time.wMonth, time.wDay);
-    const auto result = name.substr(0u, split) + date + name.substr(split);
-    std::copy_n(result.c_str(), result.size() + 1u, destination);
-}
-
-void SferaLogRuntime::writeScript(const char* path, std::int32_t value, bool primary) {
-    char text[32];
-    std::snprintf(text, sizeof(text), "%d", value);
-    writeScript(path, text, primary);
-}
-
-void SferaLogRuntime::writeTemporary(const char* text) {
-    SYSTEMTIME date{};
-    ::GetLocalTime(&date);
-    char path[80];
-    std::snprintf(path, sizeof(path), "logs\\tmp_cl_%02d%02d%02d.log", static_cast<int>(date.wYear) - 2000, date.wMonth, date.wDay);
-    std::FILE* file = nullptr;
-    if (::fopen_s(&file, path, "at") != 0 || file == nullptr) return;
-    const auto now = std::time(nullptr);
-    std::tm time{};
-    ::localtime_s(&time, &now);
-    std::fprintf(file, "%02i:%02i:%02i %s", time.tm_hour, time.tm_min, time.tm_sec, text);
-    std::fclose(file);
-}
-
-void SferaFileRuntime::appendCrashLog(std::FILE* output, const char* path, std::size_t limit, bool tail) {
-    std::vector<char> data(limit);
-    std::FILE* file = nullptr;
-    if (::fopen_s(&file, path, "r") != 0 || file == nullptr) {
-        std::fprintf(output, "\n%s not found!\n", path);
-        return;
-    }
-    if (tail) std::fseek(file, -static_cast<long>(limit), SEEK_END);
-    const auto length = std::fread(data.data(), 1u, data.size(), file);
-    std::fclose(file);
-    std::fprintf(output, "\n%s\n->\n", path);
-    std::fwrite(data.data(), 1u, length, output);
-}
-
-void SferaFileRuntime::collectCrashLogs() {
-    std::FILE* marker = nullptr;
-    if (::fopen_s(&marker, "app-is-Run.1", "r") != 0 || marker == nullptr) return;
-    std::fclose(marker);
-    std::FILE* report = nullptr;
-    if (::fopen_s(&report, "client-Crash.1", "w") == 0 && report != nullptr) {
-        const std::unique_ptr<std::FILE, decltype(&std::fclose)> output(report, &std::fclose);
-        appendCrashLog(output.get(), "ERRORLOG.TXT", 1000u, false);
-        std::remove("ERRORLOG.TXT");
-        appendCrashLog(output.get(), "Error.log", 600u, true);
-        std::remove("Error.log");
-        appendCrashLog(output.get(), "Warnings00.log", 200u, true);
-        std::remove("Warnings00.log");
-        appendCrashLog(output.get(), "error-Cause.1", 50u, false);
-        std::remove("error-Cause.1");
-    }
-    std::remove("error-Cause.1");
-    std::remove("app-is-Run.1");
-}
-
-void SferaFileRuntime::beginCrashReport() {
-    if (crash_report_active) return;
-    collectCrashLogs();
-    std::FILE* marker = nullptr;
-    if (::fopen_s(&marker, "app-is-Run.1", "w") == 0 && marker != nullptr) std::fclose(marker);
-    crash_report_active = true;
-}
-
-void SferaFileRuntime::endCrashReport() {
-    if (!crash_report_active) return;
-    if (::_access("app-is-Run.1", 0) != -1 && std::remove("app-is-Run.1") != 0) {
-        const int error = errno;
-        std::FILE* output = nullptr;
-        if (::fopen_s(&output, "error-Cause.1", "w") == 0 && output != nullptr) {
-            char message[256];
-            ::strerror_s(message, sizeof(message), error);
-            std::fprintf(output, "File %s not deleted (~), error cause: %s\n", "app-is-Run.1", message);
-            std::fclose(output);
-        }
-    }
-    crash_report_active = false;
-}
-
-void SferaProfilerRuntime::writeReport() {
-    if (frame_count == 0u || frame_time_total == 0u) return;
-    std::FILE* file = nullptr;
-    if (::fopen_s(&file, "logs\\profile.txt", "a") != 0 || file == nullptr) return;
-    const std::unique_ptr<std::FILE, decltype(&std::fclose)> output(file, &std::fclose);
-    std::fputs("\n\nProfile results:\n", file);
-    const float average = static_cast<double>(frame_time_total) / static_cast<std::int32_t>(frame_count);
-    const auto snapshot = WorldClock::microseconds();
-    report_clock_snapshot = snapshot;
-    const std::uint32_t integralAverage = static_cast<std::int64_t>(std::trunc(average));
-    const auto fps = integralAverage != 0u ? static_cast<std::uint32_t>(report_clock_snapshot) / integralAverage : 0u;
-    std::fprintf(file, "Average frame time = %d  (fps = %d)\n\n", static_cast<int>(integralAverage), static_cast<int>(fps));
-    const float frames = static_cast<std::int32_t>(frame_count);
-    for (std::size_t index = 0u; index < kProfileSlotCount; ++index) {
-        if (call_count[index] == 0u) continue;
-        if (call_count[index] == std::numeric_limits<std::uint32_t>::max()) {
-            std::fprintf(file, "N=%d,  ERROR\n", static_cast<int>(index));
-            continue;
-        }
-        const std::int64_t ticks = accumulated_ticks[index];
-        const float time = static_cast<double>(ticks) / frames;
-        const float percent = static_cast<double>(time) / average * 100.0;
-        const float calls = static_cast<double>(static_cast<std::int32_t>(call_count[index])) / frames;
-        std::fprintf(file, "N=%d,  ANoC = %5.2f,  AT = %7.1f,  AP = %5.2f\n", static_cast<int>(index), calls, time, percent);
-    }
-}
 
 void SferaMbcRuntime::pushReference(SferaMbcValue::Type type, const SferaSliceReference32& reference, bool load) {
     const auto source = reference;
@@ -17219,24 +15507,14 @@ std::uint32_t SferaMbcProcessRecord::growMemory(std::uint32_t size) {
     if (size > maximumRequest || process_memory_size > limit - alignof(std::uint32_t)) return UINT32_MAX;
     const auto aligned = (static_cast<std::size_t>(process_memory_size) + alignof(std::uint32_t) - 1) / alignof(std::uint32_t) * alignof(std::uint32_t);
     if (size >= limit - aligned) return UINT32_MAX;
-    auto* replacement = static_cast<std::uint8_t*>(WorldMemory::reallocate(process_memory_base, aligned + size, __FILE__, __LINE__));
+    auto* replacement = static_cast<std::uint8_t*>(WorldMemory::reallocate(process_memory_base, aligned + size));
     process_memory_base = replacement;
     std::memset(replacement + process_memory_size, 0, aligned + size - process_memory_size);
     process_memory_size = aligned + size;
-    if (module_tag > 0) g_sfera_mbc_module_memory_stats[module_tag].process_memory_bytes += size;
     auto& runtime = *g_sfera_mbc_runtime;
     if (runtime.active_process == this) runtime.process_memory_base = replacement;
     for (std::size_t index = 0; index < runtime.execution_context_depth; ++index) if (runtime.execution_context_stack[index].active_process == this) runtime.execution_context_stack[index].process_memory_base = replacement;
     return aligned;
-}
-
-std::size_t WorldMemory::allocatedBytes(void* memory) {
-    if (memory == nullptr) return 0;
-    UiMemoryLock lock;
-    auto* allocation = static_cast<UiAllocationHeader*>(memory) - 1;
-    const auto* link = g_sfera_allocation_hash_runtime.findLink(allocation);
-    if (*link == uiAllocationHashEnd) throw std::logic_error("UI size of unregistered memory");
-    return ::_msize(allocation);
 }
 
 SferaMbcProcessRecord* SferaMbcRuntime::findProcess(std::uint32_t id) {
@@ -17287,64 +15565,7 @@ void SferaMbcRuntime::setNamedValue(const char* name, std::uint32_t value, std::
     record->value_data[index] = value;
 }
 
-int WorldDiagnostics::debugMessage(const char* message) {
-    if (auto* device = g_sfera_graphics_runtime.d3d_runtime.get()) device->checkResult(device->native_device->Present(nullptr, nullptr, nullptr, nullptr), "Present");
-    return ::MessageBoxA(g_sfera_window_runtime.main_window_handle, message, "Debug", MB_OK);
-}
 
-std::uint32_t SferaMbcRuntime::checksumFile(const char* path) {
-    file_crc32 = 0;
-    int file = -1;
-    if (::_sopen_s(&file, path, _O_RDONLY | _O_BINARY, _SH_DENYNO, 0) != 0) return 0;
-    std::array<std::uint8_t, 65536> buffer;
-    for (;;) {
-        const auto read = ::_read(file, buffer.data(), static_cast<unsigned>(buffer.size()));
-        if (read < 0) { ::_close(file); return 0; }
-        if (read == 0) break;
-        file_crc32 = file_crc.calculate(buffer.data(), static_cast<std::size_t>(read), file_crc32);
-    }
-    ::_close(file);
-    return file_crc32;
-}
-
-std::uint32_t SferaMbcRuntime::checksumDirectory(const char* directory) {
-    const auto indexPath = std::string(directory) + "filelist.dat";
-    int cached = -1;
-    if (::_sopen_s(&cached, indexPath.c_str(), _O_RDONLY | _O_BINARY, _SH_DENYNO, 0) == 0) {
-        if (g_sfera_inter_scalar_runtime.state_06 == 0) { ::_read(cached, &file_crc32, sizeof(file_crc32)); ::_close(cached); return file_crc32; }
-        ::_close(cached);
-    }
-    std::vector<CheckFileRecord> files;
-    const auto collect = [&](const char* prefix, const char* mask) {
-        const auto pattern = std::string(prefix) + mask;
-        _finddata64i32_t data{};
-        const auto search = ::_findfirst64i32(pattern.c_str(), &data);
-        if (search == -1) return;
-        do {
-            if ((data.attrib & _A_SUBDIR) != 0 || ::_stricmp(data.name, "filelist.dat") == 0) continue;
-            const auto path = std::string(prefix) + data.name;
-            files.push_back({data.name, checksumFile(path.c_str()), static_cast<std::uint32_t>(data.size)});
-        } while (::_findnext64i32(search, &data) == 0);
-        ::_findclose(search);
-    };
-    if (std::strncmp(directory, "xupdate", 7) == 0) { collect("", "sphere*.exe"); collect("", "xlaunch*.exe"); collect("", "*.dll"); }
-    else collect(directory, "*.*");
-    std::stable_sort(files.begin(), files.end(), [](const auto& left, const auto& right) { return ::_stricmp(left.name.c_str(), right.name.c_str()) < 0; });
-    const auto output = g_sfera_files.create(indexPath.c_str());
-    file_crc32 = 0;
-    g_sfera_files.write(output, &file_crc32, sizeof(file_crc32));
-    for (auto& file : files) {
-        for (auto& character : file.name) character = std::tolower(static_cast<unsigned char>(character));
-        const auto write = [&](const void* data, std::uint32_t size) { g_sfera_files.write(output, data, size); file_crc32 = file_crc.calculate(data, size, file_crc32); };
-        write(file.name.c_str(), static_cast<std::uint32_t>(file.name.size() + 1));
-        write(&file.crc, sizeof(file.crc));
-        write(&file.size, sizeof(file.size));
-    }
-    g_sfera_files.seek(output, 0, SEEK_SET);
-    g_sfera_files.write(output, &file_crc32, sizeof(file_crc32));
-    g_sfera_files.close(output);
-    return file_crc32;
-}
 
 void CItem::setName(const char* text) {
     const auto length = ::strnlen(text, sizeof(name) - 1);
@@ -17352,101 +15573,57 @@ void CItem::setName(const char* text) {
     std::fill(name + length, std::end(name), '\0');
 }
 
-void CBaseManagerCommonItem::dumpLists() {
-    std::printf("\n-----BaseManager---ALL LISTS----------------------------\n");
-    auto* lists = list_storage.data();
-    if (lists == nullptr) return;
-    for (std::size_t index = 0; index < capacity; ++index) {
-        auto& list = lists[index];
-        if (!list.active) continue;
-        std::printf("List Name = ''%s'', min = %zu, curmax = %zu, cur = %zu\n", list.name, list.minimum_items, list.capacity, list.item_count);
-        std::printf("~~~~~ItemList~~~ALL ITEMS~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-        auto* items = list.item_storage.data();
-        if (items == nullptr || list.item_count == 0) { std::printf(". . . . . . . \n"); continue; }
-        for (std::size_t slot = 0; slot < list.capacity; ++slot) if (items[slot].active == 1) { std::printf(" ItemName = ''%s''\n", items[slot].name); items[slot].releaseItem(); }
-    }
-}
-
 std::int32_t CBaseManagerCommonItem::createList(std::int32_t minimum, std::int32_t reserve, std::uint32_t mode, const char* listName, std::uint32_t parameter) {
-    auto& log = g_sfera_log_runtime.files[0];
-    if (manager_diagnostics_mode) log.write("\n-----BaseManager---ADD LIST-----------------------------------------\n");
     CItemListCommonItem list;
     std::int32_t initialized;
     try { initialized = list.initialize(minimum, reserve, mode, listName, parameter); }
     catch (...) { list.resetItem(); throw; }
     if (initialized != 0) { list.resetItem(); return initialized; }
-    if (findStoredList(&list) != nullptr) { if (manager_diagnostics_mode) log.write(" Added List = 'ERROR' ALREADY EXIST\n"); list.resetItem(); return -101; }
+    if (findStoredList(&list) != nullptr) { list.resetItem(); return -101; }
     std::int32_t result;
     try { result = addList(&list); }
     catch (...) { list.resetItem(); throw; }
-    if (result == 0) {
-        if (auto* stored = findStoredList(&list)) stored->diagnostics_mode = manager_diagnostics_mode;
-        if (manager_diagnostics_mode) log.write((std::string(" Added List  'OK' = ''") + list.name + "''\n").c_str());
-        if (manager_diagnostics_mode == 2) dumpLists();
-    } else if (manager_diagnostics_mode && (result == -20 || result == -3)) log.write(result == -20 ? " Added List = 'ERROR' ER_ITEM_MEMORY_NOT_ALLOC\n" : " Added List = 'ERROR' ER_ITEM_NOT_ADDED\n");
     if (result != 0) list.resetItem();
     return result;
 }
 
 std::int32_t CBaseManagerCommonItem::deleteList(const char* listName) {
-    auto& log = g_sfera_log_runtime.files[0];
-    if (manager_diagnostics_mode) log.write("\n-----BaseManager---DEL LIST----------------------------------------\n");
     CItem key;
     key.setName(listName);
-    const auto result = removeList(&key);
-    if (result == 0) {
-        if (manager_diagnostics_mode) log.write((std::string(" Deleted List  'OK' = ''") + key.name + "''\n").c_str());
-        if (manager_diagnostics_mode == 2) dumpLists();
-    } else if (result == -6 && manager_diagnostics_mode) log.write(" Delete List =  'ERROR' ER_CURITEMS_LESS_MINITEMS\n");
-    return result;
+    return removeList(&key);
 }
 
 std::int32_t CBaseManagerCommonItem::insertListItem(const CItem& listKey, const CCommonItem& value) {
-    auto& log = g_sfera_log_runtime.files[0];
-    if (manager_diagnostics_mode) log.write("\n-----BaseManager---ADD ITEM ITEM----------------------------------------\n");
     auto* list = findStoredList(&listKey);
     if (list == nullptr) return -15;
     const auto result = list->addItem(&value);
-    if (result != 0 && result != -105) {
-        if (manager_diagnostics_mode && (result == -20 || result == -3)) log.write((std::string(result == -20 ? " Add ItemItem  'ERROR' ER_ITEM_MEMORY_NOT_ALLOC = ''" : " Add ItemItem  'ERROR' ER_ITEM_NOT_ADDED = ''") + value.name + "''\n").c_str());
-        return result;
-    }
-    if (manager_diagnostics_mode) log.write((std::string(result == 0 ? " Added ItemItem  'OK' = ''" : " Added ItemItem REWRITE = ''") + value.name + "''\n").c_str());
+    if (result != 0 && result != -105) return result;
     auto* inserted = list->findStoredItem(&value);
     if (list->item_parameter != 0) {
-        if (manager_diagnostics_mode) log.write(" Add ItemItem    \315\340\367\340\353\356 \321\350\355\365\360\356\355\350\347\340\366\350\350 '\302\361\345\354 \356\362 \362\345\352\363\371\345\343\356, \362\345\352\363\371\345\354\363 \356\362 \342\361\345\365'\n");
-        if (inserted == nullptr) { if (manager_diagnostics_mode) log.write((std::string(" Add pItemFrom  'NOT' Found = ''") + value.name + "''\n").c_str()); return result == 0 ? -17 : -18; }
+        if (inserted == nullptr) return result == 0 ? -17 : -18;
         auto* current = list->firstItem();
-        if (current == nullptr) { if (manager_diagnostics_mode) log.write(" Add pItemTo  'NOT' Found\n"); return result == 0 ? -16 : -19; }
+        if (current == nullptr) return result == 0 ? -16 : -19;
         do {
             if (result == -105 || current != inserted) handleInsert(list, current, inserted);
             if (result == 0) handleInsert(list, inserted, current);
             current = list->nextItem();
         } while (current != nullptr);
-        if (manager_diagnostics_mode) log.write(" Add ItemItem    \312\356\355\345\366 \321\350\355\365\360\356\355\350\347\340\366\350\350 '\302\361\345\354 \356\362 \362\345\352\363\371\345\343\356, \362\345\352\363\371\345\354\363 \356\362 \342\361\345\365'\n");
-        if (manager_diagnostics_mode == 2) dumpLists();
     }
     return result;
 }
 
 std::int32_t CBaseManagerCommonItem::deleteListItem(const CItem& listKey, const CItem& itemKey) {
-    auto& log = g_sfera_log_runtime.files[0];
-    if (manager_diagnostics_mode) log.write("\n-----BaseManager---DEL ITEM ITEM----------------------------------------\n");
     auto* list = findStoredList(&listKey);
-    if (list == nullptr) { if (manager_diagnostics_mode) log.write(" Delete ItemItem  'ERROR' ITEM NOT FOUND\n"); return -4; }
+    if (list == nullptr) return -4;
     auto* removed = list->findStoredItem(&itemKey);
     if (list->item_parameter != 0) {
-        if (removed == nullptr) { if (manager_diagnostics_mode) log.write((std::string(" Delete pItemFrom 'NOT' Found = ''") + itemKey.name + "''\n").c_str()); return -10; }
+        if (removed == nullptr) return -10;
         auto* current = list->firstItem();
-        if (current == nullptr) { if (manager_diagnostics_mode) log.write(" Delete pItemTo 'NOT' Found\n"); return -11; }
+        if (current == nullptr) return -11;
         do { handleRemove(list, current, removed); current = list->nextItem(); } while (current != nullptr);
     }
     const auto result = list->removeItem(&itemKey);
-    if (result == -6 || result == 0) {
-        if (manager_diagnostics_mode) log.write((std::string(result == -6 ? " Delete ItemItem ER_CURITEMS_LESS_MINITEMS = ''" : " Delete ItemItem  'OK' = ''") + itemKey.name + "''\n").c_str());
-        if (manager_diagnostics_mode == 2) dumpLists();
-        if (result == -6) removeList(&listKey);
-    }
+    if (result == -6) removeList(&listKey);
     return result;
 }
 
@@ -17501,86 +15678,6 @@ void SferaLogRuntime::writeFormatted(const char* format, std::va_list arguments)
     auto& message = g_sfera_client_process_runtime.log_message;
     std::vsnprintf(message, sizeof(message), format, arguments);
     files[0].write(message);
-}
-
-void SferaNetworkProbeRuntime::writeLog(const char* message, bool truncate) {
-    std::FILE* stream = nullptr;
-    if (::fopen_s(&stream, "Net.log", truncate ? "wt" : "at") != 0 || stream == nullptr) return;
-    const auto now = ::_time64(nullptr);
-    std::tm time{};
-    char stamp[128]{};
-    if (::_localtime64_s(&time, &now) == 0) std::strftime(stamp, sizeof(stamp), "%d/%m %H:%M:%S ", &time);
-    std::fputs(stamp, stream);
-    std::fputs(message, stream);
-    std::fclose(stream);
-}
-
-std::uint32_t SferaNetworkProbeRuntime::writeSamples() {
-    std::FILE* stream = nullptr;
-    if (::fopen_s(&stream, "Net.log", "at") != 0 || stream == nullptr) return 0;
-    ::EnterCriticalSection(&critical_section);
-    std::copy(std::begin(samples), std::end(samples), std::begin(snapshot));
-    snapshot_count = sample_count;
-    sample_count = 0;
-    ::LeaveCriticalSection(&critical_section);
-    for (auto index = snapshot_count; index != 0; --index) {
-        const auto& sample = snapshot[index - 1];
-        const __time64_t timestamp = static_cast<__time64_t>(sample.timestamp);
-        std::tm time{};
-        char stamp[128]{};
-        if (::_localtime64_s(&time, &timestamp) == 0) std::strftime(stamp, sizeof(stamp), "%d/%m %H:%M:%S ", &time);
-        std::fprintf(stream, "%s%d %d %d %d\n", stamp, static_cast<std::int32_t>(sample.probe_result), static_cast<std::int32_t>(sample.context_c), static_cast<std::int32_t>(sample.context_a), static_cast<std::int32_t>(sample.context_b));
-    }
-    std::fclose(stream);
-    return snapshot_count;
-}
-
-void SferaNetworkProbeRuntime::start(const char* hostname) {
-    sample_count = 0;
-    const auto length = std::min(std::strlen(hostname), sizeof(host) - 1);
-    std::copy_n(hostname, length, host);
-    host[length] = '\0';
-    ::InitializeCriticalSection(&critical_section);
-    stop_requested = 0;
-    context_a = context_b = context_c = 0;
-    DWORD identifier = 0;
-    thread_handle = ::CreateThread(nullptr, 0, &sfera_network_probe_thread, nullptr, 0, &identifier);
-    if (thread_handle == nullptr) {
-        char message[128];
-        std::snprintf(message, sizeof(message), "CreateThread error: %d\n", static_cast<int>(::GetLastError()));
-        CSphereError error;
-        error.write(message);
-    }
-}
-
-void SferaNetworkProbeRuntime::stop(bool preserveErrorLog) {
-    stop_requested = 1;
-    if (thread_handle != nullptr) {
-        ::WaitForSingleObject(thread_handle, INFINITE);
-        ::CloseHandle(thread_handle);
-        thread_handle = nullptr;
-    }
-    ::DeleteCriticalSection(&critical_section);
-    if (preserveErrorLog) std::rename("Net.log", "NetError.log");
-}
-
-void SferaNetworkRuntime::updateProbe() {
-    if (initialized == 0) return;
-    auto& probe = g_sfera_network_probe_runtime;
-    if (static_cast<std::int32_t>(error_budget) < 50) {
-        if (transport.connection_lost) {
-            if (!network_error_active) {
-                network_error_active = net_log_has_error = true;
-                probe.writeLog("-- N\n");
-            }
-            error_budget += probe.writeSamples();
-        } else {
-            network_error_active = false;
-        }
-    }
-    probe.context_a = static_cast<std::uint32_t>(transport.received_bytes);
-    probe.context_b = connection_info.round_trip_latency_ms;
-    probe.context_c = static_cast<std::uint32_t>(transport.sent_bytes);
 }
 
 void SferaNetworkRuntime::updateTcpStatistics() {
@@ -17761,7 +15858,7 @@ void SferaMbcProcessRecord::discardQueuedCommand() {
     auto* command = queued_commands;
     g_sfera_mbc_runtime->forgetMemory(command);
     queued_commands = command->next;
-    WorldMemory::release(command, "..\\ShareClientSeverCode\\Inter.cpp", 6227);
+    WorldMemory::release(command);
 }
 
 void SferaMbcRuntime::pushCommandArguments(const SferaMbcQueuedCommand& command) {
@@ -18118,13 +16215,12 @@ void SferaMbcRuntime::windowCommand() {
             if (static_cast<std::int32_t>(handle) < 0) reportError("Error creating window"); else active_process->registerResource(handle, ResourceKind::gameWindow);
             break;
         }
-        case WindowOperation::Destroy: case WindowOperation::Close: case WindowOperation::DestroyDialog: {
+        case WindowOperation::Destroy: case WindowOperation::Close: {
             if (!read(1)) return;
             const std::uint32_t handle = arguments[0];
             auto resource = ResourceKind::gameWindow;
             if (operation == WindowOperation::Destroy) GameInterface::destroyWindow(handle);
-            else if (operation == WindowOperation::Close) { resource = ResourceKind::interfaceWindow; g_sfera_interface.closeWindow(nativeResource<SphereUI::Window*>(handle), true); }
-            else { resource = ResourceKind::dialog; g_sfera_win32_dialogs.destroy(nativeResource<SferaDialogState*>(handle)); }
+            else { resource = ResourceKind::interfaceWindow; g_sfera_interface.closeWindow(nativeResource<SphereUI::Window*>(handle), true); }
             active_process->unregisterResource(handle, resource);
             break;
         }
@@ -18216,37 +16312,31 @@ void SferaMbcRuntime::windowCommand() {
             if (window) active_process->registerResource(handle, ResourceKind::interfaceWindow);
             break;
         }
-        case WindowOperation::PollEvent: case WindowOperation::PollDialogEvent: {
+        case WindowOperation::PollEvent: {
             const auto count = argument_count == 6 ? 5u : argument_count >= 5 ? 4u : 3u;
             if (!read(count)) return;
             for (std::uint32_t index = 1; index < count; ++index) warnNull(arguments[index], index);
-            if (operation == WindowOperation::PollDialogEvent) {
-                // The GUI opcode historically consumes its optional destinations a second time.
-                if (argument_count >= 5) arguments[3] = nextInteger();
-                if (argument_count == 6) arguments[4] = nextInteger();
-                if (execution_failed) return;
-                SferaDialogEvent event{};
-                auto* dialog = nativeResource<SferaDialogState*>(static_cast<std::uint32_t>(arguments[0]));
-                if (!dialog || !dialog->takeEvent(event)) { pushInteger(0); return; }
-                writeMemory(arguments[1], event.control_id); writeMemory(arguments[2], event.message);
-                if (argument_count == 6) { writeMemory(arguments[3], static_cast<std::uint32_t>(event.wparam)); writeMemory(arguments[4], static_cast<std::uint32_t>(event.lparam)); }
-            } else {
-                SphereUI::WindowEvent event{};
-                auto* window = nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(arguments[0]));
-                if (!window || !window->pollEvent(event)) { pushInteger(0); return; }
-                writeMemory(arguments[1], event.control_id); writeMemory(arguments[2], event.message);
-                if (argument_count == 5) {
-                    if (event.message == SphereUI::UiMessage::listItemEvent) { writeMemory(arguments[1], HIWORD(event.second)); writeMemory(arguments[2], event.first); writeMemory(arguments[3], LOWORD(event.second)); }
-                    else writeMemory(arguments[3], UINT32_MAX);
-                } else if (argument_count == 6) { writeMemory(arguments[3], event.first); writeMemory(arguments[4], event.second); }
+            SphereUI::WindowEvent event{};
+            auto* window = nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(arguments[0]));
+            if (!window || !window->pollEvent(event)) { pushInteger(0); return; }
+            writeMemory(arguments[1], event.control_id);
+            writeMemory(arguments[2], event.message);
+            if (argument_count == 5) {
+                if (event.message == SphereUI::UiMessage::listItemEvent) {
+                    writeMemory(arguments[1], HIWORD(event.second));
+                    writeMemory(arguments[2], event.first);
+                    writeMemory(arguments[3], LOWORD(event.second));
+                } else writeMemory(arguments[3], UINT32_MAX);
+            } else if (argument_count == 6) {
+                writeMemory(arguments[3], event.first);
+                writeMemory(arguments[4], event.second);
             }
             pushInteger(1);
             break;
         }
-        case WindowOperation::SetText: case WindowOperation::SetDialogText:
+        case WindowOperation::SetText:
             if (!read(2)) return;
-            if (operation == WindowOperation::SetDialogText) ::SetWindowTextA(dialogWindow(static_cast<std::uint32_t>(arguments[0])), pointer(arguments[1]));
-            else if (auto* window = nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(arguments[0]))) window->setText(pointer(arguments[1]));
+            if (auto* window = nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(arguments[0]))) window->setText(pointer(arguments[1]));
             pushInteger(0);
             break;
         case WindowOperation::ControlAt: case WindowOperation::ItemAt: {
@@ -18257,23 +16347,27 @@ void SferaMbcRuntime::windowCommand() {
             pushInteger(nativeHandle(result));
             break;
         }
-        case WindowOperation::SendMessage: case WindowOperation::SendDialogMessage: {
+        case WindowOperation::SendMessage: {
             if (!read(5)) return;
             std::uintptr_t first = arguments[2], second = arguments[3];
-            if ((arguments[4] & 1) && (first != 0 || operation == WindowOperation::SendDialogMessage)) first = reinterpret_cast<std::uintptr_t>(memoryAt(static_cast<std::uint32_t>(first)));
-            if ((arguments[4] & 2) && (second != 0 || operation == WindowOperation::SendDialogMessage)) second = reinterpret_cast<std::uintptr_t>(memoryAt(static_cast<std::uint32_t>(second)));
-            if (operation == WindowOperation::SendMessage && static_cast<SphereUI::UiMessage>(arguments[1]) == SphereUI::UiMessage::beginModal && (arguments[4] & 1) == 0) first = reinterpret_cast<std::uintptr_t>(nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(first)));
-            if (operation == WindowOperation::SendDialogMessage) pushInteger(static_cast<std::uint32_t>(g_sfera_win32_dialogs.sendMessage(dialogWindow(static_cast<std::uint32_t>(arguments[0])), arguments[1], first, static_cast<LPARAM>(second))));
-            else { if (static_cast<SphereUI::UiMessage>(arguments[1]) == SphereUI::UiMessage::showHelpPage) g_sfera_interface.showHelpPage(reinterpret_cast<const char*>(first)); else g_sfera_interface.sendMessage(nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(arguments[0])), static_cast<SphereUI::UiMessage>(arguments[1]), first, second); pushInteger(0); }
+            if ((arguments[4] & 1) && first != 0) first = reinterpret_cast<std::uintptr_t>(memoryAt(static_cast<std::uint32_t>(first)));
+            if ((arguments[4] & 2) && second != 0) second = reinterpret_cast<std::uintptr_t>(memoryAt(static_cast<std::uint32_t>(second)));
+            if (static_cast<SphereUI::UiMessage>(arguments[1]) == SphereUI::UiMessage::beginModal && (arguments[4] & 1) == 0) first = reinterpret_cast<std::uintptr_t>(nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(first)));
+            if (static_cast<SphereUI::UiMessage>(arguments[1]) == SphereUI::UiMessage::showHelpPage) g_sfera_interface.showHelpPage(reinterpret_cast<const char*>(first));
+            else g_sfera_interface.sendMessage(nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(arguments[0])), static_cast<SphereUI::UiMessage>(arguments[1]), first, second);
+            pushInteger(0);
             break;
         }
-        case WindowOperation::GetText: case WindowOperation::GetDialogText: {
+        case WindowOperation::GetText: {
             if (!read(3)) return;
             warnNull(arguments[1], 1);
             const std::uint32_t limit = std::max(arguments[2], 1) - 1;
             auto* destination = pointer(arguments[1]);
-            if (operation == WindowOperation::GetDialogText) ::GetWindowTextA(dialogWindow(static_cast<std::uint32_t>(arguments[0])), destination, static_cast<int>(limit));
-            else if (auto* window = nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(arguments[0])); window && limit) { const auto length = std::min<std::size_t>(window->text_length, limit); std::copy_n(window->getText(), length, destination); destination[length] = '\0'; }
+            if (auto* window = nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(arguments[0])); window && limit) {
+                const auto length = std::min<std::size_t>(window->text_length, limit);
+                std::copy_n(window->getText(), length, destination);
+                destination[length] = '\0';
+            }
             pushInteger(0);
             break;
         }
@@ -18320,25 +16414,44 @@ void SferaMbcRuntime::windowCommand() {
             else { g_sfera_interface.showOptions(g_sfera_interface.findWindow("options") == nullptr); pushInteger(1); }
             break;
         case WindowOperation::EscapeWindow: pushInteger(!g_sfera_client_config_runtime.resources_loaded ? 0 : g_sfera_interface.hasEscapeWindow() ? 1 : UINT32_MAX); break;
-        case WindowOperation::CreateDialog: {
+        case WindowOperation::LegacyCreateDialog:
             if (!read(2)) return;
-            auto* dialog = g_sfera_win32_dialogs.create(g_sfera_main_ui_state_runtime.active_ui_object, arguments[0]);
-            const auto handle = nativeHandle(dialog);
-            pushInteger(handle);
-            if (dialog == nullptr) reportError("Error creating GUI window"); else active_process->registerResource(handle, ResourceKind::dialog);
+            pushInteger(0);
+            break;
+        case WindowOperation::LegacyDestroyDialog:
+            if (!read(1)) return;
+            break;
+        case WindowOperation::LegacyPollDialogEvent: {
+            const auto count = argument_count == 6 ? 5u : argument_count >= 5 ? 4u : 3u;
+            if (!read(count)) return;
+            for (std::size_t index = 1; index < count; ++index) {
+                if (arguments[index] != 0) writeMemory(arguments[index], std::uint32_t{0});
+            }
+            pushInteger(0);
             break;
         }
-        case WindowOperation::DialogItem: {
-            if (!read(2)) return;
-            const auto* dialog = nativeResource<SferaDialogState*>(static_cast<std::uint32_t>(arguments[0]));
-            pushInteger(dialog == nullptr ? 0u : nativeHandle(::GetDlgItem(dialog->owner, arguments[1])));
+        case WindowOperation::LegacySendDialogMessage:
+            if (!read(5)) return;
+            pushInteger(0);
             break;
-        }
+        case WindowOperation::LegacyDialogItem:
+            if (!read(2)) return;
+            pushInteger(0);
+            break;
+        case WindowOperation::LegacySetDialogText:
+            if (!read(2)) return;
+            pushInteger(0);
+            break;
+        case WindowOperation::LegacyGetDialogText:
+            if (!read(3)) return;
+            if (arguments[1] != 0 && arguments[2] > 0) *pointer(arguments[1]) = '\0';
+            pushInteger(0);
+            break;
         case WindowOperation::Shutdown:
             if (argument_count > 1) { if (!read(1)) return; pushInteger(g_sfera_main_input_state_runtime.main_loop_started); }
             else g_sfera_client_process_runtime.startup_complete = true;
             break;
-        case WindowOperation::PumpMessages: g_sfera_win32_dialogs.pumpMessages(false); break;
+        case WindowOperation::LegacyPumpMessages: break;
         case WindowOperation::ActiveWindow: pushInteger(g_sfera_window_runtime.active_window_index); break;
         case WindowOperation::LoadingProgress: if (g_sfera_recovered_static_runtime.loadcount_guard == 0) GameInterface::updateLoadingProgress(80); break;
         case WindowOperation::FinishLoading: GameInterface::finishLoading(); g_sfera_recovered_static_runtime.loadcount_guard = 1; break;
@@ -18349,50 +16462,300 @@ void SferaMbcRuntime::windowCommand() {
 void SferaMbcRuntime::writeScriptLog() {
     if (argument_cursor >= argument_end) { reportError("Too few parameters"); return; }
     const auto type = g_sfera_mbc_interpreter_storage.value_stack.entries[argument_cursor].type;
-    const bool text = (type & 15u) != 0;
-    const bool real = !text && type == SferaMbcValue::Real;
-    const auto integer = real ? 0 : nextInteger();
-    const auto value = real ? nextReal() : 0.0f;
+    const bool textValue = (type & 15u) != 0;
+    const bool realValue = !textValue && type == SferaMbcValue::Real;
+    const auto integer = realValue ? 0 : nextInteger();
+    if (realValue) nextReal();
     if (execution_failed) return;
-    const auto channel = argument_count == 2 ? nextInteger() : -1;
-    const char* filename = "logs\\violations.log";
-    if (argument_count != 2) filename = "logs\\script.log";
-    else if (channel >= 1 && channel <= 3) { const char* names[]{"logs\\deletings.log", "logs\\gm.log", "logs\\trade.log"}; filename = names[channel - 1]; }
-    else if (channel >= 9 && channel <= 15 && (text || (channel != 12 && channel != 13))) { const char* names[]{"logs\\goldtaler", "logs\\mstatin", "logs\\mstatout", "logs\\gtstatin", "logs\\gtstatout", "logs\\bigmoney", "logs\\chat"}; filename = names[channel - 9]; }
-    if (text) g_sfera_log_runtime.writeScript(filename, textAt(integer), argument_count != 2);
-    else if (real) g_sfera_log_runtime.writeScript(filename, value, argument_count != 2);
-    else g_sfera_log_runtime.writeScript(filename, integer, argument_count != 2);
+    if (textValue) (void)textAt(integer);
+    if (argument_count == 2) nextInteger();
 }
 
-void SferaTcpConnectionContext::writeLog(const char* suffix, const char* message) noexcept {
-    if (!suffix || !message) {
+namespace {
+static void enqueue_tcp_payload(const std::uint8_t* data, std::uint32_t size) noexcept {
+    auto& network = g_sfera_network_runtime;
+    auto& transport = network.transport;
+    auto* critical_section = &network.receive_critical_section;
+    ::EnterCriticalSection(critical_section);
+
+    const std::uint32_t write_index = transport.receive_write_index;
+    if (transport.receive_busy && write_index == transport.receive_read_index) {
+        transport.receive_corrupted = true;
+        ::LeaveCriticalSection(critical_section);
         return;
     }
-    ::CreateDirectoryA("logs", nullptr);
-    char path[260]{};
-    std::snprintf(path, sizeof(path), "logs\\%u%s", g_sfera_recovered_static_runtime.server_number, suffix);
-    FILE* file = nullptr;
-    ::fopen_s(&file, path, "at");
-    if (!file) {
+
+    auto& slot = network.message_slots[write_index];
+    if (size > sizeof(slot.data)) {
+        transport.receive_corrupted = true;
+        ::LeaveCriticalSection(critical_section);
         return;
     }
-    std::fseek(file, 0, SEEK_END);
-    if (std::ftell(file) > 10000000L) {
-        std::fclose(file);
-        ::fopen_s(&file, path, "w");
-        if (file) {
-            std::fclose(file);
-        }
-        ::fopen_s(&file, path, "at");
-        if (!file) {
+    slot.data_size = size;
+    if (slot.data_size != 0u && data != nullptr) {
+        std::memcpy(slot.data, data, slot.data_size);
+    }
+    transport.received_bytes += size;
+    transport.receive_write_index = write_index + 1u < kSferaNetworkMessageSlotCount ? write_index + 1u : 0u;
+    transport.receive_busy = true;
+    ::LeaveCriticalSection(critical_section);
+}
+
+static void dispatch_tcp_receive_packets(SferaTcpConnectionContext& context) noexcept {
+    auto* critical_section = &g_sfera_recovered_static_runtime.scene_lock;
+    for (;;) {
+        ::EnterCriticalSection(critical_section);
+        const bool has_header = context.receive_size >= SferaTcpIncomingHeader::encodedSize;
+        const auto header = has_header ? SferaTcpIncomingHeader::decode(context.receive_buffer) : SferaTcpIncomingHeader{};
+        const std::uint16_t packet_size = header.size;
+        if (has_header && (packet_size < SferaTcpIncomingHeader::encodedSize || packet_size > kTcpReceiveBufferCapacity)) {
+            context.receive_size = 0u;
+            context.connected = 0u;
+            g_sfera_network_runtime.transport.connection_lost = true;
+            g_sfera_network_runtime.initialization_result = UINT32_MAX;
+            ::LeaveCriticalSection(critical_section);
             return;
         }
+        const bool complete = has_header && context.receive_size >= packet_size;
+        ::LeaveCriticalSection(critical_section);
+        if (!complete) {
+            return;
+        }
+        if (header.message == static_cast<std::uint16_t>(TcpMessage::payload)) {
+            enqueue_tcp_payload(context.receive_buffer + SferaTcpIncomingHeader::encodedSize, packet_size - SferaTcpIncomingHeader::encodedSize);
+        }
+        ::EnterCriticalSection(critical_section);
+        std::memmove(context.receive_buffer, context.receive_buffer + packet_size, context.receive_size - packet_size);
+        context.receive_size -= packet_size;
+        ::LeaveCriticalSection(critical_section);
     }
-    SYSTEMTIME time{};
-    ::GetLocalTime(&time);
-    std::fprintf(file, "%02u.%02u.%04u %02u:%02u:%02u %s", time.wDay, time.wMonth, time.wYear, time.wHour, time.wMinute, time.wSecond, message);
-    std::fclose(file);
 }
+
+
+DWORD WINAPI tcp_socket_receive_thread(void* parameter) noexcept {
+    auto* context = static_cast<SferaTcpConnectionContext*>(parameter);
+    if (!context) {
+        return 0u;
+    }
+    std::vector<std::uint8_t> local_buffer(kTcpReceiveBufferCapacity);
+    std::uint32_t buffered = 0u;
+    DWORD stats_tick = ::GetTickCount();
+    DWORD handshake_started_at = 0u;
+    constexpr DWORD handshake_timeout_ms = 15000u;
+    bool terminate = false;
+    while (!context->stop_requested && !terminate) {
+        if (!context->connected) {
+            handshake_started_at = 0u;
+            ::Sleep(10u);
+            continue;
+        }
+
+        if (context->remote_id == 0u) {
+            const DWORD now = ::GetTickCount();
+            if (handshake_started_at == 0u) {
+                handshake_started_at = now;
+            } else if (now - handshake_started_at >= handshake_timeout_ms) {
+                context->connected = 0u;
+                g_sfera_network_runtime.transport.connection_lost = true;
+                g_sfera_network_runtime.initialization_result = UINT32_MAX;
+                break;
+            }
+        } else {
+            handshake_started_at = 0u;
+        }
+        const std::uint32_t free_space = static_cast<std::uint32_t>(kTcpReceiveBufferCapacity) - buffered;
+        if (free_space != 0u) {
+            fd_set readable{};
+            FD_SET(context->socket, &readable);
+            timeval timeout{0, 10000};
+            const int selected = ::select(0, &readable, nullptr, nullptr, &timeout);
+            if (selected == SOCKET_ERROR) {
+                if (context->stop_requested) break;
+                g_sfera_network_runtime.transport.connection_lost = true;
+                g_sfera_network_runtime.initialization_result = UINT32_MAX;
+                break;
+            }
+            if (FD_ISSET(context->socket, &readable)) {
+                const int received = ::recv(context->socket, reinterpret_cast<char*>(local_buffer.data() + buffered), static_cast<int>(free_space), 0);
+                if (received == SOCKET_ERROR) {
+                    context->connected = 0u;
+                    if (context->stop_requested) break;
+                    g_sfera_network_runtime.transport.connection_lost = true;
+                    g_sfera_network_runtime.initialization_result = UINT32_MAX;
+                    break;
+                }
+                if (received == 0) {
+                    context->connected = 0u;
+                    g_sfera_network_runtime.transport.connection_lost = true;
+                    g_sfera_network_runtime.initialization_result = UINT32_MAX;
+                    break;
+                }
+                buffered += static_cast<std::uint32_t>(received);
+                context->received_bytes_window += static_cast<std::uint32_t>(received);
+            }
+        }
+        while (buffered >= SferaTcpIncomingHeader::encodedSize) {
+            const auto header = SferaTcpIncomingHeader::decode(local_buffer.data());
+            const std::uint16_t packet_size = header.size;
+            if (packet_size < SferaTcpIncomingHeader::encodedSize || packet_size > kTcpReceiveBufferCapacity) {
+                g_sfera_network_runtime.transport.connection_lost = true;
+                g_sfera_network_runtime.initialization_result = UINT32_MAX;
+                context->connected = 0u;
+                buffered = 0u;
+                terminate = true;
+                break;
+            }
+            if (buffered < packet_size) {
+                break;
+            }
+            const auto message = static_cast<TcpMessage>(header.message);
+            if (message == TcpMessage::connection_limit) {
+                g_sfera_network_runtime.transport.connection_lost = true;
+                g_sfera_network_runtime.initialization_result = UINT32_MAX;
+                context->connected = 0u;
+                buffered = 0u;
+                terminate = true;
+                break;
+            }
+            if (message == TcpMessage::handshake) {
+                if (packet_size < SferaTcpHandshakePacket::encodedSize) {
+                    context->connected = 0u;
+                    g_sfera_network_runtime.transport.connection_lost = true;
+                    g_sfera_network_runtime.initialization_result = UINT32_MAX;
+                    buffered = 0u;
+                    terminate = true;
+                    break;
+                }
+
+                const auto handshake = SferaTcpHandshakePacket::decode(local_buffer.data());
+                context->checksum_seed = handshake.checksum_seed;
+                context->remote_id = handshake.remote_id;
+                context->sequence = static_cast<std::uint16_t>(std::rand() % 1000 + 1);
+                const std::uint32_t mode = g_sfera_network_runtime.transport.client_mode;
+                if (!context->queuePacket(sizeof(mode), TcpMessage::client_mode, &mode)) {
+                    buffered = 0u;
+                    terminate = true;
+                    break;
+                }
+                while (context->connected && context->send_size != 0u) {
+                    context->sendPending();
+                }
+                if (!context->connected) {
+                    buffered = 0u;
+                    terminate = true;
+                    break;
+                }
+                g_sfera_network_runtime.initialization_result = 1u;
+            } else if (message == TcpMessage::keepalive) {
+                auto* timing = &g_sfera_window_runtime.timing_critical_section;
+                ::EnterCriticalSection(timing);
+                context->round_trip_ms = (::GetTickCount() - context->keepalive_started_at) / 3u;
+                context->keepalive_answered = 1u;
+                ::LeaveCriticalSection(timing);
+            } else {
+                auto* scene_lock = &g_sfera_recovered_static_runtime.scene_lock;
+                ::EnterCriticalSection(scene_lock);
+                if (kTcpReceiveBufferCapacity - context->receive_size >= packet_size) {
+                    std::memcpy(context->receive_buffer + context->receive_size, local_buffer.data(), packet_size);
+                    context->receive_size += packet_size;
+                }
+                ::LeaveCriticalSection(scene_lock);
+            }
+            std::memmove(local_buffer.data(), local_buffer.data() + packet_size, buffered - packet_size);
+            buffered -= packet_size;
+        }
+        const DWORD now = ::GetTickCount();
+        if (now - stats_tick > 1000u) {
+            stats_tick = now;
+            context->received_bytes_per_second = context->received_bytes_window;
+            context->received_bytes_window = 0u;
+        }
+        ::Sleep(15u);
+    }
+    context->connected = 0u;
+    context->sent_bytes_per_second = 0u;
+    context->received_bytes_per_second = 0u;
+    g_sfera_network_runtime.initialization_result = UINT32_MAX;
+    return 0u;
+}
+
+DWORD WINAPI tcp_receive_dispatch_thread(void* parameter) noexcept {
+    auto* context = static_cast<SferaTcpConnectionContext*>(parameter);
+    if (!context) {
+        return 0u;
+    }
+    while (!context->stop_requested) {
+        if (context->connected && context->remote_id != 0u) {
+            if (context->receive_size != 0u) {
+                dispatch_tcp_receive_packets(*context);
+            }
+            ::Sleep(6u);
+        } else {
+            ::Sleep(10u);
+        }
+    }
+    return 0u;
+}
+
+DWORD WINAPI tcp_send_maintenance_thread(void* parameter) noexcept {
+    auto* context = static_cast<SferaTcpConnectionContext*>(parameter);
+    if (!context) {
+        return 0u;
+    }
+    DWORD stats_tick = ::GetTickCount();
+    DWORD random_tick = ::GetTickCount();
+    DWORD keepalive_tick = ::GetTickCount();
+    DWORD send_tick = ::GetTickCount();
+    DWORD random_interval = static_cast<DWORD>(std::rand() % 5000 + 2000);
+    while (!context->stop_requested) {
+        if (!context->connected || g_sfera_network_runtime.initialization_result != 1u || context->remote_id == 0u) {
+            ::Sleep(10u);
+            continue;
+        }
+        DWORD now = ::GetTickCount();
+        if (now - stats_tick > 1000u) {
+            stats_tick = now;
+            auto* critical_section = &g_sfera_network_send_runtime.critical_section;
+            ::EnterCriticalSection(critical_section);
+            context->sent_bytes_per_second = context->sent_bytes_window;
+            context->sent_bytes_window = 0u;
+            ::LeaveCriticalSection(critical_section);
+        }
+        now = ::GetTickCount();
+        if (now - send_tick > 15u) {
+            send_tick = now;
+            context->sendPending();
+            if (context->sequence > 50000u) {
+                context->sequence = 1u;
+                context->queuePacket(0u, TcpMessage::sequence_reset, nullptr);
+            }
+        }
+        now = ::GetTickCount();
+        if (now - keepalive_tick > 3000u) {
+            keepalive_tick = now;
+            auto* timing = &g_sfera_window_runtime.timing_critical_section;
+            ::EnterCriticalSection(timing);
+            context->keepalive_started_at = ::GetTickCount();
+            if (!context->keepalive_answered) {
+                context->round_trip_ms += 3000u;
+            }
+            context->keepalive_answered = 0u;
+            ::LeaveCriticalSection(timing);
+            context->queuePacket(0u, TcpMessage::keepalive, nullptr);
+            context->sendPending();
+        }
+        now = ::GetTickCount();
+        if (now - random_tick > random_interval) {
+            random_interval = static_cast<DWORD>(std::rand() % 10000 + 3000);
+            random_tick = now;
+            context->queuePacket(sizeof(context->packet_counter), TcpMessage::packet_counter, &context->packet_counter);
+        }
+        ::Sleep(4u);
+    }
+    return 0u;
+}
+}
+
 
 void SferaTcpConnectionContext::sendPending() noexcept {
     if (!connected || !send_buffer) return;
@@ -18405,10 +16768,6 @@ void SferaTcpConnectionContext::sendPending() noexcept {
 
     const int sent = ::send(socket, reinterpret_cast<const char*>(send_buffer), static_cast<int>(send_size), 0);
     if (sent == SOCKET_ERROR) {
-        const int error = ::WSAGetLastError();
-        char message[128]{};
-        std::snprintf(message, sizeof(message), "-------------------------SEND ERROR, err=%d\n", error);
-        writeLog("tcp_ip_connect.log", message);
         connected = 0u;
         g_sfera_network_runtime.transport.connection_lost = true;
         g_sfera_network_runtime.initialization_result = UINT32_MAX;
@@ -18429,7 +16788,6 @@ bool SferaTcpConnectionContext::queuePacket(std::uint32_t payloadSize, TcpMessag
     ::EnterCriticalSection(critical_section);
     const std::uint32_t packet_size = payloadSize + SferaTcpOutgoingHeader::encodedSize;
     if (!send_buffer || payloadSize > UINT16_MAX - SferaTcpOutgoingHeader::encodedSize || send_size > sendCapacity || sendCapacity - send_size < packet_size || (payloadSize != 0 && payload == nullptr)) {
-        writeLog("tcp_ip_connect.log", "-------------------------ERROR: send buffer overload\n");
         g_sfera_network_runtime.initialization_result = UINT32_MAX;
         connected = 0u;
         g_sfera_network_runtime.transport.connection_lost = true;
@@ -18472,12 +16830,8 @@ bool SferaNetworkRuntime::sendPacket(std::uint32_t flags, std::span<const std::u
 }
 
 std::size_t WorldMemory::payloadSize(void* memory) {
-    if (memory == nullptr) return 0;
-    UiMemoryLock lock;
-    auto* allocation = static_cast<UiAllocationHeader*>(memory) - 1;
-    const auto* link = g_sfera_allocation_hash_runtime.findLink(allocation);
-    if (*link == uiAllocationHashEnd) throw std::logic_error("UI size of unregistered memory");
-    return g_sfera_allocation_hash_runtime.allocation_records[*link].size;
+    if (memory == nullptr) return 0u;
+    return (static_cast<SphereUI::Memory::AllocationHeader*>(memory) - 1)->size;
 }
 
 std::uint32_t SferaMbcBitStream::read(unsigned width) {
@@ -18575,7 +16929,7 @@ void SferaMbcRuntime::receiveRegion() {
     if (head == nullptr) { pushInteger(UINT32_MAX); return; }
     auto* packet = head;
     head = packet->next;
-    const auto release = [](SferaMbcRegionPacket* value) { WorldMemory::release(value->data, "..\\ShareClientSeverCode\\Inter.cpp", 7648); WorldMemory::release(value, "..\\ShareClientSeverCode\\Inter.cpp", 7649); };
+    const auto release = [](SferaMbcRegionPacket* value) { WorldMemory::release(value->data); WorldMemory::release(value); };
     const std::unique_ptr<SferaMbcRegionPacket, decltype(release)> owner(packet, release);
     SferaMbcBitStream stream(std::span<const std::uint8_t>(packet->data, WorldMemory::payloadSize(packet->data)));
     const auto& description = active_process->regions[region];
@@ -18796,14 +17150,12 @@ std::uint32_t SferaMbcRuntime::loadProcess(std::string_view name, std::uint32_t 
     process.programs_queued = process.execution_linked = false;
     process.bytecode_size = static_cast<std::uint32_t>(module.bytecode.size()) + 2;
     process.process_memory_size = module.memory.size();
-    if (process.module_tag != 0) ++g_sfera_mbc_module_memory_stats[process.module_tag].process_count;
     WorldMemory::release(process.process_memory_base);
     std::fill(std::begin(process.code_range_ids), std::end(process.code_range_ids), std::uint16_t{});
     process.code_range_ids[0] = process.module_tag;
     process.code_range_begin[0] = process.code_range_memory_offset[0] = 0;
     process.code_range_size[0] = process.bytecode_size;
     process.code_range_count = 1;
-    if (process.module_tag == 1) g_sfera_recovered_static_runtime.debug_script_arrays.start();
     process.bytecode_base = findBytecode(process.linked_modules, process.process_memory_size);
     if (process.bytecode_base == nullptr) {
         process.bytecode_base = static_cast<std::uint8_t*>(WorldMemory::allocate(process.bytecode_size));
@@ -18814,7 +17166,6 @@ std::uint32_t SferaMbcRuntime::loadProcess(std::string_view name, std::uint32_t 
     }
     process.process_memory_base = static_cast<std::uint8_t*>(WorldMemory::allocate(process.process_memory_size));
     std::copy(module.memory.begin(), module.memory.end(), process.process_memory_base);
-    if (process.module_tag != 0) g_sfera_mbc_module_memory_stats[process.module_tag].process_memory_bytes += process.process_memory_size;
     WorldMemory::release(process.program_table_base);
     process.program_count = static_cast<std::uint32_t>(module.programs.size()) + 1;
     process.program_table_base = static_cast<ScriptProgramDiagnostic*>(WorldMemory::allocate(process.program_count * sizeof(ScriptProgramDiagnostic)));
@@ -18898,7 +17249,6 @@ std::uint32_t SferaMbcRuntime::linkProcess(std::string_view name) {
     process_memory_base = process.process_memory_base;
     instruction_cursor = bytecode_base + instructionOffset;
     current_instruction_address = bytecode_base + currentOffset;
-    if (process.module_tag != 0) g_sfera_mbc_module_memory_stats[process.module_tag].process_memory_bytes += module.memory.size();
     for (std::size_t index = 0; index < execution_context_depth; ++index) if (execution_context_stack[index].active_process == &process) execution_context_stack[index].process_memory_base = process_memory_base;
     process.program_count += static_cast<std::uint32_t>(module.programs.size());
     process.program_table_base = static_cast<ScriptProgramDiagnostic*>(WorldMemory::reallocate(process.program_table_base, process.program_count * sizeof(ScriptProgramDiagnostic)));
@@ -18967,14 +17317,12 @@ void SferaMbcProcessRecord::releaseResources() {
                 std::memcpy(&offset, g_sfera_mbc_runtime->memoryAt(entry.handle, sizeof(offset), this), sizeof(offset));
                 if (offset == 0) break;
                 auto* allocation = g_sfera_mbc_runtime->memoryAt(offset, 1, this);
-                if (module_tag != 0) g_sfera_mbc_module_memory_stats[module_tag].dynamic_memory_bytes -= WorldMemory::allocatedBytes(allocation);
                 g_sfera_mbc_runtime->forgetMemory(allocation);
                 WorldMemory::release(allocation);
                 break;
             }
             case ResourceKind::gameWindow: GameInterface::destroyWindow(entry.handle); break;
             case ResourceKind::interfaceWindow: g_sfera_interface.closeWindow(g_sfera_mbc_runtime->nativeResource<SphereUI::Window*>(entry.handle), true); break;
-            case ResourceKind::dialog: g_sfera_win32_dialogs.destroy(g_sfera_mbc_runtime->nativeResource<SferaDialogState*>(entry.handle)); break;
             case ResourceKind::container: { auto* container = g_sfera_mbc_runtime->nativeResource<SferaScriptContainer*>(entry.handle); if (container != nullptr && container->header.kind >= SferaDataContainerHeader::Kind::List && container->header.kind <= SferaDataContainerHeader::Kind::HashMap) container->destroy(); break; }
             default: break;
         }
@@ -18988,10 +17336,6 @@ std::uint32_t SferaMbcRuntime::unloadProcess(std::uint32_t index) {
     if (index >= std::size(processes)) return UINT32_MAX;
     if (index == 0) g_sfera_log_runtime.files[0].write("prc_unload _main.mbl\n");
     auto& process = processes[index];
-    auto& debug = g_sfera_recovered_static_runtime.debug_script_arrays;
-    debug.checkProcess(process);
-    if (process.module_tag == 1) debug.stop(); else debug.processUnloaded(static_cast<std::int32_t>(index));
-    if (process.module_tag != 0) --g_sfera_mbc_module_memory_stats[process.module_tag].process_count;
     if (process.chain_prev_index < 0) return UINT32_MAX;
     if (index == static_cast<std::uint32_t>(process_chain_last)) { process_chain_last = process.chain_prev_index; processes[process_chain_last].chain_next_index = process_chain_last; }
     else if (index == static_cast<std::uint32_t>(process_chain_first)) { process_chain_first = process.chain_next_index; processes[process_chain_first].chain_prev_index = process_chain_first; }
@@ -19135,16 +17479,11 @@ void SferaNetworkRuntime::receiveMessages() {
 
     for (;;) {
         SferaNetworkMessageSlot message{};
-        bool corrupted = false;
         ::EnterCriticalSection(&receive_critical_section);
-        corrupted = transport.receive_corrupted;
         transport.receive_corrupted = false;
         if (transport.receive_read_index == transport.receive_write_index) {
             transport.receive_busy = false;
             ::LeaveCriticalSection(&receive_critical_section);
-            if (corrupted) {
-                g_sfera_log_runtime.writeScript("logs\\tcp", "receive_netdata(): DATA CORRUPTION\n");
-            }
             break;
         }
 
@@ -19154,23 +17493,16 @@ void SferaNetworkRuntime::receiveMessages() {
         transport.receive_read_index = (transport.receive_read_index + 1u) % kSferaNetworkMessageSlotCount;
         ::LeaveCriticalSection(&receive_critical_section);
 
-        if (corrupted) {
-            g_sfera_log_runtime.writeScript("logs\\tcp", "receive_netdata(): DATA CORRUPTION\n");
-        }
         receiveMessage(message);
     }
 }
 
-SferaTcpConnectionContext::SferaTcpConnectionContext() : receive_buffer{}, receive_size(0), socket(0), remote_id(0), workers{}, stop_requested(0), received_bytes_window(0), sent_bytes_window(0), sent_bytes_per_second(0), received_bytes_per_second(0), send_buffer(static_cast<std::uint8_t*>(WorldMemory::allocate(sendCapacity))), send_size(0), initialized(0), connected(0), round_trip_ms(0), keepalive_started_at(0), keepalive_answered(0), sequence(0), checksum_seed(0), packet_counter(0) {
-    writeLog("tcp_ip_connect.log", "============================================================================\n");
-    writeLog("tcp_ip_connect.log", "Create connect manager\n");
-}
+SferaTcpConnectionContext::SferaTcpConnectionContext() : receive_buffer{}, receive_size(0), socket(0), remote_id(0), workers{}, stop_requested(0), received_bytes_window(0), sent_bytes_window(0), sent_bytes_per_second(0), received_bytes_per_second(0), send_buffer(static_cast<std::uint8_t*>(WorldMemory::allocate(sendCapacity))), send_size(0), initialized(0), connected(0), round_trip_ms(0), keepalive_started_at(0), keepalive_answered(0), sequence(0), checksum_seed(0), packet_counter(0) {}
 
 SferaTcpConnectionContext::~SferaTcpConnectionContext() { shutdown(); WorldMemory::release(send_buffer); }
 
 void SferaTcpConnectionContext::shutdown() noexcept {
     if (initialized != 1) return;
-    writeLog("tcp_ip_connect.log", "Deinit TCP-IP manager(1)\n");
     stop_requested = 1;
     connected = 0;
 
@@ -19186,8 +17518,6 @@ void SferaTcpConnectionContext::shutdown() noexcept {
         ::CloseHandle(worker.handle);
         worker = {};
     }
-
-    writeLog("tcp_ip_connect.log", "Deinit TCP-IP manager(2)\n");
     socket = 0;
     remote_id = 0u;
     receive_size = 0u;
@@ -19197,21 +17527,20 @@ void SferaTcpConnectionContext::shutdown() noexcept {
     checksum_seed = 0u;
     ::WSACleanup();
     initialized = 0;
-    writeLog("tcp_ip_connect.log", "Deinit TCP-IP manager(3)\n");
 }
 
 int SferaTcpConnectionContext::initialize(const char* hostname, std::uint16_t port) {
     if (hostname == nullptr) return -1;
-    if (initialized == 1) { writeLog("tcp_ip_connect.log", "-------------------------ERROR: ALREADY Init TCP-IP manager\n"); return 0; }
+    if (initialized == 1) return 0;
     WSADATA data{};
     const int startup = ::WSAStartup(MAKEWORD(2, 1), &data);
-    if (startup != 0) { writeLog("tcp_ip_connect.log", "WSAStartup failed\n"); return -1; }
+    if (startup != 0) return -1;
     initialized = 1;
-    const auto fail = [this, hostname, port](const char* stage, unsigned long error) { char message[512]{}; std::snprintf(message, sizeof(message), "TCP connection %s:%u: %s failed (%lu)\n", hostname, unsigned(port), stage, error); writeLog("tcp_ip_connect.log", message); shutdown(); return -1; };
+    const auto fail = [this](const char*, unsigned long) { shutdown(); return -1; };
     socket = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socket == INVALID_SOCKET) return fail("socket", ::WSAGetLastError());
     const int noDelay = 1;
-    if (::setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&noDelay), sizeof(noDelay)) < 0) writeLog("tcp_ip_connect.log", "TCP_NODELAY failed\n");
+    (void)::setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&noDelay), sizeof(noDelay));
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_port = ::htons(port);
@@ -19226,7 +17555,7 @@ int SferaTcpConnectionContext::initialize(const char* hostname, std::uint16_t po
     ::freeaddrinfo(resolved);
     if (::connect(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) return fail("connect", ::WSAGetLastError());
     stop_requested = 0;
-    const LPTHREAD_START_ROUTINE entries[]{&sfera_tcp_socket_receive_thread, &sfera_tcp_send_maintenance_thread, &sfera_tcp_receive_dispatch_thread};
+    const LPTHREAD_START_ROUTINE entries[]{&tcp_socket_receive_thread, &tcp_send_maintenance_thread, &tcp_receive_dispatch_thread};
     for (std::size_t index = 0; index < std::size(workers); ++index) {
         auto& worker = workers[index];
         worker.handle = ::CreateThread(nullptr, 0, entries[index], this, 0, &worker.id);
@@ -19234,7 +17563,6 @@ int SferaTcpConnectionContext::initialize(const char* hostname, std::uint16_t po
         ::SetThreadPriority(worker.handle, THREAD_PRIORITY_NORMAL);
     }
     connected = 1;
-    writeLog("tcp_ip_connect.log", "Init TCP-IP manager = OK\n");
     return 0;
 }
 
@@ -19277,9 +17605,6 @@ int SferaNetworkRuntime::initialize(const char* hostname, std::uint32_t mode) {
     ::InitializeCriticalSection(&receive_critical_section);
 
     initialization_result = 0u;
-    network_error_active = false;
-    net_log_has_error = false;
-    error_budget = 0u;
 
     auto*& connection = g_sfera_client_config_runtime.tcp_connection;
     if (connection != nullptr) {
@@ -19298,7 +17623,6 @@ int SferaNetworkRuntime::initialize(const char* hostname, std::uint32_t mode) {
         return 0;
     }
 
-    g_sfera_network_probe_runtime.start(hostname);
     initialized = 1u;
     return 1;
 }
@@ -19307,15 +17631,11 @@ void SferaNetworkRuntime::shutdown() {
     auto*& connection = g_sfera_client_config_runtime.tcp_connection;
     if (connection == nullptr && initialized == 0u) return;
 
-    if (initialized != 0u) {
-        g_sfera_network_probe_runtime.stop(net_log_has_error);
-    }
     if (connection != nullptr) {
         connection->shutdown();
         std::destroy_at(connection);
         WorldMemory::release(connection);
         connection = nullptr;
-        SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "Deinit TCP-IP manager = OK\n");
     }
 
     initialized = 0u;
@@ -19390,79 +17710,6 @@ int SferaFileManager::transformEnvelope(const char* destination, const char* sou
     try { const auto result = transform(); setErrorReporting(true); return result; } catch (...) { setErrorReporting(true); throw; }
 }
 
-SferaMapGeneratorRuntime::~SferaMapGeneratorRuntime() { if (descriptor >= 0) g_sfera_files.close(descriptor); }
-void SferaMapGeneratorRuntime::begin(const char* filename) { openBitmap(filename, 8192, 8192); }
-void SferaMapGeneratorRuntime::openBitmap(const char* filename, std::uint32_t width, std::uint32_t height) {
-    if (descriptor >= 0) { g_sfera_files.close(descriptor); descriptor = -1; }
-    constexpr std::size_t channels = 3;
-    constexpr std::size_t alignment = sizeof(DWORD);
-    constexpr std::size_t headerSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
-    const auto stride = (static_cast<std::uint64_t>(width) * channels + alignment - 1) / alignment * alignment;
-    const auto fileSize = (stride * height + headerSize + alignment - 1) / alignment * alignment;
-    if (fileSize > UINT32_MAX) throw std::length_error("World bitmap is too large");
-    BITMAPFILEHEADER fileHeader{};
-    fileHeader.bfType = MAKEWORD('B', 'M');
-    fileHeader.bfSize = static_cast<DWORD>(fileSize);
-    fileHeader.bfOffBits = static_cast<DWORD>(headerSize);
-    BITMAPINFOHEADER imageHeader{};
-    imageHeader.biSize = sizeof(imageHeader);
-    imageHeader.biWidth = static_cast<LONG>(width);
-    imageHeader.biHeight = static_cast<LONG>(height);
-    imageHeader.biPlanes = 1;
-    imageHeader.biBitCount = channels * std::numeric_limits<std::uint8_t>::digits;
-    imageHeader.biCompression = BI_RGB;
-    imageHeader.biXPelsPerMeter = imageHeader.biYPelsPerMeter = 2834;
-    descriptor = g_sfera_files.create(filename);
-    if (descriptor >= 0) { g_sfera_files.write(descriptor, &fileHeader, sizeof(fileHeader)); g_sfera_files.write(descriptor, &imageHeader, sizeof(imageHeader)); }
-}
-
-SferaUpdateDownloadContext::SferaUpdateDownloadContext(std::uint16_t port, const char* hostname) : port(port), hostname(hostname == nullptr ? "" : hostname) {}
-SferaUpdateDownloadContext::~SferaUpdateDownloadContext() {
-    stop_requested = true;
-    if (worker != nullptr) { ::WaitForSingleObject(worker, INFINITE); ::CloseHandle(worker); }
-}
-UpdateDownloadState SferaUpdateDownloadContext::progress(std::int32_t& percent) const {
-    const std::int32_t length = expected_size.load(), received = resume_offset.load();
-    percent = length > 0 ? static_cast<std::int32_t>(static_cast<std::int64_t>(received) * 100 / length) : 0;
-    return state.load();
-}
-int SferaUpdateDownloadContext::begin(const char* filename) {
-    if (!completed.load()) return 3;
-    if (worker != nullptr) { ::WaitForSingleObject(worker, INFINITE); ::CloseHandle(worker); worker = nullptr; }
-    WSADATA startup{}; if (::WSAStartup(MAKEWORD(2, 2), &startup) != 0) return 4;
-    const auto fail = [this](int result) { if (socket != INVALID_SOCKET) { ::closesocket(socket); socket = INVALID_SOCKET; } ::WSACleanup(); state = UpdateDownloadState::failed; completed = true; return result; };
-    addrinfo hints{}; hints.ai_family = AF_INET; hints.ai_socktype = SOCK_STREAM; addrinfo* resolved = nullptr;
-    if (hostname.empty() || ::getaddrinfo(hostname.c_str(), nullptr, &hints, &resolved) != 0) return fail(5);
-    const bool valid = resolved != nullptr && resolved->ai_family == AF_INET && resolved->ai_addr != nullptr && resolved->ai_addrlen >= sizeof(sockaddr_in);
-    sockaddr_in remote{}; if (valid) std::memcpy(&remote, resolved->ai_addr, sizeof(remote));
-    if (resolved != nullptr) ::freeaddrinfo(resolved);
-    if (!valid) return fail(5);
-    remote.sin_port = ::htons(port);
-    socket = ::socket(AF_INET, SOCK_STREAM, 0); u_long nonblocking = 1;
-    if (socket == INVALID_SOCKET || ::ioctlsocket(socket, FIONBIO, &nonblocking) == SOCKET_ERROR) return fail(4);
-    if (::connect(socket, reinterpret_cast<const sockaddr*>(&remote), sizeof(remote)) == SOCKET_ERROR && ::WSAGetLastError() != WSAEWOULDBLOCK) return fail(6);
-    if (filename == nullptr) return fail(6);
-    if (*filename == '\\') ++filename;
-    const auto length = std::strlen(filename); if (length >= sizeof(request)) return fail(6);
-    std::copy_n(filename, length + 1, request); expected_size = 0; resume_offset = 0; output = nullptr; stop_requested = false; state = UpdateDownloadState::send_request; completed = false;
-    worker = ::CreateThread(nullptr, 0, &sfera_update_download_thread, this, 0, nullptr);
-    return worker == nullptr ? fail(2) : 0;
-}
-
-int SferaClientApplication::enumerateProcesses(std::span<char> output, std::uint32_t recordStride) {
-    static constexpr std::array ignored{"[System Process]", "idle", "csrss.exe", "winlogon.exe", "smss.exe", "services.exe", "service.exe", "lsass.exe", "taskmgr.exe", "system", "svchost.exe", "cdantsrv.exe", "spoolsv.exe", "mdm.exe", "nvsvc32.exe", "far.exe", "regsvc32.exe", "mstask.exe", "winmgmt.exe", "stisvc.exe", "rundll32.exe", "wcescoomm.exe", "internat.exe", "winword.exe", "explorer.exe", "notepad.exe", "ctfmon.exe", "icq.exe", "iexplore.exe", "srvany.exe", "spidernt.exe", "winamp.exe", "kav.exe", "winrar.exe", "kavsvc.exe", "ati2evxx.exe", "regsvc.exe", "mspmspsv.exe", "resetservice.exe", "directcd.exe", "qttask.exe", "atiptaxx.exe", "SOUNDMAN.EXE", "wuauclt.exe", "miranda32.exe", "sphere.exe", "cmd.exe", "calc.exe", "thebat.exe"};
-    if (recordStride == 0) return -1;
-    const auto snapshot = ::CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0); if (snapshot == INVALID_HANDLE_VALUE) return -1;
-    tagPROCESSENTRY32 entry{}; entry.dwSize = sizeof(entry);
-    if (!::Process32First(snapshot, &entry)) { ::CloseHandle(snapshot); return -1; }
-    do {
-        if (std::any_of(ignored.begin(), ignored.end(), [&](const char* name) { return ::_stricmp(name, entry.szExeFile) == 0; })) continue;
-        if (output.size() < recordStride) break;
-        auto record = output.first(recordStride); std::fill(record.begin(), record.end(), '\0');
-        std::copy_n(entry.szExeFile, std::min<std::size_t>(std::strlen(entry.szExeFile), recordStride - 1), record.data()); output = output.subspan(recordStride);
-    } while (::Process32Next(snapshot, &entry));
-    ::CloseHandle(snapshot); return 1;
-}
 
 std::string SferaMbcRuntime::formatArguments(const char* pattern, std::size_t limit) {
     using Argument = std::variant<std::int32_t, double, const char*>;
@@ -19558,34 +17805,26 @@ void SferaMbcRuntime::formatText(bool bounded) {
 }
 
 void SferaMbcRuntime::writeFormattedLog(bool named) {
-    std::int32_t channel = 0; bool dated = false;
     if (argument_count >= 1 && argument_cursor < argument_end) {
         const auto type = g_sfera_mbc_interpreter_storage.value_stack.entries[argument_cursor].type;
-        if (type == SferaMbcValue::Byte || type == SferaMbcValue::Integer) { channel = nextInteger(); dated = true; --argument_count; }
+        if (type == SferaMbcValue::Byte || type == SferaMbcValue::Integer) { nextInteger(); --argument_count; }
     }
     if (argument_count < (named ? 2 : 1)) { reportError(named ? "Invalid parameter list: ffflogf()" : "Invalid parameter list: fflogf()"); return; }
-    const char* filename = nullptr;
-    if (named) { const auto offset = nextInteger(); filename = textAt(offset); --argument_count; if (offset == 0) g_sfera_warning_log_runtime.append("NULL-pointer dereferencing: ffflogf, pchFileName\n", false); }
-    const auto patternOffset = nextInteger(); const auto* pattern = textAt(patternOffset); --argument_count;
-    if (named && patternOffset == 0) g_sfera_warning_log_runtime.append("NULL-pointer dereferencing: ffflogf, pchFormatString\n", false);
-    if (execution_failed) return;
-    const auto message = formatArguments(pattern, named ? std::numeric_limits<std::size_t>::max() : 4095);
-    if (execution_failed) return;
     if (named) {
-        char datedName[512]{}; if (dated) { SferaLogRuntime::datedPath(datedName, filename); filename = datedName; }
-        char path[256]{}; std::snprintf(path, sizeof(path), "logs\\%s", filename);
-        FILE* output = nullptr; if (::fopen_s(&output, path, "at") != 0 || output == nullptr) return;
-        SYSTEMTIME time{}; ::GetLocalTime(&time); std::fprintf(output, "%02u.%02u.%04u %02u:%02u:%02u ", unsigned(time.wDay), unsigned(time.wMonth), unsigned(time.wYear), unsigned(time.wHour), unsigned(time.wMinute), unsigned(time.wSecond)); std::fwrite(message.data(), 1, message.size(), output); std::fclose(output); return;
+        const auto filename = nextInteger();
+        --argument_count;
+        if (!execution_failed) (void)textAt(filename);
     }
-    static constexpr std::array<const char*, 17> paths{"logs\\script.log", "logs\\deletings.log", "logs\\gm.log", "logs\\trade.log", nullptr, nullptr, nullptr, nullptr, nullptr, "logs\\goldtaler", "logs\\mstatin", "logs\\mstatout", "logs\\gtstatin", "logs\\gtstatout", nullptr, "logs\\old_things", "logs\\add_exp"};
-    if (channel == 14) { g_sfera_log_runtime.writeTemporary(message.c_str()); return; }
-    if (channel >= 0 && static_cast<std::size_t>(channel) < paths.size() && paths[channel] != nullptr) { g_sfera_log_runtime.writeScript(paths[channel], message.c_str(), channel == 0); return; }
-    FILE* output = nullptr; if (::fopen_s(&output, "logs\\violations.log", g_sfera_log_runtime.script_first_write ? "wt" : "at") == 0 && output != nullptr) { std::fputs(message.c_str(), output); std::fclose(output); }
+    const auto patternOffset = nextInteger();
+    --argument_count;
+    const auto* pattern = textAt(patternOffset);
+    if (execution_failed) return;
+    (void)formatArguments(pattern, named ? std::numeric_limits<std::size_t>::max() : 4095u);
 }
 
 void SferaMbcRuntime::systemCommand() {
     const auto operation = nextInteger();
-    const auto address = [this](const char* name) { const std::uint32_t offset = nextInteger(); if (offset == 0) g_sfera_warning_log_runtime.append((std::string("NULL-pointer dereferencing: ffsys, ") + name + "\n").c_str(), false); return offset; };
+    const auto address = [this](const char* name) { const std::uint32_t offset = nextInteger(); if (offset == 0) ::OutputDebugStringA((std::string("NULL-pointer dereferencing: ffsys, ") + name + "\n").c_str()); return offset; };
     const auto text = [this](std::uint32_t offset) { return textAt(offset); };
     const auto selectedObject = [this]() -> WorldObject* { const auto handle = nextInteger(); if (handle < 0) return nullptr; auto* object = g_sfera_world_objects.object(handle, "GetObjectPointer"); g_sfera_inter_scalar_runtime.current_object = object; if (object == nullptr) active_tag = UINT32_MAX; return object; };
     switch (operation) {
@@ -19600,7 +17839,7 @@ void SferaMbcRuntime::systemCommand() {
             auto* object = selectedObject(); if (object == nullptr) return;
             const bool enabled = nextInteger() != 0; if (execution_failed) return;
             if (operation == 38) object->visible = enabled;
-            else { auto* extended = SphereRender::CharacterModels::checkedExtended(object, __FILE__, __LINE__); if (operation == 1) extended->simulation_enabled = enabled; else extended->gravity_enabled = enabled; }
+            else { auto* extended = SphereRender::CharacterModels::checkedExtended(object); if (operation == 1) extended->simulation_enabled = enabled; else extended->gravity_enabled = enabled; }
             return;
         }
         case 2: g_sfera_graphics_runtime.environment_factor = nextReal(); return;
@@ -19659,7 +17898,7 @@ void SferaMbcRuntime::systemCommand() {
         }
         case 34: case 37: pushInteger(g_sfera_main_input_state_runtime.mouse.buttons & (operation == 34 ? 1 : 2)); return;
         case 35: { const auto cursor = nextInteger(); const auto mask = nextInteger(); if (execution_failed) return; if (cursor) SferaStringLookupRuntime::copyString(g_sfera_main_command_state_runtime.default_cursor_name, text(cursor), sizeof(g_sfera_main_command_state_runtime.default_cursor_name)); g_sfera_main_command_state_runtime.render_channel_mask = mask; return; }
-        case 36: { const auto destination = address("G_CURSDIR"); if (execution_failed) return; float distance = 0; SferaVec3F direction{}; g_sfera_motion.pick(&distance, &direction); g_sfera_recovered_static_runtime.mbc_vector_scratch = direction; writeMemory(destination, direction); return; }
+        case 36: { const auto destination = address("G_CURSDIR"); if (execution_failed) return; float distance = 0; SferaVec3F direction{}; g_sfera_motion.pick(&distance, &direction); writeMemory(destination, direction); return; }
         case 39: { const float x = nextReal(); const float y = nextReal(); if (!execution_failed) CCursorManager::instance().activeCursor()->setPosition(static_cast<int>(x), static_cast<int>(y)); return; }
         case 41: { const auto value = nextInteger(); if (!execution_failed) g_sfera_recovered_static_runtime.render_gate = value; return; }
         case 43: {
@@ -19672,7 +17911,7 @@ void SferaMbcRuntime::systemCommand() {
         case 44: {
             const std::int32_t handle = g_sfera_world_objects.controlled_object_handle; if (handle < 0) { pushInteger(0); return; }
             auto* object = g_sfera_world_objects.object(handle, "GetObjectPointer"); g_sfera_inter_scalar_runtime.current_object = object;
-            pushInteger(object != nullptr && SphereRender::CharacterModels::checkedExtended(object, __FILE__, __LINE__)->steep_slope == 1); return;
+            pushInteger(object != nullptr && SphereRender::CharacterModels::checkedExtended(object)->steep_slope == 1); return;
         }
         case 45: { const auto handle = nextInteger(); const auto model = address("LINK_ON"); const auto slot = nextInteger(); if (!execution_failed) g_sfera_world_objects.linkModel(handle, text(model), slot); return; }
         case 46: { const auto handle = nextInteger(); const auto slot = nextInteger(); if (!execution_failed) g_sfera_world_objects.unlink(handle, slot); return; }
@@ -19696,35 +17935,26 @@ void SferaMbcRuntime::systemCommand() {
         case 58: { const auto component = nextInteger(); const auto value = nextInteger(); if (!execution_failed) g_sfera_inter_scalar_runtime.mode_01 = SferaGameCalendar::withComponent(g_sfera_inter_scalar_runtime.mode_01, component, value); return; }
         case 59: { const auto value = nextInteger(); if (!execution_failed) g_sfera_client_config_runtime.state_27 = value; return; }
         case 60: pushInteger(g_sfera_recovered_static_runtime.server_number); return;
-        case 61: if (active_process->process_id == 0) g_sfera_log_runtime.files[0].write("Unloading _main: ..\\ShareClientSeverCode\\Inter.cpp:10794"); active_process->flags |= SferaMbcProcessRecord::markedForUnload; return;
-        case 63: { const auto area = nextInteger(); const float level = nextReal(); if (!execution_failed) g_sfera_terrain_renderer.saveWater(area, level); return; }
+        case 61: active_process->flags |= SferaMbcProcessRecord::markedForUnload; return;
+        case 63: nextInteger(); nextReal(); return;
         case 64: { const auto track = address("PLAY_MUSIC"); if (!execution_failed) g_sfera_sound_runtime.requestTrack(track != 0 && *text(track) != '\0' ? text(track) : nullptr); return; }
         case 65: g_sfera_client_process_runtime.client_object->rebuildServerWall(); return;
         case 66: case 67: { const auto destination = address(operation == 66 ? "GZ_PACK, 1" : "GZ_UNPACK, 1"); const auto source = address(operation == 66 ? "GZ_PACK, 2" : "GZ_UNPACK, 2"); if (!execution_failed) pushInteger(g_sfera_files.transformEnvelope(text(destination), text(source), operation == 66)); return; }
-        case 68: case 69: { const auto map = address(operation == 68 ? "MAP_LOAD" : "MAP_SAVE"); if (execution_failed) return; auto* record = reinterpret_cast<SferaLandscapeMapRecord*>(memoryAt(map)); if (operation == 68) TerrainAssets::loadMapProbes(record); else TerrainAssets::saveMap(record); return; }
-        case 70: { const auto name = address("MAP_PICSIZE, 1"); const auto x = address("MAP_PICSIZE, 2"); const auto y = address("MAP_PICSIZE, 3"); if (execution_failed) return; std::int32_t width = 0, height = 0; TerrainAssets::loadDimensions(text(name), &width, &height); writeMemory(x, static_cast<std::uint8_t>(width)); writeMemory(y, static_cast<std::uint8_t>(height)); return; }
-        case 71: {
-            const auto index = nextInteger(); const auto enabled = nextInteger() != 0; if (execution_failed) return;
-            auto& options = g_sfera_client_config_runtime.render_options;
-            if (index >= 0 && static_cast<std::size_t>(index) < options.size()) options[index] = enabled; else reportError("Invalid render option"); return;
-        }
-        case 72: {
-            const auto program = nextInteger(); const auto arguments = nextInteger(); if (execution_failed) return;
-            if (argument_count < 4) { SferaStringLookupRuntime::copyString(g_sfera_process_runtime.executable_path, text(program), sizeof(g_sfera_process_runtime.executable_path)); SferaStringLookupRuntime::copyString(g_sfera_relaunch_runtime.argument, text(arguments), sizeof(g_sfera_relaunch_runtime.argument)); g_sfera_render_lookup_runtime.quit_requested = true; }
-            else ::_spawnl(_P_NOWAIT, text(program), text(program), text(arguments), nullptr);
-            return;
-        }
+        case 68: case 69: nextInteger(); return;
+        case 70: { nextInteger(); const auto x = nextInteger(); const auto y = nextInteger(); if (!execution_failed) { if (x != 0) writeMemory(x, std::uint8_t{}); if (y != 0) writeMemory(y, std::uint8_t{}); } return; }
+        case 71: nextInteger(); nextInteger(); return;
+        case 72: nextInteger(); nextInteger(); return;
         case 73: if (argument_count > 1) { nextInteger(); pushInteger(g_sfera_client_config_runtime.resources_loaded); } else SferaClientApplication::loadResources(); return;
-        case 74: { const auto event = nextInteger(); const auto first = nextInteger(); const auto second = nextInteger(); g_sfera_client_process_runtime.client_object->processEvent(event, first, second); return; }
+        case 74: nextInteger(); nextInteger(); nextInteger(); return;
         case 75: {
             const auto detail = nextInteger(); g_sfera_effect_manager.detail_setting = detail; const auto handle = g_sfera_world_objects.controlled_object_handle; if (static_cast<std::int32_t>(handle) <= 0) return;
             if (detail != 0) { auto* effect = g_sfera_effect_manager.createActiveEffect(300, handle); g_sfera_network_runtime.pending_effect = effect; }
             else if (g_sfera_network_runtime.pending_effect != nullptr) { g_sfera_effect_manager.removeActiveEffect(g_sfera_network_runtime.pending_effect); g_sfera_network_runtime.pending_effect = nullptr; }
             return;
         }
-        case 77: ::Sleep(nextInteger()); g_sfera_win32_dialogs.pumpMessages(false); return;
-        case 78: { auto* object = selectedObject(); if (object == nullptr) return; const float scale = nextReal(); if (!execution_failed) SphereRender::CharacterModels::checkedExtended(object, __FILE__, __LINE__)->scale = scale; return; }
-        case 79: { const auto first = nextInteger(); const auto last = nextInteger(); if (argument_count <= 3) g_sfera_client_process_runtime.client_object->setEditableRange(first, last); else g_sfera_client_process_runtime.client_object->setBackgroundRange(first, last); return; }
+        case 77: ::Sleep(nextInteger()); return;
+        case 78: { auto* object = selectedObject(); if (object == nullptr) return; const float scale = nextReal(); if (!execution_failed) SphereRender::CharacterModels::checkedExtended(object)->scale = scale; return; }
+        case 79: nextInteger(); nextInteger(); return;
         case 80: {
             const auto handle = nextInteger(); if (handle < 0) { pushInteger(UINT32_MAX); return; } if (execution_failed) return;
             auto variant = nextInteger();
@@ -19733,39 +17963,28 @@ void SferaMbcRuntime::systemCommand() {
             SphereRender::SceneRenderer::setMaterialVariant(handle, variant); pushInteger(0); return;
         }
         case 81: { const float x = nextReal(); const float y = nextReal(); const auto first = nextInteger(); const auto last = nextInteger(); pushInteger(g_sfera_client_process_runtime.client_object->typeAt(x, y, first, last)); return; }
-        case 82: { const auto type = nextInteger(); if (!execution_failed) g_sfera_vegetation.plant(type); return; }
-        case 83: {
-            const auto name = address("G_PLANT, 1"); const auto position = address("G_PLANT, 2"); const auto rotation = address("G_PLANT, 3"); if (execution_failed) return;
-            if (active_process == nullptr || name == 0 || name >= active_process->process_memory_size) WorldDiagnostics::fail("G_PLANT: invalid name buffer");
-            SferaVec3F plantedPosition{}, plantedRotation{};
-            if (!g_sfera_world_objects.takePlantedObject(std::span<char>(text(name), active_process->process_memory_size - name), plantedPosition, plantedRotation)) { pushInteger(UINT32_MAX); return; }
-            writeMemory(position, plantedPosition); writeMemory(rotation, plantedRotation); pushInteger(0); return;
-        }
+        case 82: nextInteger(); return;
+        case 83: nextInteger(); nextInteger(); nextInteger(); if (!execution_failed) pushInteger(UINT32_MAX); return;
         case 84: { auto* object = selectedObject(); if (object != nullptr && !execution_failed) pushInteger(object->spatial_membership); return; }
         case 85: {
-            const auto port = nextInteger(); const auto host = nextInteger(); const auto file = nextInteger(); if (execution_failed) return;
-            auto*& download = g_sfera_inter_scalar_runtime.update_download;
-            if (download != nullptr) { std::destroy_at(download); WorldMemory::release(download); }
-            download = std::construct_at(static_cast<SferaUpdateDownloadContext*>(WorldMemory::allocate(sizeof(SferaUpdateDownloadContext))), port, text(host));
-            pushInteger(download->begin(text(file)) == 0 ? 0 : UINT32_MAX); return;
+            nextInteger(); nextInteger(); nextInteger();
+            if (!execution_failed) pushInteger(0);
+            return;
         }
-        case 86: {
-            auto*& download = g_sfera_inter_scalar_runtime.update_download; if (download == nullptr) { pushInteger(UINT32_MAX); return; }
-            std::int32_t percent = 0; const auto state = download->progress(percent);
-            if (state != UpdateDownloadState::idle && state != UpdateDownloadState::failed) { pushInteger(percent); return; }
-            std::destroy_at(download); WorldMemory::release(download); download = nullptr; pushInteger(state == UpdateDownloadState::idle ? 101 : UINT32_MAX); return;
-        }
+        case 86: pushInteger(101); return;
         case 87: { const auto server = nextInteger(); const float x = nextReal(); const float y = nextReal(); if (!execution_failed) pushInteger(g_sfera_client_process_runtime.client_object->nearServer(x, y, server)); return; }
         case 88: { const float x = nextReal(); const float y = nextReal(); if (!execution_failed) pushInteger(g_sfera_client_process_runtime.client_object->serverAt(x, y)); return; }
         case 89: { const auto ids = nextInteger(); const auto types = nextInteger(); const auto count = nextInteger(); g_sfera_client_process_runtime.client_object->setServerMap(reinterpret_cast<const std::int32_t*>(text(ids)), reinterpret_cast<const std::int32_t*>(text(types)), count); return; }
-        case 92: g_sfera_recovered_static_runtime.debug_script_arrays.verifyFiles(); reloadQuickFiles(); return;
-        case 93: { const auto path = nextInteger(); if (!execution_failed) ::_mkdir(text(path)); return; }
+        case 92:
+            reloadQuickFiles();
+            return;
+        case 93: nextInteger(); return;
         case 94: {
             const float first = nextReal(); const float second = nextReal(); if (execution_failed) return;
             constexpr std::array<float, 6> boundaries{-742, -492, -242, 7, 257, 507};
             pushInteger(std::fabs(first - second) <= 70 && std::any_of(boundaries.begin(), boundaries.end(), [first, second](float value) { return second < value && value < first; })); return;
         }
-        case 95: { const float x = nextReal(); const float y = nextReal(); if (!execution_failed) pushInteger(g_sfera_window_runtime.path_zones != nullptr && g_sfera_window_runtime.path_zones->contains(x, y)); return; }
+        case 95: nextReal(); nextReal(); if (!execution_failed) pushInteger(0); return;
         case 96: { const auto handle = nextInteger(); const float heading = nextReal(); if (!execution_failed) g_sfera_world_objects.approachHeading(handle, heading); return; }
         case 98: {
             auto* models = g_sfera_recovered_static_runtime.render_state_08; if (models == nullptr) return;
@@ -19790,26 +18009,23 @@ void SferaMbcRuntime::systemCommand() {
         }
         case 100: { if (g_sfera_recovered_static_runtime.render_state_08 == nullptr) { pushInteger(0); return; } const auto sex = nextInteger(); const auto part = nextInteger(); if (!execution_failed) pushInteger(part == 0 || part == 1 ? SphereRender::CharacterModels::textureVariants(sex != 0, part == 0 ? 'f' : 'r') : part == 2 || part == 3 ? 4 : 0); return; }
         case 103: { const auto destination = address("G_VERSION"); if (!execution_failed) writeMemory(destination, std::uint32_t{3}); return; }
-        case 106: {
-            const auto destination = nextSlice(); nextInteger(); const std::uint32_t stride = nextInteger(); if (execution_failed || destination.base == 0) return;
-            // Dynamic and rebased buffers retain their own inclusive slice bounds.
-            const auto capacity = destination.begin != 0 ? (destination.base - destination.begin <= destination.end - destination.begin ? destination.end - destination.base + 1 : 0) : (destination.base < active_process->process_memory_size ? active_process->process_memory_size - destination.base : 0);
-            if (capacity != 0) SferaClientApplication::enumerateProcesses(std::span<char>(text(destination.base), capacity), stride);
+        case 106: { nextSlice(); nextInteger(); nextInteger(); return; }
+        case 107: { const auto enabled = nextInteger() != 0; if (!execution_failed) g_sfera_world_render_runtime.feature_toggle = enabled; return; }
+        case 109: nextInteger(); nextInteger(); return;
+        case 110: {
+            nextInteger();
+            const auto count_address = nextInteger();
+            nextInteger();
+            const auto status_address = nextInteger();
+            if (execution_failed) return;
+            if (count_address != 0) writeMemory(count_address, std::int32_t{0});
+            if (status_address != 0) writeMemory(status_address, std::int32_t{1});
             return;
         }
-        case 107: { const auto enabled = nextInteger() != 0; if (!execution_failed) g_sfera_world_render_runtime.feature_toggle = enabled; return; }
-        case 109: { const auto path = nextInteger(); const auto wildcard = nextInteger(); if (!execution_failed) g_sfera_inter_scalar_runtime.file_checker->add(text(path), text(wildcard)); return; }
-        case 110: {
-            const auto result = nextInteger(); const auto countAddress = nextInteger(); const auto synchronous = nextInteger(); const auto statusAddress = nextInteger(); if (execution_failed) return;
-            auto count = readMemory<std::int32_t>(countAddress); auto* output = reinterpret_cast<std::uint32_t*>(text(result)); auto* checker = g_sfera_inter_scalar_runtime.file_checker;
-            if (synchronous > 0) { checker->calculateResults(output, &count); writeMemory(statusAddress, std::int32_t{1}); }
-            else { const auto status = checker->readResults(output, &count); writeMemory(statusAddress, status); if (status < 0) { checker->start(); return; } }
-            writeMemory(countAddress, count); return;
-        }
-        case 111: g_sfera_inter_scalar_runtime.file_checker->reset(); return;
-        case 112: pushInteger(g_sfera_inter_scalar_runtime.file_checker->threadStatus()); return;
+        case 111: return;
+        case 112: pushInteger(1); return;
         case 113: { const auto variable = nextInteger(); const auto destination = nextInteger(); if (execution_failed) return; char* value = nullptr; std::size_t length = 0; if (::_dupenv_s(&value, &length, text(variable)) == 0 && value != nullptr) { std::copy_n(value, length, text(destination)); std::free(value); } else *text(destination) = '\0'; return; }
-        case 114: { DWORD serial = 0; pushInteger(::GetVolumeInformationA("C:\\", nullptr, 100, &serial, nullptr, nullptr, nullptr, 100) ? serial : 0); return; }
+        case 114: pushInteger(0); return;
         case 115: { const auto name = nextInteger(); if (!execution_failed) pushInteger(g_sfera_textures.find(text(name)) != 0); return; }
         case 116: { const auto name = nextInteger(); if (execution_failed) return; const auto definition = g_sfera_effect_manager.findDefinitionId(text(name)); pushInteger(definition == UINT32_MAX ? 0 : definition); return; }
         case 119: { const auto handle = nextInteger(); auto* object = g_sfera_world_objects.object(handle, "GetObjectPointer"); g_sfera_inter_scalar_runtime.current_object = object; pushInteger(object == nullptr ? UINT32_MAX : 0); return; }
@@ -19827,23 +18043,25 @@ void SferaMbcRuntime::systemCommand() {
         }
         case 126: { const auto source = nextInteger(); const float multiplier = nextReal(); if (!execution_failed) pushInteger(readMemory<std::uint32_t>(source) * static_cast<std::uint32_t>(SferaMbcValue::truncateReal(multiplier))); return; }
         case 131: { const auto destination = nextInteger(); if (execution_failed) return; SYSTEMTIME time{}; ::GetLocalTime(&time); char date[32]{}; std::snprintf(date, sizeof(date), "%d-%02d-%02d %02d:%02d:%02d", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond); std::copy_n(date, std::strlen(date) + 1, text(destination)); pushInteger(0); return; }
-        case 132: { const auto target = nextInteger(); ::ShellExecuteA(nullptr, "open", text(target), nullptr, nullptr, SW_SHOWNORMAL); pushInteger(0); return; }
+        case 132: nextInteger(); pushInteger(0); return;
         case 133: case 134: case 138: pushInteger(0); return;
         case 136: { const auto path = nextInteger(); if (execution_failed) return; _finddata64i32_t information{}; const auto handle = ::_findfirst64i32(text(path), &information); if (handle == -1) pushInteger(errno == ENOENT ? 0 : UINT32_MAX); else { ::_findclose(handle); pushInteger((information.attrib & _A_SUBDIR) != 0); } return; }
         case 140: { const auto name = address("SYS_SET_USER_NAME, 1"); SferaStringLookupRuntime::copyString(g_sfera_error_log_runtime.user_name, text(name), sizeof(g_sfera_error_log_runtime.user_name)); pushInteger(1); return; }
-        case 150: { const bool lost = nextInteger() != 0; g_sfera_network_runtime.transport.connection_lost = lost; if (lost) SferaTcpConnectionContext::writeLog("tcp_ip_connect.log", "-------------------------CONNECTION_LOST_NOTIFICATION\n"); pushInteger(0); return; }
+        case 150: { g_sfera_network_runtime.transport.connection_lost = nextInteger() != 0; pushInteger(0); return; }
         case 152: g_sfera_interface.initializeResources(); return;
-        case 206: g_sfera_map_generator_runtime.begin("WorldMap.bmp"); pushInteger(0); return;
-        case 207: trace_steps_remaining = 25; pushInteger(0); return;
+        case 206:
+            pushInteger(0);
+            return;
+        case 207: pushInteger(0); return;
         case 212: pushInteger(g_sfera_interface_runtime.invite_messages); return;
         case 213: case 214: { auto* window = nativeResource<SphereUI::Window*>(static_cast<std::uint32_t>(nextInteger())); if (window != nullptr) { if (operation == 213) g_sfera_interface.raiseWindow(*window); else g_sfera_interface.lowerWindow(*window); } return; }
-        case 215: { const auto path = nextInteger(); if (!execution_failed) pushInteger(g_sfera_inter_scalar_runtime.file_checker->fileChecksum(text(path), 65536, true)); return; }
-        case 216: { const auto path = nextInteger(); const auto wildcard = nextInteger(); if (!execution_failed) pushInteger(g_sfera_inter_scalar_runtime.file_checker->directoryChecksum(text(path), text(wildcard))); return; }
+        case 215: nextInteger(); if (!execution_failed) pushInteger(0); return;
+        case 216: nextInteger(); nextInteger(); if (!execution_failed) pushInteger(0); return;
         case 218: g_sfera_interface_runtime.secondary_gate = g_sfera_interface_runtime.primary_gate; g_sfera_interface_runtime.primary_gate = false; return;
         case 219: { const auto message = nextInteger(); if (!execution_failed) pushInteger(g_sfera_input_device_runtime.chat_filter->rejects(text(message))); return; }
         case 220: { const auto message = nextInteger(); if (!execution_failed) pushInteger(SphereUI::ChatFilter::invalidIdentifier(text(message))); return; }
         case 221: g_sfera_interface_runtime.primary_gate = g_sfera_interface_runtime.secondary_gate; return;
-        case 224: { const auto handle = nextInteger(); if (handle < 0) return; auto* object = SphereRender::CharacterModels::checkedExtended(g_sfera_world_objects.object(handle, "GetObjectPointer"), __FILE__, __LINE__); if (object == nullptr) return; const SferaVec3F velocity{nextReal(), nextReal(), nextReal()}; if (!execution_failed) object->physical_velocity = velocity; return; }
+        case 224: { const auto handle = nextInteger(); if (handle < 0) return; auto* object = SphereRender::CharacterModels::checkedExtended(g_sfera_world_objects.object(handle, "GetObjectPointer")); if (object == nullptr) return; const SferaVec3F velocity{nextReal(), nextReal(), nextReal()}; if (!execution_failed) object->physical_velocity = velocity; return; }
         case 225: { const __time64_t timestamp = nextInteger(); auto* destination = nextText(); if (destination == nullptr) return; tm local{}; if (::_localtime64_s(&local, &timestamp) == 0) std::memcpy(destination, &local, sizeof(local)); return; }
         case 226: pushInteger(::GetTickCount()); return;
         case 227: {
@@ -19852,9 +18070,9 @@ void SferaMbcRuntime::systemCommand() {
             if (length > 0.00001) { length = std::sqrt(static_cast<double>(length)); writeMemory(x, static_cast<float>(static_cast<double>(readMemory<float>(x)) / length)); writeMemory(y, static_cast<float>(static_cast<double>(readMemory<float>(y)) / length)); writeMemory(z, static_cast<float>(static_cast<double>(readMemory<float>(z)) / length)); }
             writeMemory(result, length); pushInteger(0); return;
         }
-        case 228: { const bool available = !g_sfera_client_config_runtime.gamexp_sid_present; if (available) copyText(nextSliceReference(), g_sfera_main_ui_state_runtime.gamexp_sid); pushInteger(available); return; }
+        case 228: { copyText(nextSliceReference(), ""); pushInteger(0); return; }
         case 229: { const auto source = nextSliceReference(); const auto destination = nextSliceReference(); SferaStringLookupRuntime::encodeUri(text(destination.base), text(source.base), destination.end - destination.base); pushInteger(0); return; }
-        case 230: if (!execution_failed) g_sfera_graphics_runtime.render_mode_enabled = true; return;
+        case 230: return;
         case 231: if (!execution_failed) { pushInteger(g_sfera_client_config_runtime.flag_03); g_sfera_client_config_runtime.flag_03 = 0; } return;
         case 508: {
             const auto processIndex = nextInteger(); const auto first = nextInteger(); const auto* pattern = nextText(); auto* output = nextText(true);
@@ -19877,25 +18095,20 @@ void SferaMbcRuntime::reloadQuickFiles() {
 }
 
 void SferaMbcRuntime::initialize() {
-    std::srand(::timeGetTime()); file_crc.initialize();
-    ::sscanf_s(g_sfera_startup_command_line_runtime.text, " %127s", startup_option, static_cast<unsigned>(sizeof(startup_option)));
-    if (::_strnicmp(startup_option, "-r", 2) == 0) g_sfera_inter_scalar_runtime.state_06 = 1;
-    auto*& checker = g_sfera_inter_scalar_runtime.file_checker;
-    if (checker != nullptr) { std::destroy_at(checker); WorldMemory::release(checker); checker = nullptr; }
-    checker = std::construct_at(static_cast<SferaCheckFilesContext*>(WorldMemory::allocate(sizeof(SferaCheckFilesContext))));
+    std::srand(::timeGetTime());
     g_sfera_player_lists.resetItem(); g_sfera_player_lists.field_d8 = 0; g_sfera_player_lists.initialize(0, 100, 1, "PlayersLists", 0);
-    reloadQuickFiles(); g_sfera_inter_scalar_runtime.quick_files->load("__debug.mbc", 0); g_sfera_network_runtime.shutdown();
+    reloadQuickFiles();
+    g_sfera_network_runtime.shutdown();
     process_chain_first = -1; process_chain_last = -1; execution_chain_tail = -1; execution_chain_head = -1; resetBytecodeCache();
     for (std::uint32_t index = 0; index < std::size(processes); ++index) {
         auto& process = processes[index]; process.chain_prev_index = index; process.chain_next_index = index; process.execution_prev_index = index; process.execution_next_index = index;
         std::fill(std::begin(process.received_regions), std::end(process.received_regions), nullptr);
-        if (index == 0) g_sfera_log_runtime.files[0].write("Unloading _main: ..\\ShareClientSeverCode\\Inter.cpp:4117\n");
         unloadProcess(index); process.process_id = UINT32_MAX;
     }
     mapped_memory.clear(); native_resources.clear(); native_resource_ids.clear(); next_native_handle = 1;
     process_search_cursor = 0; process_chain_first = 0; process_chain_last = 0; g_sfera_inter_scalar_runtime.state_01 = 0; g_sfera_inter_scalar_runtime.state_02 = 0;
     g_sfera_network_runtime.active_slot = UINT32_MAX; g_sfera_recovered_static_runtime.simulation_tick = 0; g_sfera_inter_scalar_runtime.mode_01 = SferaGameCalendar::pack(7801, 1, 1, 8, 0);
-    g_sfera_mbc_static_runtime.init_flag = 0; g_sfera_mbc_static_runtime.init_marker = 1; halt_state = SferaMbcRuntime::HaltState::Running; g_sfera_world_objects.controlled_object_handle = UINT32_MAX;
+    halt_state = SferaMbcRuntime::HaltState::Running; g_sfera_world_objects.controlled_object_handle = UINT32_MAX;
     g_sfera_config_text_runtime.parser_path[0] = '\0'; g_sfera_texture_cache_runtime.render_gate = 0;
     for (std::size_t index = 0; index < 400; ++index) g_sfera_world_slot_table_runtime.slots[index].state = 4;
     g_sfera_world_slot_table_runtime.active_limit = 400;
@@ -19909,14 +18122,14 @@ void SferaMbcRuntime::initialize() {
             const auto descriptor = g_sfera_files.open(file.name, _O_RDONLY); if (descriptor < 0) continue;
             std::uint32_t tag = UINT32_MAX; g_sfera_files.seek(descriptor, 20, SEEK_SET); const auto read = g_sfera_files.read(descriptor, &tag, sizeof(tag)); g_sfera_files.close(descriptor);
             if (read != sizeof(tag) || tag >= std::size(g_sfera_mbc_interpreter_storage.module_records)) continue;
-            if (tag == 0) g_sfera_warning_log_runtime.append((std::string("Null tag ") + file.name).c_str(), false);
+            if (tag == 0) ::OutputDebugStringA((std::string("Null tag ") + file.name).c_str());
             auto& name = g_sfera_mbc_interpreter_storage.module_records[tag].name;
             SferaStringLookupRuntime::copyString(name, file.name, sizeof(name));
             auto* extension = std::strrchr(name, '.'); const auto* separator = std::strrchr(name, '\\'); if (extension != nullptr && (separator == nullptr || extension > separator)) *extension = '\0';
         } while (::_findnext64i32(search, &file) == 0);
         ::_findclose(search);
     }
-    g_sfera_recovered_static_runtime.debug_script_arrays.load(); g_sfera_config_text_runtime.load("connectn.cfg");
+    g_sfera_config_text_runtime.load("connectn.cfg");
     std::int32_t port = 0; if (g_sfera_config_text_runtime.readInteger("PORT", port)) g_sfera_network_runtime.server_port = port;
     if (loadProcess("_main", 0) == UINT32_MAX) SferaClientApplication::terminateWithError("MBInter: Process '_main' not found");
     for (std::uint32_t index = 0; index < named_vector_count; ++index) {
@@ -19924,14 +18137,11 @@ void SferaMbcRuntime::initialize() {
         WorldMemory::release(vector.value_data); WorldMemory::release(vector.name_text); vector.value_data = nullptr; vector.name_text = nullptr; vector.size = 0;
     }
     named_vector_count = 0;
-    const std::uint64_t timestamp = ::_time64(nullptr); g_sfera_mbc_static_runtime.startup_time = timestamp;
     g_sfera_network_runtime.pending_effect = nullptr; g_sfera_inter_scalar_runtime.mode_01 = SferaGameCalendar::fromUnixTime(::_time64(nullptr));
 }
 
 void SferaMbcRuntime::tick() {
     auto& log = g_sfera_log_runtime.files[0];
-    if (trace_steps_remaining > 0) { --trace_steps_remaining; log.write("-------------------------------------- "); log.write(trace_steps_remaining); }
-    g_sfera_mbc_static_runtime.service_flag = 0; g_sfera_recovered_static_runtime.debug_script_arrays.checkStep(2);
     if (static_cast<std::int32_t>(g_sfera_network_runtime.active_slot) >= 0) return;
     ++g_sfera_recovered_static_runtime.simulation_tick;
     if (static_cast<std::int32_t>(++g_sfera_interpreter_scratch_runtime.network_poll_counter) >= 192) {
@@ -19949,16 +18159,13 @@ void SferaMbcRuntime::tick() {
     const std::size_t priorityLimit = simulationTick % 24 == 0 ? 2 : simulationTick % 8 == 0 ? 1 : 0;
     if (g_sfera_recovered_static_runtime.graphics_state != 0) { g_sfera_inter_scalar_runtime.state_02 = g_sfera_recovered_static_runtime.graphics_state; g_sfera_inter_scalar_runtime.state_01 = 1; }
     process_index = execution_chain_tail; dispatch_process_count = 0;
-    const auto traceContext = [&]() { if (static_cast<std::int32_t>(g_sfera_network_runtime.active_slot) >= 0) { WorldDiagnostics::describeScript(true); log.write("\n"); log.write(diagnostic_context); log.write("\n"); } };
-    const auto tracePlayer = [&](const char* header) { log.write(header); log.write((std::string("ID=") + std::to_string(processes[process_index].process_id)).c_str()); };
     while (process_index < std::size(processes) && processes[process_index].chain_prev_index >= 0) {
-        ++dispatch_process_count; trace_process_header_pending = true; g_sfera_network_runtime.active_slot = process_index; active_process = &processes[process_index]; program_table_base = active_process->program_table_base; bytecode_base = active_process->bytecode_base; process_memory_base = active_process->process_memory_base; execution_context_depth = 0; execution_failed = false;
-        if (trace_steps_remaining > 0 && active_process->module_tag == 2) tracePlayer("--- Player ---\n");
+        ++dispatch_process_count; g_sfera_network_runtime.active_slot = process_index; active_process = &processes[process_index]; program_table_base = active_process->program_table_base; bytecode_base = active_process->bytecode_base; process_memory_base = active_process->process_memory_base; execution_context_depth = 0; execution_failed = false;
         bool unload = false;
         for (std::size_t priority = 0; priority <= priorityLimit && !unload; ++priority) {
             program_index = static_cast<std::int16_t>(active_process->program_map_a[priority]);
             while (program_index >= 0) {
-                active_program_record = &program_table_base[program_index]; trace_program_header_pending = true; const auto initialProgram = program_index;
+                active_program_record = &program_table_base[program_index]; const auto initialProgram = program_index;
                 bool finishPriority = false;
                 if (active_program_record->state > 0) {
                     value_stack_size = 0; call_frame_depth = 0; instruction_step_count = 0;
@@ -19974,11 +18181,6 @@ void SferaMbcRuntime::tick() {
                                 processes[0].activateProgram("EError"); unload = true; break;
                             }
                             current_instruction_address = instruction_cursor; current_opcode = static_cast<Instruction>(*instruction_cursor);
-                            if (trace_steps_remaining > 0 && processes[process_index].module_tag == 2 && trace_program_header_pending) {
-                                trace_program_header_pending = false; if (trace_process_header_pending) { trace_process_header_pending = false; tracePlayer("=== Player ===\n"); } traceContext();
-                            }
-                            if (static_cast<std::int32_t>(g_sfera_interpreter_scratch_runtime.diagnostic_step_counter) > 1000) { g_sfera_execution_monitor_runtime.setCurrent(process_index, static_cast<std::uint32_t>(current_instruction_address - bytecode_base)); g_sfera_interpreter_scratch_runtime.diagnostic_step_counter = 0; }
-                            ++g_sfera_interpreter_scratch_runtime.diagnostic_step_counter;
                             if (current_opcode == Instruction::Yield) { ++instruction_cursor; break; }
                             if (current_opcode == Instruction::EndProgram) {
                                 active_program_record->callDepth = 0; active_program_record->state = -1; pending_program_index = static_cast<std::int16_t>(active_process->program_map_b[priority]);
@@ -20006,7 +18208,6 @@ void SferaMbcRuntime::tick() {
             }
         }
         if (unload || (active_process->flags & SferaMbcProcessRecord::unloadAfterExecution) != 0) {
-            if (process_index == 0) { log.write("Unloading _main: ..\\ShareClientSeverCode\\Inter.cpp:4812"); traceContext(); }
             unloadProcess(process_index); if (process_index == static_cast<std::uint32_t>(process_chain_last)) break;
         }
         const auto previousActive = g_sfera_network_runtime.active_slot; process_index = active_process->execution_prev_index;
@@ -20029,7 +18230,6 @@ void SferaMbcRuntime::tick() {
             flush(slot.reliable_bit_count, slot.reliable_payload, slot.reliable_process, 8); flush(slot.unreliable_bit_count, slot.unreliable_payload, slot.unreliable_process, 0);
         }
     }
-    g_sfera_execution_monitor_runtime.setCurrent(UINT32_MAX, 0);
 }
 
 void SferaMbcRuntime::buildRegion() {
@@ -20097,7 +18297,7 @@ void SferaClientApplication::configureResourceDirectory() {
     if (!::SetCurrentDirectoryW(root.c_str())) throw std::system_error(static_cast<int>(::GetLastError()), std::system_category(), "SetCurrentDirectoryW");
 }
 
-int SferaClientApplication::run(HINSTANCE instance, int showCommand) {
+int SferaClientApplication::run(HINSTANCE instance) {
     try {
         configureResourceDirectory();
         if (std::atexit(&SferaCrtStartupRuntime::releaseContainers) != 0) throw std::runtime_error("Could not register client finalization");
@@ -20120,25 +18320,15 @@ int SferaClientApplication::run(HINSTANCE instance, int showCommand) {
             return true;
         };
         readArgument("/locale", g_sfera_client_process_runtime.locale, 9);
-        if (std::strstr(arguments, "/login") != nullptr) g_sfera_client_config_runtime.gamexp_sid_present = true;
-        else if (!readArgument("/gamexp_sid", g_sfera_main_ui_state_runtime.gamexp_sid, 30)) {
-            ::MessageBoxA(nullptr, "\307\340\357\363\361\352 \357\360\356\350\347\342\356\344\350\362\361\377 \357\360\356\343\360\340\354\354\356\351 launchpoint.exe.", "\316\370\350\341\352\340 \347\340\357\363\361\352\340", MB_ICONERROR);
-            SferaCrtStartupRuntime::releaseContainers();
-            return 0;
-        }
-        g_sfera_file_runtime.beginCrashReport();
         ::InitializeCriticalSection(&g_sfera_network_send_runtime.critical_section);
         ::InitializeCriticalSection(&g_sfera_window_runtime.timing_critical_section);
         ::InitializeCriticalSection(&g_sfera_recovered_static_runtime.scene_lock);
         for (const char* directory : {".\\logs", ".\\players"}) ::CreateDirectoryA(directory, nullptr);
         SphereRender::SceneRenderer::buildColorRemap(1.0, static_cast<double>(0.3f));
         g_sfera_main_ui_state_runtime.active_ui_object = instance;
-        g_sfera_startup_command_line_runtime.show_command = showCommand;
-        SferaStringLookupRuntime::copyString(g_sfera_startup_command_line_runtime.text, arguments, sizeof(g_sfera_startup_command_line_runtime.text));
         SferaClientApplication application;
         if (application.initialize()) { resetWorld(); application.runMainLoop(); }
         shutdown();
-        g_sfera_file_runtime.endCrashReport();
         SferaCrtStartupRuntime::releaseContainers();
         return 0;
     } catch (const std::exception& error) {
@@ -20155,26 +18345,21 @@ int SferaClientApplication::run(HINSTANCE instance, int showCommand) {
 }
 
 void SferaLogRuntime::initialize() {
-    constexpr const char* paths[]{"Error.log", "test.log", "logs\\memory.log"};
-    g_sfera_main_view_state_runtime.view_mode = std::size(files);
-    for (std::size_t index = 0; index < std::size(files); ++index) {
-        auto& log = files[index];
-        SferaStringLookupRuntime::copyString(log.path.text, paths[index], sizeof(log.path.text));
-        log.truncate_on_first_write = false;
-        log.size_limit = index == 0 ? 10000000 : 500000;
-        log.write("**** Start: ");
-        const auto timestamp = ::_time64(nullptr);
-        tm local{};
-        ::_localtime64_s(&local, &timestamp);
-        char date[100]{};
-        std::strftime(date, sizeof(date), "%A, %d %B %Y", &local);
-        log.write(date);
-        log.write("  ");
-        char time[9]{};
-        ::_strtime_s(time, sizeof(time));
-        log.write(time);
-        log.write("\n");
-    }
+    auto& log = files[0];
+    SferaStringLookupRuntime::copyString(log.path.text, "Error.log", sizeof(log.path.text));
+    log.size_limit = 10000000u;
+    log.write("**** Start: ");
+    const auto timestamp = ::_time64(nullptr);
+    tm local{};
+    ::_localtime64_s(&local, &timestamp);
+    char date[100]{};
+    std::strftime(date, sizeof(date), "%A, %d %B %Y", &local);
+    log.write(date);
+    log.write("  ");
+    char time[9]{};
+    ::_strtime_s(time, sizeof(time));
+    log.write(time);
+    log.write("\n");
 }
 
 bool SferaClientApplication::initialize() {
@@ -20216,21 +18401,8 @@ bool SferaClientApplication::initialize() {
     if (!runStartupScripts()) return false;
     GameInterface::registerNativeWindowClass();
     for (std::size_t index = 0; index < std::size(g_sfera_ascii_lower_runtime.table); ++index) g_sfera_ascii_lower_runtime.table[index] = index >= 'A' && index <= 'Z' ? index + ('a' - 'A') : index;
-    const HANDLE mapping = ::CreateFileMappingA(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(SferaDebugExchange), "SphereDebug");
-    if (mapping == nullptr) terminateWithError("CreateFileMapping failed");
-    auto* exchange = static_cast<SferaDebugExchange*>(::MapViewOfFile(mapping, FILE_MAP_WRITE, 0, 0, sizeof(SferaDebugExchange)));
-    ::CloseHandle(mapping);
-    g_sfera_main_input_state_runtime.debug_exchange = exchange;
-    if (exchange == nullptr) terminateWithError("MapViewOfFile failed");
-    if (exchange->state == 2) { exchange->state = 1; while (exchange->state == 1) ::Sleep(1); }
-    g_sfera_debug_window_runtime.spider_window = ::FindWindowA("SpiderWclName", "Spider");
     g_sfera_graphics_runtime.display_width = 640;
     g_sfera_graphics_runtime.display_height = 480;
-    if (config.debug_config_enabled) {
-        settings.load("debug.cfg");
-        readInteger("REFRESH", config.refresh_rate);
-        readInteger("MEMORY_WARNING_AS_ERROR", g_sfera_recovered_static_runtime.memory_warning_as_error);
-    }
     settings.load("config.cfg");
     g_sfera_window_runtime.windowed = false;
     readInteger("WINDOWED", g_sfera_window_runtime.windowed);
@@ -20248,7 +18420,6 @@ bool SferaClientApplication::initialize() {
     if (g_sfera_input_device_runtime.lod_distance == 0.0f) g_sfera_input_device_runtime.lod_distance = 20.0f;
     const std::array<std::pair<const char*, bool*>, 3> landscapes{{{"landscape_hr", &config.high_resolution_assets}, {"landscape_ph", &config.alternate_ph_assets}, {"landscape_rd", &config.alternate_rd_assets}}};
     for (const auto& [path, enabled] : landscapes) { const DWORD attributes = ::GetFileAttributesA(path); *enabled = attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
-    if (!readInteger("VERTSYNC", g_sfera_recovered_static_runtime.vertical_sync_enabled)) { g_sfera_recovered_static_runtime.vertical_sync_enabled = true; settings.writeValue("VERTSYNC", "1", false); settings.save(false); }
     GameInterface::createNativeWindow();
     g_sfera_files.addSearchPath("landscape");
     for (const auto& [path, enabled] : landscapes) if (*enabled != 0) g_sfera_files.addSearchPath(path);
@@ -20261,9 +18432,6 @@ bool SferaClientApplication::initialize() {
     ::ShowCursor(FALSE);
     ::ShowCursor(TRUE);
     set_system_cursor_visibility(false);
-    g_sfera_memory_runtime.allocation_source_name = __FILE__;
-    g_sfera_memory_runtime.allocation_source_line = __LINE__;
-    g_sfera_world_load_runtime.snow_path_object = std::make_unique<SnowField>("xadd\\snowpath.bin");
     for (std::uint32_t index = 0; index < 2; ++index) {
         char path[64]{};
         std::snprintf(path, sizeof(path), "fonts\\font%u%s.pcx", index + 1, config.language != 0 && config.language != 1 ? g_sfera_font_runtime.language_suffix : "");
@@ -20285,7 +18453,7 @@ bool SferaClientApplication::initialize() {
 void TerrainTextureCache::initialize() {
     auto& passes = g_sfera_scene_array_runtime.render_pass_slots;
     for (std::uint32_t row = 0; row < 12; ++row) {
-        if (row >= passes.capacity) SferaClientApplication::arrayBoundsError(passes.debug_file, passes.debug_line, static_cast<std::int32_t>(row));
+        if (row >= passes.capacity) SferaClientApplication::arrayBoundsError(static_cast<std::int32_t>(row));
         const float position = static_cast<double>(row * 254) / 12.0 + 1.0 - 1.0 / 24.0;
         const auto bucket = static_cast<std::int32_t>(std::trunc(static_cast<double>(position) + 0.5)) - 1;
         passes.data[row] = static_cast<double>(position) - bucket;
@@ -20329,17 +18497,10 @@ void TerrainTextureCache::initialize() {
 }
 
 void SferaClientApplication::resetWorld() {
-    g_sfera_window_runtime.runtime_debug_enabled = true;
-    if (g_sfera_client_config_runtime.debug_config_enabled) {
-        g_sfera_config_text_runtime.load("debug.cfg");
-        const std::array<std::pair<const char*, bool*>, 3> settings{{{"RUNTIME", &g_sfera_window_runtime.runtime_debug_enabled}, {"ESCNOQUERY", &g_sfera_main_command_state_runtime.escape_without_query}, {"RENDERSHADOW", &g_sfera_world_load_runtime.render_shadows}}};
-        for (const auto& [name, destination] : settings) { std::int32_t value = 0; if (g_sfera_config_text_runtime.readInteger(name, value)) *destination = value != 0; }
-    }
     g_sfera_world_objects.destroyAll();
     g_sfera_sound_runtime.initialize();
     ShadowMap::initialize(1);
     WorldGuiControls::destroyAllText();
-    WorldDebugDraw::clear();
     std::fill(std::begin(g_sfera_main_view_state_runtime.view_coefficients), std::end(g_sfera_main_view_state_runtime.view_coefficients), 0.0f);
     SferaStringLookupRuntime::copyString(g_sfera_main_command_state_runtime.default_cursor_name, "cursor1", sizeof(g_sfera_main_command_state_runtime.default_cursor_name));
     g_sfera_world_objects.controlled_object_handle = UINT32_MAX;
@@ -20353,13 +18514,9 @@ void SferaClientApplication::resetWorld() {
     g_sfera_main_ui_state_runtime.ui_state_02 = 0;
     g_sfera_graphics_runtime.base_render_factor = 0.06f;
     for (auto& entry : g_sfera_texture_cache_runtime.entries) { entry.owner = nullptr; entry.use_count = 0; }
-    g_sfera_memory_runtime.allocation_source_name = __FILE__;
-    g_sfera_memory_runtime.allocation_source_line = __LINE__;
     delete g_sfera_recovered_static_runtime.scene_state_08;
     g_sfera_recovered_static_runtime.scene_state_08 = new EnvironmentZones;
     g_sfera_recovered_static_runtime.scene_state_08->load("Landscape\\zoning.cfg");
-    g_sfera_memory_runtime.allocation_source_name = __FILE__;
-    g_sfera_memory_runtime.allocation_source_line = __LINE__;
     delete g_sfera_alternate_environment_zones;
     g_sfera_alternate_environment_zones = new EnvironmentZones;
     g_sfera_alternate_environment_zones->load("Landscape\\zoningHaron.cfg");
@@ -20384,7 +18541,7 @@ bool SferaClientApplication::runStartupScripts() {
     for (;;) {
         const auto steps = advanceClock();
         for (std::int32_t index = 0; index < steps; ++index) { g_sfera_mbc_runtime->tick(); if (g_sfera_client_process_runtime.startup_complete) return true; }
-        g_sfera_win32_dialogs.pumpMessages();
+        dispatch_application_messages();
         if (g_sfera_render_lookup_runtime.quit_requested) return false;
         ::Sleep(10);
     }
@@ -20402,10 +18559,7 @@ bool SferaClientApplication::updateSimulation() {
     takeQueued(g_sfera_scene_control_runtime.context_queue, g_sfera_scene_control_runtime.context_count, g_sfera_scene_control_runtime.active_context);
     const auto key = g_sfera_direct_input_runtime.takeKeyPress();
     g_sfera_recovered_static_runtime.graphics_state = key;
-    if (key == DIK_ESCAPE && g_sfera_main_command_state_runtime.escape_without_query) { g_sfera_warning_log_runtime.flush(); g_sfera_profiler_runtime.writeReport(); return false; }
     if (g_sfera_input_device_runtime.exception_requested) { g_sfera_input_device_runtime.exception_requested = false; throw std::runtime_error("Client execution interrupted"); }
-    if (key == DIK_F12) g_sfera_landscape_map_runtime.show_fps ^= 1;
-    else if (key == DIK_F7) g_sfera_recovered_static_runtime.client_state_05 ^= 1;
     g_sfera_direct_input_runtime.pollKeyboard();
     auto& mouse = g_sfera_main_input_state_runtime.mouse;
     mouse = g_sfera_direct_input_runtime.pollMouse();
@@ -20420,48 +18574,30 @@ bool SferaClientApplication::updateSimulation() {
     GameInterface::updateInput();
     g_sfera_interface.update(static_cast<std::uint8_t>(g_sfera_scene_control_runtime.active_context), static_cast<std::uint8_t>(g_sfera_world_load_runtime.active_tool_context), mouse.buttons, mouse.wheel);
     if (g_sfera_main_ui_state_runtime.ui_state_08 == 1 && !g_sfera_recovered_static_runtime.interaction_enabled && g_sfera_recovered_static_runtime.render_gate == 0) {
-        if (g_sfera_client_config_runtime.render_options[1] != 0) {
-            auto* camera = g_sfera_world_objects.object(0);
-            if (camera == nullptr) WorldDiagnostics::fail("Camera object is not available");
-            camera->position.x = static_cast<double>(camera->position.x) + static_cast<double>(mouse.dx) * 0.5;
-            camera->position.z = static_cast<double>(camera->position.z) - static_cast<double>(mouse.dy) * 0.5;
-        } else g_sfera_motion.updateOrientation();
+        g_sfera_motion.updateOrientation();
     } else {
         std::fill(std::begin(g_sfera_main_view_state_runtime.view_coefficients), std::end(g_sfera_main_view_state_runtime.view_coefficients), 0.0f);
         g_sfera_landscape_patch_lookup_runtime.secondary_vector = {};
         g_sfera_landscape_patch_lookup_runtime.primary_vector = {};
         g_sfera_direct_input_runtime.pollMouse();
     }
-    g_sfera_profiler_runtime.begin(1);
     g_sfera_mbc_runtime->tick();
-    g_sfera_profiler_runtime.end(1);
-    g_sfera_profiler_runtime.begin(2);
     if (g_sfera_main_ui_state_runtime.ui_state_08 == 0) g_sfera_motion.updateControlled(1.0f / 192.0f);
-    g_sfera_profiler_runtime.end(2);
     if (++object_update_ticks_ == 4) {
         object_update_ticks_ = 0;
-        g_sfera_profiler_runtime.begin(3);
         g_sfera_motion.updateObjects(1.0f / 48.0f);
-        g_sfera_profiler_runtime.end(3);
     }
     if (++effect_update_ticks_ == 6) {
         SphereRender::SceneRenderer::adaptFog();
         effect_update_ticks_ = 0;
-        if (g_sfera_client_config_runtime.render_options[4] == 0) {
-            g_sfera_profiler_runtime.begin(4);
-            if (g_sfera_client_config_runtime.resources_loaded) g_sfera_effect_manager.updateActiveEffects();
-            g_sfera_profiler_runtime.end(4);
-        }
+        if (g_sfera_client_config_runtime.resources_loaded) g_sfera_effect_manager.updateActiveEffects();
     }
     if (++maintenance_ticks_ == 6) {
         maintenance_ticks_ = 0;
         if (++g_sfera_landscape_render_runtime.rotation_step == 32) g_sfera_landscape_render_runtime.rotation_step = 0;
         TerrainAssets::evictUnused();
-        g_sfera_network_runtime.updateProbe();
     }
-    g_sfera_profiler_runtime.begin(5);
     g_sfera_world_objects.updateExtendedSpatialIndices();
-    g_sfera_profiler_runtime.end(5);
     g_sfera_scene_control_runtime.active_context = 0;
     g_sfera_world_load_runtime.active_tool_context = 0;
     auto& phase = g_sfera_recovered_static_runtime.animation_phase;
@@ -20505,20 +18641,6 @@ void SferaClientApplication::renderFrame() {
     device.checkResult(device.native_device->Present(nullptr, nullptr, nullptr, nullptr), "Present");
 }
 
-void SferaProfilerRuntime::updateFramePercentages() {
-    const auto total = std::bit_cast<std::int64_t>(accumulated_ticks[0]);
-    if (total <= 1000000) return;
-    std::uint32_t sum = 0;
-    for (std::size_t index = 1; index <= 8; ++index) {
-        const auto weighted = std::bit_cast<std::int64_t>(accumulated_ticks[index] * 100);
-        report_percent[index] = weighted / total;
-        sum += report_percent[index];
-        accumulated_ticks[index] = {};
-    }
-    report_percent[9] = sum;
-    accumulated_ticks[0] = {};
-}
-
 void SferaClientApplication::runMainLoop() {
     object_update_ticks_ = effect_update_ticks_ = maintenance_ticks_ = 0;
     g_sfera_main_input_state_runtime.main_loop_started = true;
@@ -20527,21 +18649,11 @@ void SferaClientApplication::runMainLoop() {
     for (;;) {
         const auto steps = advanceClock();
         if (steps == 0) { const auto delay = (52 - tick_remainder_) / 10; if (delay > 50) ::Sleep(19); else if (delay > 1) ::Sleep(static_cast<DWORD>(delay - 1)); }
-        g_sfera_profiler_runtime.begin(0);
         for (std::int32_t index = 0; index < steps; ++index) if (!updateSimulation()) return;
-        if (g_sfera_frame_runtime.frame_state != UINT32_MAX) { ++g_sfera_frame_runtime.frame_state; g_sfera_frame_runtime.frame_state_anchor = WorldClock::nowTicks(); }
-        g_sfera_profiler_runtime.begin(6);
-        g_sfera_profiler_runtime.end(6);
-        g_sfera_profiler_runtime.begin(7);
         renderFrame();
-        g_sfera_profiler_runtime.end(7);
-        g_sfera_profiler_runtime.begin(8);
         if (g_sfera_client_config_runtime.resources_loaded) g_sfera_sound_runtime.update();
-        g_sfera_profiler_runtime.end(8);
-        g_sfera_win32_dialogs.pumpMessages(false);
+        dispatch_application_messages();
         if (g_sfera_render_lookup_runtime.quit_requested) return;
-        g_sfera_profiler_runtime.end(0);
-        g_sfera_profiler_runtime.updateFramePercentages();
     }
 }
 
@@ -20565,8 +18677,8 @@ void SferaClientApplication::loadResources() {
     const auto loadWeather = [](const char* path) { auto* weather = std::construct_at(static_cast<WeatherScenarios*>(WorldMemory::allocate(sizeof(WeatherScenarios)))); return weather->load(path); };
     g_sfera_weather_runtime.standard = loadWeather("landscape\\weather.txt");
     if (config.high_resolution_assets) { g_sfera_weather_runtime.highres = loadWeather("landscape_hr\\weather_hr.txt"); if (g_sfera_weather_runtime.highres == nullptr) g_sfera_weather_runtime.highres = g_sfera_weather_runtime.standard; }
-    ::Sleep(50); g_sfera_vegetation.patterns.loadPlanting(); g_sfera_world_objects.create("cam_cube", nullptr, 0, true);
-    auto* camera = SphereRender::CharacterModels::checkedExtended(*g_sfera_world_objects.object_handles.element(0), __FILE__, __LINE__);
+    ::Sleep(50); g_sfera_world_objects.create("cam_cube", nullptr, 0, true);
+    auto* camera = SphereRender::CharacterModels::checkedExtended(*g_sfera_world_objects.object_handles.element(0));
     if (camera == nullptr) terminateWithError("Camera object was not created");
     camera->render_enabled = false; g_sfera_world_objects.create("cam_cube", nullptr, 5, true); g_sfera_vegetation.initialize(); ::Sleep(50);
     g_sfera_input_device_runtime.chat_filter = std::construct_at(static_cast<SphereUI::ChatFilter*>(WorldMemory::allocate(sizeof(SphereUI::ChatFilter)))); config.resources_loaded = true;
@@ -20576,20 +18688,16 @@ void SferaClientApplication::shutdown() {
     if (g_sfera_view_motion_runtime.mode_value != 0) {
         ::ShowCursor(FALSE); set_system_cursor_visibility(true); ::MessageBoxA(g_sfera_window_runtime.main_window_handle, "Reenter in epilog detected!", "Error", MB_ICONERROR); ::ExitProcess(0);
     }
-    g_sfera_view_motion_runtime.mode_value = 1; g_sfera_warning_log_runtime.flush();
+    g_sfera_view_motion_runtime.mode_value = 1;
     auto*& vegetation = g_sfera_world_render_runtime.world_spatial_index;
     if (vegetation != nullptr) { std::destroy_at(vegetation); WorldMemory::release(vegetation); vegetation = nullptr; }
     if (g_sfera_client_config_runtime.interpreter_initialized) { g_sfera_mbc_runtime->halt_state = SferaMbcRuntime::HaltState::Requested; g_sfera_mbc_runtime->tick(); }
     g_sfera_network_runtime.shutdown();
-    g_sfera_warning_log_runtime.flush(); g_sfera_sound_runtime.shutdown();
-    auto*& download = g_sfera_inter_scalar_runtime.update_download;
-    if (download != nullptr) { std::destroy_at(download); WorldMemory::release(download); download = nullptr; }
+    g_sfera_sound_runtime.shutdown();
     auto*& filter = g_sfera_input_device_runtime.chat_filter;
     if (filter != nullptr) { std::destroy_at(filter); WorldMemory::release(filter); filter = nullptr; }
     delete g_sfera_client_process_runtime.client_object; g_sfera_client_process_runtime.client_object = nullptr;
     WorldMemory::release(g_sfera_primary_sky_environment); g_sfera_primary_sky_environment = nullptr; WorldMemory::release(g_sfera_main_aux_runtime.secondary_world_manager); g_sfera_main_aux_runtime.secondary_world_manager = nullptr;
-    auto*& zones = g_sfera_window_runtime.path_zones; if (zones != nullptr) { std::destroy_at(zones); WorldMemory::release(zones); zones = nullptr; }
-    if (g_sfera_main_input_state_runtime.debug_exchange != nullptr) { ::UnmapViewOfFile(g_sfera_main_input_state_runtime.debug_exchange); g_sfera_main_input_state_runtime.debug_exchange = nullptr; }
     g_sfera_effect_manager.shutdown(); g_sfera_interface.shutdown(); ShadowMap::shutdown(); g_sfera_world_objects.destroyAll(); g_sfera_player_lists.resetItem(); g_sfera_models.clear();
     auto*& characters = g_sfera_recovered_static_runtime.render_state_08;
     if (characters != nullptr) { characters->clear(); std::destroy_at(characters); WorldMemory::release(characters); characters = nullptr; }
@@ -20597,15 +18705,10 @@ void SferaClientApplication::shutdown() {
     g_sfera_direct_input_runtime.release(); g_sfera_font_runtime.clear(); TerrainTextureCache::release();
     if (g_sfera_window_runtime.main_window_handle != nullptr) { ::DestroyWindow(g_sfera_window_runtime.main_window_handle); g_sfera_window_runtime.main_window_handle = nullptr; }
     ::UnregisterClassA(GameInterface::nativeWindowClassName, g_sfera_main_ui_state_runtime.active_ui_object); ::CoUninitialize();
-    const auto count = std::clamp(static_cast<std::int32_t>(g_sfera_main_view_state_runtime.view_mode), 0, static_cast<std::int32_t>(std::size(g_sfera_log_runtime.files)));
-    for (std::int32_t index = 0; index < count; ++index) {
-        auto& log = g_sfera_log_runtime.files[index]; if (log.truncate_on_first_write) continue;
-        log.write("**** Quit: "); const auto timestamp = ::_time64(nullptr); tm local{}; ::_localtime64_s(&local, &timestamp); char date[128]{}; std::strftime(date, sizeof(date), "%A, %d %B %Y", &local); log.write(date); log.write("  "); char time[9]{}; ::_strtime_s(time, sizeof(time)); log.write(time); log.write("\n\n");
-        std::string path(log.path.text); const auto extension = path.find('.'); if (extension != std::string::npos) path.resize(extension); path += ".log";
-        if (g_sfera_files.fileSize(path.c_str()) > static_cast<std::int32_t>(log.size_limit)) g_sfera_files.keepTail(path.c_str(), log.size_limit);
-    }
-    if (*g_sfera_process_runtime.executable_path != '\0') ::_execl(g_sfera_process_runtime.executable_path, g_sfera_process_runtime.executable_path, g_sfera_relaunch_runtime.argument, static_cast<const char*>(nullptr));
-    g_sfera_warning_log_runtime.flush(); ::DeleteCriticalSection(&g_sfera_network_send_runtime.critical_section); ::DeleteCriticalSection(&g_sfera_window_runtime.timing_critical_section); ::DeleteCriticalSection(&g_sfera_recovered_static_runtime.scene_lock);
+    auto& log = g_sfera_log_runtime.files[0];
+    log.write("**** Quit: "); const auto timestamp = ::_time64(nullptr); tm local{}; ::_localtime64_s(&local, &timestamp); char date[128]{}; std::strftime(date, sizeof(date), "%A, %d %B %Y", &local); log.write(date); log.write("  "); char time[9]{}; ::_strtime_s(time, sizeof(time)); log.write(time); log.write("\n\n");
+    if (g_sfera_files.fileSize("Error.log") > static_cast<std::int32_t>(log.size_limit)) g_sfera_files.keepTail("Error.log", log.size_limit);
+    ::DeleteCriticalSection(&g_sfera_network_send_runtime.critical_section); ::DeleteCriticalSection(&g_sfera_window_runtime.timing_critical_section); ::DeleteCriticalSection(&g_sfera_recovered_static_runtime.scene_lock);
 }
 
 [[noreturn]] void SferaClientApplication::terminateWithError(const char* message) {
@@ -20614,15 +18717,15 @@ void SferaClientApplication::shutdown() {
     }
     g_sfera_view_motion_runtime.initialized = true;
     std::string description = "ServerN=" + std::to_string(static_cast<std::int32_t>(g_sfera_recovered_static_runtime.server_number)) + "  " + (message == nullptr ? "" : message);
-    g_sfera_warning_log_runtime.flush(); if (const auto* context = WorldDiagnostics::scriptContext()) { description += '\n'; description += context; }
+    if (const auto* context = WorldDiagnostics::scriptContext()) { description += '\n'; description += context; }
     SferaStringLookupRuntime::copyString(g_sfera_error_message_scratch_runtime.fatal_message, description.c_str(), sizeof(g_sfera_error_message_scratch_runtime.fatal_message));
     g_sfera_log_runtime.files[0].write(description.c_str()); g_sfera_log_runtime.files[0].write("\n"); ::ShowCursor(FALSE); set_system_cursor_visibility(true);
     ::MessageBoxA(g_sfera_window_runtime.main_window_handle, description.c_str(), "\316\370\350\341\352\340", MB_ICONERROR); shutdown(); ::ExitProcess(0);
 }
 
-[[noreturn]] void SferaClientApplication::arrayBoundsError(const char* file, std::uint32_t line, std::int32_t index) {
-    char message[512]{};
-    if (index < 0) std::snprintf(message, sizeof(message), "BoundCheckArray error: index less than zero\nFile: %s  Line: %d\n", file, static_cast<std::int32_t>(line));
-    else std::snprintf(message, sizeof(message), "BoundCheckArray error: index out of range %d\nFile: %s  Line: %d\n", index, file, static_cast<std::int32_t>(line));
+[[noreturn]] void SferaClientApplication::arrayBoundsError(std::int32_t index) {
+    char message[128]{};
+    if (index < 0) std::snprintf(message, sizeof(message), "BoundCheckArray error: index less than zero\n");
+    else std::snprintf(message, sizeof(message), "BoundCheckArray error: index out of range %d\n", index);
     terminateWithError(message);
 }

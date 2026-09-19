@@ -604,15 +604,9 @@ namespace SphereUI {
 
         int caret_position;
         std::size_t observed_length;
-        std::size_t history_count;
-        std::size_t history_position;
-        char history[100][256];
         void initialize();
         void copyEditState(const EditCtrl& source);
         void updatePassword();
-        void rememberText();
-        void loadHistory();
-        void saveHistory() const;
         EditCtrl() {
         }
 
@@ -1041,15 +1035,6 @@ namespace SphereUI {
         void destroy(bool free_storage) override;
     };
 
-    class MiniHelpCtrl : public ToolTipCtrl {
-    public:
-        MiniHelpCtrl() {
-        }
-
-        void initialize();
-        Window* clone() override;
-        void handleInput(const WindowInput& input) override;
-    };
 
     class CMinimapControl : public Window {
     public:

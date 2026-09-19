@@ -69,7 +69,7 @@
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <TargetMachine>MachineX86</TargetMachine>
       <StackReserveSize>8388608</StackReserveSize>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;advapi32.lib;shell32.lib;ole32.lib;comctl32.lib;ws2_32.lib;winmm.lib;dinput8.lib;dsound.lib;dxguid.lib;d3d9.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;advapi32.lib;shell32.lib;ole32.lib;comctl32.lib;ws2_32.lib;winmm.lib;dinput8.lib;dsound.lib;dxguid.lib;d3d9.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
 
   </ItemDefinitionGroup>
@@ -103,7 +103,6 @@
     <ClCompile Include="zlib.cpp" />
     <ClCompile Include="semantic_window.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="native_callbacks.cpp" />
     <ClCompile Include="sfera_sound.cpp" />
     <ClCompile Include="sfera_sound_runtime.cpp" />
     <ClCompile Include="sfera_vorbis.cpp" />
@@ -113,7 +112,6 @@
     <ClInclude Include="semantic_classes.h" />
     <ClInclude Include="zlib.h" />
     <ClInclude Include="semantic_window.h" />
-    <ClInclude Include="native_callbacks.h" />
     <ClInclude Include="sfera_sound.h" />
     <ClInclude Include="sfera_sound_runtime.h" />
     <ClInclude Include="sfera_vorbis.h" />

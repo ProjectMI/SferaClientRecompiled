@@ -13,7 +13,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp"><Filter>core</Filter></ClCompile>
-    <ClCompile Include="native_callbacks.cpp"><Filter>core</Filter></ClCompile>
     <ClCompile Include="zlib.cpp"><Filter>core</Filter></ClCompile>
     <ClCompile Include="semantic_classes.cpp"><Filter>semantic</Filter></ClCompile>
     <ClCompile Include="semantic_static.cpp"><Filter>semantic</Filter></ClCompile>
@@ -23,7 +22,6 @@
     <ClCompile Include="sfera_vorbis.cpp"><Filter>sound</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="native_callbacks.h"><Filter>core</Filter></ClInclude>
     <ClInclude Include="zlib.h"><Filter>core</Filter></ClInclude>
     <ClInclude Include="semantic_classes.h"><Filter>semantic</Filter></ClInclude>
     <ClInclude Include="semantic_static.h"><Filter>semantic</Filter></ClInclude>

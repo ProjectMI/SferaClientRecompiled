@@ -1235,7 +1235,8 @@ void SferaSoundRuntime::shutdown() {
 std::uint32_t SferaSoundRuntime::soundVolume() const {
     const auto* manager = sound_manager;
     if (manager == nullptr) return 0u;
-    return static_cast<std::uint32_t>(std::clamp(static_cast<int>(std::lround(manager->volume * 100.0f)), 0, 100));
+    return static_cast<std::uint32_t>(
+        std::clamp(static_cast<int>(std::lround(manager->volume * 100.0f)), 0, 100));
 }
 
 int SferaSoundRuntime::musicVolume() const {

@@ -1,6 +1,5 @@
 #include "semantic_window.h"
 #include "semantic_classes.h"
-#include "native_callbacks.h"
 #include "semantic_static.h"
 #include <shellapi.h>
 #include <algorithm>
@@ -1822,7 +1821,6 @@ namespace {
             values[6] = graphics.post_effects_enabled;
             values[10] = values[0];
             values[11] = mode.depth;
-            state.pending_graphics_value = values[5];
             state.comparison_graphics_value = values[4];
             optionSelection(window, 15u, static_cast<std::uint32_t>(g_sfera_graphics_runtime.d3d_runtime->display_modes.size()) - 1u, values[5]);
             optionSelection(window, 17u, 4u, values[2]);
@@ -1860,11 +1858,8 @@ namespace {
         for (const auto& setting : settings) InterfaceConfiguration::writeInteger(setting.first, setting.second);
         g_sfera_effect_manager.effects_enabled = g_sfera_client_config_runtime.effects_enabled;
         InterfaceConfiguration::save();
-        if (values[10] != values[0] || values[11] != values[1] || state.comparison_graphics_value != values[4]) {
-            detail::copyText(g_sfera_process_runtime.executable_path, "sphere.exe");
-            g_sfera_relaunch_runtime.argument[0] = '\0';
+        if (values[10] != values[0] || values[11] != values[1] || state.comparison_graphics_value != values[4])
             g_sfera_render_lookup_runtime.quit_requested = true;
-        }
     }
 
     void handleHelpEvent(Window* window, const WindowEvent& event) {
@@ -3090,8 +3085,6 @@ void SphereUI::EditCtrl::initialize() {
 
     caret_position = 0;
     observed_length = invalidIndex;
-    history_count = history_position = 0u;
-    std::memset(history, 0, sizeof(history));
     hidden = input_enabled = false;
     control_kind = UiControlKind::edit;
 }
@@ -3100,49 +3093,6 @@ void SphereUI::EditCtrl::updatePassword() {
     if (password && password_text.length != text_length) password_text.assign(std::string(text_length, '*').c_str());
 }
 
-void SphereUI::EditCtrl::loadHistory() {
-    const auto* owner = parent;
-    if (owner == nullptr) return;
-    const char* name = detail::stringData(owner->resource_name, owner->resource_name_capacity);
-    if (name == nullptr || *name == '\0') return;
-    std::ifstream stream(std::string("players\\") + name + ".txt");
-    std::string line;
-    while (history_count < 99u && std::getline(stream, line)) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        const auto length = std::min(line.size(), std::size_t{252u});
-        std::memcpy(history[history_count], line.data(), length);
-        history[history_count++][length] = '\0';
-    }
-    history_position = history_count;
-}
-
-void SphereUI::EditCtrl::saveHistory() const {
-    if (is_reference) return;
-    const auto* owner = parent;
-    if (owner == nullptr) return;
-    const char* name = detail::stringData(owner->resource_name, owner->resource_name_capacity);
-    if (name == nullptr || std::strcmp(name, "testui") != 0) return;
-    std::ofstream stream(std::string("players\\") + name + ".txt");
-    for (std::size_t index = 0u; index < std::min(history_count, std::size_t{99}); ++index) stream << history[index] << '\n';
-}
-
-void SphereUI::EditCtrl::rememberText() {
-    const std::string value(getText(), std::min(text_length, std::size_t{250}));
-    history_count = std::min(history_count, std::size_t{99});
-    for (std::size_t index = 0u; index < history_count; ++index) if (value == history[index]) {
-        std::memmove(history[index], history[index + 1u], static_cast<std::size_t>(history_count - index - 1u) * sizeof(history[0]));
-        --history_count;
-        break;
-    }
-    if (history_count == 99u) {
-        std::memmove(history[0], history[1], 98u * sizeof(history[0]));
-        --history_count;
-    }
-    std::memcpy(history[history_count], value.c_str(), value.size() + 1u);
-    ++history_count;
-    history_position = history_count;
-    history[history_count][0] = '\0';
-}
 
 bool SphereUI::EditCtrl::loadUi(const char*, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
@@ -3159,7 +3109,6 @@ bool SphereUI::EditCtrl::loadUi(const char*, SferaSimpleParser& parser, const Sf
     if (maximum_symbols == 0u) maximum_symbols = 256u;
     cursor_width = InterfaceRenderer::measureText("_", font, true).width + 1;
     input_enabled = false;
-    loadHistory();
     updatePassword();
     return true;
 }
@@ -3181,9 +3130,6 @@ void SphereUI::EditCtrl::copyEditState(const EditCtrl& source) {
     submit_on_blur = source.submit_on_blur;
     caret_position = source.caret_position;
     observed_length = source.observed_length;
-    history_count = source.history_count;
-    history_position = source.history_position;
-    std::memcpy(history, source.history, sizeof(history));
 }
 
 SphereUI::Window* SphereUI::EditCtrl::clone() {
@@ -3256,19 +3202,9 @@ void SphereUI::EditCtrl::handleInput(const WindowInput& input) {
         if (value != getText()) setText(value.c_str());
         observed_length = text_length;
         updatePassword();
-        history_count = std::min(history_count, std::size_t{99});
-        history_position = std::min(history_position, history_count);
-        if ((input.key_code == VK_UP && history_position > 0u) || (input.key_code == VK_DOWN && history_position < history_count)) {
-            history_position = input.key_code == VK_UP ? history_position - 1u : history_position + 1u;
-            setText(history[history_position]);
-            caret_position = text_length;
-            observed_length = text_length;
-            updatePassword();
-        }
         if (input.key_code == VK_TAB) notifyParent(*this, UiMessage::editTab);
         if (input.key_code == VK_RETURN) {
             notifyParent(*this, UiMessage::editSubmit);
-            rememberText();
         }
     }
     if ((input.mouse_flags & MouseInput::leftPress) != 0u) {
@@ -3312,7 +3248,6 @@ void SphereUI::EditCtrl::draw() {
 }
 
 void SphereUI::EditCtrl::destroy(bool free_storage) {
-    saveHistory();
     password_text.release();
     Runtime::setTextInputActive(false);
     Window::destroy(free_storage);
@@ -3964,15 +3899,6 @@ void SphereUI::ToolTipCtrl::destroy(bool free_storage) {
     Window::destroy(free_storage);
 }
 
-SphereUI::Window* SphereUI::MiniHelpCtrl::clone() {
-    return cloneControl(*this, [](MiniHelpCtrl& destination, const MiniHelpCtrl& source) {
-        destination.copyTipState(source);
-    });
-}
-
-void SphereUI::MiniHelpCtrl::handleInput(const WindowInput& input) {
-    updateFade();
-}
 
 SphereUI::Window* SphereUI::CMinimapControl::clone() {
     if (auto* owner = parent) resource_reference = owner->getResource("arup");
@@ -4766,10 +4692,6 @@ void SphereUI::ToolTipCtrl::initialize() {
     lines = {};
 }
 
-void SphereUI::MiniHelpCtrl::initialize() {
-    ToolTipCtrl::initialize();
-    control_kind = UiControlKind::miniHelp;
-}
 
 void SphereUI::ToolTipCtrl::reset() {
     fade_opacity = 0.0f;
@@ -7360,8 +7282,6 @@ SphereUI::Window* SphereUI::Runtime::makeControl(SphereUI::UiControlKind kind) {
             return createInitialized<EditCtrl>();
         case UiControlKind::slot:
             return createInitialized<SlotCtrl>();
-        case UiControlKind::miniHelp:
-            return createInitialized<MiniHelpCtrl>();
         case UiControlKind::spinButton:
             return createInitialized<SpinButton>();
         case UiControlKind::richEdit:
