@@ -25,6 +25,16 @@
 #include <climits>
 #include <sys/stat.h>
 namespace {
+    template<class T> struct NamedValue {
+        const char* name;
+        T value;
+    };
+
+    template<class T, class... Members>
+    void copyProperties(T& target, const T& source, Members... members) {
+        ((target.*members = source.*members), ...);
+    }
+
     constexpr std::uint32_t invalidIndex = UINT32_MAX;
     constexpr int inheritFont = -1;
     constexpr auto anyControlKind = SphereUI::UiControlKind::any;
@@ -81,6 +91,11 @@ namespace {
 }
 
 namespace SphereUI::detail {
+    void enqueueWindowEvent(std::deque<WindowEvent>& events, const WindowEvent& event) {
+        if (events.size() >= 64u) events.clear();
+        events.push_back(event);
+    }
+
     // Copy at most capacity - 1 characters; even a truncated result is NUL-terminated.
     void copyText(std::span<char> destination, const char* source) {
         if (destination.empty()) return;
@@ -90,14 +105,8 @@ namespace SphereUI::detail {
         destination[length] = '\0';
     }
 
-    void serializeHyperTextElements(const UiDeque<HyperTextElement*>& elements, UiString& hyper_text, UiString& plain);
-    void escapeHyperText(UiString& output, const UiString& source);
-    template<class Character> static Character* stringData(Character* storage, std::size_t capacity);
-    static void assignString(char (&storage)[16], std::size_t& length, std::size_t& capacity, std::string_view value);
-    static void releaseString(char (&storage)[16], std::size_t& length, std::size_t& capacity);
-    template<class T> static void appendNode(UiListNode<T>*& sentinel, std::size_t& count, T value);
-    template<class T> static void clearNodes(UiListNode<T>* sentinel);
-    template<class T> static void copyNodes(UiListNode<T>*& destination, std::size_t& count, UiListNode<T>* source);
+    void serializeHyperTextElements(std::span<const HyperTextRun> elements, std::string& hyper_text, std::string& plain);
+    std::string escapeHyperText(std::string_view source);
     SphereUI::UiControlKind controlKind(const char* name);
     SphereUI::WindowAnimation::Kind animationKind(const char* name);
     std::uint32_t alignmentFlag(const char* name);
@@ -109,15 +118,20 @@ namespace SphereUI::detail {
         return static_cast<std::uint32_t>(left) - static_cast<std::uint32_t>(right);
     }
 
-    template <class Callback> static void forEachChild(const Window& window, Callback callback) {
-        auto* sentinel = window.child_sentinel;
-        if (sentinel == nullptr) return;
-        for (auto* node = sentinel->next; node != nullptr && node != sentinel; node = node->next) if (auto* child = node->value) callback(*child);
+    template<class Callback> void forEachChild(const Window& window, Callback callback) {
+        const auto owner_id = window.registration_id;
+        std::vector<std::pair<Window*, std::uint64_t>> snapshot;
+        snapshot.reserve(window.children.size());
+        for (const auto& child : window.children) if (child) snapshot.emplace_back(child.get(), child->registration_id);
+        for (const auto& [child, identity] : snapshot) {
+            if (!g_sfera_interface.isRegistered(&window, owner_id)) break;
+            if (g_sfera_interface.isRegistered(child, identity)) callback(*child);
+        }
     }
 }
 
 namespace SphereUI::Runtime {
-    void clipboardText(UiString& result);
+    void clipboardText(std::string& result);
     static void playWindowSound(bool opening);
     static void openExternalLink(const char* target, bool mail);
     static void playLinkSound();
@@ -130,13 +144,11 @@ namespace SphereUI::Runtime {
 
     static TextExtent screenSize();
 
-    Window* makeControl(SphereUI::UiControlKind kind);
+    std::unique_ptr<Window> makeControl(SphereUI::UiControlKind kind);
     static std::uint32_t keyCode(const char* name);
 
     void broadcastMessage(Window* root, int group, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second, SphereUI::UiControlKind kind);
-    void* allocate(std::size_t size);
     static int findImage(const char* name);
-    void deallocate(void* memory);
     static void playClickSound();
     static void playScrollSound(bool page);
     static std::uint64_t clockTicks();
@@ -147,78 +159,7 @@ namespace SphereUI::Runtime {
 }
 
 namespace SphereUI::detail {
-    template<class Character> Character* stringData(Character* storage, std::size_t capacity) {
-        if (capacity < 16u) return storage;
-        Character* text = nullptr;
-        std::memcpy(&text, storage, sizeof(text));
-        return text;
-    }
-
-    void assignString(char (&storage)[16], std::size_t& length, std::size_t& capacity, std::string_view value) {
-        if (value.size() > std::size_t{std::numeric_limits<std::ptrdiff_t>::max()} - 16u) throw std::length_error("UI string too long");
-        if (capacity < 15u) capacity = 15u;
-        auto* destination = stringData(storage, capacity);
-        if (value.size() > capacity) {
-            const auto new_capacity = value.size() | std::size_t{15};
-            auto* memory = static_cast<char*>(Runtime::allocate(new_capacity + 1u));
-            if (memory == nullptr) throw std::bad_alloc();
-            if (!value.empty()) std::memcpy(memory, value.data(), value.size());
-            memory[value.size()] = '\0';
-            if (capacity >= 16u) Runtime::deallocate(destination);
-            std::memcpy(storage, &memory, sizeof(memory));
-            capacity = new_capacity;
-        } else {
-            if (!value.empty()) std::memmove(destination, value.data(), value.size());
-            destination[value.size()] = '\0';
-        }
-        length = value.size();
-    }
-
-    void releaseString(char (&storage)[16], std::size_t& length, std::size_t& capacity) {
-        if (capacity >= 16u) Runtime::deallocate(stringData(storage, capacity));
-        storage[0] = '\0';
-        length = 0u;
-        capacity = 15u;
-    }
-
-    template<class T> void appendNode(UiListNode<T>*& sentinel, std::size_t& count, T value) {
-        if (count >= std::size_t{std::numeric_limits<std::ptrdiff_t>::max()} / sizeof(UiListNode<T>) - 1u) throw std::length_error("UI list too long");
-        if (sentinel == nullptr) {
-            sentinel = static_cast<UiListNode<T>*>(Runtime::allocate(sizeof(UiListNode<T>)));
-            if (sentinel == nullptr) throw std::bad_alloc();
-            *sentinel = {sentinel, sentinel, {}};
-        }
-        auto* node = static_cast<UiListNode<T>*>(Runtime::allocate(sizeof(UiListNode<T>)));
-        if (node == nullptr) throw std::bad_alloc();
-        *node = {sentinel, sentinel->previous, value};
-        sentinel->previous->next = node;
-        sentinel->previous = node;
-        ++count;
-    }
-
-    template<class T> void clearNodes(UiListNode<T>* sentinel) {
-        if (sentinel == nullptr) return;
-        auto* node = sentinel->next;
-        while (node != nullptr && node != sentinel) {
-            auto* next = node->next;
-            Runtime::deallocate(node);
-            node = next;
-        }
-        sentinel->next = sentinel->previous = sentinel;
-    }
-
-    template<class T> void copyNodes(UiListNode<T>*& destination, std::size_t& count, UiListNode<T>* source) {
-        if (destination == source) return;
-        clearNodes(destination);
-        count = 0u;
-        if (source != nullptr) for (auto* node = source->next; node != nullptr && node != source; node = node->next) appendNode(destination, count, node->value);
-    }
-
     namespace {
-        template<class T> struct NamedValue {
-            const char* name;
-            T value;
-        };
 
         template<class T, std::size_t Size> T lookup(const char* name, const NamedValue<T> (&values)[Size], T fallback) {
             for (const auto& entry : values) if (SferaSimpleParser::equalsIgnoreCase(name, entry.name)) return entry.value;
@@ -247,883 +188,155 @@ namespace SphereUI::detail {
         return lookup(name, values, 0u);
     }
 }
-// Empty C++ constructors remain vtable-only ABI operations.
-void SphereUI::Window::initialize() {
-    std::fill(std::begin(name), std::end(name), 0);
-    name_length = {};
-    name_capacity = {};
-    behavior_flags = {};
-    width = {};
-    height = {};
-    x = {};
-    y = {};
-    alignment_flags = {};
-    group = {};
-    initial_x = {};
-    initial_y = {};
-    hidden = {};
-    disabled = {};
-    input_enabled = {};
-    is_reference = {};
-    can_drag_drop = {};
-    can_go_top = {};
-    save_last_position = {};
-    hit_transparent = {};
-    control_kind = {};
-    std::fill(std::begin(text), std::end(text), 0);
-    text_length = {};
-    text_capacity = {};
-    std::fill(std::begin(help), std::end(help), 0);
-    help_length = {};
-    help_capacity = {};
-    font = {};
-    font_initialized = {};
-    font_attributes = {};
-    text_color = {};
-    text_state = {};
-    disabled_color = {};
-    parent = {};
-    child_sentinel = {};
-    child_count = {};
-    reference_sentinel = {};
-    reference_count = {};
-    modal_owner = {};
-    event_proxy = {};
-    event_slots = {};
-    event_capacity = {};
-    event_head = {};
-    event_size = {};
-    pending_event_count = {};
-    control_id = {};
-    alpha = {};
-    animation_active = {};
-    close_completed = {};
-
-    text_offset_x = {};
-    text_offset_y = {};
-    tooltip = {};
-    overlay = {};
-    resource_parent = {};
-    event_handler_token = {};
-    caption_left = {};
-    caption_top = {};
-    caption_right = {};
-    caption_bottom = {};
-    dragging = {};
-
-    drag_offset_x = {};
-    drag_offset_y = {};
-    input_mask = {};
-    hide_after_animation = {};
-
-    show_animation = {};
-    hide_animation = {};
-    active_animation = {};
-    resource_list = {};
-    std::fill(std::begin(resource_name), std::end(resource_name), 0);
-    resource_name_length = {};
-    resource_name_capacity = {};
-    resource_reference = {};
-    name_capacity = text_capacity = help_capacity = resource_name_capacity = 15u;
+SphereUI::Window::Window() {
     hidden = true;
     can_go_top = save_last_position = font_initialized = true;
     text_color = UiColor::white;
     disabled_color = UiColor::opaqueBlack;
     alpha = 255u;
-    auto initialize_list = [](SferaWindowChildNode*& destination) {
-        auto* sentinel = static_cast<SferaWindowChildNode*>(Runtime::allocate(sizeof(SferaWindowChildNode)));
-        if (sentinel == nullptr) throw std::bad_alloc();
-        destination = sentinel;
-        *sentinel = {destination, destination, 0u};
-    };
-    initialize_list(child_sentinel);
-    initialize_list(reference_sentinel);
-    auto* proxy = static_cast<UiContainerProxy*>(Runtime::allocate(sizeof(UiContainerProxy)));
-    if (proxy == nullptr) throw std::bad_alloc();
-    event_proxy = proxy;
-    proxy->owner = &event_proxy;
-    proxy->first_iterator = nullptr;
-    g_sfera_interface.unbindEventHandler(this);
     g_sfera_interface.registerWindow(*this);
 }
-// Owning containers copy their contents, not their allocations.
-SphereUI::Window& SphereUI::Window::copyStateFrom(const Window& source) {
-    return copyStateFrom(source, true);
-}
 
-SphereUI::Window& SphereUI::Window::copyStateFrom(const Window& source, bool copy_children) {
+SphereUI::Window& SphereUI::Window::copyStateFrom(const Window& source) {
     if (this == &source) return *this;
-    setName(detail::stringData(source.name, source.name_capacity));
-    setText(source.getText());
-    setHelp(source.getHelp());
-    setResourceName(detail::stringData(source.resource_name, source.resource_name_capacity));
-    behavior_flags = source.behavior_flags;
-    width = source.width;
-    height = source.height;
-    x = source.x;
-    y = source.y;
-    alignment_flags = source.alignment_flags;
-    group = source.group;
-    initial_x = source.initial_x;
-    initial_y = source.initial_y;
-    hidden = source.hidden;
-    disabled = source.disabled;
-    input_enabled = source.input_enabled;
-    is_reference = copy_children ? source.is_reference : 1u;
-    can_drag_drop = source.can_drag_drop;
-    can_go_top = source.can_go_top;
-    save_last_position = source.save_last_position;
-    hit_transparent = source.hit_transparent;
-    control_kind = source.control_kind;
-    font = source.font;
-    font_initialized = source.font_initialized;
-    text_color = source.text_color;
-    text_state = source.text_state;
-    disabled_color = source.disabled_color;
-    parent = source.parent;
-    modal_owner = source.modal_owner;
-    control_id = source.control_id;
-    alpha = source.alpha;
-    animation_active = source.animation_active;
-    close_completed = source.close_completed;
-    text_offset_x = source.text_offset_x;
-    text_offset_y = source.text_offset_y;
-    tooltip = copy_children ? source.tooltip : 0u;
-    overlay = source.overlay;
-    resource_parent = source.resource_parent;
-    event_handler_token = source.event_handler_token;
-    caption_left = source.caption_left;
-    caption_top = source.caption_top;
-    caption_right = source.caption_right;
-    caption_bottom = source.caption_bottom;
-    dragging = source.dragging;
-    drag_offset_x = source.drag_offset_x;
-    drag_offset_y = source.drag_offset_y;
-    input_mask = source.input_mask;
-    hide_after_animation = source.hide_after_animation;
-    active_animation = source.active_animation == &source.show_animation ? &show_animation : source.active_animation == &source.hide_animation ? &hide_animation : source.active_animation;
-    resource_list = source.resource_list;
-    resource_reference = source.resource_reference;
-    show_animation = source.show_animation;
-    hide_animation = source.hide_animation;
-    if (copy_children) detail::copyNodes(child_sentinel, child_count, source.child_sentinel);
-    detail::copyNodes(reference_sentinel, reference_count, source.reference_sentinel);
-    clearEvents();
-    const auto* slots = source.event_slots;
-    for (std::size_t index = 0u; index < source.event_size; ++index) queueEvent(*slots[(source.event_head + index) % source.event_capacity]);
-    pending_event_count = source.pending_event_count;
+    copyProperties(*this, source,
+        &Window::name, &Window::text, &Window::help, &Window::resource_name, &Window::behavior_flags, &Window::width,
+        &Window::height, &Window::x, &Window::y, &Window::alignment_flags, &Window::group, &Window::initial_x, &Window::initial_y,
+        &Window::hidden, &Window::disabled, &Window::input_enabled);
+    template_instance = false;
+    copyProperties(*this, source,
+        &Window::can_drag_drop, &Window::can_go_top, &Window::save_last_position, &Window::hit_transparent, &Window::control_kind,
+        &Window::font, &Window::font_initialized, &Window::text_color, &Window::drag_over, &Window::disabled_color,
+        &Window::parent, &Window::modal_owner, &Window::control_id, &Window::alpha, &Window::close_completed,
+        &Window::text_offset_x, &Window::text_offset_y);
+    tooltip = nullptr;
+    copyProperties(*this, source,
+        &Window::overlay, &Window::resource_parent, &Window::caption_left, &Window::caption_top, &Window::caption_right,
+        &Window::caption_bottom, &Window::dragging, &Window::drag_offset_x, &Window::drag_offset_y, &Window::text_alignment,
+        &Window::hide_after_animation, &Window::animation, &Window::resources, &Window::resource_reference,
+        &Window::show_animation, &Window::hide_animation, &Window::modal_references, &Window::events);
     g_sfera_interface.copyEventHandler(this, &source);
     return *this;
 }
 
-void SphereUI::Window::initializeCopy(const Window& source) {
-    initialize();
-    is_reference = true;
-    try {
-        copyStateFrom(source, false);
-        is_reference = true;
-        tooltip = 0u;
-        if (source.active_animation == &source.show_animation) active_animation = &show_animation;
-        if (source.active_animation == &source.hide_animation) active_animation = &hide_animation;
-        detail::forEachChild(source, [&](Window& child) {
-            if (auto* copy = child.clone()) {
-                try {
-                    appendChild(copy);
-                } catch (...) {
-                    copy->destroy(true);
-                    throw;
-                }
-                copy->setParent(this);
+struct SphereUI::Window::CloneContext {
+    std::unordered_map<const Window*, Window*> windows;
+
+    Window* resolve(const Window* source) const {
+        if (source == nullptr) return nullptr;
+        const auto found = windows.find(source);
+        if (found != windows.end()) return found->second;
+        return g_sfera_interface.isRegistered(source) ? const_cast<Window*>(source) : nullptr;
+    }
+
+    void finish() const {
+        for (const auto& [source, target] : windows) {
+            target->parent = resolve(target->parent);
+            target->resource_parent = resolve(target->resource_parent);
+            target->modal_owner = resolve(target->modal_owner);
+            target->overlay = resolve(target->overlay);
+            for (auto*& reference : target->modal_references) reference = resolve(reference);
+            std::erase(target->modal_references, nullptr);
+            std::erase_if(target->events, [this](WindowEvent& event) {
+                const auto* source = event.source;
+                event.source = resolve(source);
+                return source != nullptr && event.source == nullptr;
+            });
+            if (auto* description = dynamic_cast<CDescriptionWindow*>(target)) {
+                description->displayed_source = resolve(description->displayed_source);
+                description->pending_source = resolve(description->pending_source);
             }
-        });
-        if (auto* original_tip = source.tooltip) if (auto* copy = original_tip->clone()) {
-            tooltip = copy;
-            copy->setParent(this);
         }
-    } catch (...) {
-        is_reference = true;
-        throw;
+        for (const auto& [source, target] : windows) target->template_instance = true;
     }
-}
-
-void SphereUI::Window::appendChild(Window* child) {
-    detail::appendNode(child_sentinel, child_count, child);
-}
-
-void SphereUI::Window::appendResource(UiSprite* resource) {
-    auto* resources = resource_list;
-    if (resources == nullptr) {
-        resources = static_cast<WindowResourceList*>(Runtime::allocate(sizeof(WindowResourceList)));
-        if (resources == nullptr) throw std::bad_alloc();
-        *resources = {};
-        resource_list = resources;
-    }
-    detail::appendNode(resources->sentinel, resources->count, resource);
-}
-
-SphereUI::UiSprite* SphereUI::Window::findResource(const char* name_to_find) const {
-    if (auto* ancestor = resource_parent) if (const auto resource = ancestor->findResource(name_to_find)) return resource;
-    auto* resources = resource_list;
-    if (resources == nullptr) return 0u;
-    auto* sentinel = resources->sentinel;
-    if (sentinel != nullptr) for (auto* node = sentinel->next; node != nullptr && node != sentinel; node = node->next) if (SferaSimpleParser::equalsIgnoreCase((node->value == nullptr ? nullptr : node->value->name), name_to_find)) return node->value;
-    return 0u;
-}
-
-SphereUI::UiSprite* SphereUI::Window::getResource(const char* name_to_find) {
-    if (const auto existing = findResource(name_to_find)) return existing;
-    if (Runtime::findImage(name_to_find) == -1) return 0u;
-    const auto sprite = UiSprite::create();
-    if (sprite == 0u) return 0u;
-    try {
-        sprite->setImage(name_to_find);
-        appendResource(sprite);
-    } catch (...) {
-        sprite->destroy();
-        throw;
-    }
-    return sprite;
-}
-
-void SphereUI::Window::release() {
-    if (!is_reference) if (auto* resources = resource_list) {
-        auto* sentinel = resources->sentinel;
-        if (sentinel != nullptr) for (auto* node = sentinel->next; node != nullptr && node != sentinel; node = node->next) if (node->value != nullptr) node->value->destroy();
-        detail::clearNodes(resources->sentinel);
-        Runtime::deallocate(sentinel);
-        Runtime::deallocate(resources);
-        resource_list = 0u;
-    }
-    detail::forEachChild(*this, [](Window& child) {
-        child.destroy(true);
-    });
-    detail::clearNodes(child_sentinel);
-    child_count = 0u;
-    if (auto* tip = tooltip) {
-        tip->destroy(true);
-        tooltip = 0u;
-    }
-    g_sfera_interface.unregisterWindow(*this);
-    g_sfera_interface.unbindEventHandler(this);
-    detail::releaseString(resource_name, resource_name_length, resource_name_capacity);
-    if (auto* slots = event_slots) {
-        for (std::size_t index = event_capacity; index != 0u; --index) Runtime::deallocate(slots[index - 1u]);
-        Runtime::deallocate(slots);
-    }
-    event_slots = nullptr;
-    event_capacity = 0u;
-    clearEvents();
-    Runtime::deallocate(event_proxy);
-    event_proxy = 0u;
-    detail::clearNodes(reference_sentinel);
-    Runtime::deallocate(reference_sentinel);
-    reference_sentinel = nullptr;
-    reference_count = 0u;
-    Runtime::deallocate(child_sentinel);
-    child_sentinel = 0u;
-    detail::releaseString(help, help_length, help_capacity);
-    detail::releaseString(text, text_length, text_capacity);
-    detail::releaseString(name, name_length, name_capacity);
-}
-
-namespace {
-    template<class T> void reserveArray(T*& begin, T*& end, T*& capacity, std::size_t requested) {
-        using namespace SphereUI;
-        const std::size_t maximum = std::numeric_limits<std::ptrdiff_t>::max() / sizeof(T);
-        if (requested > maximum) throw std::length_error("UI array too long");
-        const auto available = begin == nullptr ? 0u : static_cast<std::size_t>(capacity - begin);
-        if (requested <= available) return;
-        const auto count = begin == nullptr ? 0u : static_cast<std::size_t>(end - begin);
-        const auto grown = available > maximum - available / 2u ? maximum : available + available / 2u;
-        const auto new_capacity = std::max(grown, requested);
-        auto* memory = static_cast<T*>(Runtime::allocate(new_capacity * sizeof(T)));
-        if (memory == nullptr) throw std::bad_alloc();
-        if (count != 0u) std::copy_n(begin, count, memory);
-        Runtime::deallocate(begin);
-        begin = memory;
-        end = memory + count;
-        capacity = memory + new_capacity;
-    }
-}
-
-template<class T> std::size_t SphereUI::UiVector<T>::size() const {
-    return begin == nullptr ? 0u : static_cast<std::size_t>(end - begin);
-}
-
-template<class T> T& SphereUI::UiVector<T>::at(std::size_t index) {
-    if (index >= size()) throw std::out_of_range("UI vector index");
-    return begin[index];
-}
-
-template<class T> const T& SphereUI::UiVector<T>::at(std::size_t index) const {
-    if (index >= size()) throw std::out_of_range("UI vector index");
-    return begin[index];
-}
-
-template<class T> void SphereUI::UiVector<T>::reserve(std::size_t count) {
-    reserveArray(begin, end, capacity, count);
-}
-
-template<class T> void SphereUI::UiVector<T>::append(const T& value) {
-    const T copy = value;
-    reserve(size() + 1u);
-    *end++ = copy;
-}
-
-template<class T> void SphereUI::UiVector<T>::erase(std::size_t index) {
-    const auto count = size();
-    if (index >= count) return;
-    std::move(begin + index + 1u, end, begin + index);
-    --end;
-}
-
-template<class T> void SphereUI::UiVector<T>::clear() {
-    end = begin;
-}
-
-template<class T> void SphereUI::UiVector<T>::release() {
-    Runtime::deallocate(begin);
-    begin = end = capacity = nullptr;
-}
-
-template<class T> void SphereUI::UiVector<T>::copyFrom(const UiVector& source) {
-    if (this == &source) return;
-    const auto count = source.size();
-    reserve(count);
-    if (count != 0u) std::copy_n(source.begin, count, begin);
-    end = begin == nullptr ? nullptr : begin + count;
-}
-
-template struct SphereUI::UiVector<std::uint32_t>;
-template struct SphereUI::UiVector<SphereUI::Window*>;
-const char* SphereUI::UiString::data() const {
-    return detail::stringData(storage, capacity);
-}
-
-void SphereUI::UiString::assign(const char* text) {
-    detail::assignString(storage, length, capacity, text == nullptr ? "" : text);
-}
-
-void SphereUI::UiString::release() {
-    detail::releaseString(storage, length, capacity);
-}
-
-std::size_t SphereUI::UiStringVector::size() const {
-    return begin == nullptr ? 0u : static_cast<std::size_t>(end - begin);
-}
-
-SphereUI::UiString& SphereUI::UiStringVector::at(std::size_t index) {
-    if (index >= size()) throw std::out_of_range("UI string index");
-    return begin[index];
-}
-
-const SphereUI::UiString& SphereUI::UiStringVector::at(std::size_t index) const {
-    if (index >= size()) throw std::out_of_range("UI string index");
-    return begin[index];
-}
-
-void SphereUI::UiStringVector::append(const char* text) {
-    insert(size(), text);
-}
-
-void SphereUI::UiStringVector::insert(std::size_t index, const char* text) {
-    if (index > size()) throw std::out_of_range("UI string insertion");
-    UiString value{};
-    value.capacity = 15u;
-    value.assign(text);
-    try {
-        const auto count = size();
-        reserveArray(begin, end, capacity, count + 1u);
-        std::move_backward(begin + index, end, end + 1u);
-        begin[index] = value;
-        ++end;
-    } catch (...) {
-        value.release();
-        throw;
-    }
-}
-
-void SphereUI::UiStringVector::erase(std::size_t index) {
-    at(index).release();
-    std::move(begin + index + 1u, end, begin + index);
-    *--end = {};
-}
-
-void SphereUI::UiStringVector::clear() {
-    const auto count = size();
-    for (std::size_t index = 0u; index < count; ++index) at(index).release();
-    end = begin;
-}
-
-void SphereUI::UiStringVector::release() {
-    clear();
-    Runtime::deallocate(begin);
-    begin = end = capacity = nullptr;
-}
-
-void SphereUI::UiStringVector::copyFrom(const UiStringVector& source) {
-    if (this == &source) return;
-    UiStringVector copy{};
-    try {
-        for (std::size_t index = 0u; index < source.size(); ++index) copy.append(source.at(index).data());
-    } catch (...) {
-        copy.release();
-        throw;
-    }
-    release();
-    begin = copy.begin;
-    end = copy.end;
-    capacity = copy.capacity;
-}
-
-std::size_t SphereUI::UiTextRows::size() const {
-    return begin == nullptr ? 0u : static_cast<std::size_t>(end - begin);
-}
-
-SphereUI::UiTextRow& SphereUI::UiTextRows::at(std::size_t index) {
-    if (index >= size()) throw std::out_of_range("UI text row index");
-    return begin[index];
-}
-
-const SphereUI::UiTextRow& SphereUI::UiTextRows::at(std::size_t index) const {
-    if (index >= size()) throw std::out_of_range("UI text row index");
-    return begin[index];
-}
-
-void SphereUI::UiTextRows::append(const char* text, std::uint32_t color, int offset) {
-    UiTextRow row{};
-    row.text.capacity = 15u;
-    row.text.assign(text);
-    row.color = color;
-    row.offset = offset;
-    try {
-        reserveArray(begin, end, capacity, size() + 1u);
-        *end++ = row;
-    } catch (...) {
-        row.text.release();
-        throw;
-    }
-}
-
-void SphereUI::UiTextRows::erase(std::size_t index) {
-    if (index >= size()) return;
-    begin[index].text.release();
-    std::move(begin + index + 1u, end, begin + index);
-    --end;
-}
-
-void SphereUI::UiTextRows::clear() {
-    for (std::size_t index = 0u; index < size(); ++index) at(index).text.release();
-    end = begin;
-}
-
-void SphereUI::UiTextRows::release() {
-    clear();
-    Runtime::deallocate(begin);
-    begin = end = capacity = nullptr;
-}
-
-void SphereUI::UiTextRows::copyFrom(const UiTextRows& source) {
-    if (this == &source) return;
-    UiTextRows copy{};
-    try {
-        for (std::size_t index = 0u; index < source.size(); ++index) {
-            const auto& row = source.at(index);
-            copy.append(row.text.data(), row.color, row.offset);
-        }
-    } catch (...) {
-        copy.release();
-        throw;
-    }
-    release();
-    begin = copy.begin;
-    end = copy.end;
-    capacity = copy.capacity;
-}
-
-template<class T> std::size_t SphereUI::UiStringRecords<T>::size() const {
-    return begin == nullptr ? 0u : static_cast<std::size_t>(end - begin);
-}
-
-template<class T> T& SphereUI::UiStringRecords<T>::at(std::size_t index) {
-    if (index >= size()) throw std::out_of_range("UI record index");
-    return begin[index];
-}
-
-template<class T> const T& SphereUI::UiStringRecords<T>::at(std::size_t index) const {
-    if (index >= size()) throw std::out_of_range("UI record index");
-    return begin[index];
-}
-
-template<class T> void SphereUI::UiStringRecords<T>::append(const T& value) {
-    T copy = value;
-    copy.text = {};
-    copy.text.capacity = 15u;
-    copy.text.assign(value.text.data());
-    try {
-        reserveArray(begin, end, capacity, size() + 1u);
-        *end++ = copy;
-    } catch (...) {
-        copy.text.release();
-        throw;
-    }
-}
-
-template<class T> void SphereUI::UiStringRecords<T>::clear() {
-    for (std::size_t index = 0u; index < size(); ++index) at(index).text.release();
-    end = begin;
-}
-
-template<class T> void SphereUI::UiStringRecords<T>::release() {
-    clear();
-    Runtime::deallocate(begin);
-    begin = end = capacity = nullptr;
-}
-
-template<class T> void SphereUI::UiStringRecords<T>::copyFrom(const UiStringRecords& source) {
-    if (this == &source) return;
-    UiStringRecords copy{};
-    try {
-        for (std::size_t index = 0u; index < source.size(); ++index) copy.append(source.at(index));
-    } catch (...) {
-        copy.release();
-        throw;
-    }
-    release();
-    begin = copy.begin;
-    end = copy.end;
-    capacity = copy.capacity;
-}
-
-template struct SphereUI::UiStringRecords<SphereUI::UiMenuItem>;
-namespace {
-    template<class T> constexpr std::size_t dequeBlockSize() {
-        return sizeof(T) <= 1u ? 16u : sizeof(T) <= 2u ? 8u : sizeof(T) <= 4u ? 4u : sizeof(T) <= 8u ? 2u : 1u;
-    }
-
-    template<class T> void releaseDequeValue(T& value) {
-        if constexpr (std::is_same_v<T, SphereUI::UiString> || std::is_same_v<T, SphereUI::HyperTextChatListItem>) value.release();
-    }
-
-    template<class T> T copyDequeValue(const T& value) {
-        if constexpr (std::is_same_v<T, SphereUI::UiString>) {
-            T copy{};
-            copy.capacity = 15u;
-            copy.assign(value.data());
-            return copy;
-        } else if constexpr (std::is_same_v<T, SphereUI::HyperTextChatListItem>) {
-            T copy{};
-            copy.copyFrom(value);
-            return copy;
-        } else return value;
-    }
-
-    template<class T> void growDeque(SphereUI::UiDeque<T>& deque) {
-        constexpr std::size_t maximum_map_size = std::numeric_limits<std::ptrdiff_t>::max() / sizeof(T*);
-        const auto old_size = deque.map_size;
-        if (old_size > maximum_map_size / 2u) throw std::length_error("UI deque too long");
-        const auto new_size = old_size == 0u ? 8u : old_size * 2u;
-        auto* replacement = static_cast<T**>(SphereUI::Runtime::allocate(new_size * sizeof(T*)));
-        if (replacement == nullptr) throw std::bad_alloc();
-        std::fill_n(replacement, new_size, nullptr);
-        const auto first = deque.offset / dequeBlockSize<T>();
-        for (std::size_t index = 0u; index < old_size; ++index) replacement[index] = deque.map[(first + index) & (old_size - 1u)];
-        SphereUI::Runtime::deallocate(deque.map);
-        deque.map = replacement;
-        deque.map_size = new_size;
-        deque.offset %= dequeBlockSize<T>();
-    }
-}
-
-template<class T> void SphereUI::UiDeque<T>::initialize() {
-    if (proxy != nullptr) return;
-    proxy = static_cast<UiContainerProxy*>(Runtime::allocate(sizeof(UiContainerProxy)));
-    if (proxy == nullptr) throw std::bad_alloc();
-    *proxy = {this, nullptr};
-}
-
-template<class T> T& SphereUI::UiDeque<T>::at(std::size_t index) {
-    if (index >= count) throw std::out_of_range("UI deque index");
-    const auto position = offset + index;
-    auto* block = map[(position / dequeBlockSize<T>()) & (map_size - 1u)];
-    return block[position % dequeBlockSize<T>()];
-}
-
-template<class T> const T& SphereUI::UiDeque<T>::at(std::size_t index) const {
-    return const_cast<UiDeque*>(this)->at(index);
-}
-
-template<class T> void SphereUI::UiDeque<T>::pushBack(const T& value) {
-    T copy = copyDequeValue(value);
-    try {
-        initialize();
-        if (count >= map_size * dequeBlockSize<T>() - offset % dequeBlockSize<T>()) growDeque(*this);
-        const auto position = offset + count;
-        auto*& block = map[(position / dequeBlockSize<T>()) & (map_size - 1u)];
-        if (block == nullptr) {
-            block = static_cast<T*>(Runtime::allocate(dequeBlockSize<T>() * sizeof(T)));
-            if (block == nullptr) throw std::bad_alloc();
-            std::fill_n(block, dequeBlockSize<T>(), T{});
-        }
-        auto& destination = block[position % dequeBlockSize<T>()];
-        destination = copy;
-        if constexpr (std::is_same_v<T, HyperTextChatListItem>) if (destination.elements.proxy != nullptr) destination.elements.proxy->owner = &destination.elements;
-        ++count;
-    } catch (...) {
-        releaseDequeValue(copy);
-        throw;
-    }
-}
-
-template<class T> void SphereUI::UiDeque<T>::popBack() {
-    if (count == 0u) return;
-    auto& value = at(count - 1u);
-    releaseDequeValue(value);
-    value = {};
-    --count;
-    if (count == 0u) offset = 0u;
-}
-
-template<class T> void SphereUI::UiDeque<T>::popFront() {
-    if (count == 0u) return;
-    auto& value = at(0u);
-    releaseDequeValue(value);
-    value = {};
-    --count;
-    offset = count == 0u ? 0u : (offset + 1u) & (map_size * dequeBlockSize<T>() - 1u);
-}
-
-template<class T> void SphereUI::UiDeque<T>::clear() {
-    while (count != 0u) popBack();
-}
-
-template<class T> void SphereUI::UiDeque<T>::release() {
-    clear();
-    if (map != nullptr) for (std::size_t index = 0u; index < map_size; ++index) Runtime::deallocate(map[index]);
-    Runtime::deallocate(map);
-    Runtime::deallocate(proxy);
-    proxy = nullptr;
-    map = nullptr;
-    map_size = offset = count = 0u;
-}
-
-template<class T> void SphereUI::UiDeque<T>::copyFrom(const UiDeque& source) {
-    if (this == &source) return;
-    UiDeque copy{};
-    try {
-        copy.initialize();
-        for (std::size_t index = 0u; index < source.count; ++index) copy.pushBack(source.at(index));
-    } catch (...) {
-        copy.release();
-        throw;
-    }
-    release();
-    *this = copy;
-    proxy->owner = this;
-}
-
-template struct SphereUI::UiDeque<SphereUI::UiString>;
-template struct SphereUI::UiDeque<HyperTextElement*>;
-void SphereUI::UiStringDeque::append(const char* text) {
-    UiString value{};
-    value.capacity = 15u;
-    value.assign(text);
-    try {
-        pushBack(value);
-    } catch (...) {
-        value.release();
-        throw;
-    }
-    value.release();
-}
-
-template struct SphereUI::UiDeque<SphereUI::HyperTextChatListItem>;
-template<class T> void SphereUI::UiArray<T>::append(const T& value) {
-    const T copy = value;
-    const auto count = size();
-    constexpr auto maximum = (std::numeric_limits<std::ptrdiff_t>::max()) / sizeof(T);
-    if (count >= maximum) throw std::length_error("UI array too long");
-    if (end == capacity) {
-        const auto next = std::max<std::size_t>(8u, count + count / 2u + 1u);
-        auto* storage = static_cast<T*>(Runtime::allocate(next * sizeof(T)));
-        if (storage == nullptr) throw std::bad_alloc();
-        if (count != 0u) std::copy_n(begin, count, storage);
-        Runtime::deallocate(begin);
-        begin = storage;
-        end = storage + count;
-        capacity = storage + next;
-    }
-    *end++ = copy;
-}
-
-template<class T> void SphereUI::UiArray<T>::release() {
-    Runtime::deallocate(begin);
-    begin = end = capacity = nullptr;
-}
-
-template<class T> void SphereUI::UiArray<T>::copyFrom(const UiArray& source) {
-    if (this == &source) return;
-    UiArray copy{};
-    try {
-        for (std::size_t index = 0u; index < source.size(); ++index) copy.append(source.at(index));
-    } catch (...) {
-        copy.release();
-        throw;
-    }
-    release();
-    *this = copy;
-}
-
-template struct SphereUI::UiArray<SphereUI::UiIndexRange>;
-HyperTextGeometry* HyperTextElement::geometry() {
-    if (type == 4u) return &static_cast<HyperTextElement_PlainText*>(this)->bounds;
-    if (type == 2u || type == 5u) return &static_cast<HyperTextElementWithParameters*>(this)->bounds;
-    return nullptr;
-}
-
-const HyperTextGeometry* HyperTextElement::geometry() const {
-    return const_cast<HyperTextElement*>(this)->geometry();
-}
-
-const char* HyperTextElement_Link::linkValue() const {
-    const char* value = std::strstr(target.data(), "://");
-    if (value == nullptr) return "";
-    value += 3;
-    if (*value == '/') ++value;
-    return value;
-}
-
-void HyperTextElement::release() {
-    if (type == 5u) static_cast<HyperTextElement_Link*>(this)->target.release();
-    if (type == 2u || type == 5u) static_cast<HyperTextElementWithParameters*>(this)->parameters.release();
-    text.release();
-    SphereUI::Runtime::deallocate(this);
-}
-
-HyperTextElement* HyperTextElement::clone() const {
-    HyperTextElement* result = nullptr;
-    const auto create = []<class T>() {
-        auto* memory = SphereUI::Runtime::allocate(sizeof(T));
-        if (memory == nullptr) throw std::bad_alloc();
-        std::memset(memory, 0, sizeof(T));
-        return std::construct_at(static_cast<T*>(memory));
-    };
-    switch (type) {
-        case 2u:
-            result = create.operator()<HyperTextElementWithParameters>();
-            break;
-        case 3u:
-            result = create.operator()<HyperTextElement_WordWrap>();
-            break;
-        case 4u:
-            result = create.operator()<HyperTextElement_PlainText>();
-            break;
-        case 5u:
-            result = create.operator()<HyperTextElement_Link>();
-            break;
-        default:
-            result = create.operator()<HyperTextElement>();
-            break;
-    }
-    result->type = type;
-    try {
-        result->text.assign(text.data());
-        if (const auto* bounds = geometry()) *result->geometry() = *bounds;
-        if (type == 2u || type == 5u) static_cast<HyperTextElementWithParameters*>(result)->parameters.assign(static_cast<const HyperTextElementWithParameters*>(this)->parameters.data());
-        if (type == 5u) {
-            auto* link = static_cast<HyperTextElement_Link*>(result);
-            const auto* source = static_cast<const HyperTextElement_Link*>(this);
-            link->target.assign(source->target.data());
-            link->link_kind = source->link_kind;
-        }
-    } catch (...) {
-        result->release();
-        throw;
-    }
+};
+
+std::unique_ptr<SphereUI::Window> SphereUI::Window::clone() const {
+    CloneContext context;
+    auto result = cloneInto(context);
+    context.finish();
     return result;
 }
 
+void SphereUI::Window::initializeCopy(const Window& source, CloneContext& context) {
+    if (!context.windows.emplace(&source, this).second) throw std::logic_error("UI clone has duplicate ownership");
+    copyStateFrom(source);
+    children.clear();
+    children.reserve(source.children.size());
+    for (const auto& child : source.children) {
+        if (child) appendChild(child->cloneInto(context));
+        else children.push_back(nullptr);
+    }
+    tooltip.reset(source.tooltip ? static_cast<ToolTipCtrl*>(source.tooltip->cloneInto(context).release()) : nullptr);
+    if (tooltip) tooltip->setParent(this);
+}
+
+void SphereUI::Window::appendChild(std::unique_ptr<Window> child) {
+    if (!child) return;
+    child->setParent(this);
+    children.push_back(std::move(child));
+}
+
+void SphereUI::Window::appendResource(std::shared_ptr<const UiSprite> resource) {
+    if (resource) resources.push_back(std::move(resource));
+}
+
+std::shared_ptr<const SphereUI::UiSprite> SphereUI::Window::findResource(const char* name_to_find) const {
+    if (resource_parent != nullptr) if (auto resource = resource_parent->findResource(name_to_find)) return resource;
+    const auto found = std::find_if(resources.begin(), resources.end(), [name_to_find](const auto& resource) {
+        return SferaSimpleParser::equalsIgnoreCase(resource->name.c_str(), name_to_find);
+    });
+    return found == resources.end() ? nullptr : *found;
+}
+
+std::shared_ptr<const SphereUI::UiSprite> SphereUI::Window::getResource(const char* name_to_find) {
+    if (auto existing = findResource(name_to_find)) return existing;
+    if (Runtime::findImage(name_to_find) == -1) return {};
+    auto sprite = std::make_shared<UiSprite>();
+    sprite->setImage(name_to_find);
+    appendResource(sprite);
+    return sprite;
+}
+
+SphereUI::Window::~Window() {
+    g_sfera_mbc_runtime.forgetNativeResource(this);
+    g_sfera_interface.unbindEventHandler(this);
+    auto owned_children = std::move(children);
+    owned_children.clear();
+    tooltip.reset();
+    g_sfera_interface.unregisterWindow(*this);
+}
+
+HyperTextGeometry* HyperTextRun::geometry() {
+    if (auto* bounds = std::get_if<HyperTextGeometry>(&content)) return bounds;
+    if (auto* value = link()) return &value->bounds;
+    return nullptr;
+}
+
+const HyperTextGeometry* HyperTextRun::geometry() const {
+    if (const auto* bounds = std::get_if<HyperTextGeometry>(&content)) return bounds;
+    if (const auto* value = link()) return &value->bounds;
+    return nullptr;
+}
+
+const char* HyperTextRun::Link::linkValue() const {
+    const auto separator = target.find("://");
+    if (separator == std::string::npos) return "";
+    auto offset = separator + 3u;
+    if (offset < target.size() && target[offset] == '/') ++offset;
+    return target.c_str() + offset;
+}
+
 void SphereUI::HyperTextChatListItem::initialize(const char* text, std::uint32_t channel_id, std::uint32_t text_color) {
-    hyper_text.assign(text == nullptr ? "" : text);
-    channel = channel_id;
-    color = text_color;
-    elements.initialize();
-    HyperTextParser::parseElements(hyper_text, elements, plain_text);
+    HyperTextChatListItem replacement;
+    replacement.hyper_text = text == nullptr ? "" : text;
+    replacement.channel = channel_id;
+    replacement.color = text_color;
+    HyperTextParser::parseElements(replacement.hyper_text, replacement.elements, replacement.plain_text);
+    *this = std::move(replacement);
 }
 
-void SphereUI::HyperTextChatListItem::release() {
-    for (std::size_t index = 0u; index < elements.count; ++index) if (auto* element = elements.at(index)) element->release();
-    elements.release();
-    rows.release();
-    plain_text.release();
-    hyper_text.release();
-}
-
-void SphereUI::HyperTextChatListItem::copyFrom(const HyperTextChatListItem& source) {
-    if (this == &source) return;
-    HyperTextChatListItem copy{};
-    try {
-        copy.hyper_text.assign(source.hyper_text.data());
-        copy.plain_text.assign(source.plain_text.data());
-        copy.channel = source.channel;
-        copy.color = source.color;
-        copy.rows.copyFrom(source.rows);
-        copy.elements.initialize();
-        for (std::size_t index = 0u; index < source.elements.count; ++index) {
-            auto* original = source.elements.at(index);
-            auto* element = original == nullptr ? nullptr : original->clone();
-            try {
-                copy.elements.pushBack(element);
-            } catch (...) {
-                if (element != nullptr) element->release();
-                throw;
-            }
-        }
-    } catch (...) {
-        copy.release();
-        throw;
-    }
-    release();
-    *this = copy;
-    elements.proxy->owner = &elements;
-}
-
-uint32_t HyperTextElement::elementType() const {
-    return type;
-}
-
-void HyperTextElement::initializeText(std::uint32_t kind, const char* value) {
-    type = kind;
-    text = {};
-    text.assign(value == nullptr ? "" : value);
-}
-
-namespace {
-    using SphereUI::UiIntegerSetNode;
-    void releaseIntegerBranch(UiIntegerSetNode* node, const UiIntegerSetNode* sentinel) {
-        if (node == nullptr || node == sentinel) return;
-        releaseIntegerBranch(node->left, sentinel);
-        releaseIntegerBranch(node->right, sentinel);
-        SphereUI::Runtime::deallocate(node);
-    }
-
-    UiIntegerSetNode*& integerChild(UiIntegerSetNode& node, bool right) {
-        return right ? node.right : node.left;
-    }
-
-    void rotateIntegerTree(SphereUI::UiIntegerSet& tree, UiIntegerSetNode* node, bool right) {
-        auto* pivot = integerChild(*node, !right);
-        integerChild(*node, !right) = integerChild(*pivot, right);
-        if (integerChild(*pivot, right) != tree.sentinel) integerChild(*pivot, right)->parent = node;
-        pivot->parent = node->parent;
-        auto* parent = node->parent;
-        if (parent == tree.sentinel) parent->parent = pivot;
-        else integerChild(*parent, node == parent->right) = pivot;
-        integerChild(*pivot, right) = node;
-        node->parent = pivot;
-    }
-
-    std::string escapedHyperText(std::string_view text) {
+std::string SphereUI::detail::escapeHyperText(std::string_view text) {
         std::string output;
         for (char character : text) {
             if (character == '<') output += "\\[";
@@ -1135,133 +348,20 @@ namespace {
         }
         return output;
     }
-}
 
-void SphereUI::UiIntegerSet::initialize() {
-    if (sentinel != nullptr) return;
-    auto* head = static_cast<UiIntegerSetNode*>(Runtime::allocate(sizeof(UiIntegerSetNode)));
-    if (head == nullptr) throw std::bad_alloc();
-    sentinel = head;
-    *head = {head, head, head, 0u, true, true};
-    count = 0u;
-}
-
-bool SphereUI::UiIntegerSet::contains(std::uint32_t value) const {
-    if (sentinel == nullptr) return false;
-    auto* node = sentinel->parent;
-    while (node != sentinel) {
-        if (node->value == value) return true;
-        node = value < node->value ? node->left : node->right;
-    }
-    return false;
-}
-
-void SphereUI::UiIntegerSet::insert(std::uint32_t value) {
-    initialize();
-    auto* head = sentinel;
-    auto* parent = head;
-    auto* node = head->parent;
-    while (node != head) {
-        parent = node;
-        if (node->value == value) return;
-        node = value < node->value ? node->left : node->right;
-    }
-    node = static_cast<UiIntegerSetNode*>(Runtime::allocate(sizeof(UiIntegerSetNode)));
-    if (node == nullptr) throw std::bad_alloc();
-    *node = {head, parent, head, value, false, false};
-    if (parent == head) head->parent = head->left = head->right = node;
-    else {
-        integerChild(*parent, value > parent->value) = node;
-        if (value < head->left->value) head->left = node;
-        if (value > head->right->value) head->right = node;
-    }
-    ++count;
-    while (!node->parent->black) {
-        parent = node->parent;
-        auto* grandparent = parent->parent;
-        const bool right = parent == grandparent->right;
-        auto* uncle = integerChild(*grandparent, !right);
-        if (!uncle->black) {
-            parent->black = uncle->black = true;
-            grandparent->black = false;
-            node = grandparent;
-        } else {
-            if (node == integerChild(*parent, !right)) {
-                node = parent;
-                rotateIntegerTree(*this, node, right);
-                parent = node->parent;
-                grandparent = parent->parent;
-            }
-            parent->black = true;
-            grandparent->black = false;
-            rotateIntegerTree(*this, grandparent, !right);
-        }
-    }
-    head->parent->black = true;
-}
-
-void SphereUI::UiIntegerSet::clear() {
-    if (sentinel != nullptr) {
-        releaseIntegerBranch(sentinel->parent, sentinel);
-        sentinel->left = sentinel->parent = sentinel->right = sentinel;
-    }
-    count = 0u;
-}
-
-void SphereUI::UiIntegerSet::release() {
-    clear();
-    Runtime::deallocate(sentinel);
-    sentinel = nullptr;
-    proxy = nullptr;
-}
-
-void SphereUI::UiIntegerSet::copyFrom(const UiIntegerSet& source) {
-    if (this == &source) return;
-    UiIntegerSet copy{};
-    try {
-        copy.initialize();
-        if (source.sentinel != nullptr) {
-            const auto visit = [&](auto&& self, const UiIntegerSetNode* node) -> void {
-                if (node == source.sentinel) return;
-                self(self, node->left);
-                copy.insert(node->value);
-                self(self, node->right);
-            };
-            visit(visit, source.sentinel->parent);
-        }
-    } catch (...) {
-        copy.release();
-        throw;
-    }
-    release();
-    *this = copy;
-}
-
-void SphereUI::detail::escapeHyperText(UiString& output, const UiString& source) {
-    const auto value = escapedHyperText(std::string_view(source.data(), source.length));
-    assignString(output.storage, output.length, output.capacity, value);
-}
-
-void SphereUI::detail::serializeHyperTextElements(const UiDeque<HyperTextElement*>& elements, UiString& hyper_text, UiString& plain) {
+void SphereUI::detail::serializeHyperTextElements(std::span<const HyperTextRun> elements, std::string& hyper_text, std::string& plain) {
     std::string raw, visible;
-    for (std::size_t index = 0u; index < elements.count; ++index) if (const auto* element = elements.at(index)) {
-        const std::string_view text(element->text.data(), element->text.length);
-        if (element->type == 3u) {
-            raw += text;
-            visible += text;
-        } else if (element->type == 4u || element->type == 5u) {
-            if (element->type == 5u) {
-                raw += "<l ";
-                raw += static_cast<const HyperTextElement_Link*>(element)->parameters.data();
-                raw += '>';
-            }
-            raw += escapedHyperText(text);
-            if (element->type == 5u) raw += "</l>";
-            visible += text;
+    for (const auto& element : elements) {
+        if (element.isWrap()) raw += element.text;
+        else {
+            if (const auto* link = element.link()) raw += "<l " + link->parameters + ">";
+            raw += escapeHyperText(element.text);
+            if (element.link() != nullptr) raw += "</l>";
         }
+        visible += element.text;
     }
-    assignString(hyper_text.storage, hyper_text.length, hyper_text.capacity, raw);
-    assignString(plain.storage, plain.length, plain.capacity, visible);
+    hyper_text = std::move(raw);
+    plain = std::move(visible);
 }
 
 void SphereUI::Runtime::setTextInputActive(bool active) {
@@ -1273,17 +373,7 @@ void SphereUI::Runtime::broadcastMessage(Window* root, int group, SphereUI::UiMe
         root->dispatchMessage(group, message, first, second, kind);
         return;
     }
-    for (auto* window : g_sfera_interface.windows) if (window != nullptr) window->dispatchMessage(group, message, first, second, kind);
-}
-
-void* SphereUI::Runtime::allocate(std::size_t size) { return WorldMemory::allocate(size); }
-void SphereUI::Runtime::deallocate(void* memory) { WorldMemory::release(memory); }
-
-namespace {
-
-}
-
-namespace SphereUI {
+    for (const auto& window : g_sfera_interface.windows) if (window != nullptr) window->dispatchMessage(group, message, first, second, kind);
 }
 
 namespace {
@@ -1301,8 +391,8 @@ namespace {
             std::array<std::array<char, 12>, 256> result{};
             for (const auto& binding : uiKeyBindings) SphereUI::detail::copyText(result[binding.code], binding.name);
             for (std::size_t value = '0'; value <= 'Z'; ++value) if (value <= '9' || value >= 'A') result[value][0] = value;
-            for (std::size_t index = 0u; index != 12u; ++index) std::snprintf(result[VK_F1 + index].data(), result[VK_F1 + index].size(), "F%u", index + 1u);
-            for (std::size_t index = 0u; index != 10u; ++index) std::snprintf(result[VK_NUMPAD0 + index].data(), result[VK_NUMPAD0 + index].size(), "NUMPAD%u", index);
+            for (std::size_t index = 0u; index != 12u; ++index) std::snprintf(result[VK_F1 + index].data(), result[VK_F1 + index].size(), "F%zu", index + 1u);
+            for (std::size_t index = 0u; index != 10u; ++index) std::snprintf(result[VK_NUMPAD0 + index].data(), result[VK_NUMPAD0 + index].size(), "NUMPAD%zu", index);
             return result;
         }();
         return code < names.size() && names[code][0] != '\0' ? names[code].data() : nullptr;
@@ -1446,7 +536,7 @@ void SphereUI::Runtime::openExternalLink(const char* target, bool mail) {
     ::ShowWindow(g_sfera_window_runtime.main_window_handle, SW_MINIMIZE);
 }
 
-void SphereUI::Runtime::clipboardText(UiString& result) {
+void SphereUI::Runtime::clipboardText(std::string& result) {
     result.assign("");
     if (!::IsClipboardFormatAvailable(CF_TEXT) || !::OpenClipboard(nullptr)) return;
     const auto handle = ::GetClipboardData(CF_TEXT);
@@ -1476,57 +566,19 @@ SphereUI::TextExtent SphereUI::Runtime::screenSize() {
     return {g_sfera_graphics_runtime.display_width, g_sfera_graphics_runtime.display_height};
 }
 
-namespace {
-
-}
-
 namespace SphereUI::Runtime {
     void invokeEventHandler(WindowEventHandler handler, Window* window, const WindowEvent& event);
 }
 
 namespace {
     using namespace SphereUI;
-    void appendWindowEvent(WindowEvent**& slots, std::size_t& capacity, std::size_t& head, std::size_t& size, std::size_t& pending, const WindowEvent& event) {
-        if (pending >= 64u) {
-            size = 0u;
-            head = 0u;
-            pending = 0u;
-        }
-        if (size + 1u >= capacity) {
-            const auto growth = std::max(std::size_t{8}, capacity / 2u);
-            if (capacity > std::size_t{std::numeric_limits<std::ptrdiff_t>::max()} / sizeof(WindowEvent*) - growth) throw std::length_error("Window event queue too long");
-            const auto next_capacity = capacity + growth;
-            auto* replacement = static_cast<WindowEvent**>(Runtime::allocate(next_capacity * sizeof(WindowEvent*)));
-            if (replacement == nullptr) throw std::bad_alloc();
-            std::fill_n(replacement, next_capacity, nullptr);
-            auto* previous = slots;
-            for (std::size_t index = 0u; index < capacity; ++index) replacement[index] = previous[(head + index) % capacity];
-            Runtime::deallocate(previous);
-            slots = replacement;
-            capacity = next_capacity;
-            head = 0u;
-        }
-        auto*& queued = slots[(head + size) % capacity];
-        if (queued == nullptr) {
-            queued = static_cast<WindowEvent*>(Runtime::allocate(sizeof(WindowEvent)));
-            if (queued == nullptr) throw std::bad_alloc();
-        }
-        *queued = event;
-        ++size;
-        ++pending;
-    }
 
     void queueInterfaceRefresh() {
         g_sfera_interface.queueEvent({nullptr, 0u, UiMessage::refreshInterface, 0u, 0u});
     }
 
     Window* optionChild(Window* window, std::uint32_t index) {
-        if (window == nullptr || index == 0u) return window;
-        auto* sentinel = window->child_sentinel;
-        if (sentinel == nullptr) return nullptr;
-        auto* node = sentinel->next;
-        for (std::size_t current = 1u; current < index && node != nullptr && node != sentinel; ++current) node = node->next;
-        return node == nullptr || node == sentinel ? nullptr : node->value;
+        return window == nullptr ? nullptr : window->controlAt(index);
     }
 
     void optionMessage(Window* window, std::uint32_t index, SphereUI::UiMessage message, std::uintptr_t first = 0u, std::uintptr_t second = 0u) {
@@ -1601,7 +653,7 @@ namespace {
     }
 
     std::uint32_t bindingCount() {
-        return g_sfera_mbc_runtime->namedValue("SSKS_NUMBER");
+        return g_sfera_mbc_runtime.namedValue("SSKS_NUMBER");
     }
 
     const char* bindingName(std::uint32_t key) {
@@ -1636,15 +688,15 @@ namespace {
         if (show) {
             std::fill(std::begin(state.configured_bindings), std::end(state.configured_bindings), 0u);
             for (std::size_t slot = 0u; slot < std::max(5u, count); ++slot) {
-                const auto key = g_sfera_mbc_runtime->namedValue("SSKS", slot);
+                const auto key = g_sfera_mbc_runtime.namedValue("SSKS", slot);
                 state.configured_bindings[slot] = slot < 5u ? uiVirtualKey(key) : key;
             }
-            state.configured_bindings[63] = g_sfera_mbc_runtime->namedValue("INMS");
+            state.configured_bindings[63] = g_sfera_mbc_runtime.namedValue("INMS");
             std::copy(std::begin(state.configured_bindings), std::end(state.configured_bindings), std::begin(state.working_bindings));
             optionLabel(window, 4u, state.configured_bindings[63] == 0u ? "UISTR_WT_OPT23" : "UISTR_WT_OPT24");
             for (std::size_t slot = 0u; slot < count; ++slot) {
                 optionMessage(window, 5u, UiMessage::appendListItem);
-                std::snprintf(g_sfera_options_dialog_runtime.widget_key_name, sizeof(g_sfera_options_dialog_runtime.widget_key_name), "UISTR_WT_KEY%02u", slot + 1u);
+                std::snprintf(g_sfera_options_dialog_runtime.widget_key_name, sizeof(g_sfera_options_dialog_runtime.widget_key_name), "UISTR_WT_KEY%02zu", slot + 1u);
                 optionLabel(bindingRow(window, slot), 2u, g_sfera_options_dialog_runtime.widget_key_name);
                 refreshBindingLabel(window, slot);
             }
@@ -1652,8 +704,8 @@ namespace {
             return;
         }
         setOptionsVisible(true);
-        g_sfera_mbc_runtime->setNamedValue("INMS", state.configured_bindings[63]);
-        for (std::size_t slot = 0u; slot < std::max(5u, count); ++slot) g_sfera_mbc_runtime->setNamedValue("SSKS", slot < 5u ? uiScanCode(state.configured_bindings[slot]) : state.configured_bindings[slot], slot);
+        g_sfera_mbc_runtime.setNamedValue("INMS", state.configured_bindings[63]);
+        for (std::size_t slot = 0u; slot < std::max(5u, count); ++slot) g_sfera_mbc_runtime.setNamedValue("SSKS", slot < 5u ? uiScanCode(state.configured_bindings[slot]) : state.configured_bindings[slot], slot);
         queueInterfaceRefresh();
         g_sfera_options_dialog_runtime.widget_keys_initialized = false;
     }
@@ -1665,7 +717,7 @@ namespace {
         if (window == nullptr) return;
         auto& state = g_sfera_graphics_options_runtime;
         if (show) {
-            for (std::size_t index = 0u; index < 5u; ++index) state.saved_interface_values[index] = index == 2u ? g_sfera_interface_runtime.sounds_enabled : g_sfera_mbc_runtime->namedValue(interfaceSettingKeys[index]);
+            for (std::size_t index = 0u; index < 5u; ++index) state.saved_interface_values[index] = index == 2u ? g_sfera_interface_runtime.sounds_enabled : g_sfera_mbc_runtime.namedValue(interfaceSettingKeys[index]);
             InterfaceConfiguration::open("config.cfg");
             state.saved_interface_values[5] = InterfaceConfiguration::readInteger("MBST", state.saved_interface_values[5]);
             state.saved_interface_values[6] = missingConfigValue;
@@ -1682,7 +734,7 @@ namespace {
             return;
         }
         setOptionsVisible(true);
-        for (std::size_t index = 0u; index < std::size(interfaceSettingKeys); ++index) g_sfera_mbc_runtime->setNamedValue(interfaceSettingKeys[index], state.saved_interface_values[index]);
+        for (std::size_t index = 0u; index < std::size(interfaceSettingKeys); ++index) g_sfera_mbc_runtime.setNamedValue(interfaceSettingKeys[index], state.saved_interface_values[index]);
         g_sfera_interface_runtime.description_auto_popup = state.saved_interface_values[7];
         g_sfera_interface_runtime.invite_messages = state.saved_interface_values[8];
         InterfaceConfiguration::open("config.cfg");
@@ -1699,14 +751,14 @@ namespace {
 
     void resetSavedWindowPositions() {
         g_sfera_interface.saved_positions.clear();
-        for (auto* window : g_sfera_interface.windows) if (window != nullptr && window->save_last_position) window->alignToScreen(true);
+        for (const auto& window : g_sfera_interface.windows) if (window != nullptr && window->save_last_position) window->alignToScreen(true);
     }
 
-    UiIndexVector& savedChatFonts() {
+    std::vector<std::uint32_t>& savedChatFonts() {
         return g_sfera_options_dialog_runtime.saved_chat_fonts;
     }
 
-    UiIndexVector& editedChatFonts() {
+    std::vector<std::uint32_t>& editedChatFonts() {
         return g_sfera_options_dialog_runtime.edited_chat_fonts;
     }
 
@@ -1723,13 +775,13 @@ namespace {
             auto& edited = editedChatFonts();
             saved.reserve(2u);
             edited.reserve(2u);
-            saved.append(4u);
-            saved.append(4u);
+            saved.push_back(4u);
+            saved.push_back(4u);
             InterfaceConfiguration::open("config.cfg");
             saved.at(0u) = InterfaceConfiguration::readInteger("CHAT_LIST_FONT", saved.at(0u));
             saved.at(1u) = InterfaceConfiguration::readInteger("CHAT_EDIT_FONT", saved.at(1u));
             for (std::size_t index = 0u; index < 2u; ++index) if (auto* control = optionChild(window, index + 3u)) control->setFont(saved.at(index));
-            edited.copyFrom(saved);
+            edited = saved;
             return;
         }
         if (window == nullptr) return;
@@ -1875,10 +927,10 @@ namespace {
         if (event.message != UiMessage::hyperTextPageChanged) return;
         auto* control = static_cast<HyperTextCtrl*>(event.source);
         if (control == nullptr) return;
-        const auto* document = control->document;
+        const auto* document = control->document.get();
         const auto* name = document == nullptr ? nullptr : document->name.c_str();
         if (name != nullptr && SferaSimpleParser::equalsIgnoreCase(name, "Language\\helpindex.hts")) control->handleMessage(UiMessage::clearHyperTextHistory, 0u, 0u);
-        optionMessage(window, 2u, UiMessage::setEnabled, control->history.count == 0u ? 0u : 1u);
+        optionMessage(window, 2u, UiMessage::setEnabled, control->history.size() == 0u ? 0u : 1u);
     }
 
     void handleSoundOptionsEvent(Window* window, const WindowEvent& event) {
@@ -1972,12 +1024,12 @@ namespace {
         for (std::size_t index = 0u; index < std::size(interfaceControlIds); ++index) if (event.control_id == interfaceControlIds[index]) {
             auto& value = state.interface_values[index];
             value = value == 0u;
-            if (index == 0u) g_sfera_mbc_runtime->setNamedValue(interfaceSettingKeys[index], value);
+            if (index == 0u) g_sfera_mbc_runtime.setNamedValue(interfaceSettingKeys[index], value);
             if (index == 3u) g_sfera_interface_runtime.cross_enabled = value;
             optionToggleLabel(window, interfaceControlIds[index], value);
             if (index == 2u) g_sfera_interface_runtime.sounds_enabled = value;
             else if (index != 3u) {
-                if (index != 0u && index < std::size(interfaceSettingKeys)) g_sfera_mbc_runtime->setNamedValue(interfaceSettingKeys[index], value);
+                if (index != 0u && index < std::size(interfaceSettingKeys)) g_sfera_mbc_runtime.setNamedValue(interfaceSettingKeys[index], value);
                 queueInterfaceRefresh();
             }
             return;
@@ -1995,7 +1047,7 @@ namespace {
         if (event.message == UiMessage::leftClick) {
             if (event.control_id == 1u) {
                 std::copy_n(state.graphics_snapshot, 7u, values);
-                auto* lod = g_sfera_recovered_static_runtime.render_state_08;
+                auto* lod = g_sfera_recovered_static_runtime.render_state_08.get();
                 if (lod != nullptr) lod->setDistances(g_sfera_input_device_runtime.lod_distance, g_sfera_input_device_runtime.minimum_lod_distance);
                 setGraphicsOptionsVisible(false);
             } else if (event.control_id == 2u) {
@@ -2087,7 +1139,7 @@ namespace {
             return;
         }
         if (event.message == UiMessage::leftClick) {
-            if (event.control_id == 1u) savedChatFonts().copyFrom(editedChatFonts());
+            if (event.control_id == 1u) savedChatFonts() = editedChatFonts();
             else if (event.control_id != 2u) return;
         } else if (event.message != UiMessage::close) return;
         setFontOptionsVisible(false);
@@ -2184,21 +1236,6 @@ namespace {
         std::copy_n(source, std::char_traits<char>::length(source) + 1u, destination);
     }
 
-    template<class T> T* createInitialized() {
-        void* storage = SphereUI::Runtime::allocate(sizeof(T));
-        if (storage == nullptr) return nullptr;
-        std::memset(storage, 0, sizeof(T));
-        auto* result = std::construct_at(static_cast<T*>(storage));
-        try {
-            result->initialize();
-        } catch (...) {
-            result->destroy(false);
-            SphereUI::Runtime::deallocate(result);
-            throw;
-        }
-        return result;
-    }
-
     class ViewportScope {
         SphereUI::UiViewport saved{};
         bool changed = false;
@@ -2213,6 +1250,9 @@ namespace {
             changed = true;
         }
 
+        ViewportScope(const ViewportScope&) = delete;
+        ViewportScope& operator=(const ViewportScope&) = delete;
+
         ~ViewportScope() {
             if (changed && restore) SphereUI::InterfaceRenderer::setViewport(saved);
         }
@@ -2222,21 +1262,17 @@ namespace {
         }
     };
 
-    struct NamedFlag {
-        const char* name;
-        std::uint32_t value;
-    };
 
-    constexpr NamedFlag buttonStyles[] = { {
+    constexpr NamedValue<std::uint32_t> buttonStyles[] = { {
         "LOSTCHECK", ButtonStyle::releaseOutside
     }, {"NOTIFY_LB", ButtonStyle::repeatWhilePressed}, {"SEND_QUIT", ButtonStyle::sendClose}, {"CENTER_TEXT", ButtonStyle::centerText}, {"SEND_HELP", ButtonStyle::showHelp}};
-    constexpr NamedFlag textAlignments[] = { {
+    constexpr NamedValue<std::uint32_t> textAlignments[] = { {
         "RIGHT_X", TextAlignment::right
     }, {"RIGHT_Y", TextAlignment::bottom}, {"CENTER_X", TextAlignment::horizontalCenter}, {"CENTER_Y", TextAlignment::verticalCenter}, {"CENTER", TextAlignment::center}, {"RIGHT", TextAlignment::right | TextAlignment::bottom}};
-    constexpr NamedFlag imageStyles[] = { {
+    constexpr NamedValue<std::uint32_t> imageStyles[] = { {
         "NOTIFY_LB", 1u
     }, {"NOTIFY_FOCUS", 2u}};
-    constexpr NamedFlag textStyles[] = { {
+    constexpr NamedValue<std::uint32_t> textStyles[] = { {
         "NOTIFY_CLICK", 1u
     }
     };
@@ -2244,11 +1280,14 @@ namespace {
         SferaSimpleParser& parser;
         const SferaParserRange& range;
         SferaParserRange saved_block{};
-        char buffer[1024]{};
+        std::string buffer;
     public:
         UiReader(SferaSimpleParser& source, const SferaParserRange& scope) : parser(source), range(scope) {
             parser.getBlockRange(&saved_block);
         }
+
+        UiReader(const UiReader&) = delete;
+        UiReader& operator=(const UiReader&) = delete;
 
         ~UiReader() {
             parser.setBlockRange(&saved_block);
@@ -2263,7 +1302,8 @@ namespace {
         }
 
         const char* token(std::size_t index = 0u, bool quoted = false) {
-            return quoted ? parser.readQuotedString(index, buffer) : parser.readStringBounded(index, buffer, sizeof(buffer));
+            const bool present = quoted ? parser.readQuotedString(index, buffer) : parser.readString(index, buffer);
+            return present ? buffer.c_str() : nullptr;
         }
 
         const char* string(const char* key, bool quoted = false) {
@@ -2286,7 +1326,7 @@ namespace {
         bool pair(const char* key, int& first, int& second) {
             if (!has(key)) return false;
             int values[2]{};
-            if (!parser.readIntSequence(0u, values, 2u)) return false;
+            if (!parser.readIntSequence(0u, values)) return false;
             first = values[0];
             second = values[1];
             return true;
@@ -2295,7 +1335,7 @@ namespace {
         bool rectangle(const char* key, int& left, int& top, int& right, int& bottom) {
             if (!has(key)) return false;
             int values[4]{};
-            if (!parser.readIntSequence(0u, values, 4u)) return false;
+            if (!parser.readIntSequence(0u, values)) return false;
             left = values[0];
             top = values[1];
             right = values[2];
@@ -2306,18 +1346,18 @@ namespace {
         void color(const char* key, std::uint32_t& color) {
             if (!has(key)) return;
             int values[3]{};
-            if (!parser.readIntSequence(0u, values, 3u)) return;
+            if (!parser.readIntSequence(0u, values)) return;
             color = SferaColor::rgba(values[0], values[1], values[2]).argb();
         }
 
         void rgba(const char* key, std::uint32_t& color) {
             if (!has(key)) return;
             int values[4]{};
-            if (!parser.readIntSequence(0u, values, 4u)) return;
+            if (!parser.readIntSequence(0u, values)) return;
             color = SferaColor::rgba(values[0], values[1], values[2], values[3]).argb();
         }
 
-        template<std::size_t Size> void flags(const char* key, std::uint32_t& value, const NamedFlag (&names)[Size], bool reset = false) {
+        template<std::size_t Size> void flags(const char* key, std::uint32_t& value, const NamedValue<std::uint32_t> (&names)[Size], bool reset = false) {
             if (!has(key)) return;
             if (reset) value = 0u;
             for (std::size_t index = 0u; index < parser.tokenCount(); index += 2u) {
@@ -2326,7 +1366,7 @@ namespace {
             }
         }
 
-        void sprite(const char* key, SphereUI::Window& window, SphereUI::UiSprite*& destination) {
+        void sprite(const char* key, SphereUI::Window& window, std::shared_ptr<const SphereUI::UiSprite>& destination) {
             const char* name = string(key, true);
             if (name == nullptr) return;
             auto* owner = window.parent;
@@ -2368,28 +1408,23 @@ namespace {
         const auto bounds = windowBounds(window);
         int dx = 0;
         int dy = 0;
-        if (window.input_mask != 0u) {
+        if (window.text_alignment != 0u) {
             const auto extent = SphereUI::InterfaceRenderer::measureText(window.getText(), window.font, window.font_initialized);
             if (extent.width < window.width) {
-                if ((window.input_mask & TextAlignment::right) != 0u) dx = window.width - extent.width;
-                if ((window.input_mask & TextAlignment::horizontalCenter) != 0u) dx = (window.width - extent.width) / 2;
+                if ((window.text_alignment & TextAlignment::right) != 0u) dx = window.width - extent.width;
+                if ((window.text_alignment & TextAlignment::horizontalCenter) != 0u) dx = (window.width - extent.width) / 2;
             }
             if (extent.height < window.height) {
-                if ((window.input_mask & TextAlignment::bottom) != 0u) dy = window.height - extent.height;
-                if ((window.input_mask & TextAlignment::verticalCenter) != 0u) dy = (window.height - extent.height) / 2;
+                if ((window.text_alignment & TextAlignment::bottom) != 0u) dy = window.height - extent.height;
+                if ((window.text_alignment & TextAlignment::verticalCenter) != 0u) dy = (window.height - extent.height) / 2;
             }
         }
         renderLabel(window, window.getText(), SphereUI::detail::addCoordinate(bounds.left, dx), SphereUI::detail::addCoordinate(bounds.top, dy), color, bounds);
     }
 
-    void appendCircular(SphereUI::UiTextRows& rows, std::size_t maximum, std::size_t& next, const char* text, std::uint32_t color, int offset) {
-        if (maximum == 0u || rows.size() < maximum) rows.append(text == nullptr ? " " : text, color, offset);
-        else {
-            auto& row = rows.at(next % rows.size());
-            row.text.assign(text == nullptr ? " " : text);
-            row.color = color;
-            row.offset = offset;
-        }
+    template<class Row> void appendCircular(std::vector<Row>& rows, std::size_t maximum, std::size_t& next, Row row) {
+        if (maximum == 0u || rows.size() < maximum) rows.push_back(std::move(row));
+        else rows.at(next % rows.size()) = std::move(row);
         if (maximum != 0u) next = (next + 1u) % maximum;
     }
 
@@ -2419,19 +1454,10 @@ namespace {
     void drawChild(SphereUI::Window* address, std::uint32_t alpha);
     void inputChild(SphereUI::Window* address, const SphereUI::WindowInput& input);
     template<class Value> void storeValue(std::uintptr_t address, Value value);
-    template<class T, class Copy> SphereUI::Window* cloneControl(const T& source, Copy copy) {
-        void* storage = SphereUI::Runtime::allocate(sizeof(T));
-        if (storage == nullptr) return nullptr;
-        std::memset(storage, 0, sizeof(T));
-        auto* result = std::construct_at(static_cast<T*>(storage));
-        try {
-            result->initializeCopy(source);
-            copy(*result, source);
-        } catch (...) {
-            result->destroy(false);
-            SphereUI::Runtime::deallocate(result);
-            throw;
-        }
+    template<class T, class Copy> std::unique_ptr<SphereUI::Window> cloneControl(const T& source, SphereUI::Window::CloneContext& context, Copy copy) {
+        auto result = std::make_unique<T>();
+        result->initializeCopy(source, context);
+        copy(*result, source, context);
         return result;
     }
 
@@ -2442,29 +1468,20 @@ namespace {
         }
     }
 
-    template<class T> void destroyOwned(T*& address) {
-        auto* control = address;
-        address = nullptr;
-        if (control != nullptr) control->destroy(true);
+    template<class T> void cloneOwned(std::unique_ptr<T>& destination, const std::unique_ptr<T>& source, SphereUI::Window& owner, SphereUI::Window::CloneContext& context) {
+        std::unique_ptr<T> copy(source ? static_cast<T*>(source->cloneInto(context).release()) : nullptr);
+        if (source && !copy) throw std::bad_alloc();
+        if (copy) copy->setParent(&owner);
+        destination = std::move(copy);
     }
 
-    template<class T> void cloneOwned(T*& destination, T* source, SphereUI::Window& owner) {
-        auto* original = source;
-        auto* copy = original != nullptr ? static_cast<T*>(original->clone()) : nullptr;
-        if (original != nullptr && copy == nullptr) throw std::bad_alloc();
-        destroyOwned(destination);
-        destination = copy;
-        if (copy != nullptr) copy->setParent(&owner);
-    }
-
-    template<class T> bool loadPart(SphereUI::Window& owner, T*& destination, UiReader& reader, const char* key, const char* filename, SferaSimpleParser& parser, SphereUI::UiControlKind kind, std::uint32_t id) {
+    template<class T> bool loadPart(SphereUI::Window& owner, std::unique_ptr<T>& destination, UiReader& reader, const char* key, const char* filename, SferaSimpleParser& parser, UiControlKind kind, std::uint32_t id) {
         SferaParserRange part{};
         if (!reader.block(key, part)) return false;
-        auto* control = static_cast<T*>(owner.createControl(filename, parser, part, kind, id));
-        destroyOwned(destination);
-        destination = control;
-        if (control != nullptr) control->setParent(&owner);
-        return control != nullptr;
+        std::unique_ptr<T> control(static_cast<T*>(owner.createControl(filename, parser, part, kind, id).release()));
+        if (control) control->setParent(&owner);
+        destination = std::move(control);
+        return destination != nullptr;
     }
 
     void readAnimation(UiReader& reader, SferaSimpleParser& parser, const char* key, SphereUI::WindowAnimation& animation) {
@@ -2483,56 +1500,37 @@ namespace {
 
     template<class T> void loadNavigationButtons(T& owner, UiReader& reader, const char* filename, SferaSimpleParser& parser, bool defaults, float interval = 0.0f) {
         const char* names[] = {"leftbutton", "rightbutton"};
-        SphereUI::ButtonCtrl** destinations[] = {&owner.decrease_button, &owner.increase_button};
+        std::unique_ptr<SphereUI::ButtonCtrl>* destinations[] = {&owner.decrease_button, &owner.increase_button};
         for (std::size_t index = 0u; index < 2u; ++index) if (loadPart(owner, *destinations[index], reader, names[index], filename, parser, UiControlKind::button, index + 1u) && defaults) {
-            auto* button = *destinations[index];
+            auto* button = destinations[index]->get();
             button->button_flags |= ButtonStyle::releaseOutside | ButtonStyle::repeatWhilePressed;
             if (interval != 0.0f) button->repeat_interval = interval;
         }
     }
 
-    template<class T> void cloneNavigationButtons(T& destination, const T& source) {
-        cloneOwned(destination.decrease_button, source.decrease_button, destination);
-        cloneOwned(destination.increase_button, source.increase_button, destination);
+    template<class T> void cloneNavigationButtons(T& destination, const T& source, SphereUI::Window::CloneContext& context) {
+        cloneOwned(destination.decrease_button, source.decrease_button, destination, context);
+        cloneOwned(destination.increase_button, source.increase_button, destination, context);
     }
 
-    void copyScrollFields(SphereUI::ScrollBar& destination, const SphereUI::ScrollBar& source) {
-        destination.scroll_resource = source.scroll_resource;
-        destination.thumb_width = source.thumb_width;
-        destination.thumb_height = source.thumb_height;
-        destination.thumb_x = source.thumb_x;
-        destination.thumb_y = source.thumb_y;
-        destination.orientation_flags = source.orientation_flags;
-        destination.normalized_position = source.normalized_position;
-        destination.minimum = source.minimum;
-        destination.maximum = source.maximum;
-        destination.current = source.current;
-        destination.step = source.step;
-        destination.page_step = source.page_step;
-        destination.dragging_thumb = source.dragging_thumb;
-        destination.explicit_step = source.explicit_step;
-        destination.notify_changes = source.notify_changes;
-        destination.repeat_started_at = source.repeat_started_at;
-        destination.track_left = source.track_left;
-        destination.track_top = source.track_top;
-        destination.track_right = source.track_right;
-        destination.track_bottom = source.track_bottom;
-        destination.page_click_active = source.page_click_active;
-        cloneNavigationButtons(destination, source);
+    void copyScrollFields(SphereUI::ScrollBar& destination, const SphereUI::ScrollBar& source, SphereUI::Window::CloneContext& context) {
+        copyProperties(destination, source,
+            &SphereUI::ScrollBar::scroll_resource, &SphereUI::ScrollBar::thumb_width, &SphereUI::ScrollBar::thumb_height,
+            &SphereUI::ScrollBar::thumb_x, &SphereUI::ScrollBar::thumb_y, &SphereUI::ScrollBar::orientation_flags,
+            &SphereUI::ScrollBar::normalized_position, &SphereUI::ScrollBar::minimum, &SphereUI::ScrollBar::maximum,
+            &SphereUI::ScrollBar::current, &SphereUI::ScrollBar::step, &SphereUI::ScrollBar::page_step,
+            &SphereUI::ScrollBar::dragging_thumb, &SphereUI::ScrollBar::explicit_step, &SphereUI::ScrollBar::notify_changes,
+            &SphereUI::ScrollBar::repeat_started_at, &SphereUI::ScrollBar::track_left, &SphereUI::ScrollBar::track_top,
+            &SphereUI::ScrollBar::track_right, &SphereUI::ScrollBar::track_bottom, &SphereUI::ScrollBar::page_click_active);
+        cloneNavigationButtons(destination, source, context);
     }
 
-    void copySpinFields(SphereUI::SpinButton& destination, const SphereUI::SpinButton& source) {
-        destination.minimum = source.minimum;
-        destination.maximum = source.maximum;
-        destination.current = source.current;
-        destination.previous = source.previous;
-        destination.step = source.step;
-        destination.body = source.body;
-        destination.body_index = source.body_index;
-        destination.status_valid = source.status_valid;
-        destination.notify_changes = source.notify_changes;
-        destination.update_enabled = source.update_enabled;
-        cloneNavigationButtons(destination, source);
+    void copySpinFields(SphereUI::SpinButton& destination, const SphereUI::SpinButton& source, SphereUI::Window::CloneContext& context) {
+        copyProperties(destination, source,
+            &SphereUI::SpinButton::minimum, &SphereUI::SpinButton::maximum, &SphereUI::SpinButton::current,
+            &SphereUI::SpinButton::previous, &SphereUI::SpinButton::step, &SphereUI::SpinButton::body_index,
+            &SphereUI::SpinButton::status_valid, &SphereUI::SpinButton::notify_changes, &SphereUI::SpinButton::update_enabled);
+        cloneNavigationButtons(destination, source, context);
     }
 
     bool moveScroll(SphereUI::ScrollBar& control, bool increase, int amount) {
@@ -2544,7 +1542,7 @@ namespace {
     }
 
     void enableNavigationButtons(SphereUI::ScrollBar& control) {
-        for (auto address : {control.decrease_button, control.increase_button}) if (auto* button = address) button->handleMessage(UiMessage::setEnabled, control.minimum != control.maximum ? 1u : 0u, 0u);
+        for (auto address : {control.decrease_button.get(), control.increase_button.get()}) if (auto* button = address) button->handleMessage(UiMessage::setEnabled, control.minimum != control.maximum ? 1u : 0u, 0u);
     }
 
     std::uint32_t opacity_alpha(double value) {
@@ -2566,15 +1564,8 @@ bool SphereUI::Window::loadUi(const char* filename, SferaSimpleParser& parser, c
         parser.setBlockRange(&sprites);
         SferaParserRange entry{};
         while (parser.nextBlock("sprite", &entry)) {
-            const auto sprite = UiSprite::create();
-            if (sprite == 0u) continue;
-            try {
-                if (sprite->loadUi(filename, parser, entry)) appendResource(sprite);
-                else sprite->destroy();
-            } catch (...) {
-                sprite->destroy();
-                throw;
-            }
+            auto sprite = std::make_shared<UiSprite>();
+            if (sprite->loadUi(filename, parser, entry)) appendResource(std::move(sprite));
         }
         parser.clearBlockRange();
     }
@@ -2610,47 +1601,34 @@ bool SphereUI::Window::loadUi(const char* filename, SferaSimpleParser& parser, c
     while (parser.nextBlock("control", &entry)) {
         UiReader child_reader(parser, entry);
         const char* name = child_reader.string("classID");
-        if (name != nullptr) if (auto* child = createControl(filename, parser, entry, detail::controlKind(name), ordinal)) {
-            try {
-                appendChild(child);
-            } catch (...) {
-                child->destroy(true);
-                throw;
-            }
+        if (name != nullptr) if (auto child = createControl(filename, parser, entry, detail::controlKind(name), ordinal)) {
             child->control_id = next_id++;
+            appendChild(std::move(child));
         }
         ++ordinal;
     }
     return true;
 }
 
-SphereUI::Window* SphereUI::Window::clone() {
-    void* storage = Runtime::allocate(sizeof(Window));
-    if (storage == nullptr) return nullptr;
-    auto* result = std::construct_at(static_cast<Window*>(storage));
-    try {
-        result->initializeCopy(*this);
-    } catch (...) {
-        result->release();
-        Runtime::deallocate(result);
-        throw;
-    }
+std::unique_ptr<SphereUI::Window> SphereUI::Window::cloneInto(CloneContext& context) const {
+    auto result = std::make_unique<Window>();
+    result->initializeCopy(*this, context);
     return result;
 }
 
 std::uint32_t SphereUI::Window::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
     if (message >= UiMessage::setTooltipLine && message <= UiMessage::setTooltipTextColor) {
-        auto* tip = tooltip;
+        auto* tip = tooltip.get();
         if (tip == nullptr) {
-            tip = Runtime::makeControl(UiControlKind::tooltip);
+            tooltip = std::make_unique<ToolTipCtrl>();
+            tip = tooltip.get();
             if (tip == nullptr) return 0u;
             tip->setParent(this);
-            tooltip = tip;
         }
         return tip->handleMessage(message, first, second);
     }
     const auto hide_tip = [&] {
-        if (auto* tip = tooltip) static_cast<ToolTipCtrl*>(tip)->reset();
+        if (auto* tip = tooltip.get()) tip->reset();
     };
     switch (message) {
         case UiMessage::setInputEnabled:
@@ -2677,7 +1655,7 @@ std::uint32_t SphereUI::Window::handleMessage(SphereUI::UiMessage message, std::
             storeValue(first, disabled);
             break;
         case UiMessage::setTextAlignment:
-            input_mask = first;
+            text_alignment = first;
             break;
         case UiMessage::animateVisibility:
             animateVisibility(first != 0u);
@@ -2730,7 +1708,7 @@ void SphereUI::Window::draw() {
     const auto screen_x = detail::addCoordinate(x, owner == nullptr ? 0 : owner->x);
     const auto screen_y = detail::addCoordinate(y, owner == nullptr ? 0 : owner->y);
     if ((behavior_flags & WindowStyle::skipDrawing) == 0u && resource_reference != nullptr) resource_reference->drawNatural(static_cast<float>(screen_x), static_cast<float>(screen_y), SferaColor::rgba(255u, 255u, 255u, alpha).argb());
-    if ((behavior_flags & WindowStyle::showTitle) != 0u && text_length != 0u) {
+    if ((behavior_flags & WindowStyle::showTitle) != 0u && text.size() != 0u) {
         const auto caption_width = detail::subtractCoordinate(caption_right, caption_left);
         const auto caption_height = detail::subtractCoordinate(caption_bottom, caption_top);
         int font_id = font;
@@ -2751,7 +1729,8 @@ void SphereUI::Window::draw() {
 
 void SphereUI::Window::handleInput(const WindowInput& input) {
     if (!input_enabled) return;
-    if (hide_after_animation && !animation_active) {
+    const auto identity = registration_id;
+    if (hide_after_animation && !isAnimating()) {
         hide_after_animation = false;
         handleMessage(UiMessage::setHidden, 1u, 0u);
         return;
@@ -2776,9 +1755,11 @@ void SphereUI::Window::handleInput(const WindowInput& input) {
     }
     detail::forEachChild(*this, [&](Window& child) {
         if (child.disabled) return;
-        if (auto* tip = child.tooltip) tip->handleInput(input);
-        child.handleInput(input);
+        const auto child_identity = child.registration_id;
+        if (auto* tip = child.tooltip.get()) tip->handleInput(input);
+        if (g_sfera_interface.isRegistered(&child, child_identity)) child.handleInput(input);
     });
+    if (!g_sfera_interface.isRegistered(this, identity)) return;
     if (auto* window = overlay; window != nullptr && !window->hidden) window->handleInput(input);
 }
 
@@ -2787,18 +1768,13 @@ void SphereUI::Window::setOpacity(float opacity) {
     alpha = new_alpha;
     replace_color_alpha(text_color, new_alpha);
     replace_color_alpha(disabled_color, new_alpha);
-    auto* sentinel = child_sentinel;
-    if (sentinel == nullptr) return;
-    for (auto* node = sentinel->next; node != sentinel; node = node->next) if (auto* child = node->value) child->setOpacity(opacity);
+    detail::forEachChild(*this, [opacity](Window& child) { child.setOpacity(opacity); });
 }
 
 bool SphereUI::Window::hitTest(int screen_x, int screen_y) {
     if (hidden) return false;
-    auto* sentinel = child_sentinel;
-    if (sentinel == nullptr) return true;
-    for (auto* node = sentinel->next; node != nullptr && node != sentinel; node = node->next) {
-        auto* child = node->value;
-        if (child != nullptr && child->can_drag_drop && child->containsPoint(screen_x, screen_y) && child->hitTest(screen_x, screen_y)) break;
+    for (const auto& child : children) {
+        if (child->can_drag_drop && child->containsPoint(screen_x, screen_y) && child->hitTest(screen_x, screen_y)) break;
     }
     return true;
 }
@@ -2806,8 +1782,9 @@ bool SphereUI::Window::hitTest(int screen_x, int screen_y) {
 void SphereUI::Window::dispatchMessage(int target_group, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second, SphereUI::UiControlKind target_kind) {
     detail::forEachChild(*this, [&](Window& child) {
         if (target_group != -1 && child.group != target_group) return;
+        const auto identity = child.registration_id;
         if (target_kind == anyControlKind || child.control_kind == target_kind) child.handleMessage(message, first, second);
-        if (child.control_kind == UiControlKind::listItem) child.dispatchMessage(target_group, message, first, second, target_kind);
+        if (g_sfera_interface.isRegistered(&child, identity) && child.control_kind == UiControlKind::listItem) child.dispatchMessage(target_group, message, first, second, target_kind);
     });
 }
 
@@ -2819,15 +1796,8 @@ int SphereUI::Window::getFont() const {
     return font;
 }
 
-void SphereUI::Window::destroy(bool free_storage) {
-    g_sfera_mbc_runtime->forgetNativeResource(this);
-    std::construct_at(this);
-    release();
-    if (free_storage) Runtime::deallocate(this);
-}
-
 bool SphereUI::ButtonCtrl::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
-    
+
     UiReader reader(parser, range);
     reader.sprite("checkedImage", *this, pressed_image);
     reader.sprite("focusedImage", *this, hover_image);
@@ -2839,7 +1809,7 @@ bool SphereUI::ButtonCtrl::loadUi(const char* , SferaSimpleParser& parser, const
     if (SferaSimpleParser::equalsIgnoreCase(method, "NONE")) behavior_flags |= WindowStyle::skipDrawing;
     if (const char* name = reader.string("hotKey", true)) {
         hotkey = Runtime::keyCode(name);
-        std::string_view arguments(parser.token);
+        std::string_view arguments(parser.valueText());
         const auto first = arguments.find_first_not_of(numericWhitespace);
         const auto end = first == std::string_view::npos ? first : arguments.find_first_of(numericWhitespace, first);
         arguments = end == std::string_view::npos ? std::string_view{} : arguments.substr(end);
@@ -2854,24 +1824,13 @@ bool SphereUI::ButtonCtrl::loadUi(const char* , SferaSimpleParser& parser, const
     return true;
 }
 
-void SphereUI::ButtonCtrl::copyButtonState(const ButtonCtrl& source) {
-    if (this == &source) return;
-    visual_state = source.visual_state;
-    idle_image = source.idle_image;
-    pressed_image = source.pressed_image;
-    hover_image = source.hover_image;
-    button_flags = source.button_flags;
-    hotkey = source.hotkey;
-    repeat_started_at = source.repeat_started_at;
-    pressed = source.pressed;
-    repeat_interval = source.repeat_interval;
-    hover_color = source.hover_color;
-    disabled_image = source.disabled_image;
-}
+std::unique_ptr<SphereUI::Window> SphereUI::ButtonCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](auto& target, const auto& source, SphereUI::Window::CloneContext& context) {
 
-SphereUI::Window* SphereUI::ButtonCtrl::clone() {
-    return cloneControl(*this, [](auto& target, const auto& source) {
-        target.copyButtonState(source);
+        copyProperties(target, source,
+            &ButtonCtrl::visual_state, &ButtonCtrl::idle_image, &ButtonCtrl::pressed_image, &ButtonCtrl::hover_image,
+            &ButtonCtrl::button_flags, &ButtonCtrl::hotkey, &ButtonCtrl::repeat_started_at, &ButtonCtrl::pressed,
+            &ButtonCtrl::repeat_interval, &ButtonCtrl::hover_color, &ButtonCtrl::disabled_image);
     });
 }
 
@@ -2887,11 +1846,11 @@ void SphereUI::ButtonCtrl::draw() {
     if (hidden || (behavior_flags & WindowStyle::skipDrawing) != 0u) return;
     const auto bounds = windowBounds(*this);
     if ((button_flags & ButtonStyle::stateImages) != 0u) {
-        UiSprite* const images[] = {idle_image, pressed_image, hover_image};
+        const std::shared_ptr<const UiSprite> images[] = {idle_image, pressed_image, hover_image};
         const auto image = disabled ? disabled_image : images[std::min(visual_state, 2u)];
         if (image != nullptr) image->draw(static_cast<float>(bounds.left), static_cast<float>(bounds.top), static_cast<float>(bounds.right), static_cast<float>(bounds.bottom), SferaColor::rgba(255u, 255u, 255u, alpha).argb());
     }
-    if (text_length != 0u) alignedLabel(*this, disabled ? disabled_color : visual_state == 0u ? text_color : hover_color);
+    if (text.size() != 0u) alignedLabel(*this, disabled ? disabled_color : visual_state == 0u ? text_color : hover_color);
 }
 
 void SphereUI::ButtonCtrl::handleInput(const WindowInput& input) {
@@ -2930,13 +1889,9 @@ void SphereUI::ButtonCtrl::handleInput(const WindowInput& input) {
     }
 }
 
-void SphereUI::ButtonCtrl::destroy(bool free_storage) {
-    release();
-    if (free_storage) Runtime::deallocate(this);
-}
 
 bool SphereUI::CheckBox::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
-    
+
     UiReader reader(parser, range);
     hover_color = text_color;
     reader.sprite("checkedImage", *this, checked_image);
@@ -2952,22 +1907,14 @@ bool SphereUI::CheckBox::loadUi(const char* , SferaSimpleParser& parser, const S
 
 void SphereUI::CheckBox::copyCheckState(const CheckBox& source) {
     if (this == &source) return;
-    unchecked_image = source.unchecked_image;
-    checked_image = source.checked_image;
-    unchecked_hover_image = source.unchecked_hover_image;
-    checked_hover_image = source.checked_hover_image;
-    checked = source.checked;
-    hovered = source.hovered;
-    image_x = source.image_x;
-    image_y = source.image_y;
-    button_flags = source.button_flags;
-    label_x = source.label_x;
-    label_y = source.label_y;
-    hover_color = source.hover_color;
+    copyProperties(*this, source,
+        &CheckBox::unchecked_image, &CheckBox::checked_image, &CheckBox::unchecked_hover_image, &CheckBox::checked_hover_image,
+        &CheckBox::checked, &CheckBox::hovered, &CheckBox::image_x, &CheckBox::image_y, &CheckBox::button_flags,
+        &CheckBox::label_x, &CheckBox::label_y, &CheckBox::hover_color);
 }
 
-SphereUI::Window* SphereUI::CheckBox::clone() {
-    return cloneControl(*this, [](auto& target, const auto& source) {
+std::unique_ptr<SphereUI::Window> SphereUI::CheckBox::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](auto& target, const auto& source, SphereUI::Window::CloneContext& context) {
         target.copyCheckState(source);
     });
 }
@@ -3024,10 +1971,10 @@ void SphereUI::CheckBox::playClickSound() {
 
 void SphereUI::CDescriptionWindow::draw() {
     if (hidden) return;
-    const auto* caption = caption_sprite;
-    const auto* lower = bottom_sprite;
-    const auto* left = left_sprite;
-    const auto* right = right_sprite;
+    const auto caption = caption_sprite;
+    const auto lower = bottom_sprite;
+    const auto left = left_sprite;
+    const auto right = right_sprite;
     if (caption == nullptr || lower == nullptr || left == nullptr || right == nullptr) return;
     const auto bounds = windowBounds(*this);
     const auto color = SferaColor::rgba(255u, 255u, 255u, alpha).argb();
@@ -3053,9 +2000,8 @@ void SphereUI::CDescriptionWindow::draw() {
     });
 }
 
-void SphereUI::CDescriptionWindow::destroy(bool free_storage) {
-    Runtime::setDescriptionWindow(nullptr);
-    Window::destroy(free_storage);
+SphereUI::CDescriptionWindow::~CDescriptionWindow() {
+    if (Runtime::descriptionWindow() == this) Runtime::setDescriptionWindow(nullptr);
 }
 
 void SphereUI::Window::setInputFocus(bool focused, bool submit_on_blur) {
@@ -3069,30 +2015,19 @@ void SphereUI::Window::setInputFocus(bool focused, bool submit_on_blur) {
     input_enabled = true;
 }
 
-void SphereUI::EditCtrl::initialize() {
-    Window::initialize();
-    cursor_x = cursor_y = cursor_offset_x = cursor_offset_y = 0;
-    numeric = password = false;
-
+SphereUI::EditCtrl::EditCtrl() {
     maximum_symbols = 256u;
     cursor_width = 5;
-    password_text = {};
-    password_text.capacity = 15u;
     cursor_color = UiColor::whiteRgb;
-    cursor_alignment = 0u;
-    blink_started = 0u;
     cursor_visible = cursor_uses_text_color = submit_on_blur = true;
-
-    caret_position = 0;
     observed_length = invalidIndex;
     hidden = input_enabled = false;
     control_kind = UiControlKind::edit;
 }
 
 void SphereUI::EditCtrl::updatePassword() {
-    if (password && password_text.length != text_length) password_text.assign(std::string(text_length, '*').c_str());
+    if (password && password_text.size() != text.size()) password_text.assign(std::string(text.size(), '*').c_str());
 }
-
 
 bool SphereUI::EditCtrl::loadUi(const char*, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
@@ -3105,7 +2040,8 @@ bool SphereUI::EditCtrl::loadUi(const char*, SferaSimpleParser& parser, const Sf
         cursor_color = SferaColor::fromArgb(cursor_color).withAlpha(0u).argb();
         cursor_uses_text_color = false;
     }
-    reader.pair("cursoroffset", cursor_offset_x, cursor_offset_y);
+    int unused_horizontal_offset = 0;
+    reader.pair("cursoroffset", unused_horizontal_offset, cursor_offset_y);
     if (maximum_symbols == 0u) maximum_symbols = 256u;
     cursor_width = InterfaceRenderer::measureText("_", font, true).width + 1;
     input_enabled = false;
@@ -3113,28 +2049,14 @@ bool SphereUI::EditCtrl::loadUi(const char*, SferaSimpleParser& parser, const Sf
     return true;
 }
 
-void SphereUI::EditCtrl::copyEditState(const EditCtrl& source) {
-    cursor_x = source.cursor_x;
-    cursor_y = source.cursor_y;
-    cursor_offset_x = source.cursor_offset_x;
-    cursor_offset_y = source.cursor_offset_y;
-    numeric = source.numeric;
-    password = source.password;
-    maximum_symbols = source.maximum_symbols;
-    cursor_width = source.cursor_width;
-    password_text.assign(source.password_text.data());
-    cursor_color = source.cursor_color;
-    blink_started = source.blink_started;
-    cursor_visible = source.cursor_visible;
-    cursor_uses_text_color = source.cursor_uses_text_color;
-    submit_on_blur = source.submit_on_blur;
-    caret_position = source.caret_position;
-    observed_length = source.observed_length;
-}
+std::unique_ptr<SphereUI::Window> SphereUI::EditCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](EditCtrl& target, const EditCtrl& source, SphereUI::Window::CloneContext& context) {
 
-SphereUI::Window* SphereUI::EditCtrl::clone() {
-    return cloneControl(*this, [](EditCtrl& target, const EditCtrl& source) {
-        target.copyEditState(source);
+        copyProperties(target, source,
+            &EditCtrl::cursor_offset_y, &EditCtrl::numeric, &EditCtrl::password, &EditCtrl::maximum_symbols,
+            &EditCtrl::cursor_width, &EditCtrl::password_text, &EditCtrl::cursor_color, &EditCtrl::blink_started,
+            &EditCtrl::cursor_visible, &EditCtrl::cursor_uses_text_color, &EditCtrl::submit_on_blur, &EditCtrl::caret_position,
+            &EditCtrl::observed_length);
     });
 }
 
@@ -3149,7 +2071,7 @@ std::uint32_t SphereUI::EditCtrl::handleMessage(SphereUI::UiMessage message, std
             break;
         case UiMessage::getEditText:
             if (auto* output = reinterpret_cast<char*>(first)) {
-                const auto length = std::min(text_length, std::size_t{250});
+                const auto length = std::min(text.size(), std::size_t{250});
                 std::memcpy(output, getText(), length);
                 output[length] = '\0';
             }
@@ -3157,7 +2079,7 @@ std::uint32_t SphereUI::EditCtrl::handleMessage(SphereUI::UiMessage message, std
         case UiMessage::getEditFocus:
             return input_enabled;
         case UiMessage::moveEditCaretToEnd:
-            caret_position = text_length;
+            caret_position = text.size();
             break;
         default:
             break;
@@ -3200,7 +2122,7 @@ void SphereUI::EditCtrl::handleInput(const WindowInput& input) {
                 break;
         }
         if (value != getText()) setText(value.c_str());
-        observed_length = text_length;
+        observed_length = text.size();
         updatePassword();
         if (input.key_code == VK_TAB) notifyParent(*this, UiMessage::editTab);
         if (input.key_code == VK_RETURN) {
@@ -3218,8 +2140,8 @@ void SphereUI::EditCtrl::draw() {
     const auto bounds = windowBounds(*this);
     ViewportScope viewport(bounds);
     if (!viewport) return;
-    if (observed_length != text_length) caret_position = text_length;
-    caret_position = std::clamp(caret_position, 0, static_cast<int>(text_length));
+    if (observed_length != text.size()) caret_position = text.size();
+    caret_position = std::clamp(caret_position, 0, static_cast<int>(text.size()));
     updatePassword();
     const char* display = password ? password_text.data() : getText();
     const auto extent = InterfaceRenderer::measureText(display, font, font_initialized);
@@ -3231,10 +2153,10 @@ void SphereUI::EditCtrl::draw() {
         dx = width - full_width;
         if (caret_x < -static_cast<std::int64_t>(dx)) dx = caret_position == 0 ? 0 : cursor_width - caret_x;
     } else {
-        if ((input_mask & TextAlignment::horizontalCenter) != 0u) dx = (width - extent.width) / 2;
-        if ((input_mask & TextAlignment::right) != 0u) dx = width - full_width;
+        if ((text_alignment & TextAlignment::horizontalCenter) != 0u) dx = (width - extent.width) / 2;
+        if ((text_alignment & TextAlignment::right) != 0u) dx = width - full_width;
     }
-    if ((input_mask & TextAlignment::bottom) != 0u && extent.height < height) dy = height - extent.height;
+    if ((text_alignment & TextAlignment::bottom) != 0u && extent.height < height) dy = height - extent.height;
     const auto left = detail::addCoordinate(bounds.left, dx), top = detail::addCoordinate(bounds.top, dy);
     renderLabel(*this, display, left, top, text_color, bounds);
     const auto now = Runtime::clockTicks();
@@ -3247,10 +2169,8 @@ void SphereUI::EditCtrl::draw() {
     }
 }
 
-void SphereUI::EditCtrl::destroy(bool free_storage) {
-    password_text.release();
+SphereUI::EditCtrl::~EditCtrl() {
     Runtime::setTextInputActive(false);
-    Window::destroy(free_storage);
 }
 
 bool SphereUI::ListCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
@@ -3270,20 +2190,20 @@ bool SphereUI::ListCtrl::loadUi(const char* filename, SferaSimpleParser& parser,
     reader.count("maxItems", maximum_items);
     parser.setScanRange(&range);
     while (parser.nextValue("addstring")) {
-        char key[1024]{}, color_text[1024]{};
-        parser.readStringBounded(0u, key, sizeof(key));
-        parser.readStringBounded(1u, color_text, sizeof(color_text));
+        std::string key, color_text;
+        parser.readString(0u, key);
+        parser.readString(1u, color_text);
         std::uint32_t color = 0u;
-        if (key[0] != '\0' && readHexColor(color_text, color)) addText(g_sfera_interface.localizedText(key), color);
+        if (!key.empty() && readHexColor(color_text.c_str(), color)) addText(g_sfera_interface.localizedText(key.c_str()), color);
     }
     parser.clearScanRange();
     updateLayout();
     return true;
 }
 
-SphereUI::Window* SphereUI::ListCtrl::clone() {
-    return cloneControl(*this, [](ListCtrl& destination, const ListCtrl& source) {
-        destination.copyListState(source);
+std::unique_ptr<SphereUI::Window> SphereUI::ListCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](ListCtrl& destination, const ListCtrl& source, SphereUI::Window::CloneContext& context) {
+        destination.copyListState(source, context);
     });
 }
 
@@ -3296,7 +2216,7 @@ std::uint32_t SphereUI::ListCtrl::handleMessage(SphereUI::UiMessage message, std
             return 1u;
         case UiMessage::updateScrollLayout:
             if (first != 0u) updateLayout();
-            else if (auto* bar = scrollbar) bar->setParameters({0u, ScrollField::all, 0, 0, 0, 0, 0});
+            else if (auto* bar = scrollbar.get()) bar->setParameters({0u, ScrollField::all, 0, 0, 0, 0, 0});
             return 1u;
         case UiMessage::appendListText:
             {
@@ -3304,7 +2224,7 @@ std::uint32_t SphereUI::ListCtrl::handleMessage(SphereUI::UiMessage message, std
                 addText(reinterpret_cast<const char*>(first), second);
                 if (chatlike && at_bottom) {
                     vertical_offset = maximum_scroll;
-                    if (auto* bar = scrollbar) bar->setParameters({0u, ScrollField::position, 0, 0, 0, vertical_offset, 0});
+                    if (auto* bar = scrollbar.get()) bar->setParameters({0u, ScrollField::position, 0, 0, 0, vertical_offset, 0});
                     updateVisibleRange();
                 }
                 return 1u;
@@ -3380,12 +2300,12 @@ void SphereUI::ListCtrl::draw() {
             if (selected_index >= visible_begin && selected_index < end) drawSelection(bounds.left, bounds.top, detail::addCoordinate(first_y, static_cast<int>(static_cast<std::uint32_t>(selected_index - visible_begin) * static_cast<std::uint32_t>(line_height))), false);
         }
     }
-    drawChild(scrollbar, alpha);
+    drawChild(scrollbar.get(), alpha);
 }
 
 void SphereUI::ListCtrl::handleInput(const WindowInput& input) {
     if (hidden) return;
-    inputChild(scrollbar, input);
+    inputChild(scrollbar.get(), input);
     if (!can_select) {
         selected_index = -1;
         return;
@@ -3413,17 +2333,12 @@ void SphereUI::ListCtrl::handleInput(const WindowInput& input) {
     }
 }
 
-void SphereUI::ListCtrl::destroy(bool free_storage) {
-    destroyOwned(scrollbar);
-    rows.release();
-    Window::destroy(free_storage);
-}
 
-SphereUI::Window* SphereUI::FilterListCtrl::clone() {
-    return cloneControl(*this, [](FilterListCtrl& destination, const FilterListCtrl& source) {
-        destination.copyListState(source);
+std::unique_ptr<SphereUI::Window> SphereUI::FilterListCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](FilterListCtrl& destination, const FilterListCtrl& source, SphereUI::Window::CloneContext& context) {
+        destination.copyListState(source, context);
         destination.filter_mask = source.filter_mask;
-        destination.history.copyFrom(source.history);
+        destination.history = source.history;
         destination.history_write = source.history_write;
     });
 }
@@ -3451,10 +2366,6 @@ std::uint32_t SphereUI::FilterListCtrl::handleMessage(SphereUI::UiMessage messag
     }
 }
 
-void SphereUI::FilterListCtrl::destroy(bool free_storage) {
-    history.release();
-    ListCtrl::destroy(free_storage);
-}
 
 bool SphereUI::FontPicker::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
@@ -3463,14 +2374,14 @@ bool SphereUI::FontPicker::loadUi(const char* filename, SferaSimpleParser& parse
     return true;
 }
 
-SphereUI::Window* SphereUI::FontPicker::clone() {
-    return cloneControl(*this, [](FontPicker& destination, const FontPicker& source) {
-        cloneOwned(destination.selector, source.selector, destination);
-        cloneOwned(destination.preview, source.preview, destination);
-        if (auto* selector = destination.selector) {
+std::unique_ptr<SphereUI::Window> SphereUI::FontPicker::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](FontPicker& destination, const FontPicker& source, SphereUI::Window::CloneContext& context) {
+        cloneOwned(destination.selector, source.selector, destination, context);
+        cloneOwned(destination.preview, source.preview, destination, context);
+        if (auto* selector = destination.selector.get()) {
             selector->setRange(0, static_cast<int>(g_sfera_fonts.count() - 1u));
             selector->setStep(1);
-            if (auto* preview = destination.preview) selector->setCurrentValue(preview->getFont() - 2);
+            if (auto* preview = destination.preview.get()) selector->setCurrentValue(preview->getFont() - 2);
         }
     });
 }
@@ -3481,7 +2392,7 @@ std::uint32_t SphereUI::FontPicker::handleMessage(SphereUI::UiMessage message, s
         return 1u;
     }
     if (message == UiMessage::getSelectedFont) {
-        if (auto* window = preview) storeValue(first, window->getFont());
+        if (auto* window = preview.get()) storeValue(first, window->getFont());
         return 1u;
     }
     return Window::handleMessage(message, first, second);
@@ -3489,18 +2400,18 @@ std::uint32_t SphereUI::FontPicker::handleMessage(SphereUI::UiMessage message, s
 
 void SphereUI::FontPicker::draw() {
     if (hidden || (behavior_flags & WindowStyle::skipDrawing) != 0u) return;
-    drawChild(selector, alpha);
-    drawChild(preview, alpha);
+    drawChild(selector.get(), alpha);
+    drawChild(preview.get(), alpha);
 }
 
 void SphereUI::FontPicker::handleInput(const WindowInput& input) {
     if (hidden) return;
-    inputChild(selector, input);
-    inputChild(preview, input);
+    inputChild(selector.get(), input);
+    inputChild(preview.get(), input);
     WindowEvent event{};
     while (pollEvent(event)) {
         if (event.message != UiMessage::spinValueChanged) continue;
-        if (auto* window = preview) {
+        if (auto* window = preview.get()) {
             const auto font_id = event.first + 2u;
             window->setFont(font_id);
             if (auto* owner = parent) owner->queueEvent({this, control_id, UiMessage::selectedFontChanged, font_id, 0u});
@@ -3509,25 +2420,20 @@ void SphereUI::FontPicker::handleInput(const WindowInput& input) {
 }
 
 void SphereUI::FontPicker::setFont(int font_id) {
-    if (auto* spin = selector) spin->setCurrentValue(static_cast<int>(font_id - 2u));
-    if (auto* window = preview) window->setFont(font_id);
+    if (auto* spin = selector.get()) spin->setCurrentValue(static_cast<int>(font_id - 2u));
+    if (auto* window = preview.get()) window->setFont(font_id);
     Window::setFont(font_id);
 }
 
 int SphereUI::FontPicker::getFont() const {
-    if (const auto* selector_control = selector) return selector_control->currentValue() + 2;
-    if (const auto* preview_control = preview) return preview_control->getFont();
+    if (const auto* selector_control = selector.get()) return selector_control->currentValue() + 2;
+    if (const auto* preview_control = preview.get()) return preview_control->getFont();
     return Window::getFont();
 }
 
-void SphereUI::FontPicker::destroy(bool free_storage) {
-    destroyOwned(selector);
-    destroyOwned(preview);
-    Window::destroy(free_storage);
-}
 
 bool SphereUI::ImageCtrl::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
-    
+
     UiReader reader(parser, range);
     resource_reference = nullptr;
     reader.sprite("image", *this, resource_reference);
@@ -3537,23 +2443,12 @@ bool SphereUI::ImageCtrl::loadUi(const char* , SferaSimpleParser& parser, const 
     return true;
 }
 
-void SphereUI::ImageCtrl::copyImageState(const ImageCtrl& source) {
-    if (this == &source) return;
-    image_style = source.image_style;
-    interaction_active = source.interaction_active;
-    const auto image = (source.fallback_image == nullptr ? nullptr : source.fallback_image->clone());
-    if (fallback_image != nullptr) fallback_image->destroy();
-    fallback_image = image;
-    if (source.resource_reference == source.fallback_image) resource_reference = fallback_image;
-    rotated = source.rotated;
-    rotation_radians = source.rotation_radians;
-    base_alpha = source.base_alpha;
-    opacity = source.opacity;
-}
+std::unique_ptr<SphereUI::Window> SphereUI::ImageCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](auto& target, const auto& source, SphereUI::Window::CloneContext& context) {
 
-SphereUI::Window* SphereUI::ImageCtrl::clone() {
-    return cloneControl(*this, [](auto& target, const auto& source) {
-        target.copyImageState(source);
+        copyProperties(target, source,
+            &ImageCtrl::image_style, &ImageCtrl::interaction_active, &ImageCtrl::fallback_image, &ImageCtrl::rotated,
+            &ImageCtrl::rotation_radians, &ImageCtrl::base_alpha, &ImageCtrl::opacity);
     });
 }
 
@@ -3619,14 +2514,6 @@ void SphereUI::ImageCtrl::setOpacity(float new_opacity) {
     opacity = new_opacity;
 }
 
-void SphereUI::ImageCtrl::destroy(bool free_storage) {
-    if (fallback_image != nullptr) {
-        fallback_image->destroy();
-        fallback_image = nullptr;
-    }
-    release();
-    if (free_storage) Runtime::deallocate(this);
-}
 
 bool SphereUI::ListItemCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
@@ -3634,21 +2521,14 @@ bool SphereUI::ListItemCtrl::loadUi(const char* filename, SferaSimpleParser& par
     if (loadPart(*this, horizontal_scroll, reader, "hscrollbar", filename, parser, UiControlKind::scrollBar, 1u)) horizontal_scroll->orientation_flags |= 1u;
     SferaParserRange part{};
     if (reader.block("itemTemplate", part)) {
-        auto* original = createInitialized<Window>();
-        if (original == nullptr) throw std::bad_alloc();
-        try {
-            original->setParent(parent);
-            if (!original->loadUi(filename, parser, part)) throw std::runtime_error("list item template could not be loaded");
-            original->setParent(nullptr);
-            original->hidden = false;
-            original->resource_parent = parent;
-            original->input_enabled = true;
-        } catch (...) {
-            original->destroy(true);
-            throw;
-        }
-        destroyOwned(item_template);
-        item_template = original;
+        auto original = std::make_unique<Window>();
+        original->setParent(parent);
+        if (!original->loadUi(filename, parser, part)) throw std::runtime_error("list item template could not be loaded");
+        original->setParent(nullptr);
+        original->hidden = false;
+        original->resource_parent = parent;
+        original->input_enabled = true;
+        item_template = std::move(original);
     }
     int count = 0;
     reader.integer("createItems", count);
@@ -3663,9 +2543,9 @@ bool SphereUI::ListItemCtrl::loadUi(const char* filename, SferaSimpleParser& par
     return true;
 }
 
-SphereUI::Window* SphereUI::ListItemCtrl::clone() {
-    return cloneControl(*this, [](ListItemCtrl& destination, const ListItemCtrl& source) {
-        destination.copyItemState(source);
+std::unique_ptr<SphereUI::Window> SphereUI::ListItemCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](ListItemCtrl& destination, const ListItemCtrl& source, SphereUI::Window::CloneContext& context) {
+        destination.copyItemState(source, context);
     });
 }
 
@@ -3681,7 +2561,7 @@ std::uint32_t SphereUI::ListItemCtrl::handleMessage(SphereUI::UiMessage message,
             return 1u;
         case UiMessage::updateScrollLayout:
             if (first != 0u) updateLayout();
-            else for (auto address : {vertical_scroll, horizontal_scroll}) if (auto* bar = address) bar->setParameters({0u, ScrollField::all, 0, 0, 0, 0, 0});
+            else for (auto address : {vertical_scroll.get(), horizontal_scroll.get()}) if (auto* bar = address) bar->setParameters({0u, ScrollField::all, 0, 0, 0, 0, 0});
             return 1u;
         case UiMessage::appendListItem:
             addItem();
@@ -3713,8 +2593,8 @@ std::uint32_t SphereUI::ListItemCtrl::handleMessage(SphereUI::UiMessage message,
 
 void SphereUI::ListItemCtrl::draw() {
     if (hidden || (behavior_flags & WindowStyle::skipDrawing) != 0u) return;
-    drawChild(vertical_scroll, alpha);
-    drawChild(horizontal_scroll, alpha);
+    drawChild(vertical_scroll.get(), alpha);
+    drawChild(horizontal_scroll.get(), alpha);
     if (item_template == nullptr) return;
     const auto end = std::min(visible_end, static_cast<int>(items.size()));
     {
@@ -3732,8 +2612,8 @@ void SphereUI::ListItemCtrl::draw() {
 
 void SphereUI::ListItemCtrl::handleInput(const WindowInput& input) {
     if (hidden) return;
-    inputChild(vertical_scroll, input);
-    inputChild(horizontal_scroll, input);
+    inputChild(vertical_scroll.get(), input);
+    inputChild(horizontal_scroll.get(), input);
     if (!can_select) selected_index = -1;
     for (std::size_t index = 0u; index < items.size(); ++index) if (auto* item = itemAt(index)) {
         WindowEvent event{};
@@ -3743,7 +2623,7 @@ void SphereUI::ListItemCtrl::handleInput(const WindowInput& input) {
     const bool inside = contains(bounds, input.mouse_x, input.mouse_y);
     WindowInput forwarded = input;
     if (!inside) forwarded.mouse_x = forwarded.mouse_y = 65535;
-    const auto* original = item_template;
+    const auto* original = item_template.get();
     if (original == nullptr) return;
     const auto end = std::min(visible_end, static_cast<int>(items.size()));
     auto item_x = detail::subtractCoordinate(bounds.left, cropped_x), item_y = detail::subtractCoordinate(bounds.top, cropped_y);
@@ -3770,7 +2650,7 @@ void SphereUI::ListItemCtrl::setOpacity(float opacity) {
     const auto new_alpha = opacity_alpha(opacity * 255.0);
     alpha = new_alpha;
     replace_color_alpha(text_color, new_alpha);
-    if (auto* original = item_template) original->setOpacity(opacity);
+    if (auto* original = item_template.get()) original->setOpacity(opacity);
     for (std::size_t index = 0u; index < items.size(); ++index) if (auto* item = itemAt(index)) item->setOpacity(opacity);
 }
 
@@ -3785,14 +2665,6 @@ void SphereUI::ListItemCtrl::dispatchMessage(int target_group, SphereUI::UiMessa
     for (std::size_t index = 0u; index < items.size(); ++index) if (auto* child = itemAt(index)) child->dispatchMessage(target_group, message, first, second, target_kind);
 }
 
-void SphereUI::ListItemCtrl::destroy(bool free_storage) {
-    destroyOwned(item_template);
-    clearItems();
-    destroyOwned(vertical_scroll);
-    destroyOwned(horizontal_scroll);
-    items.release();
-    Window::destroy(free_storage);
-}
 
 bool SphereUI::ToolTipCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
@@ -3814,9 +2686,14 @@ bool SphereUI::ToolTipCtrl::loadUi(const char* filename, SferaSimpleParser& pars
     return true;
 }
 
-SphereUI::Window* SphereUI::ToolTipCtrl::clone() {
-    return cloneControl(*this, [](ToolTipCtrl& destination, const ToolTipCtrl& source) {
-        destination.copyTipState(source);
+std::unique_ptr<SphereUI::Window> SphereUI::ToolTipCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](ToolTipCtrl& destination, const ToolTipCtrl& source, SphereUI::Window::CloneContext& context) {
+
+        copyProperties(destination, source,
+            &ToolTipCtrl::screen_x, &ToolTipCtrl::screen_y, &ToolTipCtrl::hover_pending, &ToolTipCtrl::hover_started,
+            &ToolTipCtrl::fade_opacity, &ToolTipCtrl::fade_started, &ToolTipCtrl::background_color, &ToolTipCtrl::tooltip_width,
+            &ToolTipCtrl::tooltip_height, &ToolTipCtrl::dismissed, &ToolTipCtrl::line_height, &ToolTipCtrl::margin_left,
+            &ToolTipCtrl::margin_top, &ToolTipCtrl::margin_right, &ToolTipCtrl::margin_bottom, &ToolTipCtrl::lines);
     });
 }
 
@@ -3867,7 +2744,7 @@ void SphereUI::ToolTipCtrl::draw() {
 }
 
 void SphereUI::ToolTipCtrl::handleInput(const WindowInput& input) {
-    if (lines.size() == 0u || lines.at(0u).length == 0u) {
+    if (lines.size() == 0u || lines.at(0u).size() == 0u) {
         hidden = true;
         return;
     }
@@ -3894,27 +2771,18 @@ void SphereUI::ToolTipCtrl::handleInput(const WindowInput& input) {
     }
 }
 
-void SphereUI::ToolTipCtrl::destroy(bool free_storage) {
-    lines.release();
-    Window::destroy(free_storage);
-}
 
-
-SphereUI::Window* SphereUI::CMinimapControl::clone() {
-    if (auto* owner = parent) resource_reference = owner->getResource("arup");
-    return cloneControl(*this, [](CMinimapControl&, const CMinimapControl&) {
+std::unique_ptr<SphereUI::Window> SphereUI::CMinimapControl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](CMinimapControl& target, const CMinimapControl& source, SphereUI::Window::CloneContext&) {
+        if (source.parent) target.resource_reference = target.getResource("arup");
     });
-}
-
-std::uint32_t SphereUI::CMinimapControl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
-    return Window::handleMessage(message, first, second);
 }
 
 void SphereUI::CMinimapControl::draw() {
     if (hidden) return;
     const auto bounds = windowBounds(*this);
     const float left = bounds.left, top = bounds.top;
-    InterfaceRenderer::drawTexture(g_sfera_graphics_runtime.d3d_runtime->minimapTexture().native_texture, left, top, left + 256.0f, top + 256.0f, SferaColor::rgba(255u, 255u, 255u, alpha).argb());
+    InterfaceRenderer::drawTexture(g_sfera_graphics_runtime.d3d_runtime->minimapTexture().native_texture.Get(), left, top, left + 256.0f, top + 256.0f, SferaColor::rgba(255u, 255u, 255u, alpha).argb());
     float heading = 0.0f;
     if (Runtime::playerHeading(heading) && resource_reference != nullptr) {
         int parent_x = 0, parent_y = 0;
@@ -3924,17 +2792,13 @@ void SphereUI::CMinimapControl::draw() {
     }
 }
 
-void SphereUI::CMinimapControl::destroy(bool free_storage) {
-    Window::destroy(free_storage);
-}
-
 void SphereUI::ProgressBar::initializeProgressState() {
     minimum = 0;
     maximum = 100;
     current = 0;
     progress_ratio = 0.0f;
     display_mode = 0u;
-    status_text[0] = '\0';
+    status_text.clear();
     status_x = 0;
     status_y = 0;
 }
@@ -3953,26 +2817,21 @@ void SphereUI::ProgressBar::setProgressRange(int new_minimum, int new_maximum) {
     refreshProgressDisplay();
 }
 
-void SphereUI::ProgressBar::copyProgressState(const ProgressBar& source) {
-    minimum = source.minimum;
-    maximum = source.maximum;
-    current = source.current;
-    progress_ratio = source.progress_ratio;
-    display_mode = source.display_mode;
-    std::memcpy(status_text, source.status_text, sizeof(status_text));
-    status_x = source.status_x;
-    status_y = source.status_y;
+namespace {
+    void updateStatusText(std::string& text, std::uint32_t mode, double percent, int current, int range) {
+        if (mode == 1u) text = std::to_string(static_cast<int>(std::trunc(percent))) + "%";
+        else if (mode == 2u) text = std::to_string(current) + " / " + std::to_string(range);
+    }
 }
 
 void SphereUI::ProgressBar::refreshProgressDisplay() {
     const int range = detail::subtractCoordinate(maximum, minimum);
     progress_ratio = range == 0 ? 0.0f : std::min(std::fabs(static_cast<float>(current) / static_cast<float>(range)), 1.0f);
-    if (display_mode == 1u) std::snprintf(status_text, sizeof(status_text), "%d%%", static_cast<int>(std::trunc(progress_ratio * 100.0f)));
-    else if (display_mode == 2u) std::snprintf(status_text, sizeof(status_text), "%d / %d", current, range);
+    updateStatusText(status_text, display_mode, progress_ratio * 100.0f, current, range);
 }
 
 bool SphereUI::ProgressBar::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
-    
+
     UiReader reader(parser, range);
     reader.drawMethod(*this);
     reader.status("statusShow", display_mode);
@@ -3987,9 +2846,12 @@ bool SphereUI::ProgressBar::loadUi(const char* , SferaSimpleParser& parser, cons
     return true;
 }
 
-SphereUI::Window* SphereUI::ProgressBar::clone() {
-    return cloneControl(*this, [](auto& target, const auto& source) {
-        target.copyProgressState(source);
+std::unique_ptr<SphereUI::Window> SphereUI::ProgressBar::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](auto& target, const auto& source, SphereUI::Window::CloneContext& context) {
+
+        copyProperties(target, source,
+            &ProgressBar::minimum, &ProgressBar::maximum, &ProgressBar::current, &ProgressBar::progress_ratio,
+            &ProgressBar::display_mode, &ProgressBar::status_text, &ProgressBar::status_x, &ProgressBar::status_y);
     });
 }
 
@@ -4021,16 +2883,16 @@ void SphereUI::ProgressBar::draw() {
     if (display_mode != 0u) {
         const auto left = detail::addCoordinate(bounds.left, status_x);
         const auto top = detail::addCoordinate(bounds.top, status_y);
-        renderLabel(*this, status_text, left, top, text_color, {left, top, detail::addCoordinate(left, 100), detail::addCoordinate(top, 100)});
+        renderLabel(*this, status_text.c_str(), left, top, text_color, {left, top, detail::addCoordinate(left, 100), detail::addCoordinate(top, 100)});
     }
 }
 
 void SphereUI::ProgressBar::handleInput(const WindowInput& ) {
-    
+
 }
 
-SphereUI::Window* SphereUI::RadioButtonCtrl::clone() {
-    return cloneControl(*this, [](auto& target, const auto& source) {
+std::unique_ptr<SphereUI::Window> SphereUI::RadioButtonCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](auto& target, const auto& source, SphereUI::Window::CloneContext& context) {
         target.copyCheckState(source);
     });
 }
@@ -4063,8 +2925,8 @@ bool SphereUI::ScrollBar::loadUi(const char* filename, SferaSimpleParser& parser
     return true;
 }
 
-SphereUI::Window* SphereUI::ScrollBar::clone() {
-    return cloneControl(*this, copyScrollFields);
+std::unique_ptr<SphereUI::Window> SphereUI::ScrollBar::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, copyScrollFields);
 }
 
 std::uint32_t SphereUI::ScrollBar::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
@@ -4111,13 +2973,13 @@ void SphereUI::ScrollBar::draw() {
         const auto top = detail::addCoordinate(bounds.top, thumb_y);
         if (scroll_resource != nullptr) scroll_resource->draw(static_cast<float>(left), static_cast<float>(top), static_cast<float>(detail::addCoordinate(left, thumb_width)), static_cast<float>(detail::addCoordinate(top, thumb_height)), color);
     }
-    drawChild(decrease_button, alpha);
-    drawChild(increase_button, alpha);
+    drawChild(decrease_button.get(), alpha);
+    drawChild(increase_button.get(), alpha);
 }
 
 void SphereUI::ScrollBar::handleInput(const WindowInput& input) {
-    inputChild(decrease_button, input);
-    inputChild(increase_button, input);
+    inputChild(decrease_button.get(), input);
+    inputChild(increase_button.get(), input);
     bool changed = false;
     WindowEvent event{};
     while (pollEvent(event)) if (event.message == UiMessage::leftClick && (event.control_id == 1u || event.control_id == 2u)) if (moveScroll(*this, event.control_id == 2u, step)) {
@@ -4184,11 +3046,6 @@ void SphereUI::ScrollBar::handleInput(const WindowInput& input) {
     if (parent != nullptr) loadControlParameters();
 }
 
-void SphereUI::ScrollBar::destroy(bool free_storage) {
-    destroyOwned(decrease_button);
-    destroyOwned(increase_button);
-    Window::destroy(free_storage);
-}
 
 void SphereUI::ScrollBar::updateControlState() {
     const auto span = detail::subtractCoordinate(maximum, minimum);
@@ -4220,10 +3077,10 @@ bool SphereUI::SliderCtrl::loadUi(const char* filename, SferaSimpleParser& parse
     return ScrollBar::loadUi(filename, parser, range);
 }
 
-SphereUI::Window* SphereUI::SliderCtrl::clone() {
-    return cloneControl(*this, [](SliderCtrl& destination, const SliderCtrl& source) {
-        copyScrollFields(destination, source);
-        std::copy(std::begin(source.value_text), std::end(source.value_text), std::begin(destination.value_text));
+std::unique_ptr<SphereUI::Window> SphereUI::SliderCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](SliderCtrl& destination, const SliderCtrl& source, SphereUI::Window::CloneContext& context) {
+        copyScrollFields(destination, source, context);
+        destination.value_text = source.value_text;
         destination.display_mode = source.display_mode;
         destination.status_x = source.status_x;
         destination.status_y = source.status_y;
@@ -4237,14 +3094,13 @@ void SphereUI::SliderCtrl::draw() {
         const auto bounds = windowBounds(*this);
         const auto left = detail::addCoordinate(bounds.left, status_x);
         const auto top = detail::addCoordinate(bounds.top, status_y);
-        renderLabel(*this, value_text, left, top, text_color, {left, top, detail::addCoordinate(left, 100), detail::addCoordinate(top, 100)});
+        renderLabel(*this, value_text.c_str(), left, top, text_color, {left, top, detail::addCoordinate(left, 100), detail::addCoordinate(top, 100)});
     }
 }
 
 void SphereUI::SliderCtrl::updateControlState() {
     ScrollBar::updateControlState();
-    if (display_mode == 1u) std::snprintf(value_text, sizeof(value_text), "%d%%", static_cast<int>(std::trunc(normalized_position * 100.0)));
-    else if (display_mode == 2u) std::snprintf(value_text, sizeof(value_text), "%d / %d", current, detail::subtractCoordinate(maximum, minimum));
+    updateStatusText(value_text, display_mode, normalized_position * 100.0, current, detail::subtractCoordinate(maximum, minimum));
 }
 
 void SphereUI::SliderCtrl::loadControlParameters() {
@@ -4252,8 +3108,7 @@ void SphereUI::SliderCtrl::loadControlParameters() {
 }
 
 bool SphereUI::SlotCtrl::hitTest(int , int ) {
-    
-    
+
     if (hidden) return false;
     if (auto* owner = parent) owner->queueEvent({this, control_id, UiMessage::slotHitTest, 0u, 0u});
     return true;
@@ -4293,8 +3148,8 @@ bool SphereUI::SpinButton::loadUi(const char* filename, SferaSimpleParser& parse
     return true;
 }
 
-SphereUI::Window* SphereUI::SpinButton::clone() {
-    return cloneControl(*this, copySpinFields);
+std::unique_ptr<SphereUI::Window> SphereUI::SpinButton::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, copySpinFields);
 }
 
 std::uint32_t SphereUI::SpinButton::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
@@ -4325,26 +3180,26 @@ std::uint32_t SphereUI::SpinButton::handleMessage(SphereUI::UiMessage message, s
             break;
     }
     if (message == UiMessage::setEnabled || message == UiMessage::setHidden) {
-        if (auto* window = decrease_button) window->handleMessage(message, first, second);
-        if (auto* window = increase_button) window->handleMessage(message, first, second);
+        if (auto* window = decrease_button.get()) window->handleMessage(message, first, second);
+        if (auto* window = increase_button.get()) window->handleMessage(message, first, second);
     }
     return Window::handleMessage(message, first, second);
 }
 
 void SphereUI::SpinButton::draw() {
     if (hidden) return;
-    drawChild(decrease_button, alpha);
-    drawChild(increase_button, alpha);
+    drawChild(decrease_button.get(), alpha);
+    drawChild(increase_button.get(), alpha);
 }
 
 void SphereUI::SpinButton::handleInput(const WindowInput& input) {
     if (hidden) return;
     if (!disabled) {
-        if (auto* window = increase_button) window->handleMessage(UiMessage::setEnabled, current != maximum, 0u);
-        if (auto* window = decrease_button) window->handleMessage(UiMessage::setEnabled, current != minimum, 0u);
+        if (auto* window = increase_button.get()) window->handleMessage(UiMessage::setEnabled, current != maximum, 0u);
+        if (auto* window = decrease_button.get()) window->handleMessage(UiMessage::setEnabled, current != minimum, 0u);
     }
-    inputChild(decrease_button, input);
-    inputChild(increase_button, input);
+    inputChild(decrease_button.get(), input);
+    inputChild(increase_button.get(), input);
     WindowEvent event{};
     while (pollEvent(event)) {
         if (event.message != UiMessage::leftClick) continue;
@@ -4360,24 +3215,11 @@ void SphereUI::SpinButton::handleInput(const WindowInput& input) {
     if (!status_valid) updateStatus();
 }
 
-void SphereUI::SpinButton::destroy(bool free_storage) {
-    destroyOwned(decrease_button);
-    destroyOwned(increase_button);
-    Window::destroy(free_storage);
-}
 
 void SphereUI::SpinButton::updateStatus() {
     auto* owner = parent;
     if (owner == nullptr) return;
-    if (body == nullptr && body_index != invalidIndex) {
-        if (body_index == 0u) body = parent;
-        else {
-            std::uint32_t index = 0u;
-            detail::forEachChild(*owner, [&](Window& child) {
-                if (++index == body_index) body = &child;
-            });
-        }
-    }
+    Window* body = body_index == invalidIndex ? nullptr : owner->controlAt(body_index);
     if (current < minimum) current = minimum;
     if (current > maximum) current = maximum;
     if (current != previous) {
@@ -4394,9 +3236,9 @@ void SphereUI::SpinButton::updateStatus() {
 }
 
 bool SphereUI::TextCtrl::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
-    
+
     UiReader reader(parser, range);
-    if ((width == 0 || height == 0) && text_length != 0u) {
+    if ((width == 0 || height == 0) && text.size() != 0u) {
         const auto extent = InterfaceRenderer::measureText(getText(), font, font_initialized);
         width = extent.width;
         height = extent.height;
@@ -4405,14 +3247,14 @@ bool SphereUI::TextCtrl::loadUi(const char* , SferaSimpleParser& parser, const S
     return true;
 }
 
-SphereUI::Window* SphereUI::TextCtrl::clone() {
-    return cloneControl(*this, [](auto& target, const auto& source) {
+std::unique_ptr<SphereUI::Window> SphereUI::TextCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](auto& target, const auto& source, SphereUI::Window::CloneContext& context) {
         target.text_style = source.text_style;
     });
 }
 
 void SphereUI::TextCtrl::draw() {
-    if (!hidden && text_length != 0u) alignedLabel(*this, text_color);
+    if (!hidden && text.size() != 0u) alignedLabel(*this, text_color);
 }
 
 void SphereUI::TextCtrl::handleInput(const WindowInput& input) {
@@ -4442,38 +3284,33 @@ bool SphereUI::Window::containsPoint(int screen_x, int screen_y) const {
 int SphereUI::Window::childControlAt(int screen_x, int screen_y) const {
     if (hidden) return 0;
     if (!containsPoint(screen_x, screen_y)) return -1;
-    auto* sentinel = child_sentinel;
-    if (sentinel == nullptr) return 0;
-    for (auto* node = sentinel->previous; node != nullptr && node != sentinel; node = node->previous) {
-        auto* child = node->value;
-        if (child != nullptr && !child->hidden && child->containsPoint(screen_x, screen_y)) return child->control_id;
+    for (auto it = children.rbegin(); it != children.rend(); ++it) {
+        const auto& child = *it;
+        if (!child->hidden && child->containsPoint(screen_x, screen_y)) return child->control_id;
     }
     return 0;
 }
 
 void SphereUI::Window::clearEvents() {
-    event_head = 0u;
-    event_size = 0u;
-    pending_event_count = 0u;
+    events.clear();
 }
 
 void SphereUI::Window::queueEvent(const WindowEvent& event) {
-    appendWindowEvent(event_slots, event_capacity, event_head, event_size, pending_event_count, event);
+    detail::enqueueWindowEvent(events, event);
 }
 
 bool SphereUI::Window::pollEvent(WindowEvent& event) {
-    if (pending_event_count == 0u || event_size == 0u) return false;
-    event = *event_slots[event_head];
-    --event_size;
-    --pending_event_count;
-    event_head = event_size == 0u ? 0u : (event_head + 1u) % event_capacity;
+    if (events.empty()) return false;
+    event = events.front();
+    events.pop_front();
     return true;
 }
 
 void SphereUI::Window::processEvents() {
     if (!g_sfera_interface.hasEventHandler(this)) return;
+    const auto identity = registration_id;
     WindowEvent event{};
-    while (g_sfera_interface.isRegistered(this) && pollEvent(event)) g_sfera_interface.dispatchEvent(this, event);
+    while (g_sfera_interface.isRegistered(this, identity) && pollEvent(event)) g_sfera_interface.dispatchEvent(this, event);
 }
 
 namespace {
@@ -4491,7 +3328,7 @@ namespace {
     template<class Value> void storeValue(std::uintptr_t address, Value value) {
         if (address == 0) return;
         if constexpr (sizeof(Value) > sizeof(std::uint32_t)) {
-            if (std::cmp_greater(value, std::numeric_limits<std::uint32_t>::max()) || (std::is_signed_v<Value> && std::cmp_less(value, std::numeric_limits<std::int32_t>::min()))) throw std::overflow_error("UI result exceeds an MBC word");
+            if (std::cmp_greater(value, std::numeric_limits<std::uint32_t>::max()) || (std::is_signed_v<Value> && std::cmp_less(value, std::numeric_limits<int>::min()))) throw std::overflow_error("UI result exceeds an MBC word");
         }
         const auto word = value;
         std::memcpy(reinterpret_cast<void*>(address), &word, sizeof(word));
@@ -4499,35 +3336,35 @@ namespace {
 }
 
 const char* SphereUI::Window::getText() const {
-    return detail::stringData(text, text_capacity);
+    return text.c_str();
 }
 
 const char* SphereUI::Window::getHelp() const {
-    return detail::stringData(help, help_capacity);
+    return help.c_str();
 }
 
 void SphereUI::Window::setText(const char* value) {
-    detail::assignString(text, text_length, text_capacity, value == nullptr ? "" : value);
+    text.assign(value == nullptr ? "" : value);
 }
 
 void SphereUI::Window::setHelp(const char* value) {
-    detail::assignString(help, help_length, help_capacity, value == nullptr ? "" : value);
+    help.assign(value == nullptr ? "" : value);
 }
 
 const char* SphereUI::Window::getName() const {
-    return detail::stringData(name, name_capacity);
+    return name.c_str();
 }
 
 const char* SphereUI::Window::getResourceName() const {
-    return detail::stringData(resource_name, resource_name_capacity);
+    return resource_name.c_str();
 }
 
 void SphereUI::Window::setName(const char* value) {
-    detail::assignString(name, name_length, name_capacity, value == nullptr ? "" : value);
+    name.assign(value == nullptr ? "" : value);
 }
 
 void SphereUI::Window::setResourceName(const char* value) {
-    detail::assignString(resource_name, resource_name_length, resource_name_capacity, value == nullptr ? "" : value);
+    resource_name.assign(value == nullptr ? "" : value);
 }
 
 void SphereUI::ButtonCtrl::click() {
@@ -4543,81 +3380,62 @@ void SphereUI::ButtonCtrl::click() {
 }
 
 void SphereUI::ImageCtrl::setImage(const ImageDescription* description) {
-    if (description == nullptr) {
-        resource_reference = nullptr;
-        return;
+    if (description == nullptr) { resource_reference.reset(); return; }
+    if (resource_reference && SferaSimpleParser::equalsIgnoreCase(resource_reference->name.c_str(), description->name)) return;
+    auto replacement = parent ? parent->findResource(description->name) : nullptr;
+    if (!replacement) replacement = g_sfera_interface.sharedSprite(description->name);
+    if (!replacement) {
+        auto image = std::make_shared<UiSprite>();
+        image->setDescription(*description);
+        fallback_image = image;
+        replacement = std::move(image);
     }
-    if (resource_reference != nullptr && SferaSimpleParser::equalsIgnoreCase(resource_reference->name, description->name)) return;
-    resource_reference = nullptr;
-    if (auto* owner = parent) resource_reference = owner->findResource(description->name);
-    if (resource_reference == nullptr) resource_reference = g_sfera_interface.sharedSprite(description->name);
-    if (resource_reference != nullptr) return;
-    if (fallback_image == nullptr) {
-        fallback_image = UiSprite::create();
-        if (fallback_image == nullptr) throw std::bad_alloc();
-    }
-    fallback_image->setDescription(*description);
-    resource_reference = fallback_image;
+    resource_reference = std::move(replacement);
 }
 
-SphereUI::Window* SphereUI::Window::createControl(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range, SphereUI::UiControlKind kind, std::uint32_t id) {
+std::unique_ptr<SphereUI::Window> SphereUI::Window::createControl(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range, SphereUI::UiControlKind kind, std::uint32_t id) {
     if (kind == anyControlKind) return nullptr;
-    auto* control = Runtime::makeControl(kind);
+    auto control = Runtime::makeControl(kind);
     if (control == nullptr) return nullptr;
     UiReader reader(parser, range);
-    try {
-        SferaParserRange tip_range{};
-        if (reader.block("tooltip", tip_range)) {
-            auto* tip = Runtime::makeControl(UiControlKind::tooltip);
-            if (tip != nullptr) {
-                tip->setParent(control);
-                control->tooltip = tip;
-                if (!tip->loadUi(filename, parser, tip_range)) destroyOwned(control->tooltip);
-            }
+    SferaParserRange tip_range{};
+    if (reader.block("tooltip", tip_range)) {
+        auto tip = std::make_unique<ToolTipCtrl>();
+        if (tip != nullptr) {
+            tip->setParent(control.get());
+            if (tip->loadUi(filename, parser, tip_range)) control->tooltip = std::move(tip);
         }
-        reader.pair("position", control->x, control->y);
-        reader.pair("size", control->width, control->height);
-        reader.color("disabledColor", control->disabled_color);
-        if (reader.pair("showTitle", control->text_offset_x, control->text_offset_y)) control->behavior_flags |= WindowStyle::showTitle;
-        reader.boolean("disabled", control->disabled);
-        reader.boolean("hidden", control->hidden);
-        reader.integer("group", control->group);
-        if (reader.has("font")) {
-            control->font = static_cast<std::uint8_t>(parser.readInt(0u));
-            control->font_initialized = true;
-        }
-        reader.flags("textFormat", control->input_mask, textAlignments, true);
-        reader.color("textColor", control->text_color);
-        if (const char* value = reader.string("windowText")) control->setText(g_sfera_interface.localizedText(value));
-        if (const char* value = reader.string("windowHelp", true)) control->setHelp(value);
-        if (const char* value = reader.string("setWindowText", true)) control->setText(value);
-        reader.boolean("canDragDrop", control->can_drag_drop);
-        control->parent = parent == nullptr ? this : parent;
-        if (!control->loadUi(filename, parser, range)) {
-            control->destroy(true);
-            return nullptr;
-        }
-        control->control_id = id;
-        return control;
-    } catch (...) {
-        control->destroy(true);
-        throw;
     }
+    reader.pair("position", control->x, control->y);
+    reader.pair("size", control->width, control->height);
+    reader.color("disabledColor", control->disabled_color);
+    if (reader.pair("showTitle", control->text_offset_x, control->text_offset_y)) control->behavior_flags |= WindowStyle::showTitle;
+    reader.boolean("disabled", control->disabled);
+    reader.boolean("hidden", control->hidden);
+    reader.integer("group", control->group);
+    if (reader.has("font")) {
+        control->font = static_cast<std::uint8_t>(parser.readInt(0u));
+        control->font_initialized = true;
+    }
+    reader.flags("textFormat", control->text_alignment, textAlignments, true);
+    reader.color("textColor", control->text_color);
+    if (const char* value = reader.string("windowText")) control->setText(g_sfera_interface.localizedText(value));
+    if (const char* value = reader.string("windowHelp", true)) control->setHelp(value);
+    if (const char* value = reader.string("setWindowText", true)) control->setText(value);
+    reader.boolean("canDragDrop", control->can_drag_drop);
+    control->parent = parent == nullptr ? this : parent;
+    if (!control->loadUi(filename, parser, range)) return nullptr;
+    control->control_id = id;
+    return control;
+
 }
 
-void SphereUI::FontPicker::initialize() {
-    Window::initialize();
-    selector = nullptr;
-    preview = nullptr;
+SphereUI::FontPicker::FontPicker() {
     hidden = false;
     control_kind = UiControlKind::fontPicker;
 }
 
-void SphereUI::SpinButton::initialize() {
-    Window::initialize();
-    decrease_button = increase_button = nullptr;
-    body = nullptr;
-    minimum = current = 0;
+SphereUI::SpinButton::SpinButton() {
     maximum = 100;
     previous = -1;
     step = 1;
@@ -4627,29 +3445,17 @@ void SphereUI::SpinButton::initialize() {
     control_kind = UiControlKind::spinButton;
 }
 
-void SphereUI::ScrollBar::initialize() {
-    Window::initialize();
-    scroll_resource = nullptr;
-    decrease_button = increase_button = nullptr;
-    orientation_flags = 0u;
-    thumb_width = thumb_height = thumb_x = thumb_y = minimum = current = track_left = track_top = track_right = track_bottom = 0;
-    normalized_position = 0.0f;
+SphereUI::ScrollBar::ScrollBar() {
     maximum = 100;
     step = 1;
     page_step = 20;
     dragging_thumb = explicit_step = notify_changes = page_click_active = hidden = false;
-    repeat_started_at = 0;
-
     control_kind = UiControlKind::scrollBar;
 }
 
-void SphereUI::SliderCtrl::initialize() {
-    ScrollBar::initialize();
+SphereUI::SliderCtrl::SliderCtrl() {
     control_kind = UiControlKind::slider;
     orientation_flags = 1u;
-    std::fill(std::begin(value_text), std::end(value_text), 0);
-    display_mode = 0u;
-    status_x = status_y = 0;
 }
 
 void SphereUI::ScrollBar::setParameters(const ScrollParameters& parameters) {
@@ -4672,12 +3478,7 @@ void SphereUI::ScrollBar::getParameters(ScrollParameters& parameters) const {
     parameters.step = step;
 }
 
-void SphereUI::ToolTipCtrl::initialize() {
-    Window::initialize();
-    screen_x = screen_y = line_height = 0;
-    hover_pending = dismissed = false;
-    hover_started = fade_started = 0u;
-    fade_opacity = 0.0f;
+SphereUI::ToolTipCtrl::ToolTipCtrl() {
     background_color = UiColor::tooltipBackground;
     text_color = 0u;
     font = 2u;
@@ -4689,9 +3490,7 @@ void SphereUI::ToolTipCtrl::initialize() {
     margin_top = 1;
     margin_right = 2;
     margin_bottom = 1;
-    lines = {};
 }
-
 
 void SphereUI::ToolTipCtrl::reset() {
     fade_opacity = 0.0f;
@@ -4727,7 +3526,7 @@ void SphereUI::ToolTipCtrl::updateLayout() {
 
 void SphereUI::ToolTipCtrl::appendLine(const char* text) {
     if (text == nullptr) return;
-    lines.append(text);
+    lines.emplace_back(text == nullptr ? "" : text);
     updateLayout();
 }
 
@@ -4738,44 +3537,26 @@ void SphereUI::ToolTipCtrl::setLine(std::uint32_t index, const char* text) {
     }
     if (text == nullptr) text = "";
     if (std::strcmp(lines.at(index).data(), text) == 0) return;
-    lines.at(index).assign(text);
+    lines.at(index).assign(text == nullptr ? "" : text);
     updateLayout();
 }
 
-void SphereUI::ToolTipCtrl::copyTipState(const ToolTipCtrl& source) {
-    screen_x = source.screen_x;
-    screen_y = source.screen_y;
-    hover_pending = source.hover_pending;
-    hover_started = source.hover_started;
-    fade_opacity = source.fade_opacity;
-    fade_started = source.fade_started;
-    background_color = source.background_color;
-    tooltip_width = source.tooltip_width;
-    tooltip_height = source.tooltip_height;
-    dismissed = source.dismissed;
-    line_height = source.line_height;
-    margin_left = source.margin_left;
-    margin_top = source.margin_top;
-    margin_right = source.margin_right;
-    margin_bottom = source.margin_bottom;
-    lines.copyFrom(source.lines);
-}
-
 void SphereUI::Window::resetToolTips() {
-    if (auto* tip = tooltip) static_cast<ToolTipCtrl*>(tip)->reset();
+    if (auto* tip = tooltip.get()) tip->reset();
     detail::forEachChild(*this, [](Window& child) {
         child.resetToolTips();
     });
 }
 
-void SphereUI::CDescriptionWindow::initialize() {
+SphereUI::CDescriptionWindow::CDescriptionWindow() {
     auto* original = g_sfera_interface.templateWindow("objdesc2");
     if (original == nullptr) throw std::runtime_error("description template objdesc2 is missing");
-    Window::initializeCopy(*original);
+    CloneContext context;
+    Window::initializeCopy(*original, context);
+    context.finish();
     displayed_source = pending_source = nullptr; show_deadline = hide_deadline = 0u;
-    pinned = false;
     const char* names[] = {"window_caption", "window_bottom", "window_left", "window_right"};
-    UiSprite** sprites[] = {&caption_sprite, &bottom_sprite, &left_sprite, &right_sprite};
+    std::shared_ptr<const UiSprite>* sprites[] = {&caption_sprite, &bottom_sprite, &left_sprite, &right_sprite};
     for (std::size_t index = 0u; index < 4u; ++index) {
         *sprites[index] = findResource(names[index]);
         if (*sprites[index] == 0u) throw std::runtime_error(std::string("description sprite is missing: ") + names[index]);
@@ -4788,12 +3569,29 @@ void SphereUI::CDescriptionWindow::initialize() {
     frame_height = detail::subtractCoordinate(height, content->height);
     g_sfera_interface.bindEventHandler(this, WindowEventHandler::description);
     close();
-    g_sfera_interface.addTopLevelWindow(*this);
+}
+
+std::unique_ptr<SphereUI::Window> SphereUI::CDescriptionWindow::cloneInto(CloneContext& context) const {
+    auto copy = std::unique_ptr<CDescriptionWindow>(new CDescriptionWindow(std::in_place));
+    copy->initializeCopy(*this, context);
+    copy->displayed_source = displayed_source;
+    copy->pending_source = pending_source;
+    copy->show_deadline = show_deadline;
+    copy->hide_deadline = hide_deadline;
+    copy->caption_sprite = caption_sprite;
+    copy->bottom_sprite = bottom_sprite;
+    copy->left_sprite = left_sprite;
+    copy->right_sprite = right_sprite;
+    copy->frame_height = frame_height;
+    copy->pinned = pinned;
+    return copy;
 }
 
 SphereUI::CDescriptionWindow* SphereUI::CDescriptionWindow::instance() {
     if (auto* existing = Runtime::descriptionWindow()) return existing;
-    auto* result = createInitialized<CDescriptionWindow>();
+    auto window = std::make_unique<CDescriptionWindow>();
+    auto* result = window.get();
+    g_sfera_interface.addTopLevelWindow(std::move(window));
     Runtime::setDescriptionWindow(result);
     return result;
 }
@@ -4866,48 +3664,32 @@ void SphereUI::CDescriptionWindow::requestDescription(const char* text, bool for
     else if (Runtime::milliseconds() >= show_deadline) showDescription(text, pending_source, 250u, false);
 }
 
-void SphereUI::ListItemCtrl::initialize() {
-    Window::initialize();
-    item_template = nullptr;
-    items = {};
-    horizontal_offset = vertical_offset = visible_begin = visible_end = visible_capacity = cropped_x = cropped_y = maximum_y = maximum_x = 0;
-    vertical_scroll = horizontal_scroll = nullptr;
-    layout_dirty = can_select = horizontal = user_move = false;
-    selection_sprite = nullptr;
+SphereUI::ListItemCtrl::ListItemCtrl() {
     selected_index = -1;
     hidden = false;
     control_kind = UiControlKind::listItem;
 }
 
 SphereUI::Window* SphereUI::ListItemCtrl::itemAt(std::size_t index) const {
-    return index < items.size() ? items.at(index) : nullptr;
+    return index < items.size() ? items.at(index).get() : nullptr;
 }
 
 int SphereUI::ListItemCtrl::addItem() {
-    auto* original = item_template;
-    if (original == nullptr) return -1;
-    auto* item = original->clone();
-    if (item == nullptr) return -1;
+    if (!item_template) return -1;
+    std::unique_ptr<Window> item(item_template->clone());
+    if (!item) return -1;
     item->hidden = false;
-    try {
-        items.append(item);
-    } catch (...) {
-        item->destroy(true);
-        throw;
-    }
-    return items.size() - 1u;
+    items.push_back(std::move(item));
+    return static_cast<int>(items.size() - 1u);
 }
 
 void SphereUI::ListItemCtrl::clearItems() {
-    const auto count = items.size();
-    for (std::size_t index = 0u; index < count; ++index) destroyOwned(items.at(index));
     items.clear();
 }
 
 void SphereUI::ListItemCtrl::removeItem(std::size_t index) {
     if (index >= items.size()) return;
-    destroyOwned(items.at(index));
-    items.erase(index);
+    items.erase(items.begin() + index);
     bool changed = index == static_cast<std::uint32_t>(selected_index);
     if (changed) selected_index = -1;
     if (selected_index < 0 || static_cast<std::size_t>(selected_index) >= items.size()) {
@@ -4918,7 +3700,7 @@ void SphereUI::ListItemCtrl::removeItem(std::size_t index) {
 }
 
 void SphereUI::ListItemCtrl::updateVisibleRange() {
-    const auto* original = item_template;
+    const auto* original = item_template.get();
     if (original == nullptr) return;
     horizontal_offset = std::clamp(horizontal_offset, 0, std::max(maximum_x, 0));
     vertical_offset = std::clamp(vertical_offset, 0, std::max(maximum_y, 0));
@@ -4935,11 +3717,10 @@ void SphereUI::ListItemCtrl::updateVisibleRange() {
         cropped_x = cropped_y = visible_begin = 0;
         visible_end = items.size();
     }
-    layout_dirty = true;
 }
 
 void SphereUI::ListItemCtrl::updateLayout() {
-    const auto* original = item_template;
+    const auto* original = item_template.get();
     if (original == nullptr) return;
     const auto extent = !horizontal ? original->height : original->width;
     const auto available = !horizontal ? height : width;
@@ -4950,84 +3731,52 @@ void SphereUI::ListItemCtrl::updateLayout() {
     maximum_y = std::max(0, detail::subtractCoordinate(total_height, height));
     horizontal_offset = std::clamp(horizontal_offset, 0, maximum_x);
     vertical_offset = std::clamp(vertical_offset, 0, maximum_y);
-    if (auto* bar = vertical_scroll) bar->setParameters({0u, ScrollField::all, 0, maximum_y, height, vertical_offset, static_cast<int>(static_cast<std::uint32_t>(original->height) / 10u + 1u)});
-    if (auto* bar = horizontal_scroll) bar->setParameters({0u, ScrollField::all, 0, maximum_x, width, horizontal_offset, static_cast<int>(static_cast<std::uint32_t>(maximum_x) / 10u + 1u)});
+    if (auto* bar = vertical_scroll.get()) bar->setParameters({0u, ScrollField::all, 0, maximum_y, height, vertical_offset, static_cast<int>(static_cast<std::uint32_t>(original->height) / 10u + 1u)});
+    if (auto* bar = horizontal_scroll.get()) bar->setParameters({0u, ScrollField::all, 0, maximum_x, width, horizontal_offset, static_cast<int>(static_cast<std::uint32_t>(maximum_x) / 10u + 1u)});
     updateVisibleRange();
 }
 
-void SphereUI::ListItemCtrl::copyItemState(const ListItemCtrl& source) {
+void SphereUI::ListItemCtrl::copyItemState(const ListItemCtrl& source, CloneContext& context) {
     if (this == &source) return;
     clearItems();
-    horizontal_offset = source.horizontal_offset;
-    vertical_offset = source.vertical_offset;
-    visible_begin = source.visible_begin;
-    visible_end = source.visible_end;
-    visible_capacity = source.visible_capacity;
-    cropped_x = source.cropped_x;
-    cropped_y = source.cropped_y;
-    maximum_x = source.maximum_x;
-    maximum_y = source.maximum_y;
-    layout_dirty = source.layout_dirty;
-    can_select = source.can_select;
-    selection_sprite = source.selection_sprite;
-    selected_index = source.selected_index;
-    horizontal = source.horizontal;
-    user_move = source.user_move;
-    cloneOwned(item_template, source.item_template, *this);
-    if (auto* copy = item_template) copy->setParent(nullptr);
-    for (std::size_t index = 0u; index < source.items.size(); ++index) if (addItem() < 0) throw std::bad_alloc();
-    cloneOwned(vertical_scroll, source.vertical_scroll, *this);
-    cloneOwned(horizontal_scroll, source.horizontal_scroll, *this);
+    copyProperties(*this, source,
+        &ListItemCtrl::horizontal_offset, &ListItemCtrl::vertical_offset, &ListItemCtrl::visible_begin, &ListItemCtrl::visible_end,
+        &ListItemCtrl::visible_capacity, &ListItemCtrl::cropped_x, &ListItemCtrl::cropped_y, &ListItemCtrl::maximum_x,
+        &ListItemCtrl::maximum_y, &ListItemCtrl::can_select, &ListItemCtrl::selection_sprite, &ListItemCtrl::selected_index,
+        &ListItemCtrl::horizontal, &ListItemCtrl::user_move);
+    cloneOwned(item_template, source.item_template, *this, context);
+    if (item_template) item_template->parent = source.item_template->parent;
+    items.reserve(source.items.size());
+    for (const auto& item : source.items) items.push_back(item ? item->cloneInto(context) : nullptr);
+    cloneOwned(vertical_scroll, source.vertical_scroll, *this, context);
+    cloneOwned(horizontal_scroll, source.horizontal_scroll, *this, context);
 }
 
 void SphereUI::Window::drawToolTips() {
     detail::forEachChild(*this, [](Window& child) {
-        if (!child.hidden) if (auto* tip = child.tooltip) tip->draw();
+        if (!child.hidden) if (auto* tip = child.tooltip.get()) tip->draw();
     });
     if (auto* control = overlay) if (!control->hidden) control->draw();
 }
 
-void SphereUI::ListCtrl::initialize() {
-    Window::initialize();
-    visible_begin = visible_end = 0;
-    rows = {};
-    maximum_items = write_index = 0u;
-    maximum_scroll = visible_capacity = vertical_offset = cropped_y = 0;
+SphereUI::ListCtrl::ListCtrl() {
     line_height = 1;
-    chatlike = format_strings = continue_mark = can_select = click_pending = false;
-    scrollbar = nullptr;
     selected_index = -1;
     selection_border = 3;
     selection_color = UiColor::listSelection;
-    selection_line_color = 0u;
-    click_time = 0u;
     hidden = false;
     control_kind = UiControlKind::textList;
 }
 
-void SphereUI::ListCtrl::copyListState(const ListCtrl& source) {
+void SphereUI::ListCtrl::copyListState(const ListCtrl& source, CloneContext& context) {
     if (this == &source) return;
-    visible_begin = source.visible_begin;
-    visible_end = source.visible_end;
-    rows.copyFrom(source.rows);
-    maximum_items = source.maximum_items;
-    write_index = source.write_index;
-    maximum_scroll = source.maximum_scroll;
-    line_height = source.line_height;
-    visible_capacity = source.visible_capacity;
-    vertical_offset = source.vertical_offset;
-    cropped_y = source.cropped_y;
-    chatlike = source.chatlike;
-    format_strings = source.format_strings;
-    continue_mark = source.continue_mark;
-    can_select = source.can_select;
-    selected_index = source.selected_index;
-    selection_border = source.selection_border;
-    selection_color = source.selection_color;
-    selection_line_color = source.selection_line_color;
-    click_time = source.click_time;
-    click_pending = source.click_pending;
-    cloneOwned(scrollbar, source.scrollbar, *this);
+    copyProperties(*this, source,
+        &ListCtrl::visible_begin, &ListCtrl::visible_end, &ListCtrl::rows, &ListCtrl::maximum_items, &ListCtrl::write_index,
+        &ListCtrl::maximum_scroll, &ListCtrl::line_height, &ListCtrl::visible_capacity, &ListCtrl::vertical_offset,
+        &ListCtrl::cropped_y, &ListCtrl::chatlike, &ListCtrl::format_strings, &ListCtrl::continue_mark, &ListCtrl::can_select,
+        &ListCtrl::selected_index, &ListCtrl::selection_border, &ListCtrl::selection_color, &ListCtrl::selection_line_color,
+        &ListCtrl::click_time, &ListCtrl::click_pending);
+    cloneOwned(scrollbar, source.scrollbar, *this, context);
 }
 
 std::size_t SphereUI::ListCtrl::physicalIndex(std::size_t logical_index) const {
@@ -5049,7 +3798,7 @@ void SphereUI::ListCtrl::updateLayout() {
     visible_capacity = line_height > 0 ? height / line_height + 1 : 0;
     const int extent = rows.size() * static_cast<std::uint32_t>(line_height);
     maximum_scroll = height > extent ? 0 : std::max(0, detail::addCoordinate(detail::subtractCoordinate(extent, height), 1));
-    if (auto* bar = scrollbar) bar->setParameters({0u, ScrollField::all, 0, maximum_scroll, height, vertical_offset, line_height});
+    if (auto* bar = scrollbar.get()) bar->setParameters({0u, ScrollField::all, 0, maximum_scroll, height, vertical_offset, line_height});
     updateVisibleRange();
 }
 
@@ -5059,13 +3808,13 @@ void SphereUI::ListCtrl::appendLine(const char* text, std::uint32_t color) {
         notifyParent(*this, UiMessage::listSelectionChanged, invalidIndex);
     }
     int offset = 0;
-    if (input_mask != 0u && text != nullptr) {
+    if (text_alignment != 0u && text != nullptr) {
         const auto extent = InterfaceRenderer::measureText(text, font, font_initialized);
         const auto remainder = detail::subtractCoordinate(width, extent.width);
-        if ((input_mask & TextAlignment::right) != 0u) offset = remainder;
-        if ((input_mask & TextAlignment::horizontalCenter) != 0u) offset = std::abs(static_cast<std::int64_t>(remainder)) / 2;
+        if ((text_alignment & TextAlignment::right) != 0u) offset = remainder;
+        if ((text_alignment & TextAlignment::horizontalCenter) != 0u) offset = std::abs(static_cast<std::int64_t>(remainder)) / 2;
     }
-    appendCircular(rows, maximum_items, write_index, text, color, offset);
+    appendCircular(rows, maximum_items, write_index, UiTextRow{text == nullptr ? " " : text, color, offset});
     updateLayout();
 }
 
@@ -5097,7 +3846,7 @@ void SphereUI::ListCtrl::clearRows() {
 
 void SphereUI::ListCtrl::removeRow(std::size_t logical_index) {
     if (logical_index >= rows.size()) return;
-    rows.erase(physicalIndex(logical_index));
+    rows.erase(rows.begin() + physicalIndex(logical_index));
     if (maximum_items != 0u) write_index = write_index == 0u ? 0u : write_index - 1u;
     if (parent != nullptr && selected_index != -1) {
         selected_index = -1;
@@ -5136,11 +3885,8 @@ void SphereUI::ListCtrl::drawSelection(int screen_x, int screen_y, int row_y, bo
     InterfaceRenderer::drawTexture(nullptr, right - 1.0f, top, right, bottom, line, 0.0f, 0.0f, false);
 }
 
-void SphereUI::FilterListCtrl::initialize() {
-    ListCtrl::initialize();
+SphereUI::FilterListCtrl::FilterListCtrl() {
     filter_mask = 255u;
-    history = {};
-    history_write = 0u;
     control_kind = UiControlKind::filteredList;
 }
 
@@ -5150,7 +3896,7 @@ void SphereUI::FilterListCtrl::clearHistory() {
 }
 
 void SphereUI::FilterListCtrl::appendHistory(const char* text, std::uint32_t color, std::uint32_t mask) {
-    appendCircular(history, maximum_items, history_write, text, mask, static_cast<int>(color));
+    appendCircular(history, maximum_items, history_write, HistoryEntry{text == nullptr ? " " : text, color, mask});
 }
 
 void SphereUI::FilterListCtrl::applyFilter(std::uint32_t mask) {
@@ -5160,7 +3906,7 @@ void SphereUI::FilterListCtrl::applyFilter(std::uint32_t mask) {
     clearRows();
     for (std::size_t index = 0u; index < history.size(); ++index) {
         const auto& row = history.at(index);
-        if ((row.color & mask) != 0u) addText(row.text.data(), static_cast<std::uint32_t>(row.offset));
+        if ((row.filter & mask) != 0u) addText(row.text.data(), row.color);
     }
 }
 
@@ -5174,63 +3920,9 @@ namespace {
     }
 }
 
-void SphereUI::CMenuListControl::initialize() {
-    Window::initialize();
-    maximum_items = {};
-    top_sprite = {};
-    middle_sprite = {};
-    hovered_sprite = {};
-    bottom_sprite = {};
-    title_color = {};
-    normal_color = {};
-    hovered_color = {};
-    item_disabled_color = {};
-    show_title = {};
-
-    title_margin = {};
-    title_format = {};
-    item_margin = {};
-    item_format = {};
-    top_size = {};
-    item_size = {};
-    bottom_size = {};
-    parent_screen_x = {};
-    parent_screen_y = {};
-    parent_width = {};
-    parent_height = {};
-    items = {};
-    hovered_index = {};
-    saved_viewport = {};
+SphereUI::CMenuListControl::CMenuListControl() {
     maximum_items = hovered_index = 1u;
     control_kind = UiControlKind::menu;
-}
-
-void SphereUI::CMenuListControl::copyMenuState(const CMenuListControl& source) {
-    if (this == &source) return;
-    items.copyFrom(source.items);
-    maximum_items = source.maximum_items;
-    top_sprite = source.top_sprite;
-    middle_sprite = source.middle_sprite;
-    hovered_sprite = source.hovered_sprite;
-    bottom_sprite = source.bottom_sprite;
-    title_color = source.title_color;
-    normal_color = source.normal_color;
-    hovered_color = source.hovered_color;
-    item_disabled_color = source.item_disabled_color;
-    show_title = source.show_title;
-    title_margin = source.title_margin;
-    title_format = source.title_format;
-    item_margin = source.item_margin;
-    item_format = source.item_format;
-    top_size = source.top_size;
-    item_size = source.item_size;
-    bottom_size = source.bottom_size;
-    parent_screen_x = source.parent_screen_x;
-    parent_screen_y = source.parent_screen_y;
-    parent_width = source.parent_width;
-    parent_height = source.parent_height;
-    hovered_index = source.hovered_index;
-    saved_viewport = source.saved_viewport;
 }
 
 bool SphereUI::CMenuListControl::loadUi(const char*, SferaSimpleParser& parser, const SferaParserRange& range) {
@@ -5239,7 +3931,7 @@ bool SphereUI::CMenuListControl::loadUi(const char*, SferaSimpleParser& parser, 
     reader.sprite("middleSprite", *this, middle_sprite);
     reader.sprite("bottomSprite", *this, bottom_sprite);
     if (top_sprite == nullptr || middle_sprite == nullptr || bottom_sprite == nullptr) return false;
-    const auto dimensions = [](const UiSprite* sprite) {
+    const auto dimensions = [](const std::shared_ptr<const UiSprite>& sprite) {
         return TextExtent{sprite->width, sprite->height};
     };
     top_size = dimensions(top_sprite);
@@ -5269,9 +3961,18 @@ bool SphereUI::CMenuListControl::loadUi(const char*, SferaSimpleParser& parser, 
     return true;
 }
 
-SphereUI::Window* SphereUI::CMenuListControl::clone() {
-    return cloneControl(*this, [](auto& destination, const auto& source) {
-        destination.copyMenuState(source);
+std::unique_ptr<SphereUI::Window> SphereUI::CMenuListControl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](auto& destination, const auto& source, SphereUI::Window::CloneContext& context) {
+
+        copyProperties(destination, source,
+            &CMenuListControl::items, &CMenuListControl::maximum_items, &CMenuListControl::top_sprite,
+            &CMenuListControl::middle_sprite, &CMenuListControl::hovered_sprite, &CMenuListControl::bottom_sprite,
+            &CMenuListControl::title_color, &CMenuListControl::normal_color, &CMenuListControl::hovered_color,
+            &CMenuListControl::item_disabled_color, &CMenuListControl::show_title, &CMenuListControl::title_margin,
+            &CMenuListControl::title_format, &CMenuListControl::item_margin, &CMenuListControl::item_format,
+            &CMenuListControl::top_size, &CMenuListControl::item_size, &CMenuListControl::bottom_size,
+            &CMenuListControl::parent_screen_x, &CMenuListControl::parent_screen_y, &CMenuListControl::parent_width,
+            &CMenuListControl::parent_height, &CMenuListControl::hovered_index);
     });
 }
 
@@ -5299,17 +4000,7 @@ void SphereUI::CMenuListControl::keepOnScreen() {
 
 void SphereUI::CMenuListControl::addItem(const char* text, bool enabled) {
     if (items.size() >= maximum_items) return;
-    UiMenuItem value{};
-    value.text.capacity = 15u;
-    value.text.assign(text);
-    value.enabled = enabled;
-    try {
-        items.append(value);
-    } catch (...) {
-        value.text.release();
-        throw;
-    }
-    value.text.release();
+    items.push_back({text == nullptr ? "" : text, enabled});
     height += item_size.height;
     updateParentPosition();
     if (auto* owner = parent) owner->handleMessage(UiMessage::setSize, static_cast<std::uint32_t>(parent_width), static_cast<std::uint32_t>(parent_height + item_size.height));
@@ -5352,7 +4043,7 @@ std::uint32_t SphereUI::CMenuListControl::handleMessage(SphereUI::UiMessage mess
             if (first < items.size()) items.at(first).enabled = second != 0u;
             break;
         case UiMessage::setMenuItemText:
-            if (first < items.size()) items.at(first).text.assign(reinterpret_cast<const char*>(second));
+            if (first < items.size()) items.at(first).text.assign(second == 0u ? "" : reinterpret_cast<const char*>(second));
             break;
         default:
             return Window::handleMessage(message, first, second);
@@ -5369,7 +4060,7 @@ void SphereUI::CMenuListControl::drawHeader() {
     }
 }
 
-void SphereUI::CMenuListControl::drawItem(std::size_t index, UiSprite* sprite, std::uint32_t color) {
+void SphereUI::CMenuListControl::drawItem(std::size_t index, const std::shared_ptr<const UiSprite>& sprite, std::uint32_t color) {
     if (index >= items.size()) return;
     const auto bounds = windowBounds(*this);
     const auto row_top = bounds.top + top_size.height + static_cast<int>(index) * item_size.height;
@@ -5387,7 +4078,6 @@ void SphereUI::CMenuListControl::drawFooter() {
 void SphereUI::CMenuListControl::draw() {
     if (hidden || (behavior_flags & WindowStyle::skipDrawing) != 0u) return;
     keepOnScreen();
-    saved_viewport = InterfaceRenderer::viewport();
     ViewportScope viewport(windowBounds(*this));
     if (!viewport) return;
     drawHeader();
@@ -5406,40 +4096,8 @@ void SphereUI::CMenuListControl::handleInput(const WindowInput& input) {
     if (const auto* owner = parent; owner != nullptr && !owner->containsPoint(position.x, position.y) && (input.mouse_flags & 3u) != 0u) closeMenu();
 }
 
-void SphereUI::CMenuListControl::destroy(bool free_storage) {
-    items.release();
-    Window::destroy(free_storage);
-}
 
-void SphereUI::SlotCtrl::initialize() {
-    Window::initialize();
-    full_sprite = {};
-    empty_sprite = {};
-    border_sprite = {};
-    fill_alpha = {};
-    fill_color = {};
-    border_color = {};
-    image_offset_x = {};
-    image_offset_y = {};
-    item_image = {};
-    show_full_background = {};
-    has_item = {};
-
-    press_x = {};
-    press_y = {};
-    left_pressed = {};
-    right_pressed = {};
-    drag_started = {};
-
-    description = {};
-    count_offset_x = {};
-    count_offset_y = {};
-    item_count = {};
-    top_left_overlay = {};
-    bottom_right_overlay = {};
-    bottom_left_overlay = {};
-    item_image.initialize();
-    description.capacity = 15u;
+SphereUI::SlotCtrl::SlotCtrl() {
     fill_alpha = 128u;
     fill_color = UiColor::slotFill;
     border_color = UiColor::slotBorder;
@@ -5449,55 +4107,15 @@ void SphereUI::SlotCtrl::initialize() {
     hidden = false;
     control_kind = UiControlKind::slot;
     can_drag_drop = true;
-    input_mask = TextAlignment::right;
+    text_alignment = TextAlignment::right;
     text_color = UiColor::white;
 }
 
-void SphereUI::SlotCtrl::copySlotState(const SlotCtrl& source) {
-    if (this == &source) return;
-    item_image.copyFrom(source.item_image);
-    description.assign(source.description.data());
-    const auto replace_overlay = [](UiSprite*& target, const UiSprite* original) {
-        const auto copy = (original == nullptr ? nullptr : original->clone());
-        if (target != nullptr) target->destroy();
-        target = copy;
-    };
-    replace_overlay(top_left_overlay, source.top_left_overlay);
-    replace_overlay(bottom_right_overlay, source.bottom_right_overlay);
-    replace_overlay(bottom_left_overlay, source.bottom_left_overlay);
-    full_sprite = source.full_sprite;
-    empty_sprite = source.empty_sprite;
-    border_sprite = source.border_sprite;
-    fill_alpha = source.fill_alpha;
-    fill_color = source.fill_color;
-    border_color = source.border_color;
-    image_offset_x = source.image_offset_x;
-    image_offset_y = source.image_offset_y;
-    show_full_background = source.show_full_background;
-    has_item = source.has_item;
-
-    press_x = source.press_x;
-    press_y = source.press_y;
-    left_pressed = source.left_pressed;
-    right_pressed = source.right_pressed;
-    drag_started = source.drag_started;
-
-    count_offset_x = source.count_offset_x;
-    count_offset_y = source.count_offset_y;
-    item_count = source.item_count;
-}
-
-void SphereUI::SlotCtrl::setOverlay(UiSprite*& destination, const char* image) {
-    if (image == nullptr) {
-        if (destination != nullptr) destination->destroy();
-        destination = 0u;
-        return;
-    }
-    if (destination == 0u) {
-        destination = UiSprite::create();
-        if (destination == 0u) throw std::bad_alloc();
-    }
-    destination->setImage(image);
+void SphereUI::SlotCtrl::setOverlay(std::shared_ptr<const UiSprite>& destination, const char* image) {
+    if (image == nullptr) { destination.reset(); return; }
+    auto replacement = std::make_shared<UiSprite>();
+    replacement->setImage(image);
+    destination = std::move(replacement);
 }
 
 void SphereUI::SlotCtrl::setItem(const char* image) {
@@ -5512,7 +4130,7 @@ void SphereUI::SlotCtrl::setItem(const char* image) {
         setOverlay(bottom_left_overlay, nullptr);
         return;
     }
-    if (item_image.name == 0u || std::strcmp(item_image.name, image) != 0) item_image.setImage(image);
+    if (item_image.name != image) item_image.setImage(image);
     show_full_background = false;
     has_item = true;
 }
@@ -5543,9 +4161,16 @@ bool SphereUI::SlotCtrl::loadUi(const char*, SferaSimpleParser& parser, const Sf
     return true;
 }
 
-SphereUI::Window* SphereUI::SlotCtrl::clone() {
-    return cloneControl(*this, [](auto& destination, const auto& source) {
-        destination.copySlotState(source);
+std::unique_ptr<SphereUI::Window> SphereUI::SlotCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](auto& destination, const auto& source, SphereUI::Window::CloneContext& context) {
+
+        copyProperties(destination, source,
+            &SlotCtrl::item_image, &SlotCtrl::description, &SlotCtrl::top_left_overlay, &SlotCtrl::bottom_right_overlay,
+            &SlotCtrl::bottom_left_overlay, &SlotCtrl::full_sprite, &SlotCtrl::empty_sprite, &SlotCtrl::border_sprite,
+            &SlotCtrl::fill_alpha, &SlotCtrl::fill_color, &SlotCtrl::border_color, &SlotCtrl::image_offset_x,
+            &SlotCtrl::image_offset_y, &SlotCtrl::show_full_background, &SlotCtrl::has_item, &SlotCtrl::press_x,
+            &SlotCtrl::press_y, &SlotCtrl::left_pressed, &SlotCtrl::right_pressed, &SlotCtrl::drag_started,
+            &SlotCtrl::count_offset_x, &SlotCtrl::count_offset_y, &SlotCtrl::item_count);
     });
 }
 
@@ -5565,7 +4190,7 @@ std::uint32_t SphereUI::SlotCtrl::handleMessage(SphereUI::UiMessage message, std
             }
             break;
         case UiMessage::setSlotDescription:
-            description.assign(reinterpret_cast<const char*>(first));
+            description.assign(first == 0u ? "" : reinterpret_cast<const char*>(first));
             break;
         case UiMessage::setSlotCount:
             setItemCount(first);
@@ -5600,28 +4225,28 @@ void SphereUI::SlotCtrl::draw() {
     const float left = bounds.left, top = bounds.top;
     const auto white = SferaColor::rgba(255u, 255u, 255u, alpha).argb();
     const auto background_color = SferaColor::fromArgb(fill_color).withAlpha(fill_alpha * alpha / 256u).argb();
-    if (auto* background = show_full_background && full_sprite != nullptr ? full_sprite : empty_sprite) background->drawNatural(left + image_offset_x, top + image_offset_y, background_color);
+    if (auto background = show_full_background && full_sprite != nullptr ? full_sprite : empty_sprite) background->drawNatural(left + image_offset_x, top + image_offset_y, background_color);
     if (has_item) {
         const auto image_width = std::min(std::max(0, width), item_image.width), image_height = std::min(std::max(0, height), item_image.height);
         const auto image_left = left + (width - image_width) / 2, image_top = top + (height - image_height) / 2;
         item_image.draw(image_left, image_top, image_left + image_width, image_top + image_height, white);
     }
     if (top_left_overlay != nullptr) top_left_overlay->drawNatural(left + 1.0f, top, white);
-    if (auto* sprite = bottom_right_overlay) sprite->drawNatural(left + width - sprite->width - 1.0f, top + height - sprite->height - 1.0f, white);
-    if (auto* sprite = bottom_left_overlay) {
+    if (auto sprite = bottom_right_overlay) sprite->drawNatural(left + width - sprite->width - 1.0f, top + height - sprite->height - 1.0f, white);
+    if (auto sprite = bottom_left_overlay) {
         const auto dx = image_offset_x == -2 ? 1.0f : 3.0f, dy = image_offset_x == -2 ? 0.0f : image_offset_x == -1 ? 1.0f : 2.0f;
         sprite->drawNatural(left + dx, top + height - sprite->height - dy - 1.0f, white);
     }
-    if (text_length != 0u && (has_item || (behavior_flags & WindowStyle::showTitle) != 0u)) {
+    if (text.size() != 0u && (has_item || (behavior_flags & WindowStyle::showTitle) != 0u)) {
         const auto extent = InterfaceRenderer::measureText(getText(), font, font_initialized);
         auto dx = count_offset_x, dy = count_offset_y;
         if (extent.width < width) {
-            if ((input_mask & TextAlignment::right) != 0u) dx += width - extent.width;
-            if ((input_mask & TextAlignment::horizontalCenter) != 0u) dx = count_offset_x + (width - extent.width) / 2;
+            if ((text_alignment & TextAlignment::right) != 0u) dx += width - extent.width;
+            if ((text_alignment & TextAlignment::horizontalCenter) != 0u) dx = count_offset_x + (width - extent.width) / 2;
         }
         if (extent.height < height) {
-            if ((input_mask & TextAlignment::bottom) != 0u) dy += height - extent.height;
-            if ((input_mask & TextAlignment::verticalCenter) != 0u) dy = count_offset_y + (height - extent.height) / 2;
+            if ((text_alignment & TextAlignment::bottom) != 0u) dy += height - extent.height;
+            if ((text_alignment & TextAlignment::verticalCenter) != 0u) dy = count_offset_y + (height - extent.height) / 2;
         }
         for (const auto offset : {TextExtent{1, 1}, TextExtent{-1, -1}, TextExtent{-1, 1}, TextExtent{1, -1}}) renderLabel(*this, getText(), bounds.left + dx + offset.width, bounds.top + dy + offset.height, SferaColor::rgba(0u, 0u, 0u, alpha).argb(), bounds);
         renderLabel(*this, getText(), bounds.left + dx, bounds.top + dy, SferaColor::fromArgb((disabled ? disabled_color : text_color)).withAlpha(alpha).argb(), bounds);
@@ -5654,43 +4279,12 @@ void SphereUI::SlotCtrl::handleInput(const WindowInput& input) {
     }
 }
 
-void SphereUI::SlotCtrl::destroy(bool free_storage) {
-    for (auto* sprite : {&top_left_overlay, &bottom_right_overlay, &bottom_left_overlay}) {
-        if (*sprite != nullptr) (*sprite)->destroy();
-        *sprite = 0u;
-    }
-    description.release();
-    item_image.release();
-    Window::destroy(free_storage);
-}
 
-void SphereUI::RichEditCtrl::initialize() {
-    Window::initialize();
-    lines = {};
-    caret_row = caret_column = 0;
-    blink_started = 0u;
+SphereUI::RichEditCtrl::RichEditCtrl() {
     cursor_visible = true;
-
-    cursor_width = line_height = page_rows = first_row = 0;
-    scrollbar = nullptr;
     control_kind = UiControlKind::richEdit;
     hidden = input_enabled = false;
-    lines.append("");
-}
-
-void SphereUI::RichEditCtrl::copyRichState(const RichEditCtrl& source) {
-    if (this == &source) return;
-    lines.copyFrom(source.lines);
-    caret_row = source.caret_row;
-    caret_column = source.caret_column;
-    blink_started = source.blink_started;
-    cursor_visible = source.cursor_visible;
-    cursor_width = source.cursor_width;
-    line_height = source.line_height;
-    page_rows = source.page_rows;
-    first_row = source.first_row;
-    destroyOwned(scrollbar);
-    cloneOwned(scrollbar, source.scrollbar, *this);
+    lines.push_back("");
 }
 
 void SphereUI::RichEditCtrl::updateMetrics(int font_id) {
@@ -5701,24 +4295,24 @@ void SphereUI::RichEditCtrl::updateMetrics(int font_id) {
 }
 
 void SphereUI::RichEditCtrl::updateScroll() {
-    if (auto* scroll = scrollbar) scroll->setParameters({sizeof(ScrollParameters), ScrollField::all, 0, std::max(0, static_cast<int>(lines.size()) - page_rows - 1), page_rows, first_row, 1});
+    if (auto* scroll = scrollbar.get()) scroll->setParameters({sizeof(ScrollParameters), ScrollField::all, 0, std::max(0, static_cast<int>(lines.size()) - page_rows - 1), page_rows, first_row, 1});
 }
 
 void SphereUI::RichEditCtrl::ensureCaretVisible() {
-    if (lines.size() == 0u) lines.append("");
+    if (lines.size() == 0u) lines.push_back("");
     caret_row = std::clamp(caret_row, 0, static_cast<int>(lines.size()) - 1);
-    caret_column = std::clamp(caret_column, 0, static_cast<int>(lines.at(caret_row).length));
+    caret_column = std::clamp(caret_column, 0, static_cast<int>(lines.at(caret_row).size()));
     first_row = std::max(0, std::clamp(first_row, caret_row - std::max(0, page_rows), caret_row));
     updateScroll();
 }
 
 void SphereUI::RichEditCtrl::moveCaret(std::uint32_t key) {
     ensureCaretVisible();
-    const int length = lines.at(caret_row).length;
+    const int length = lines.at(caret_row).size();
     switch (key) {
         case VK_LEFT:
             if (caret_column > 0) --caret_column;
-            else if (caret_row > 0) caret_column = lines.at(--caret_row).length;
+            else if (caret_row > 0) caret_column = lines.at(--caret_row).size();
             break;
         case VK_RIGHT:
             if (caret_column < length) ++caret_column;
@@ -5753,31 +4347,25 @@ void SphereUI::RichEditCtrl::moveCaret(std::uint32_t key) {
 
 void SphereUI::RichEditCtrl::setContent(const char* text) {
     const std::string source = text == nullptr ? "" : text;
-    UiStringVector replacement{};
+    std::vector<std::string> replacement{};
     std::string line;
     int used_width = 0;
-    try {
-        for (unsigned char character : source) {
-            const char glyph[] = {static_cast<char>(character), 0};
-            const auto extent = InterfaceRenderer::measureText(glyph, font, font_initialized);
-            if (character == '\n' || used_width + extent.width + cursor_width > width) {
-                replacement.append(line.c_str());
-                line.clear();
-                used_width = 0;
-            } else {
-                line.push_back(static_cast<char>(character));
-                used_width += extent.width;
-            }
+    for (unsigned char character : source) {
+        const char glyph[] = {static_cast<char>(character), 0};
+        const auto extent = InterfaceRenderer::measureText(glyph, font, font_initialized);
+        if (character == '\n' || used_width + extent.width + cursor_width > width) {
+            replacement.push_back(line.c_str());
+            line.clear();
+            used_width = 0;
+        } else {
+            line.push_back(static_cast<char>(character));
+            used_width += extent.width;
         }
-        if (!line.empty() || replacement.size() == 0u) replacement.append(line.c_str());
-    } catch (...) {
-        replacement.release();
-        throw;
     }
-    lines.release();
-    lines = replacement;
+    if (!line.empty() || replacement.size() == 0u) replacement.push_back(line.c_str());
+    lines = std::move(replacement);
     caret_row = static_cast<int>(lines.size()) - 1;
-    caret_column = lines.at(caret_row).length;
+    caret_column = lines.at(caret_row).size();
     ensureCaretVisible();
 }
 
@@ -5786,10 +4374,10 @@ void SphereUI::RichEditCtrl::copyContent(char* destination, std::uint32_t capaci
     std::size_t copied = 0u;
     for (std::size_t index = 0u; index < lines.size() && copied + 1u < capacity; ++index) {
         const auto& line = lines.at(index);
-        const auto count = std::min<std::size_t>(line.length, capacity - copied - 1u);
+        const auto count = std::min<std::size_t>(line.size(), capacity - copied - 1u);
         std::memcpy(destination + copied, line.data(), count);
         copied += count;
-        if (count < line.length) break;
+        if (count < line.size()) break;
         if (copied + 1u < capacity) destination[copied++] = '\n';
     }
     destination[copied] = 0;
@@ -5799,7 +4387,7 @@ void SphereUI::RichEditCtrl::insertAt(std::uint32_t column, std::uint8_t charact
     for (;;) {
         if (row >= lines.size()) {
             const char glyph[] = {static_cast<char>(character), 0};
-            lines.append(glyph);
+            lines.push_back(glyph);
             return;
         }
         std::string text = lines.at(row).data();
@@ -5821,7 +4409,7 @@ void SphereUI::RichEditCtrl::insertCharacter(std::uint8_t character) {
     const auto& row = lines.at(caret_row);
     const char glyph[] = {static_cast<char>(character), 0};
     const auto prospective = InterfaceRenderer::measureText(row.data(), font, font_initialized).width + InterfaceRenderer::measureText(glyph, font, font_initialized).width + cursor_width;
-    if (caret_column == static_cast<int>(row.length) && prospective >= width) {
+    if (caret_column == static_cast<int>(row.size()) && prospective >= width) {
         insertAt(0u, character, ++caret_row);
         caret_column = 1;
     } else {
@@ -5863,13 +4451,13 @@ void SphereUI::RichEditCtrl::eraseCharacter(bool backward) {
             if (row == 0u) return;
             --row;
             --caret_row;
-            caret_column = lines.at(row).length;
+            caret_column = lines.at(row).size();
         }
         if (row + 1u >= lines.size()) return;
         const auto transferred = mergeRows(row, row + 1u);
         std::string remainder = lines.at(row + 1u).data();
         remainder.erase(0u, transferred);
-        if (remainder.empty()) lines.erase(row + 1u);
+        if (remainder.empty()) lines.erase(lines.begin() + row + 1u);
         else lines.at(row + 1u).assign(remainder.c_str());
     }
     ensureCaretVisible();
@@ -5880,7 +4468,7 @@ void SphereUI::RichEditCtrl::splitLine() {
     std::string text = lines.at(caret_row).data();
     const auto following = text.substr(caret_column);
     text.resize(caret_column);
-    lines.insert(static_cast<std::uint32_t>(caret_row + 1), following.c_str());
+    lines.insert(lines.begin() + caret_row + 1, following);
     lines.at(caret_row).assign(text.c_str());
     ++caret_row;
     caret_column = 0;
@@ -5893,7 +4481,7 @@ void SphereUI::RichEditCtrl::drawCaret(float left, float top) {
     const auto elapsed = now - blink_started;
     if (elapsed > 4000u) cursor_visible = static_cast<std::uint8_t>(((elapsed - 4000u) / 4000u) & 1u);
     if (!input_enabled || !cursor_visible || caret_row < 0 || caret_row >= static_cast<int>(lines.size())) return;
-    const std::string prefix(lines.at(caret_row).data(), std::clamp(caret_column, 0, static_cast<int>(lines.at(caret_row).length)));
+    const std::string prefix(lines.at(caret_row).data(), std::clamp(caret_column, 0, static_cast<int>(lines.at(caret_row).size())));
     const auto extent = InterfaceRenderer::measureText(prefix.c_str(), font, font_initialized);
     InterfaceRenderer::drawText("_", static_cast<int>(left) + extent.width, static_cast<int>(top), text_color, font, font_initialized, windowBounds(*this), false);
 }
@@ -5906,9 +4494,14 @@ bool SphereUI::RichEditCtrl::loadUi(const char* filename, SferaSimpleParser& par
     return true;
 }
 
-SphereUI::Window* SphereUI::RichEditCtrl::clone() {
-    return cloneControl(*this, [](RichEditCtrl& copy, const RichEditCtrl& source) {
-        copy.copyRichState(source);
+std::unique_ptr<SphereUI::Window> SphereUI::RichEditCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](RichEditCtrl& copy, const RichEditCtrl& source, SphereUI::Window::CloneContext& context) {
+
+        copyProperties(copy, source,
+            &RichEditCtrl::lines, &RichEditCtrl::caret_row, &RichEditCtrl::caret_column, &RichEditCtrl::blink_started,
+            &RichEditCtrl::cursor_visible, &RichEditCtrl::cursor_width, &RichEditCtrl::line_height, &RichEditCtrl::page_rows,
+            &RichEditCtrl::first_row);
+        cloneOwned(copy.scrollbar, source.scrollbar, copy, context);
         copy.updateMetrics(source.font);
         copy.updateScroll();
     });
@@ -5945,7 +4538,7 @@ void SphereUI::RichEditCtrl::draw() {
             if (caret_row >= start && caret_row < finish) drawCaret(static_cast<float>(bounds.left), static_cast<float>(bounds.top + (caret_row - start) * line_height));
         }
     }
-    drawChild(scrollbar, alpha);
+    drawChild(scrollbar.get(), alpha);
 }
 
 void SphereUI::RichEditCtrl::handleInput(const WindowInput& input) {
@@ -5959,85 +4552,44 @@ void SphereUI::RichEditCtrl::handleInput(const WindowInput& input) {
         else if (key >= VK_PRIOR && key <= VK_DOWN) moveCaret(key);
         if (key == VK_BACK || key == VK_DELETE || key == VK_RETURN || (key >= VK_PRIOR && key <= VK_DOWN)) input.key_code = 0u;
     }
-    inputChild(scrollbar, input);
+    inputChild(scrollbar.get(), input);
     if ((input.mouse_flags & MouseInput::leftPress) != 0u) setInputFocus(hitTest(input.mouse_x, input.mouse_y));
 }
 
-void SphereUI::RichEditCtrl::destroy(bool free_storage) {
+SphereUI::RichEditCtrl::~RichEditCtrl() {
     Runtime::setTextInputActive(false);
-    destroyOwned(scrollbar);
-    lines.release();
-    Window::destroy(free_storage);
 }
 
 namespace {
-    void releaseDocument(SphereUI::HyperTextDocument*& address) {
-        auto* document = address;
-        address = nullptr;
-        delete document;
-    }
 
-    void copyDocument(SphereUI::HyperTextDocument*& destination, const SphereUI::HyperTextDocument* source, const SphereUI::Window& owner, std::uint32_t format) {
-        auto* original = source;
-        auto* copy = original == nullptr ? nullptr : original->clone(owner.width - (owner.font < 2u ? 2 : 0), format, owner.font);
-        releaseDocument(destination);
-        destination = copy;
+    void copyDocument(std::unique_ptr<SphereUI::HyperTextDocument>& destination, const std::unique_ptr<SphereUI::HyperTextDocument>& source, const SphereUI::Window& owner, std::uint32_t format) {
+        destination = source ? source->clone(owner.width - (owner.font < 2 ? 2 : 0), format, owner.font) : nullptr;
     }
 }
 
-void SphereUI::HyperTextCtrl::initialize() {
-    Window::initialize();
-    document = nullptr;
-    text_format = 0u;
-    std::fill_n(pending_name, 256u, char{});
-    remember_page = false;
-
-    maximum_scroll = scroll_position = first_line_offset = clip_offset = clip_height = previous_line_offset = previous_clip_offset = previous_clip_height = 0;
-    previous_document = nullptr;
+SphereUI::HyperTextCtrl::HyperTextCtrl() {
     transition_fraction = 1.0f;
-    transition_active = false;
-
-    transition_started = 0u;
-    scrollbar = nullptr;
-    history = {};
-    history.initialize();
     link_color = UiColor::hyperLink;
     hover_color = UiColor::hyperLinkHover;
     tooltip_index = -1;
-    pending_buffer = nullptr;
-    pending_bytes = 0u;
-    discard_old_text = false;
-
     hidden = false;
     control_kind = UiControlKind::hyperText;
 }
 
-void SphereUI::HyperTextCtrl::copyHyperTextState(const HyperTextCtrl& source) {
+void SphereUI::HyperTextCtrl::copyHyperTextState(const HyperTextCtrl& source, CloneContext& context) {
     if (this == &source) return;
-    history.copyFrom(source.history);
+    history = source.history;
     copyDocument(document, source.document, source, source.text_format);
     copyDocument(previous_document, source.previous_document, source, source.text_format);
-    destroyOwned(scrollbar);
-    cloneOwned(scrollbar, source.scrollbar, *this);
-    text_format = source.text_format;
-    std::copy_n(source.pending_name, 256u, pending_name);
-    remember_page = source.remember_page;
-    maximum_scroll = source.maximum_scroll;
-    scroll_position = source.scroll_position;
-    first_line_offset = source.first_line_offset;
-    clip_offset = source.clip_offset;
-    clip_height = source.clip_height;
-    previous_line_offset = source.previous_line_offset;
-    previous_clip_offset = source.previous_clip_offset;
-    previous_clip_height = source.previous_clip_height;
-    transition_fraction = source.transition_fraction;
-    transition_active = source.transition_active;
-    transition_started = source.transition_started;
-    link_color = source.link_color;
-    hover_color = source.hover_color;
+    scrollbar.reset();
+    cloneOwned(scrollbar, source.scrollbar, *this, context);
+    copyProperties(*this, source,
+        &HyperTextCtrl::text_format, &HyperTextCtrl::pending_page, &HyperTextCtrl::maximum_scroll, &HyperTextCtrl::scroll_position,
+        &HyperTextCtrl::first_line_offset, &HyperTextCtrl::clip_offset, &HyperTextCtrl::clip_height,
+        &HyperTextCtrl::previous_line_offset, &HyperTextCtrl::previous_clip_offset, &HyperTextCtrl::previous_clip_height,
+        &HyperTextCtrl::transition_fraction, &HyperTextCtrl::transition_active, &HyperTextCtrl::transition_started,
+        &HyperTextCtrl::link_color, &HyperTextCtrl::hover_color);
     tooltip_index = -1;
-    pending_buffer = source.pending_buffer;
-    pending_bytes = source.pending_bytes;
     discard_old_text = source.discard_old_text;
 }
 
@@ -6050,27 +4602,19 @@ std::uint32_t SphereUI::HyperTextCtrl::parseTextFormat(const char* name) {
 
 void SphereUI::HyperTextCtrl::queuePage(const char* name, bool remember) {
     if (transition_active) return;
-    if (name == nullptr) {
-        pending_name[0] = 0;
-        return;
-    }
-    const std::string value(name);
-    const auto count = std::min(value.size(), sizeof(pending_name) - 1u);
-    std::memmove(pending_name, value.data(), count);
-    pending_name[count] = 0;
-    remember_page = remember ? 1u : 0u;
+    if (name == nullptr || *name == '\0') { pending_page = std::monostate{}; return; }
+    PageRequest request{std::string(name, std::min(std::char_traits<char>::length(name), std::size_t{255})), remember};
+    pending_page = std::move(request);
 }
 
 void SphereUI::HyperTextCtrl::queueBuffer(const char* buffer, std::size_t size) {
     if (transition_active || buffer == nullptr || size == 0u) return;
-    std::memcpy(pending_name, "buffer", 7u);
-    remember_page = false;
-    pending_buffer = buffer;
-    pending_bytes = size;
+    std::string bytes(buffer, size);
+    pending_page = std::move(bytes);
 }
 
 void SphereUI::HyperTextCtrl::updateScroll() {
-    auto* page = document;
+    auto* page = document.get();
     if (page == nullptr) return;
     scroll_position = std::clamp(scroll_position, 0, std::max(0, maximum_scroll));
     first_line_offset = 0;
@@ -6080,24 +4624,23 @@ void SphereUI::HyperTextCtrl::updateScroll() {
 }
 
 void SphereUI::HyperTextCtrl::updateDocument(bool resize_to_content) {
-    if (pending_name[0] == 0) return;
+    if (std::holds_alternative<std::monostate>(pending_page)) return;
     const auto page_width = width - (font < 2u ? 2 : 0);
-    HyperTextDocument* replacement = nullptr;
-    if (pending_buffer != nullptr) replacement = new HyperTextDocument(std::string_view(pending_buffer, pending_bytes), page_width, text_format, font);
-    else if (auto* source = g_sfera_interface.findHyperText(pending_name)) replacement = source->clone(page_width, text_format, font);
+    std::unique_ptr<HyperTextDocument> replacement;
+    bool remember = false;
+    if (const auto* bytes = std::get_if<std::string>(&pending_page)) {
+        replacement = std::make_unique<HyperTextDocument>(*bytes, page_width, text_format, font);
+    } else if (const auto* request = std::get_if<PageRequest>(&pending_page)) {
+        remember = request->remember;
+        if (auto* source = g_sfera_interface.findHyperText(request->name.c_str())) replacement = source->clone(page_width, text_format, font);
+    }
     if (replacement != nullptr) {
-        auto* current = document;
-        try {
-            if (current != nullptr && !discard_old_text && remember_page && !current->name.empty()) history.append(current->name.c_str());
-        } catch (...) {
-            delete replacement;
-            throw;
-        }
+        auto* current = document.get();
+        if (current != nullptr && !discard_old_text && remember && !current->name.empty()) history.push_back(current->name);
         if (current != nullptr) {
-            if (discard_old_text) releaseDocument(document);
+            if (discard_old_text) document.reset();
             else {
-                releaseDocument(previous_document);
-                previous_document = document;
+                previous_document = std::move(document);
                 previous_line_offset = first_line_offset;
                 previous_clip_offset = clip_offset;
                 previous_clip_height = clip_height;
@@ -6106,22 +4649,20 @@ void SphereUI::HyperTextCtrl::updateDocument(bool resize_to_content) {
                 transition_started = Runtime::clockTicks();
             }
             notifyParent(*this, UiMessage::hyperTextPageChanged);
-            if (auto* tip = tooltip) static_cast<ToolTipCtrl*>(tip)->reset();
+            if (auto* tip = tooltip.get()) tip->reset();
         }
-        document = replacement;
-        replacement->link_color = link_color;
-        replacement->hover_color = hover_color;
+        document = std::move(replacement);
+        document->link_color = link_color;
+        document->hover_color = hover_color;
         tooltip_index = -1;
-        const auto extent = replacement->totalHeight();
+        const auto extent = document->totalHeight();
         if (resize_to_content && extent > 0) height = extent;
         maximum_scroll = std::max(0, extent - height);
         scroll_position = 0;
         updateScroll();
-        if (auto* scroll = scrollbar) scroll->setParameters({sizeof(ScrollParameters), ScrollField::all, 0, maximum_scroll, height, 0, replacement->line_height});
+        if (auto* scroll = scrollbar.get()) scroll->setParameters({sizeof(ScrollParameters), ScrollField::all, 0, maximum_scroll, height, 0, document->line_height});
     }
-    pending_name[0] = 0;
-    pending_buffer = nullptr;
-    pending_bytes = 0u;
+    pending_page = std::monostate{};
 }
 
 void SphereUI::HyperTextCtrl::openLink(const char* target) {
@@ -6151,10 +4692,10 @@ bool SphereUI::HyperTextCtrl::loadUi(const char* filename, SferaSimpleParser& pa
     return true;
 }
 
-SphereUI::Window* SphereUI::HyperTextCtrl::clone() {
-    return cloneControl(*this, [](HyperTextCtrl& copy, const HyperTextCtrl& source) {
-        copy.copyHyperTextState(source);
-        if (copy.tooltip == nullptr) copy.tooltip = createInitialized<ToolTipCtrl>();
+std::unique_ptr<SphereUI::Window> SphereUI::HyperTextCtrl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](HyperTextCtrl& copy, const HyperTextCtrl& source, SphereUI::Window::CloneContext& context) {
+        copy.copyHyperTextState(source, context);
+        if (copy.tooltip == nullptr) copy.tooltip = std::make_unique<ToolTipCtrl>();
     });
 }
 
@@ -6168,10 +4709,10 @@ std::uint32_t SphereUI::HyperTextCtrl::handleMessage(SphereUI::UiMessage message
             return 1u;
         case UiMessage::previousHyperTextPage:
         case UiMessage::firstHyperTextPage:
-            if (history.count != 0u) {
-                if (message == UiMessage::firstHyperTextPage) while (history.count > 1u) history.popBack();
-                const std::string name = history.at(history.count - 1u).data();
-                history.popBack();
+            if (history.size() != 0u) {
+                if (message == UiMessage::firstHyperTextPage) while (history.size() > 1u) history.pop_back();
+                const std::string name = history.at(history.size() - 1u).data();
+                history.pop_back();
                 queuePage(name.c_str(), false);
             }
             return 1u;
@@ -6194,32 +4735,32 @@ std::uint32_t SphereUI::HyperTextCtrl::handleMessage(SphereUI::UiMessage message
 
 void SphereUI::HyperTextCtrl::draw() {
     if (hidden) return;
-    if (auto* tip = tooltip) if (!tip->hidden && tip->alpha != alpha) tip->setOpacity(static_cast<float>(alpha) / 255.0f);
+    if (auto* tip = tooltip.get()) if (!tip->hidden && tip->alpha != alpha) tip->setOpacity(static_cast<float>(alpha) / 255.0f);
     const auto bounds = windowBounds(*this);
     {
         ViewportScope viewport(bounds);
         if (viewport) {
             const auto fraction = std::clamp(transition_fraction, 0.0f, 1.0f);
-            if (auto* page = previous_document) page->draw(bounds.left, bounds.top - previous_line_offset, previous_clip_offset, previous_clip_height, static_cast<std::uint32_t>((1.0f - fraction) * alpha));
-            if (auto* page = document) page->draw(bounds.left, bounds.top - first_line_offset, clip_offset, clip_height, static_cast<std::uint32_t>(fraction * alpha));
+            if (auto* page = previous_document.get()) page->draw(bounds.left, bounds.top - previous_line_offset, previous_clip_offset, previous_clip_height, static_cast<std::uint32_t>((1.0f - fraction) * alpha));
+            if (auto* page = document.get()) page->draw(bounds.left, bounds.top - first_line_offset, clip_offset, clip_height, static_cast<std::uint32_t>(fraction * alpha));
         }
     }
-    drawChild(scrollbar, alpha);
+    drawChild(scrollbar.get(), alpha);
 }
 
 void SphereUI::HyperTextCtrl::handleInput(const WindowInput& input) {
     updateDocument(false);
-    inputChild(scrollbar, input);
+    inputChild(scrollbar.get(), input);
     if (transition_active) {
         const auto now = Runtime::clockTicks();
         const auto elapsed = now >= transition_started ? now - transition_started : 0u;
         transition_fraction = std::clamp(static_cast<float>(static_cast<double>(elapsed) / 5000.0), 0.0f, 1.0f);
         if (elapsed > 5000u) {
             transition_active = false;
-            releaseDocument(previous_document);
+            previous_document.reset();
         }
     }
-    auto* page = document;
+    auto* page = document.get();
     if (page == nullptr) return;
     int hovered = -1;
     for (std::size_t index = 0u; index < page->tooltips.size(); ++index) {
@@ -6228,7 +4769,7 @@ void SphereUI::HyperTextCtrl::handleInput(const WindowInput& input) {
         if (region.hovered && hovered < 0) hovered = index;
     }
     if (hovered != tooltip_index) {
-        if (auto* tip = static_cast<ToolTipCtrl*>(tooltip)) {
+        if (auto* tip = tooltip.get()) {
             tip->reset();
             if (hovered >= 0) {
                 tip->setLine(0u, page->tooltips.at(hovered).target.c_str());
@@ -6247,87 +4788,38 @@ void SphereUI::HyperTextCtrl::handleInput(const WindowInput& input) {
     }
 }
 
-void SphereUI::HyperTextCtrl::destroy(bool free_storage) {
-    releaseDocument(document);
-    releaseDocument(previous_document);
-    destroyOwned(scrollbar);
-    history.release();
-    Window::destroy(free_storage);
-}
 
-void SphereUI::HyperTextChatListControl::initialize() {
-    Window::initialize();
+SphereUI::HyperTextChatListControl::HyperTextChatListControl() {
     control_kind = UiControlKind::hyperTextChat;
-    messages = {};
-    messages.initialize();
-    visible_messages = {};
-    channels = {};
-    selected_link_text = {};
-    selected_link_value = {};
-    selected_plain_text = {};
-    selected_hyper_text = {};
-    player_link_color = item_link_color = link_color = UiColor::white;
+    item_link_color = link_color = UiColor::white;
     maximum_items = 256u;
     row_height = 15u;
-    page_rows = 0u;
-    parent_x = parent_y = 0;
-    bottom_message = bottom_row = scroll_offset = 0u;
-    scrollbar = nullptr;
-    saved_viewport = {};
-    rendered_rows = {};
 }
 
-void SphereUI::HyperTextChatListControl::copyChatState(const HyperTextChatListControl& source) {
-    if (this == &source) return;
-    messages.copyFrom(source.messages);
-    visible_messages.copyFrom(source.visible_messages);
-    channels.copyFrom(source.channels);
-    selected_link_text.assign(source.selected_link_text.data());
-    selected_link_value.assign(source.selected_link_value.data());
-    selected_plain_text.assign(source.selected_plain_text.data());
-    selected_hyper_text.assign(source.selected_hyper_text.data());
-    player_link_color = source.player_link_color;
-    item_link_color = source.item_link_color;
-    link_color = source.link_color;
-    maximum_items = source.maximum_items;
-    row_height = source.row_height;
-    page_rows = source.page_rows;
-    parent_x = source.parent_x;
-    parent_y = source.parent_y;
-    bottom_message = source.bottom_message;
-    bottom_row = source.bottom_row;
-    scroll_offset = source.scroll_offset;
-    saved_viewport = source.saved_viewport;
-    rendered_rows.copyFrom(source.rendered_rows);
-    destroyOwned(scrollbar);
-    cloneOwned(scrollbar, source.scrollbar, *this);
-}
+std::unique_ptr<SphereUI::Window> SphereUI::HyperTextChatListControl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](auto& copy, const auto& source, SphereUI::Window::CloneContext& context) {
 
-SphereUI::Window* SphereUI::HyperTextChatListControl::clone() {
-    return cloneControl(*this, [](auto& copy, const auto& source) {
-        copy.copyChatState(source);
+        copyProperties(copy, source,
+            &HyperTextChatListControl::messages, &HyperTextChatListControl::visible_messages, &HyperTextChatListControl::channels,
+            &HyperTextChatListControl::selected_link_text, &HyperTextChatListControl::selected_link_value,
+            &HyperTextChatListControl::selected_plain_text, &HyperTextChatListControl::selected_hyper_text,
+            &HyperTextChatListControl::item_link_color, &HyperTextChatListControl::link_color,
+            &HyperTextChatListControl::maximum_items, &HyperTextChatListControl::row_height, &HyperTextChatListControl::page_rows,
+            &HyperTextChatListControl::parent_x, &HyperTextChatListControl::parent_y, &HyperTextChatListControl::bottom_message,
+            &HyperTextChatListControl::bottom_row, &HyperTextChatListControl::scroll_offset,
+            &HyperTextChatListControl::rendered_rows);
+        cloneOwned(copy.scrollbar, source.scrollbar, copy, context);
     });
 }
 
-void SphereUI::HyperTextChatListControl::destroy(bool free_storage) {
-    destroyOwned(scrollbar);
-    messages.release();
-    visible_messages.release();
-    channels.release();
-    rendered_rows.release();
-    selected_link_text.release();
-    selected_link_value.release();
-    selected_plain_text.release();
-    selected_hyper_text.release();
-    Window::destroy(free_storage);
-}
 
 bool SphereUI::HyperTextChatListControl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     if (!reader.has("linkColor")) return false;
     reader.color("linkColor", link_color);
-    player_link_color = item_link_color = link_color;
-    reader.color("playerLinkColor", player_link_color);
+    item_link_color = link_color;
+    std::uint32_t unused_player_color = link_color;
+    reader.color("playerLinkColor", unused_player_color);
     reader.color("itemLinkColor", item_link_color);
     maximum_items = 256u;
     row_height = 15u;
@@ -6347,10 +4839,10 @@ bool SphereUI::HyperTextChatListControl::loadUi(const char* filename, SferaSimpl
 void SphereUI::HyperTextChatListControl::rebuildVisible() {
     visible_messages.clear();
     rendered_rows.clear();
-    for (std::size_t reverse = messages.count; reverse != 0u; --reverse) {
+    for (std::size_t reverse = messages.size(); reverse != 0u; --reverse) {
         const auto& item = messages.at(reverse - 1u);
         for (std::size_t channel = 0u; channel < channels.size(); ++channel) if (channels.at(channel) == item.channel) {
-            visible_messages.append(reverse - 1u);
+            visible_messages.push_back(reverse - 1u);
             break;
         }
     }
@@ -6365,20 +4857,11 @@ const char* SphereUI::HyperTextChatListControl::messageText(std::size_t index, b
 
 void SphereUI::HyperTextChatListControl::addMessage(const char* text, std::uint32_t channel, std::uint32_t color) {
     HyperTextChatListItem item{};
-    try {
-        item.initialize(text, channel, color);
-        item.layout(width, font);
-        if (item.rows.size() == 0u) {
-            item.release();
-            return;
-        }
-        messages.pushBack(item);
-    } catch (...) {
-        item.release();
-        throw;
-    }
-    item.release();
-    while (messages.count > std::max(maximum_items, std::size_t{1})) messages.popFront();
+    item.initialize(text, channel, color);
+    item.layout(width, font);
+    if (item.rows.empty()) return;
+    messages.push_back(std::move(item));
+    while (messages.size() > std::max(maximum_items, std::size_t{1})) messages.pop_front();
     bool visible = false;
     for (std::size_t index = 0u; index < channels.size(); ++index) visible |= channels.at(index) == channel;
     if (visible) scroll_offset = 0u;
@@ -6388,7 +4871,7 @@ void SphereUI::HyperTextChatListControl::addMessage(const char* text, std::uint3
 
 void SphereUI::HyperTextChatListControl::addChannel(std::uint32_t channel) {
     for (std::size_t index = 0u; index < channels.size(); ++index) if (channels.at(index) == channel) return;
-    channels.append(channel);
+    channels.push_back(channel);
     scroll_offset = 0u;
     rebuildVisible();
     updateScroll(false);
@@ -6396,15 +4879,9 @@ void SphereUI::HyperTextChatListControl::addChannel(std::uint32_t channel) {
 
 void SphereUI::HyperTextChatListControl::setChannels(const std::uint32_t* values, std::size_t count) {
     if (values == nullptr && count != 0u) return;
-    UiIndexVector replacement{};
-    try {
-        for (std::size_t index = 0u; index < count; ++index) replacement.append(values[index]);
-    } catch (...) {
-        replacement.release();
-        throw;
-    }
-    channels.release();
-    channels = replacement;
+    std::vector<std::uint32_t> replacement;
+    if (count != 0u) replacement.assign(values, values + count);
+    channels = std::move(replacement);
     scroll_offset = 0u;
     rebuildVisible();
     updateScroll(false);
@@ -6419,21 +4896,11 @@ void SphereUI::HyperTextChatListControl::clearChannels() {
 void SphereUI::HyperTextChatListControl::setFont(int font_id) {
     if (font == font_id) return;
     Window::setFont(font_id);
-    for (std::size_t index = 0u; index < messages.count; ++index) {
-        auto& item = messages.at(index);
-        const std::string text = item.hyper_text.data();
-        const auto channel = item.channel;
-        const auto color = item.color;
-        HyperTextChatListItem replacement{};
-        try {
-            replacement.initialize(text.c_str(), channel, color);
-            replacement.layout(width, font);
-            item.copyFrom(replacement);
-        } catch (...) {
-            replacement.release();
-            throw;
-        }
-        replacement.release();
+    for (auto& item : messages) {
+        HyperTextChatListItem replacement;
+        replacement.initialize(item.hyper_text.c_str(), item.channel, item.color);
+        replacement.layout(width, font);
+        item = std::move(replacement);
     }
     scroll_offset = 0u;
     rebuildVisible();
@@ -6472,11 +4939,11 @@ void SphereUI::HyperTextChatListControl::updateScroll(bool reset) {
         }
         skip -= count;
     }
-    if (auto* child = scrollbar) child->setParameters({sizeof(ScrollParameters), ScrollField::all, 0, static_cast<int>(reset ? 0u : maximum), 1, static_cast<int>(reset ? 0u : maximum - scroll_offset), 1});
+    if (auto* child = scrollbar.get()) child->setParameters({sizeof(ScrollParameters), ScrollField::all, 0, static_cast<int>(reset ? 0u : maximum), 1, static_cast<int>(reset ? 0u : maximum - scroll_offset), 1});
 }
 
 void SphereUI::HyperTextChatListControl::readScroll() {
-    if (auto* child = scrollbar) {
+    if (auto* child = scrollbar.get()) {
         ScrollParameters parameters{};
         child->getParameters(parameters);
         scroll_offset = std::max(parameters.maximum - parameters.current, 0);
@@ -6484,13 +4951,13 @@ void SphereUI::HyperTextChatListControl::readScroll() {
     }
 }
 
-void SphereUI::HyperTextChatListControl::drawElement(HyperTextElement& element, int left, int top, std::uint32_t color) {
+void SphereUI::HyperTextChatListControl::drawElement(HyperTextRun& element, int left, int top, std::uint32_t color) {
     auto* geometry = element.geometry();
-    if (geometry == nullptr || (element.type != 4u && element.type != 5u)) return;
+    if (geometry == nullptr || (!element.isPlain() && element.link() == nullptr)) return;
     geometry->x = left - detail::addCoordinate(parent_x, x);
     geometry->y = top - detail::addCoordinate(parent_y, y);
-    if (element.type == 5u) {
-        const auto kind = static_cast<HyperTextElement_Link&>(element).link_kind;
+    if (element.link() != nullptr) {
+        const auto kind = element.link()->link_kind;
         if (kind == 1u) color = item_link_color;
         else if (kind == 2u) color = SferaColor::fromArgb(color).scaledRgb(3u, 4u).argb();
         else color = link_color;
@@ -6514,36 +4981,36 @@ void SphereUI::HyperTextChatListControl::draw() {
             for (std::size_t reverse = last + 1u; reverse > first; --reverse) {
                 const auto row = reverse - 1u;
                 const auto top = detail::subtractCoordinate(detail::subtractCoordinate(bounds.bottom, 1), static_cast<int>((rendered_rows.size() + 1u) * row_height));
-                rendered_rows.append({item_index, row});
+                rendered_rows.push_back({item_index, row});
                 auto left = bounds.left;
                 const auto range = item.rows.at(row);
-                for (std::size_t index = range.first; index <= range.last && index < item.elements.count; ++index) if (auto* element = item.elements.at(index)) if (auto* geometry = element->geometry()) {
+                for (std::size_t index = range.first; index <= range.last && index < item.elements.size(); ++index) if (auto* element = &item.elements.at(index)) if (auto* geometry = element->geometry()) {
                     drawElement(*element, left, top, item.color);
                     left = detail::addCoordinate(left, geometry->width);
                 }
             }
         }
     }
-    drawChild(scrollbar, alpha);
+    drawChild(scrollbar.get(), alpha);
 }
 
 void SphereUI::HyperTextChatListControl::handleInput(const WindowInput& input) {
     if (hidden || visible_messages.size() == 0u) return;
-    inputChild(scrollbar, input);
+    inputChild(scrollbar.get(), input);
     updateParentPosition();
     const auto bounds = windowBounds(*this);
     if (!contains(bounds, input.mouse_x, input.mouse_y) || (input.mouse_flags & MouseInput::anyRelease) == 0u) return;
     const auto row = static_cast<std::uint32_t>(std::max(bounds.bottom - 1 - input.mouse_y, 0)) / std::max(row_height, 1u);
     if (row >= rendered_rows.size()) return;
     const auto rendered = rendered_rows.at(row);
-    if (rendered.first >= visible_messages.size()) return;
-    auto& item = messages.at(visible_messages.at(rendered.first));
-    if (rendered.last >= item.rows.size()) return;
-    const auto range = item.rows.at(rendered.last);
-    for (std::size_t index = range.first; index <= range.last && index < item.elements.count; ++index) {
-        auto* element = item.elements.at(index);
-        if (element == nullptr || element->type != 5u) continue;
-        auto& link = *static_cast<HyperTextElement_Link*>(element);
+    if (rendered.message_index >= visible_messages.size()) return;
+    auto& item = messages.at(visible_messages.at(rendered.message_index));
+    if (rendered.row_index >= item.rows.size()) return;
+    const auto range = item.rows.at(rendered.row_index);
+    for (std::size_t index = range.first; index <= range.last && index < item.elements.size(); ++index) {
+        auto* element = &item.elements.at(index);
+        if (element == nullptr || element->link() == nullptr) continue;
+        auto& link = *element->link();
         const auto& rectangle = link.bounds;
         const auto local_x = input.mouse_x - bounds.left;
         const auto local_y = input.mouse_y - bounds.top;
@@ -6553,7 +5020,7 @@ void SphereUI::HyperTextChatListControl::handleInput(const WindowInput& input) {
         } else if (link.link_kind == 1u && (input.mouse_flags & MouseInput::leftRelease) != 0u) {
             if (auto* description = Runtime::descriptionWindow()) description->showDescription(link.linkValue(), 0u, 5000u, true);
         } else if (link.link_kind == 2u) {
-            selected_link_text.assign(link.text.data());
+            selected_link_text = element->text;
             selected_link_value.assign(link.linkValue());
             if ((input.mouse_flags & MouseInput::leftRelease) != 0u) notifyParent(*this, UiMessage::chatPlayerLeftClick, 0u, 0u);
             else {
@@ -6605,185 +5072,103 @@ std::uint32_t SphereUI::HyperTextChatListControl::handleMessage(SphereUI::UiMess
 }
 
 namespace {
-    class OwnedHyperTextElements {
-    public:
-        SphereUI::UiDeque<HyperTextElement*> values{};
-        OwnedHyperTextElements() = default;
-        OwnedHyperTextElements(const OwnedHyperTextElements&) = delete;
-        OwnedHyperTextElements& operator=(const OwnedHyperTextElements&) = delete;
-        ~OwnedHyperTextElements() {
-            SphereUI::HyperTextParser::releaseElements(values);
-        }
-
-        void append(HyperTextElement* element) {
-            if (element == nullptr) return;
-            try {
-                values.pushBack(element);
-            } catch (...) {
-                element->release();
-                throw;
-            }
-        }
-
-        void copy(const HyperTextElement& element) {
-            append(element.clone());
-        }
-
-        void plain(std::string_view text) {
-            if (text.empty()) return;
-            if (values.count != 0u) if (auto* last = (values.at(values.count - 1u)); last != nullptr && last->type == 4u) {
-                const std::string merged = std::string(last->text.data(), last->text.length) + std::string(text);
-                last->text.assign(merged.c_str());
-                return;
-            }
-            auto* memory = SphereUI::Runtime::allocate(sizeof(HyperTextElement_PlainText));
-            if (memory == nullptr) throw std::bad_alloc();
-            auto* element = std::construct_at(static_cast<HyperTextElement_PlainText*>(memory));
-            element->text = {};
-            element->bounds = {};
-            try {
-                element->initializeText(4u, std::string(text).c_str());
-            } catch (...) {
-                element->release();
-                throw;
-            }
-            append(element);
-        }
-
-        void take(SphereUI::UiDeque<HyperTextElement*>& destination) {
-            SphereUI::HyperTextParser::releaseElements(destination);
-            destination = values;
-            values = {};
-            if (destination.proxy != 0u) destination.proxy->owner = &destination;
-        }
-    };
-
-    void appendEditorElement(OwnedHyperTextElements& destination, const HyperTextElement& element) {
-        if (element.type == 4u) destination.plain(std::string_view(element.text.data(), element.text.length));
-        else destination.copy(element);
+    void appendPlainRun(std::vector<HyperTextRun>& destination, std::string_view text) {
+        if (text.empty()) return;
+        if (!destination.empty() && destination.back().isPlain()) destination.back().text.append(text);
+        else destination.push_back({std::string(text), HyperTextGeometry{}});
     }
 
-    void commitEditorElements(SphereUI::HyperTextEditControl& editor, OwnedHyperTextElements& replacement) {
-        SphereUI::UiString raw{}, visible{};
-        try {
-            SphereUI::detail::serializeHyperTextElements(replacement.values, raw, visible);
-        } catch (...) {
-            raw.release();
-            visible.release();
-            throw;
-        }
-        editor.hyper_text.release();
-        editor.visible_text.release();
-        editor.hyper_text = raw;
-        editor.visible_text = visible;
-        replacement.take(editor.elements);
+    void appendEditorElement(std::vector<HyperTextRun>& destination, const HyperTextRun& element) {
+        if (element.isPlain()) appendPlainRun(destination, element.text);
+        else destination.push_back(element);
+    }
+
+    void commitEditorElements(SphereUI::HyperTextEditControl& editor, std::vector<HyperTextRun>& replacement) {
+        std::string raw, visible;
+        SphereUI::detail::serializeHyperTextElements(replacement, raw, visible);
+        editor.hyper_text = std::move(raw);
+        editor.visible_text = std::move(visible);
+        editor.elements = std::move(replacement);
     }
 
     std::string editorHistoryPath(const SphereUI::HyperTextEditControl& editor) {
         const auto* parent = editor.parent;
-        if (parent == nullptr || parent->resource_name_length == 0u) return {
-        };
-        SphereUI::UiString profile{};
+        if (parent == nullptr || parent->resource_name.empty()) return {};
+        std::string profile;
         SphereUI::HyperTextEditControl::historyProfile(profile);
-        const std::string path = std::string("players\\") + SphereUI::detail::stringData(parent->resource_name, parent->resource_name_capacity) + "_" + profile.data() + "_hyperTextEdit.log";
-        profile.release();
-        return path;
+        return "players\\" + parent->resource_name + "_" + profile + "_hyperTextEdit.log";
     }
 }
 
-void SphereUI::HyperTextEditControl::initialize() {
-    Window::initialize();
-    history = {};
-    history_position = 0u;
+SphereUI::HyperTextEditControl::HyperTextEditControl() {
     maximum_history = 256u;
-    edit_modes = {};
-    visible_text = {};
-    hyper_text = {};
-    elements = {};
     cursor_type = 1u;
-    caret_position = blink_started = 0u;
     cursor_visible = true;
-
-    text_margins = {};
     cursor_color = plain_color = player_link_color = item_link_color = link_color = UiColor::white;
     maximum_visible_length = 256u;
     maximum_hyper_length = 3072u;
-    visible_first = visible_last = 0u;
-    saved_viewport = {};
-    parent_x = parent_y = 0;
     control_kind = UiControlKind::hyperTextEdit;
-    history.initialize();
-    elements.initialize();
-    edit_modes.insert(0u);
+    edit_modes.set(PlainText);
 }
 
 void SphereUI::HyperTextEditControl::setContent(const char* text, std::uint32_t mode) {
     if (text == nullptr || mode > 1u) return;
     const std::string source(text);
     if (mode == 0u && source == hyper_text.data()) return;
-    if (source.size() + (mode == 1u ? hyper_text.length : 0u) > maximum_hyper_length) return;
-    UiString raw{}, plain{};
-    OwnedHyperTextElements parsed, replacement;
-    try {
-        raw.assign(source.c_str());
-        HyperTextParser::parseElements(raw, parsed.values, plain);
-    } catch (...) {
-        raw.release();
-        plain.release();
-        throw;
-    }
-    raw.release();
-    const auto added_length = plain.length;
-    plain.release();
-    if (mode == 1u && (visible_text.length > maximum_visible_length || added_length > maximum_visible_length - visible_text.length)) return;
+    if (source.size() + (mode == 1u ? hyper_text.size() : 0u) > maximum_hyper_length) return;
+    std::string plain;
+    std::vector<HyperTextRun> parsed, replacement;
+    HyperTextParser::parseElements(source, parsed, plain);
+    const auto added_length = plain.size();
+    if (mode == 1u && (visible_text.size() > maximum_visible_length || added_length > maximum_visible_length - visible_text.size())) return;
     std::size_t used = 0u;
-    const auto append = [&](const UiDeque<HyperTextElement*>& input) {
-        for (std::size_t index = 0u; index < input.count; ++index) if (auto* element = input.at(index)) {
-            const auto length = element->text.length;
+    const auto append = [&](const std::vector<HyperTextRun>& input) {
+        for (const auto& element : input) {
+            const auto length = element.text.size();
             if (used >= maximum_visible_length) break;
             if (length > maximum_visible_length - used) {
-                replacement.plain(std::string_view(element->text.data(), maximum_visible_length - used));
+                appendPlainRun(replacement, std::string_view(element.text.data(), maximum_visible_length - used));
                 used = maximum_visible_length;
             } else {
-                appendEditorElement(replacement, *element);
+                appendEditorElement(replacement, element);
                 used += length;
             }
         }
     };
     if (mode == 1u) append(elements);
-    append(parsed.values);
+    append(parsed);
     commitEditorElements(*this, replacement);
     moveCaret(35u);
 }
 
 void SphereUI::HyperTextEditControl::insertPlainText(const char* text) {
-    if (text == nullptr || visible_text.length >= maximum_visible_length) return;
-    const std::string insertion(text, std::min<std::size_t>(std::strlen(text), maximum_visible_length - visible_text.length));
+    if (text == nullptr || visible_text.size() >= maximum_visible_length) return;
+    const std::string insertion(text, std::min<std::size_t>(std::strlen(text), maximum_visible_length - visible_text.size()));
     if (insertion.empty()) return;
-    caret_position = std::min(caret_position, visible_text.length);
-    OwnedHyperTextElements replacement;
+    caret_position = std::min(caret_position, visible_text.size());
+    std::vector<HyperTextRun> replacement;
     std::size_t position = 0u;
     bool inserted = false;
-    for (std::size_t index = 0u; index < elements.count; ++index) if (auto* element = elements.at(index)) {
-        const auto length = element->text.length;
+    for (const auto& element : elements) {
+        const auto length = element.text.size();
         if (!inserted && caret_position <= position + length) {
             const auto offset = caret_position - position;
-            if (element->type == 5u && offset == 0u) {
-                replacement.plain(insertion);
-                replacement.copy(*element);
-            } else if (element->type == 5u && offset == length) {
-                replacement.copy(*element);
-                replacement.plain(insertion);
+            if (element.link() != nullptr && offset == 0u) {
+                appendPlainRun(replacement, insertion);
+                replacement.push_back(element);
+            } else if (element.link() != nullptr && offset == length) {
+                replacement.push_back(element);
+                appendPlainRun(replacement, insertion);
             } else {
-                std::string value(element->text.data(), length);
+                std::string value(element.text.data(), length);
                 value.insert(offset, insertion);
-                replacement.plain(value);
+                appendPlainRun(replacement, value);
             }
             inserted = true;
-        } else appendEditorElement(replacement, *element);
+        } else appendEditorElement(replacement, element);
         position += length;
     }
-    if (!inserted) replacement.plain(insertion);
+    if (!inserted) appendPlainRun(replacement, insertion);
     const auto caret = caret_position + insertion.size();
     commitEditorElements(*this, replacement);
     caret_position = caret;
@@ -6793,24 +5178,24 @@ void SphereUI::HyperTextEditControl::insertPlainText(const char* text) {
 }
 
 void SphereUI::HyperTextEditControl::insertCharacter(std::uint8_t character) {
-    if (!edit_modes.contains(0u) || character < 32u || (edit_modes.contains(1u) && (character < '0' || character > '9'))) return;
+    if (!edit_modes.test(PlainText) || character < 32u || (edit_modes.test(Numeric) && (character < '0' || character > '9'))) return;
     const char text[] = {static_cast<char>(character), 0};
     insertPlainText(text);
 }
 
 void SphereUI::HyperTextEditControl::eraseCharacter(bool backspace) {
-    caret_position = std::min(caret_position, visible_text.length);
-    if ((backspace && caret_position == 0u) || (!backspace && caret_position == visible_text.length)) return;
+    caret_position = std::min(caret_position, visible_text.size());
+    if ((backspace && caret_position == 0u) || (!backspace && caret_position == visible_text.size())) return;
     const auto target = caret_position - (backspace ? 1u : 0u);
-    OwnedHyperTextElements replacement;
+    std::vector<HyperTextRun> replacement;
     std::size_t position = 0u;
-    for (std::size_t index = 0u; index < elements.count; ++index) if (auto* element = elements.at(index)) {
-        const auto length = element->text.length;
+    for (const auto& element : elements) {
+        const auto length = element.text.size();
         if (target >= position && target < position + length) {
-            std::string value(element->text.data(), length);
+            std::string value(element.text.data(), length);
             value.erase(target - position, 1u);
-            replacement.plain(value);
-        } else appendEditorElement(replacement, *element);
+            appendPlainRun(replacement, value);
+        } else appendEditorElement(replacement, element);
         position += length;
     }
     commitEditorElements(*this, replacement);
@@ -6833,41 +5218,41 @@ std::size_t SphereUI::HyperTextEditControl::fitText(const char* text, int font, 
 }
 
 void SphereUI::HyperTextEditControl::updateVisibleEnd() {
-    visible_first = std::min(visible_first, visible_text.length);
-    if (visible_text.length == 0u) {
+    visible_first = std::min(visible_first, visible_text.size());
+    if (visible_text.size() == 0u) {
         visible_last = 0u;
         return;
     }
-    const auto length = visible_text.length - visible_first;
+    const auto length = visible_text.size() - visible_first;
     const auto fit = fitText(visible_text.data() + visible_first, font, std::max(0, width - text_margins.left - text_margins.right), false);
-    visible_last = std::min(visible_text.length - 1u, visible_first + (fit == length ? (length == 0u ? 0u : length - 1u) : fit));
+    visible_last = std::min(visible_text.size() - 1u, visible_first + (fit == length ? (length == 0u ? 0u : length - 1u) : fit));
 }
 
 void SphereUI::HyperTextEditControl::updateVisibleStart() {
-    if (visible_text.length == 0u) {
+    if (visible_text.size() == 0u) {
         visible_first = visible_last = 0u;
         return;
     }
-    visible_last = std::min(visible_last, visible_text.length - 1u);
+    visible_last = std::min(visible_last, visible_text.size() - 1u);
     const std::string prefix(visible_text.data(), visible_last + 1u);
     const auto first = fitText(prefix.c_str(), font, std::max(0, width - text_margins.left - text_margins.right), true);
     visible_first = first == 0u ? 0u : first + 1u;
 }
 
 void SphereUI::HyperTextEditControl::moveCaret(std::uint32_t key) {
-    caret_position = std::min(caret_position, visible_text.length);
+    caret_position = std::min(caret_position, visible_text.size());
     if (key == VK_HOME) {
         caret_position = visible_first = 0u;
         updateVisibleEnd();
     } else if (key == VK_END) {
-        caret_position = visible_text.length;
+        caret_position = visible_text.size();
         visible_last = caret_position == 0u ? 0u : caret_position - 1u;
         updateVisibleStart();
     } else if (key == VK_LEFT && caret_position != 0u) {
         --caret_position;
         if (caret_position < visible_first) visible_first = caret_position;
         updateVisibleEnd();
-    } else if (key == VK_RIGHT && caret_position < visible_text.length) {
+    } else if (key == VK_RIGHT && caret_position < visible_text.size()) {
         ++caret_position;
         if (caret_position > visible_last + 1u) {
             visible_last = caret_position - 1u;
@@ -6877,14 +5262,14 @@ void SphereUI::HyperTextEditControl::moveCaret(std::uint32_t key) {
     }
 }
 
-void SphereUI::HyperTextEditControl::drawElement(const TextExtent& point, HyperTextElement& element, std::uint32_t color, const UiIndexRange& range) {
-    if (element.type != 4u && element.type != 5u) return;
-    const auto first = std::min(range.first, element.text.length);
-    const auto length = range.last == invalidIndex ? element.text.length - first : std::min(element.text.length - first, range.last >= first ? range.last - first + 1u : 0u);
+void SphereUI::HyperTextEditControl::drawElement(const TextExtent& point, HyperTextRun& element, std::uint32_t color, const UiIndexRange& range) {
+    if (!element.isPlain() && element.link() == nullptr) return;
+    const auto first = std::min(range.first, element.text.size());
+    const auto length = range.last == invalidIndex ? element.text.size() - first : std::min(element.text.size() - first, range.last >= first ? range.last - first + 1u : 0u);
     std::string display(element.text.data() + first, length);
-    if (element.type == 4u && edit_modes.contains(2u)) display.assign(length, '*');
-    if (element.type == 5u) {
-        const auto kind = static_cast<HyperTextElement_Link&>(element).link_kind;
+    if (element.isPlain() && edit_modes.test(Password)) display.assign(length, '*');
+    if (element.link() != nullptr) {
+        const auto kind = element.link()->link_kind;
         color = kind == 1u ? item_link_color : kind == 2u ? player_link_color : link_color;
     }
     const auto extent = InterfaceRenderer::measureText(display.c_str(), font, true);
@@ -6895,7 +5280,7 @@ void SphereUI::HyperTextEditControl::drawElement(const TextExtent& point, HyperT
 void SphereUI::HyperTextEditControl::drawCaret() {
     if (cursor_type == 0u) return;
     const auto bounds = windowBounds(*this);
-    const auto start = std::min(visible_first, visible_text.length), caret = std::clamp(caret_position, start, visible_text.length);
+    const auto start = std::min(visible_first, visible_text.size()), caret = std::clamp(caret_position, start, visible_text.size());
     std::string prefix(visible_text.data() + start, caret - start);
     const auto left = bounds.left + text_margins.left + InterfaceRenderer::measureText(prefix.c_str(), font, true).width;
     const auto top = bounds.top + text_margins.top;
@@ -6907,9 +5292,6 @@ void SphereUI::HyperTextEditControl::drawCaret() {
 void SphereUI::HyperTextEditControl::draw() {
     if (hidden || (behavior_flags & WindowStyle::skipDrawing) != 0u) return;
     const auto bounds = windowBounds(*this);
-    saved_viewport = InterfaceRenderer::viewport();
-    parent_x = parent_y = 0;
-    if (const auto* owner = parent) owner->getAbsolutePosition(parent_x, parent_y);
     ViewportScope clip(bounds);
     if (!clip) return;
     const auto now = Runtime::milliseconds();
@@ -6917,63 +5299,56 @@ void SphereUI::HyperTextEditControl::draw() {
         blink_started = now;
         cursor_visible = !cursor_visible ? 1u : 0u;
     }
-    caret_position = std::min(caret_position, visible_text.length);
+    caret_position = std::min(caret_position, visible_text.size());
     updateVisibleEnd();
     if (cursor_visible && input_enabled) drawCaret();
     std::size_t position = 0u;
     TextExtent point{bounds.left + text_margins.left, bounds.top + text_margins.top};
-    for (std::size_t index = 0u; index < elements.count; ++index) if (auto* element = elements.at(index)) {
-        const auto length = element->text.length;
+    for (auto& element : elements) {
+        const auto length = element.text.size();
         if (length != 0u && position + length > visible_first && position <= visible_last) {
             const UiIndexRange range{visible_first > position ? visible_first - position : 0u, std::min(length - 1u, visible_last - position)};
-            drawElement(point, *element, plain_color, range);
-            if (const auto* geometry = element->geometry()) point.width = detail::addCoordinate(point.width, geometry->width);
+            drawElement(point, element, plain_color, range);
+            if (const auto* geometry = element.geometry()) point.width = detail::addCoordinate(point.width, geometry->width);
         }
         position += length;
     }
 }
 
 void SphereUI::HyperTextEditControl::historyUp() {
-    if (edit_modes.contains(2u) || history.count == 0u) return;
-    history_position = std::min(history_position, history.count);
+    if (edit_modes.test(Password) || history.size() == 0u) return;
+    history_position = std::min(history_position, history.size());
     if (history_position != 0u) --history_position;
     setContent(history.at(history_position).data());
 }
 
 void SphereUI::HyperTextEditControl::historyDown() {
-    if (edit_modes.contains(2u) || history.count == 0u) return;
-    if (history_position < history.count) ++history_position;
-    setContent(history.at(std::min(history_position, history.count - 1u)).data());
+    if (edit_modes.test(Password) || history.size() == 0u) return;
+    if (history_position < history.size()) ++history_position;
+    setContent(history.at(std::min(history_position, history.size() - 1u)).data());
 }
 
 void SphereUI::HyperTextEditControl::submitText() {
     notifyParent(*this, UiMessage::hyperEditSubmit);
-    if (edit_modes.contains(2u) || hyper_text.length == 0u || maximum_history == 0u) return;
-    UiStringDeque replacement{};
-    try {
-        for (std::size_t index = 0u; index < history.count; ++index) if (std::strcmp(history.at(index).data(), hyper_text.data()) != 0) replacement.append(history.at(index).data());
-        while (replacement.count >= maximum_history) replacement.popFront();
-        replacement.append(hyper_text.data());
-    } catch (...) {
-        replacement.release();
-        throw;
+    if (edit_modes.test(Password) || hyper_text.size() == 0u || maximum_history == 0u) return;
+    std::deque<std::string> replacement;
+    for (const auto& entry : history) {
+        if (std::strcmp(entry.c_str(), hyper_text.c_str()) != 0) replacement.emplace_back(entry.c_str());
     }
-    history.release();
-    history = replacement;
-    if (history.proxy != 0u) history.proxy->owner = &history;
-    history_position = history.count;
+    while (replacement.size() >= maximum_history) replacement.pop_front();
+    replacement.emplace_back(hyper_text.c_str());
+    history = std::move(replacement);
+    history_position = history.size();
 }
 
 void SphereUI::HyperTextEditControl::pasteClipboard() {
-    UiString clipboard{};
-    Runtime::clipboardText(clipboard);
-    std::string value(clipboard.data(), clipboard.length);
-    clipboard.release();
+    std::string value;
+    Runtime::clipboardText(value);
     for (char& character : value) if (character == '\n' || character == '\r') character = ' ';
     insertPlainText(value.c_str());
 }
 
-void SphereUI::HyperTextEditControl::historyProfile(UiString& result) {
+void SphereUI::HyperTextEditControl::historyProfile(std::string& result) {
     std::ifstream stream("connectn.cfg");
     std::string line, value;
     while (std::getline(stream, line)) {
@@ -6986,90 +5361,58 @@ void SphereUI::HyperTextEditControl::historyProfile(UiString& result) {
     result.assign(value.c_str());
 }
 
-void SphereUI::HyperTextEditControl::transformHistory(UiString& result, const UiString& source, bool decode) {
+void SphereUI::HyperTextEditControl::transformHistory(std::string& result, const std::string& source, bool decode) {
     constexpr std::int8_t primary[] = {1, 2, 3, -2, 1, -1, -2, -3, 2, -1, 0, -2, 2};
     constexpr std::int8_t secondary[] = {0, -1, -2, 2, -1, 0, 1};
-    std::string value(source.data(), source.length);
+    std::string value(source.data(), source.size());
     for (std::size_t index = 0u; index < value.size(); ++index) {
         const auto shift = primary[index % 13u] + secondary[index % 7u];
         value[index] = static_cast<unsigned char>(value[index]) + (decode ? shift : -shift);
     }
-    detail::assignString(result.storage, result.length, result.capacity, value);
+    result.assign(value);
 }
 
 void SphereUI::HyperTextEditControl::loadHistory() {
-    if (edit_modes.contains(2u)) return;
+    if (edit_modes.test(Password)) return;
     const auto path = editorHistoryPath(*this);
     if (path.empty()) return;
     std::ifstream stream(path, std::ios::binary);
     std::string line;
-    while (history.count < maximum_history && std::getline(stream, line)) {
+    while (history.size() < maximum_history && std::getline(stream, line)) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty()) continue;
-        UiString encoded{}, decoded{};
-        try {
-            detail::assignString(encoded.storage, encoded.length, encoded.capacity, line);
-            transformHistory(decoded, encoded, true);
-            history.pushBack(decoded);
-        } catch (...) {
-            encoded.release();
-            decoded.release();
-            throw;
-        }
-        encoded.release();
-        decoded.release();
+        std::string decoded;
+        transformHistory(decoded, line, true);
+        history.push_back(std::move(decoded));
     }
-    history_position = history.count;
+    history_position = history.size();
 }
 
 void SphereUI::HyperTextEditControl::saveHistory() const {
-    if (edit_modes.contains(2u) || history.count == 0u) return;
+    if (edit_modes.test(Password) || history.size() == 0u) return;
     const auto path = editorHistoryPath(*this);
     if (path.empty()) return;
     std::ofstream stream(path, std::ios::binary);
-    for (std::size_t index = 0u; index < history.count && stream; ++index) {
-        UiString encoded{};
+    for (std::size_t index = 0u; index < history.size() && stream; ++index) {
+        std::string encoded{};
         transformHistory(encoded, history.at(index), false);
-        stream.write(encoded.data(), encoded.length);
+        stream.write(encoded.data(), encoded.size());
         stream << "\r\n";
-        encoded.release();
     }
 }
 
-void SphereUI::HyperTextEditControl::copyEditorState(const HyperTextEditControl& source) {
-    if (this == &source) return;
-    OwnedHyperTextElements copy;
-    for (std::size_t index = 0u; index < source.elements.count; ++index) if (const auto* element = source.elements.at(index)) copy.copy(*element);
-    history.copyFrom(source.history);
-    edit_modes.copyFrom(source.edit_modes);
-    visible_text.assign(source.visible_text.data());
-    hyper_text.assign(source.hyper_text.data());
-    copy.take(elements);
-    history_position = source.history_position;
-    maximum_history = source.maximum_history;
-    cursor_type = source.cursor_type;
-    caret_position = source.caret_position;
-    blink_started = source.blink_started;
-    cursor_visible = source.cursor_visible;
-    text_margins = source.text_margins;
-    cursor_color = source.cursor_color;
-    plain_color = source.plain_color;
-    player_link_color = source.player_link_color;
-    item_link_color = source.item_link_color;
-    link_color = source.link_color;
-    maximum_visible_length = source.maximum_visible_length;
-    maximum_hyper_length = source.maximum_hyper_length;
-    visible_first = source.visible_first;
-    visible_last = source.visible_last;
-    saved_viewport = source.saved_viewport;
-    parent_x = source.parent_x;
-    parent_y = source.parent_y;
+std::unique_ptr<SphereUI::Window> SphereUI::HyperTextEditControl::cloneInto(CloneContext& context) const {
+    return cloneControl(*this, context, [](auto& target, const auto& source, SphereUI::Window::CloneContext& context) {
 
-}
-
-SphereUI::Window* SphereUI::HyperTextEditControl::clone() {
-    return cloneControl(*this, [](auto& target, const auto& source) {
-        target.copyEditorState(source);
+        copyProperties(target, source,
+            &HyperTextEditControl::elements, &HyperTextEditControl::history, &HyperTextEditControl::edit_modes,
+            &HyperTextEditControl::visible_text, &HyperTextEditControl::hyper_text, &HyperTextEditControl::history_position,
+            &HyperTextEditControl::maximum_history, &HyperTextEditControl::cursor_type, &HyperTextEditControl::caret_position,
+            &HyperTextEditControl::blink_started, &HyperTextEditControl::cursor_visible, &HyperTextEditControl::text_margins,
+            &HyperTextEditControl::cursor_color, &HyperTextEditControl::plain_color, &HyperTextEditControl::player_link_color,
+            &HyperTextEditControl::item_link_color, &HyperTextEditControl::link_color,
+            &HyperTextEditControl::maximum_visible_length, &HyperTextEditControl::maximum_hyper_length,
+            &HyperTextEditControl::visible_first, &HyperTextEditControl::visible_last);
     });
 }
 
@@ -7090,19 +5433,19 @@ bool SphereUI::HyperTextEditControl::loadUi(const char*, SferaSimpleParser& pars
     reader.count("maxHistoryLength", maximum_history);
     cursor_type = 1u;
     if (const char* value = reader.string("cursorType")) cursor_type = SferaSimpleParser::equalsIgnoreCase(value, "none") ? 0u : SferaSimpleParser::equalsIgnoreCase(value, "uline") ? 2u : 1u;
-    edit_modes.clear();
+    edit_modes.reset();
     if (reader.has("editMode")) for (std::size_t index = 0u; index < parser.tokenCount(); ++index) {
         const char* value = reader.token(index);
-        if (SferaSimpleParser::equalsIgnoreCase(value, "enterPlainText")) edit_modes.insert(0u);
+        if (SferaSimpleParser::equalsIgnoreCase(value, "enterPlainText")) edit_modes.set(PlainText);
         else if (SferaSimpleParser::equalsIgnoreCase(value, "numbersOnly")) {
-            edit_modes.insert(0u);
-            edit_modes.insert(1u);
+            edit_modes.set(PlainText);
+            edit_modes.set(Numeric);
         } else if (SferaSimpleParser::equalsIgnoreCase(value, "password")) {
-            edit_modes.insert(0u);
-            edit_modes.insert(2u);
+            edit_modes.set(PlainText);
+            edit_modes.set(Password);
         }
     }
-    if (edit_modes.count == 0u) edit_modes.insert(0u);
+    if (edit_modes.none()) edit_modes.set(PlainText);
     text_margins = {};
     reader.rectangle("titleTextMargin", text_margins.left, text_margins.top, text_margins.right, text_margins.bottom);
     loadHistory();
@@ -7123,8 +5466,8 @@ std::uint32_t SphereUI::HyperTextEditControl::handleMessage(SphereUI::UiMessage 
             if (first != 0u) copyMessageText(reinterpret_cast<char*>(first), message == UiMessage::getHyperEditPlainText ? visible_text.data() : hyper_text.data());
             return 1u;
         case UiMessage::getHyperEditLengths:
-            storeValue(first, visible_text.length);
-            storeValue(second, hyper_text.length);
+            storeValue(first, visible_text.size());
+            storeValue(second, hyper_text.size());
             return 1u;
         case UiMessage::setHyperEditTextColor:
             plain_color = first;
@@ -7159,145 +5502,120 @@ void SphereUI::HyperTextEditControl::handleInput(const WindowInput& input) {
         return;
     }
     if (!input_enabled) setInputFocus(true);
-    if (visible_text.length == 0u) return;
-    const auto start = std::min(visible_first, visible_text.length);
-    const auto end = std::min(visible_last + 1u, visible_text.length);
+    if (visible_text.size() == 0u) return;
+    const auto start = std::min(visible_first, visible_text.size());
+    const auto end = std::min(visible_last + 1u, visible_text.size());
     const std::string visible(visible_text.data() + start, end > start ? end - start : 0u);
-    caret_position = std::min(visible_text.length, start + fitText(visible.c_str(), font, cursor.x - bounds.left - text_margins.left, false));
+    caret_position = std::min(visible_text.size(), start + fitText(visible.c_str(), font, cursor.x - bounds.left - text_margins.left, false));
     if ((input.key_modifiers & 1u) == 0u) return;
     std::size_t position = 0u;
-    for (std::size_t index = 0u; index < elements.count; ++index) if (auto* element = elements.at(index)) {
-        if (caret_position >= position && caret_position < position + element->text.length && element->type == 5u) {
-            if (auto* description = Runtime::descriptionWindow()) description->showDescription(static_cast<HyperTextElement_Link*>(element)->linkValue(), 0u, 250u, false);
+    for (const auto& element : elements) {
+        if (caret_position >= position && caret_position < position + element.text.size() && element.link() != nullptr) {
+            if (auto* description = Runtime::descriptionWindow()) description->showDescription(element.link()->linkValue(), 0u, 250u, false);
             break;
         }
-        position += element->text.length;
+        position += element.text.size();
     }
 }
 
-void SphereUI::HyperTextEditControl::destroy(bool free_storage) {
-    if (is_reference) saveHistory();
-    HyperTextParser::releaseElements(elements);
-    visible_text.release();
-    hyper_text.release();
-    history.release();
-    edit_modes.release();
+SphereUI::HyperTextEditControl::~HyperTextEditControl() {
+    if (template_instance) {
+        try { saveHistory(); }
+        catch (const std::exception&) { }
+    }
     Runtime::setTextInputActive(false);
-    Window::destroy(free_storage);
 }
 
-void SphereUI::ButtonCtrl::initialize() {
-    Window::initialize();
-    idle_image = pressed_image = hover_image = disabled_image = nullptr;
-    visual_state = button_flags = hotkey = 0u;
-    repeat_started_at = 0;
-    pressed = false;
-
+SphereUI::ButtonCtrl::ButtonCtrl() {
     repeat_interval = 0.05f;
     hover_color = UiColor::white;
     hidden = false;
     control_kind = UiControlKind::button;
-    input_mask = TextAlignment::center;
+    text_alignment = TextAlignment::center;
 }
 
-void SphereUI::CheckBox::initialize() {
-    Window::initialize();
-    unchecked_image = unchecked_hover_image = checked_image = checked_hover_image = nullptr;
-    button_flags = 0u;
-    checked = hovered = false;
-
-    image_x = image_y = label_x = label_y = 0;
+SphereUI::CheckBox::CheckBox() {
     hover_color = UiColor::white;
     hidden = false;
     control_kind = UiControlKind::checkBox;
 }
 
-void SphereUI::RadioButtonCtrl::initialize() {
-    CheckBox::initialize();
+SphereUI::RadioButtonCtrl::RadioButtonCtrl() {
     control_kind = UiControlKind::radioButton;
 }
 
-void SphereUI::TextCtrl::initialize() {
-    Window::initialize();
-    text_style = 0u;
+SphereUI::TextCtrl::TextCtrl() {
     hidden = false;
     control_kind = UiControlKind::text;
 }
 
-void SphereUI::ImageCtrl::initialize() {
-    Window::initialize();
-    fallback_image = nullptr;
-    image_style = 0u;
-    interaction_active = rotated = false;
-    rotation_radians = 0.0f;
+SphereUI::ImageCtrl::ImageCtrl() {
     base_alpha = 255u;
     opacity = 1.0f;
     hidden = false;
     control_kind = UiControlKind::image;
 }
 
-void SphereUI::ProgressBar::initialize() {
-    Window::initialize();
+SphereUI::ProgressBar::ProgressBar() {
     initializeProgressState();
     hidden = false;
     control_kind = UiControlKind::progressBar;
 }
 
-void SphereUI::CMinimapControl::initialize() {
-    Window::initialize();
+SphereUI::CMinimapControl::CMinimapControl() {
     resource_reference = nullptr;
     hidden = false;
     control_kind = UiControlKind::minimap;
 }
 
-SphereUI::Window* SphereUI::Runtime::makeControl(SphereUI::UiControlKind kind) {
+std::unique_ptr<SphereUI::Window> SphereUI::Runtime::makeControl(SphereUI::UiControlKind kind) {
     switch (kind) {
         case UiControlKind::window:
-            return createInitialized<Window>();
+            return std::make_unique<Window>();
         case UiControlKind::button:
-            return createInitialized<ButtonCtrl>();
+            return std::make_unique<ButtonCtrl>();
         case UiControlKind::text:
-            return createInitialized<TextCtrl>();
+            return std::make_unique<TextCtrl>();
         case UiControlKind::image:
-            return createInitialized<ImageCtrl>();
+            return std::make_unique<ImageCtrl>();
         case UiControlKind::progressBar:
-            return createInitialized<ProgressBar>();
+            return std::make_unique<ProgressBar>();
         case UiControlKind::scrollBar:
-            return createInitialized<ScrollBar>();
+            return std::make_unique<ScrollBar>();
         case UiControlKind::hyperText:
-            return createInitialized<HyperTextCtrl>();
+            return std::make_unique<HyperTextCtrl>();
         case UiControlKind::checkBox:
-            return createInitialized<CheckBox>();
+            return std::make_unique<CheckBox>();
         case UiControlKind::radioButton:
-            return createInitialized<RadioButtonCtrl>();
+            return std::make_unique<RadioButtonCtrl>();
         case UiControlKind::tooltip:
-            return createInitialized<ToolTipCtrl>();
+            return std::make_unique<ToolTipCtrl>();
         case UiControlKind::textList:
-            return createInitialized<ListCtrl>();
+            return std::make_unique<ListCtrl>();
         case UiControlKind::slider:
-            return createInitialized<SliderCtrl>();
+            return std::make_unique<SliderCtrl>();
         case UiControlKind::listItem:
-            return createInitialized<ListItemCtrl>();
+            return std::make_unique<ListItemCtrl>();
         case UiControlKind::edit:
-            return createInitialized<EditCtrl>();
+            return std::make_unique<EditCtrl>();
         case UiControlKind::slot:
-            return createInitialized<SlotCtrl>();
+            return std::make_unique<SlotCtrl>();
         case UiControlKind::spinButton:
-            return createInitialized<SpinButton>();
+            return std::make_unique<SpinButton>();
         case UiControlKind::richEdit:
-            return createInitialized<RichEditCtrl>();
+            return std::make_unique<RichEditCtrl>();
         case UiControlKind::filteredList:
-            return createInitialized<FilterListCtrl>();
+            return std::make_unique<FilterListCtrl>();
         case UiControlKind::minimap:
-            return createInitialized<CMinimapControl>();
+            return std::make_unique<CMinimapControl>();
         case UiControlKind::menu:
-            return createInitialized<CMenuListControl>();
+            return std::make_unique<CMenuListControl>();
         case UiControlKind::hyperTextChat:
-            return createInitialized<HyperTextChatListControl>();
+            return std::make_unique<HyperTextChatListControl>();
         case UiControlKind::hyperTextEdit:
-            return createInitialized<HyperTextEditControl>();
+            return std::make_unique<HyperTextEditControl>();
         case UiControlKind::fontPicker:
-            return createInitialized<FontPicker>();
+            return std::make_unique<FontPicker>();
         default:
             return nullptr;
     }
@@ -7316,52 +5634,45 @@ void SphereUI::Window::alignToScreen(bool reset_position) {
     if ((alignment_flags & alignCenterY) != 0u) y = detail::addCoordinate(y, static_cast<int>(vertical >> 1u));
 }
 
-void SphereUI::Window::applyAnimation(const WindowAnimation& effect, float fraction) {
+void SphereUI::Window::applyAnimation(const AnimationPlayback& playback, float fraction) {
+    const auto& effect = playback.effect;
     if (effect.kind == WindowAnimation::Kind::FadeIn || effect.kind == WindowAnimation::Kind::FadeOut) {
         setOpacity(effect.kind == WindowAnimation::Kind::FadeIn ? fraction : 1.0f - fraction);
         return;
     }
     if (effect.kind < WindowAnimation::Kind::MoveLeft || effect.kind > WindowAnimation::Kind::MoveDown) return;
     const double distance = static_cast<double>(effect.distance) * fraction;
-    const double value = effect.origin + ((effect.kind == WindowAnimation::Kind::MoveLeft || effect.kind == WindowAnimation::Kind::MoveUp) ? -distance : distance);
+    const double value = playback.origin + ((effect.kind == WindowAnimation::Kind::MoveLeft || effect.kind == WindowAnimation::Kind::MoveUp) ? -distance : distance);
     const auto coordinate = !std::isfinite(value) || value < -2147483648.0 || value >= 2147483648.0 ? std::numeric_limits<int>::min() : static_cast<int>(std::trunc(value));
     if (effect.kind <= WindowAnimation::Kind::MoveRight) setPosition(coordinate, y);
     else setPosition(x, coordinate);
 }
 
-void SphereUI::Window::startAnimation(SphereUI::WindowAnimation::Phase phase) {
-    if (auto* previous = active_animation; animation_active && previous != nullptr) applyAnimation(*previous, 1.0f);
-    if (phase == WindowAnimation::Phase::Idle || phase > WindowAnimation::Phase::Closing) {
-        active_animation = nullptr;
-        animation_active = false;
-        return;
-    }
+void SphereUI::Window::startAnimation(WindowAnimation::Phase phase) {
+    if (animation) applyAnimation(*animation, 1.0f);
+    animation.reset();
+    if (phase == WindowAnimation::Phase::Idle || phase > WindowAnimation::Phase::Closing) return;
     if (phase == WindowAnimation::Phase::Showing) setOpacity(1.0f);
-    auto& effect = phase == WindowAnimation::Phase::Showing ? show_animation : hide_animation;
-    if (effect.kind == WindowAnimation::Kind::None) {
-        active_animation = nullptr;
-        animation_active = false;
-        return;
+    const auto& effect = phase == WindowAnimation::Phase::Showing ? show_animation : hide_animation;
+    if (effect.kind == WindowAnimation::Kind::None) return;
+    AnimationPlayback playback{effect, Runtime::clockTicks(), 0.0f, phase};
+    if (effect.kind >= WindowAnimation::Kind::MoveLeft && effect.kind <= WindowAnimation::Kind::MoveDown) {
+        playback.origin = static_cast<double>(effect.kind <= WindowAnimation::Kind::MoveRight ? x : y)
+            - ((effect.kind == WindowAnimation::Kind::MoveRight || effect.kind == WindowAnimation::Kind::MoveDown) ? effect.distance : 0.0f) + effect.offset;
     }
-    animation_active = true;
-    active_animation = &effect;
-    if (effect.kind >= WindowAnimation::Kind::MoveLeft && effect.kind <= WindowAnimation::Kind::MoveDown) effect.origin = static_cast<double>(effect.kind <= WindowAnimation::Kind::MoveRight ? x : y) - ((effect.kind == WindowAnimation::Kind::MoveRight || effect.kind == WindowAnimation::Kind::MoveDown) ? effect.distance : 0.0f) + effect.offset;
-    effect.start_time = Runtime::clockTicks();
-    effect.phase = phase;
+    animation = playback;
     Runtime::playWindowSound(phase == WindowAnimation::Phase::Showing);
     updateAnimation();
 }
 
 void SphereUI::Window::updateAnimation() {
-    auto* effect = active_animation;
-    if (effect == nullptr) return;
-    const auto started = effect->start_time;
-    const float elapsed = static_cast<double>(std::bit_cast<std::int64_t>(Runtime::clockTicks() - started)) / 10000.0;
-    float fraction = elapsed / effect->duration;
+    if (!animation) return;
+    const float elapsed = static_cast<double>(std::bit_cast<std::int64_t>(Runtime::clockTicks() - animation->start_time)) / 10000.0;
+    float fraction = elapsed / animation->effect.duration;
     if (!std::isfinite(fraction) || fraction < 0.0f || fraction > 1.0f) fraction = 1.0f;
-    applyAnimation(*effect, fraction);
+    applyAnimation(*animation, fraction);
     if (fraction == 1.0f) {
-        if (effect->phase == WindowAnimation::Phase::Closing) close_completed = true;
+        if (animation->phase == WindowAnimation::Phase::Closing) close_completed = true;
         startAnimation(WindowAnimation::Phase::Idle);
     }
 }
@@ -7373,15 +5684,15 @@ void SphereUI::Window::beginClose(bool animated) {
         return;
     }
     startAnimation(WindowAnimation::Phase::Closing);
-    if (!animation_active) close_completed = true;
+    if (!isAnimating()) close_completed = true;
     input_enabled = false;
 }
 
 void SphereUI::Window::animateVisibility(bool hide) {
     if (hide) {
         startAnimation(WindowAnimation::Phase::Hiding);
-        hide_after_animation = animation_active;
-        if (!animation_active) handleMessage(UiMessage::setHidden, 1u, 0u);
+        hide_after_animation = isAnimating();
+        if (!isAnimating()) handleMessage(UiMessage::setHidden, 1u, 0u);
     } else {
         hide_after_animation = false;
         handleMessage(UiMessage::setHidden, 0u, 0u);
@@ -7391,11 +5702,9 @@ void SphereUI::Window::animateVisibility(bool hide) {
 
 SphereUI::Window* SphereUI::Window::controlAt(std::size_t index) const {
     if (index == 0u) return const_cast<Window*>(this);
-    if (child_sentinel == nullptr) return nullptr;
-    for (auto* node = child_sentinel->next; node != child_sentinel; node = node->next) if (--index == 0u) return node->value;
-    return nullptr;
+    return index <= children.size() ? children[index - 1u].get() : nullptr;
 }
 
 void SphereUI::Window::addModalReference(Window& window) {
-    detail::appendNode(reference_sentinel, reference_count, &window);
+    modal_references.push_back(&window);
 }

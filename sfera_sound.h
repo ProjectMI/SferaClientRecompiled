@@ -89,12 +89,10 @@ public:
 
     char* filename = nullptr;
     float duration_seconds = 0.0f;
-    std::int32_t cache_lifetime_seconds = 0;
+    int cache_lifetime_seconds = 0;
     std::uint64_t cache_idle_since = UINT64_MAX;
     bool cache_available = true;
     bool playback_finished = true;
-    CSound* cache_next = nullptr;
-    CSound* cache_previous = nullptr;
 
 private:
     struct Impl;

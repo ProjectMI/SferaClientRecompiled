@@ -7,20 +7,13 @@
 #include <cstdint>
 
 namespace SphereUI { struct SavedWindowPosition; struct LocalizedTextEntry; struct DisplayMode; }
-struct SferaScreenVertex;
-struct IDirect3DBaseTexture9;
 struct IDirect3D9;
 struct IDirect3DDevice9;
-struct IDirect3DBaseTexture9;
 namespace SphereUI { struct UiSprite; }
 
 namespace {
 
-const std::size_t kDynamicIndexScratchCount = 3000;
-const std::size_t kErrorMessageCapacity = 1004;
-const std::size_t kFontLookupClassCount = 5;
 const std::size_t kFontLookupGlyphCount = 256;
-const std::size_t kLandscapeMapRecordCount = 6400;
 
 const std::size_t kRenderBlendLutStorageSize = 64 * 64 * 4 + 1;
 const std::size_t kRenderQuantizationTableSize = 3072;
@@ -30,114 +23,70 @@ const std::size_t kTextureCacheEntryCount = 50;
 
 const char* sfera_cursor_texture_name(uint32_t slot);
 
-struct SferaItemArray {
-    void** block_vector_begin;
-    void** block_vector_end;
-    void** block_vector_capacity_end;
-    std::size_t free_capacity;
-    void** free_items;
-    std::size_t free_count;
-    std::size_t growth_count;
 
-    bool grow(std::size_t item_size);
-    void* take();
-    void put(void* item);
-    void clear();
-};
 
 struct SferaNetworkSendRuntime { CRITICAL_SECTION critical_section; };
 struct SferaInterpreterScratchRuntime {
     uint32_t network_poll_counter;
-    CItemListCommonItem* item_lookup_result;
 };
 
 struct WorldObject;
 
 struct SferaLightRecord {
-    SferaEffectVec3F position;
+    SferaVec3F position;
     float color[4];
     float radius;
-    SferaEffectVec3F bounds_min;
-    SferaEffectVec3F bounds_max;
+    SferaVec3F bounds_min;
+    SferaVec3F bounds_max;
     float viewer_distance_squared;
 
-    void update(const SferaEffectVec3F& new_position, const float* new_color, float new_radius);
+    void update(const SferaVec3F& new_position, const float* new_color, float new_radius);
 };
 
 struct SferaLightRuntime {
-    SferaBoundCheckArray<SferaLightRecord*> handles;
-    SferaBoundCheckArray<SferaLightRecord*> visible_handles;
+    std::vector<std::unique_ptr<SferaLightRecord>> handles;
+    std::vector<SferaLightRecord*> visible_handles;
     std::array<bool, 31> active_lights{};
     std::array<std::uint32_t, 30> render_candidate_indices{};
     std::array<bool, 30> render_candidate_active{};
     std::size_t active_count = 0;
     std::size_t candidate_count = 0;
 
-    SferaLightRecord* record(std::int32_t handle) const;
+    SferaLightRecord* record(int handle) const;
     void setActive(std::uint32_t index, bool enabled, std::uint32_t sourceLine);
     void activateMask(std::uint32_t mask);
     void setDirectionalLight(const SferaVec3F& direction, const SferaVec3F& color);
     void invalidateActiveLights();
     void disableActiveLights();
-    std::int32_t create(const SferaEffectVec3F& position, const float* color, float radius);
-    void write(std::int32_t handle, const SferaEffectVec3F& position, const float* color, float radius);
-    void release(std::int32_t handle);
+    int create(const SferaVec3F& position, const float* color, float radius);
+    void write(int handle, const SferaVec3F& position, const float* color, float radius);
+    void release(int handle);
 };
 
-struct SferaLandscapeRuntime {
-    SferaBoundCheckArray<TerrainRegion> file_records;
-};
-struct SferaCollisionRuntime {
-    SferaBoundCheckArray<float> candidate_handles;
-    SferaBoundCheckArray<std::uint32_t> near_result_handles;
 
-};
-struct SferaSceneArrayRuntime {
-
-    SferaBoundCheckArray<float> render_pass_slots;
-    SferaBoundCheckArray<SferaVec3F> clip_vectors;
-    SferaBoundCheckArray<SferaVec3F> scene_points;
-    SferaBoundCheckArray<SphereRender::SceneSortEntry> object_positions;
-    SferaBoundCheckArray<SferaMatrix4x4F> model_matrices;
-
-    SferaBoundCheckArray<const TerrainCell*> object_sort_keys;
-    SferaBoundCheckArray<float> object_draw_indices;
-    SferaBoundCheckArray<std::uint32_t*> object_visibility_indices;
-    SferaBoundCheckArray<SferaVec3F> clip_points;
-    SferaBoundCheckArray<SferaMatrix4x4F> character_matrices;
-    SferaBoundCheckArray<TerrainPatch*> object_sort_indices;
-    SferaBoundCheckArray<std::uint32_t> clip_indices;
-};
-struct SferaSceneBuildRuntime {
-    std::size_t object_count;
-};
 
 struct SferaModelMaterialLookupRuntime {
     std::uint64_t refresh_tick;
 };
-struct SferaIntrusiveListHeader {
-    SferaActiveEffect* first;
-    SferaActiveEffect* last;
-};
 
-void sfera_effect_list_append(SferaIntrusiveListHeader& list, SferaActiveEffect& item);
-void sfera_effect_list_remove(SferaIntrusiveListHeader& list, SferaActiveEffect& item);
+
 struct SferaNatureManager {
     NatureRainListener rain_listener;
     LightingListener lighting_listener;
-    IEffect* rain_effect;
-    float rain_intensity;
-    float rain_scale;
-    IEffect* lighting_effect;
-    float lighting_level;
-    SferaActiveEffect* rain_effect_handle;
-    SferaActiveEffect* lighting_effect_handle;
-    SferaActiveEffect* ambient_rain_handles[3];
+    CRainEffect* rain_effect = nullptr;
+    float rain_intensity = 0.5f;
+    float rain_scale = 0.0f;
+    CScriptedEffect* lighting_effect = nullptr;
+    float lighting_level = 0.5f;
+    SferaActiveEffect* rain_effect_handle = nullptr;
+    SferaActiveEffect* lighting_effect_handle = nullptr;
+    std::array<SferaActiveEffect*, 3> ambient_rain_handles{};
 
     static void updateRain();
     static void updateLightning();
-    void initialize();
+    bool initialize();
     void shutdown();
+    void forgetEffect(const SferaActiveEffect& item);
     bool attachRainEffect(IEffect& effect);
     void detachRainEffect();
     bool attachLightingEffect(IEffect& effect);
@@ -152,10 +101,7 @@ struct SferaNatureManager {
     void updateAmbientRainEffects();
 };
 
-struct SferaNatureRuntime { SferaNatureManager* manager; };
 SferaNatureManager* sfera_nature_manager();
-void sfera_initialize_nature_manager();
-void sfera_shutdown_nature_manager();
 
 struct SferaControlOptionsRuntime {
     uint32_t active_slot;
@@ -197,13 +143,10 @@ struct SferaMainCommandStateRuntime {
     char default_cursor_name[8];
     uint32_t render_channel_mask;
     uint32_t command_state;
-    uint32_t window_count;
 
-    uint32_t near_collision_count;
 };
 
 struct SferaMainInputStateRuntime {
-    uint32_t input_state;
 
     float motion_accumulator;
     uint32_t input_state_02;
@@ -215,16 +158,11 @@ struct SferaMainInputStateRuntime {
     float motion_x;
     float motion_y;
     bool main_loop_started;
-    uint32_t active_input_handle;
 
-    SphereWorld::GrassCell* landscape_texture_base;
-    uint8_t landscape_texture_lut[256][2];
-    uint32_t landscape_state;
 };
 
 struct SferaMainViewStateRuntime {
     float projection_samples[125];
-    std::size_t projection_sample_count;
 
     float view_coefficients[6];
 
@@ -233,20 +171,15 @@ struct SferaMainViewStateRuntime {
 };
 
 struct SferaMainUiStateRuntime {
-    uint32_t ui_state;
     uint32_t ui_state_02;
-    SphereWorld::GrassCell* ui_state_03;
-    uint32_t ui_state_04;
 
     float scene_scale;
-    uint32_t ui_state_05;
     HINSTANCE active_ui_object;
     SferaFrustumF clip_frustum;
 
-    uint32_t ui_state_07;
     uint32_t ui_state_08;
 
-    bool effectVisible(const IEffect& effect, const SferaEffectVec3F& position) const;
+    bool effectVisible(const IEffect& effect, const SferaVec3F& position) const;
 };
 
 struct SferaClientConfigRuntime {
@@ -272,36 +205,22 @@ struct SferaClientConfigRuntime {
     bool effects_enabled;
     uint32_t state_27;
 
-    uint32_t state_28;
 
 };
 
 struct SferaClientMainScalarRuntime {
-    uint32_t counter_01;
     uint32_t state_01;
-    std::uint16_t* state_02;
-    uint32_t state_03;
-    uint32_t state_04;
 
     uint32_t mode_01;
-    uint32_t mode_02;
 
     std::size_t primary_animation_frame;
-    uint32_t state_07;
-
-    uint32_t state_27;
-    uint32_t state_28;
 
 };
 struct SferaInterScalarRuntime {
-    uint32_t state_01;
-    uint32_t state_02;
     QuickFile* quick_files;
     uint32_t mode_01;
 
     WorldObject* current_object;
-    uint32_t state_04;
-    uint32_t state_07;
 };
 
 struct SferaInterfaceRuntime {
@@ -314,20 +233,13 @@ struct SferaInterfaceRuntime {
     bool invite_messages;
     SphereUI::CDescriptionWindow* description_control;
     uint32_t previous_input_modifiers;
-    SferaBoundCheckArray<GameUiWindow*> windows;
-    SferaBoundCheckArray<WorldGuiControl*> window_handle_table;
 };
-using SferaStdAllocator = StdAllocator;
 
 struct SferaSceneVectorRuntime {
     SferaVec3F render_scale;
     SferaVec3F transform_scratch;
     SferaVec3F frame_102_position;
     SferaVec3F frame_101_position;
-};
-struct SferaSpatialBoundsRuntime {
-    SferaVec3F minimum;
-    SferaVec3F maximum;
 };
 struct SferaViewSpatialRuntime {
     SferaVec3F basis[4];
@@ -336,34 +248,8 @@ struct SferaViewSpatialRuntime {
     SferaVec3F position_offset;
     SferaVec3F scale;
     SferaVec3F world_anchor;
-    SferaVec3F view_axis;
-};
-struct SferaLandscapeInterpolationRuntime {
-    std::size_t subdivision_count;
-
-};
-struct SferaSkyInterpolationRuntime {
-    SferaVec4F primary_samples[10];
-    float primary_key_positions[10];
-    SferaVec4F primary_reference;
-    SferaVec4F secondary_samples[6];
-    float secondary_key_positions[6];
-};
-struct SferaColorExpansionRuntime {
-    uint32_t five_bit_to_eight_bit[32];
-    bool initialized;
 };
 
-struct SferaScreenVertex {
-    float x;
-    float y;
-    float z;
-    float rhw;
-    uint32_t diffuse;
-    uint32_t specular;
-    float u;
-    float v;
-};
 struct SferaSceneRenderRuntime {
     SferaScreenVertex textured_quad[4];
     SferaScreenVertex interface_quad[4];
@@ -391,35 +277,29 @@ struct SferaOptionsDialogRuntime {
     uint32_t comparison_graphics_value;
     bool widget_keys_initialized;
     uint32_t reflection_quality;
-    SphereUI::UiIndexVector saved_chat_fonts;
-    SphereUI::UiIndexVector edited_chat_fonts;
+    std::vector<std::uint32_t> saved_chat_fonts;
+    std::vector<std::uint32_t> edited_chat_fonts;
 };
 struct SferaWindowRuntime {
 
-    uint32_t clip_vector_count;
     float distance_scratch;
     CRITICAL_SECTION timing_critical_section;
-
-    uint32_t input_state;
     uint32_t active_window_index;
     bool windowed;
     HWND main_window_handle;
 
-    std::array<std::uint32_t, 2>* landscape_grid_records;
-    std::size_t landscape_grid_count;
     char diagnostic_message[2048];
 
 };
 struct SferaInputDeviceRuntime {
     uint32_t process_value;
-    uint32_t input_generation;
 
     float minimum_lod_distance;
     float lod_distance;
 
     float frame_interval;
     bool exception_requested;
-    SphereUI::ChatFilter* chat_filter;
+    std::unique_ptr<SphereUI::ChatFilter> chat_filter;
 };
 struct SferaScreenClipRuntime {
     int left;
@@ -429,17 +309,14 @@ struct SferaScreenClipRuntime {
 };
 struct SferaWorldRenderRuntime {
     SphereRender::Model* active_model;
-    SphereWorld::DynamicVegetation* world_spatial_index;
     bool feature_toggle;
     bool scene_active;
 };
 struct SferaWorldLoadRuntime {
     uint32_t active_tool_context;
-    std::size_t live_object_count;
 
     uint32_t loading_work_total;
 };
-using SferaWorldBoundsRuntime = SferaSpatialBoundsRuntime;
 struct SferaRenderLookupEntry {
     uint32_t resource;
     uint32_t mask;
@@ -459,19 +336,11 @@ struct SferaClientProcessRuntime {
     uint32_t ui_bridge;
     bool startup_complete;
     char locale[10];
-    Contours* client_object;
-    char log_message[912];
+    std::unique_ptr<Contours> client_object;
 };
 struct SferaMainRenderRuntime {
-    std::size_t world_object_count;
     uint32_t secondary_render_pass;
     uint32_t grass_depth_mode;
-};
-struct SferaMicrotextureRecord {
-    uint16_t lookup_key;
-
-    uint32_t name;
-    TerrainTextureImage* resource;
 };
 struct SferaSceneControlRuntime {
 
@@ -482,44 +351,29 @@ struct SferaSceneControlRuntime {
     uint32_t active_context;
     std::size_t context_count;
     uint32_t context_queue[30];
-    std::size_t microtexture_count;
-    SferaMicrotextureRecord microtextures[100];
 };
 struct SferaMainAuxRuntime {
-    SkyEnvironment* secondary_world_manager;
+    std::unique_ptr<SkyEnvironment> secondary_world_manager;
     uint32_t color_component;
 
-};
-struct SferaLandscapeMapRecord {
-    char material_name[20];
-    uint8_t tile_x;
-    uint8_t tile_y;
-};
-struct SferaLandscapeMapRuntime {
-
-    SferaLandscapeMapRecord records[kLandscapeMapRecordCount];
 };
 struct SferaSkyRuntime {
     float horizon_scale;
     uint16_t indices[594];
 };
 struct SferaTextureCacheEntry {
-    const TerrainCell* owner;
-    uint8_t kind;
+    const TerrainCell* owner = nullptr;
+    uint8_t kind = 0;
 
-    IDirect3DTexture9* resource;
-    uint32_t use_count;
+    Microsoft::WRL::ComPtr<IDirect3DTexture9> resource;
+    uint32_t use_count = 0;
 };
 struct SferaTextureCacheRuntime {
 
     uint32_t render_gate;
 
     bool cache_enabled;
-    SferaTextureCacheEntry entries[kTextureCacheEntryCount];
-};
-struct SferaErrorMessageScratchRuntime {
-    char fatal_message[kErrorMessageCapacity];
-
+    std::array<SferaTextureCacheEntry, kTextureCacheEntryCount> entries;
 };
 struct SferaGrassMapRuntime {
     uint32_t alternating_update_phase;
@@ -538,11 +392,8 @@ struct SferaViewGeometryRuntime {
 };
 
 struct SferaLandscapePatchLookupRuntime {
-    std::size_t active_count;
-    float parameter;
     SferaVec3F primary_vector;
     SferaVec3F secondary_vector;
-    TerrainRegion* patch_records[6400];
 };
 struct SferaViewMotionRuntime {
     float motion_terms[5];
@@ -581,10 +432,6 @@ struct SferaStaticRenderLookupRuntime {
     uint8_t color_remap_c[256];
 
 };
-struct SferaSpatialIndexRuntime {
-    std::map<std::pair<std::int32_t, std::int32_t>, SphereWorld::SpatialLeaf> quadtree_cells;
-
-};
 struct SferaCollisionScratchRuntime {
     SferaLightRecord light_candidates[30];
 
@@ -597,8 +444,6 @@ struct SferaRecoveredStaticRuntime {
     float inverse_40;
 
     uint32_t view_transition_counter;
-    uint32_t view_direction_state;
-    uint32_t scene_mode;
 
     CRITICAL_SECTION scene_lock;
 
@@ -606,18 +451,14 @@ struct SferaRecoveredStaticRuntime {
     uint32_t render_gate;
     uint32_t text_size_height;
 
-    uint32_t client_state_02;
-    uint32_t client_state_03;
-    float clip_depth;
 
     uint32_t graphics_state;
-    uint32_t font_renderer_state;
 
-    SphereRender::CharacterModels* render_state_08;
+    std::unique_ptr<SphereRender::CharacterModels> render_state_08;
     uint32_t render_state_09;
 
     uint32_t scene_state_07;
-    EnvironmentZones* scene_state_08;
+    std::unique_ptr<EnvironmentZones> scene_state_08;
     uint32_t scene_state_09;
     bool interaction_enabled;
     uint32_t interaction_input_flags;
@@ -631,40 +472,37 @@ struct SferaPendingKeyRuntime {
     uint32_t key_codes[30];
 };
 struct SferaEffectManager {
-    bool deferred_lifecycle;
-    uint32_t render_cycle;
-    std::size_t active_resource_count;
-    uint32_t detail_setting;
-    bool effects_enabled;
-    std::size_t render_slot_count;
-    std::uint16_t* particle_random_table;
-    SferaEffectMeshResource* particle_resource_head;
-    IEffect* effect_definition_head;
-    bool initialized;
+    uint32_t render_cycle{};
+    bool effects_enabled{};
+    std::size_t render_slot_count{};
+    std::array<std::uint16_t, 65536> particle_random_table{};
+    std::vector<std::shared_ptr<const SferaEffectMeshResource>> mesh_resources;
+    std::vector<std::shared_ptr<IEffect>> definitions;
+    bool initialized{};
     std::vector<std::size_t> render_order;
-    std::size_t active_effect_count;
-    SferaIntrusiveListHeader active_effects;
-    uint32_t generation;
-    uint32_t last_processed_generation;
+    std::list<std::shared_ptr<SferaActiveEffect>> active_effects;
+    std::unique_ptr<SferaNatureManager> nature;
+    std::unique_ptr<SferaBloodEffectRuntime> blood;
+    bool shutting_down = false;
+    bool updating = false;
+    uint32_t generation{};
+    uint32_t last_processed_generation{};
     enum class FlareTransition { Idle, FadeOut, FadeIn };
-    FlareTransition flare_transition;
-    bool flare_enabled;
-    int flare_alpha;
-    SferaVec3F viewer_position;
-    SferaBoundCheckArray<SferaEffectRenderSlot> render_slots;
-    std::array<SferaEffectListenerEntry, 16> effect_listeners{};
-    std::size_t listener_count = 0;
+    FlareTransition flare_transition{};
+    bool flare_enabled{};
+    int flare_alpha{};
+    SferaVec3F viewer_position{};
+    std::vector<SferaEffectRenderSlot> render_slots;
+    std::vector<SferaEffectListenerEntry> effect_listeners;
 
-    void* allocate(std::size_t size) const;
-    void free(void* pointer) const;
     void reportError(const char* message) const;
     SferaEffectRenderSlot* acquireRenderSlot();
-    void finalizeBillboard(SferaEffectRenderSlot& slot, const SferaEffectVec3F& position, float size) const;
-    float viewerDistance(const SferaEffectVec3F& position) const;
+    void finalizeBillboard(SferaEffectRenderSlot& slot, const SferaVec3F& position, float size) const;
+    float viewerDistance(const SferaVec3F& position) const;
     float viewerDistance(std::uint32_t source_handle) const;
-    void appendDefinition(IEffect* effect);
-    IEffect* findDefinition(uint32_t effect_id) const;
-    IEffect* findDefinition(const char* script_name) const;
+    void appendDefinition(std::shared_ptr<IEffect> effect);
+    std::shared_ptr<IEffect> findDefinition(uint32_t effect_id) const;
+    std::shared_ptr<IEffect> findDefinition(const char* script_name) const;
     int32_t findDefinitionId(const char* script_name) const;
     IEffectListener* findListener(uint32_t effect_id) const;
     bool registerListener(std::uint32_t effect_id, IEffectListener& listener);
@@ -680,34 +518,32 @@ struct SferaEffectManager {
     void renderParticles();
     void drawFlare(int x, int y, int size, bool enabled);
     std::uint32_t listenerKey(const SferaActiveEffect* handle) const;
-    void removeActiveEffect(SferaActiveEffect* handle);
+    bool removeActiveEffect(SferaActiveEffect* handle);
     bool initialize();
     void shutdown();
     SferaActiveEffect* createActiveEffect(std::uint32_t effect_id, std::uint32_t source_handle);
     SferaActiveEffect* createActiveEffect(const char* script_name, std::uint32_t source_handle);
-    void removeActiveEffect(SferaActiveEffect& item);
-    bool setEffectParameters(std::uint32_t source_handle, const SferaEffectParameter* parameters, std::size_t count);
+    bool removeActiveEffect(SferaActiveEffect& item);
+    bool setEffectParameters(std::uint32_t source_handle, std::span<const SferaEffectParameter> parameters);
+    void retireEffect(SferaActiveEffect& item);
     void updateActiveEffects();
     void updateActiveEffect(SferaActiveEffect& item, std::uint16_t state_flags, float viewer_distance);
 };
 
-inline SferaItemArray g_sfera_effect_items{.growth_count = 6000u};
-inline SferaItemArray g_sfera_sound_effect_items{.growth_count = 128u};
 inline SferaServerWall g_sfera_server_wall{.texture_id = -1};
-inline SferaNetworkRuntime g_sfera_network_runtime{.initialization_result = UINT32_MAX, .server_port = 25858u, .connection_slot = UINT32_MAX, .pending_effect = nullptr, .active_slot = UINT32_MAX, .shutdown_state = UINT32_MAX};
+inline SferaNetworkRuntime g_sfera_network_runtime{.initialization_result = UINT32_MAX, .server_port = 25858u, .connection_slot = UINT32_MAX, .pending_effect = nullptr, .active_slot = UINT32_MAX};
 inline SferaNetworkSendRuntime g_sfera_network_send_runtime;
-inline SkyEnvironment* g_sfera_primary_sky_environment;
+inline std::unique_ptr<SkyEnvironment> g_sfera_primary_sky_environment;
 
 inline SferaSliceReference32 g_sfera_pop_slice_fallback;
 inline SferaSliceReference32 g_sfera_pop_sliceup_fallback;
 inline SferaInterpreterScratchRuntime g_sfera_interpreter_scratch_runtime;
-inline SferaGraphicsRuntime g_sfera_graphics_runtime{.fog_distance = 100.0f, .saved_fog_distance = 50.0f, .lods_enabled = 1u, .hardware_cursor_enabled = 1u, .environment_factor = 0.8500000238418579f, .base_microtexture_id = UINT32_MAX, .view_parameter = 0.6460000276565552f, .view_scale = 1.0f, .post_effects_enabled = 1u, .rebuild_percent = UINT32_MAX, .runtime_counter = 2000u};
+inline SferaGraphicsRuntime g_sfera_graphics_runtime{.fog_distance = 100.0f, .saved_fog_distance = 50.0f, .lods_enabled = 1u, .hardware_cursor_enabled = 1u, .environment_factor = 0.8500000238418579f, .base_microtexture_id = UINT32_MAX, .view_scale = 1.0f, .post_effects_enabled = 1u, .rebuild_percent = UINT32_MAX};
 inline SferaSceneRenderRuntime g_sfera_scene_render_runtime;
 inline SferaMatrix4x4F g_sfera_model_coordinate_matrix;
 inline SferaMatrix4x4F g_sfera_character_frame_matrix;
 inline SferaScreenVertex g_sfera_sky_screen_vertices[120];
 inline SferaScreenVertex g_sfera_landscape_screen_vertices[1200];
-inline SferaBoundCheckArray<std::uint32_t> g_sfera_character_index_map;
 inline SferaGraphicsOptionsRuntime g_sfera_graphics_options_runtime;
 inline SferaSphereOptionsRuntime g_sfera_sphere_options_runtime;
 inline SferaOptionsDialogRuntime g_sfera_options_dialog_runtime;
@@ -716,23 +552,20 @@ inline SferaInputDeviceRuntime g_sfera_input_device_runtime;
 inline SferaScreenClipRuntime g_sfera_screen_clip_runtime;
 inline SferaWorldRenderRuntime g_sfera_world_render_runtime;
 inline SferaWorldLoadRuntime g_sfera_world_load_runtime;
-inline SferaWorldBoundsRuntime g_sfera_world_bounds_runtime;
+inline SphereWorld::Bounds g_sfera_world_bounds_runtime;
 inline SferaRenderLookupRuntime g_sfera_render_lookup_runtime;
 inline SferaLandscapeRenderRuntime g_sfera_landscape_render_runtime;
 inline SferaClientProcessRuntime g_sfera_client_process_runtime;
 inline SferaMainRenderRuntime g_sfera_main_render_runtime;
 inline SferaSceneControlRuntime g_sfera_scene_control_runtime;
 inline SferaMainAuxRuntime g_sfera_main_aux_runtime;
-inline SferaLandscapeMapRuntime g_sfera_landscape_map_runtime;
 inline SferaSkyRuntime g_sfera_sky_runtime;
 inline SferaTextureCacheRuntime g_sfera_texture_cache_runtime;
-inline SferaErrorMessageScratchRuntime g_sfera_error_message_scratch_runtime;
 inline SferaGrassMapRuntime g_sfera_grass_map_runtime;
 inline SferaPhysicsRuntime g_sfera_physics_runtime;
 inline SferaViewGeometryRuntime g_sfera_view_geometry_runtime;
 inline SferaMatrix4x4F g_sfera_model_transform_scratch_matrix;
-inline SferaSkyInterpolationRuntime g_sfera_sky_interpolation_runtime;
-inline SferaColorExpansionRuntime g_sfera_color_expansion_runtime;
+inline SkyState g_sfera_sky_interpolation_runtime;
 inline SferaLandscapePatchLookupRuntime g_sfera_landscape_patch_lookup_runtime;
 inline SferaViewMotionRuntime g_sfera_view_motion_runtime;
 inline SferaRenderSampleRuntime g_sfera_render_sample_runtime;
@@ -742,23 +575,16 @@ inline SferaWorldSlotTableRuntime g_sfera_world_slot_table_runtime;
 inline SferaConfigTextRuntime g_sfera_config_text_runtime;
 inline SferaStaticRenderLookupRuntime g_sfera_static_render_lookup_runtime;
 
-inline SferaSpatialIndexRuntime g_sfera_spatial_index_runtime;
 inline SferaCollisionScratchRuntime g_sfera_collision_scratch_runtime;
 inline SferaRecoveredStaticRuntime g_sfera_recovered_static_runtime;
 inline SferaPendingKeyRuntime g_sfera_pending_key_runtime;
-inline EnvironmentZones* g_sfera_alternate_environment_zones;
+inline std::unique_ptr<EnvironmentZones> g_sfera_alternate_environment_zones;
 inline SferaViewSpatialRuntime g_sfera_view_spatial_runtime;
-inline SferaSpatialBoundsRuntime g_sfera_spatial_bounds_runtime;
-inline WorldObjects g_sfera_world_objects{.max_occupied_object_handle = UINT32_MAX, .controlled_object_handle = UINT32_MAX, .contour_mode = UINT32_MAX};
+inline SphereWorld::Bounds g_sfera_spatial_bounds_runtime;
+inline WorldObjects g_sfera_world_objects{.max_occupied_object_handle = UINT32_MAX, .controlled_object_handle = UINT32_MAX};
 inline SferaLightRuntime g_sfera_light_runtime;
-inline SferaLandscapeRuntime g_sfera_landscape_runtime;
-inline SferaLandscapeInterpolationRuntime g_sfera_landscape_interpolation_runtime;
-inline SferaCollisionRuntime g_sfera_collision_runtime;
-inline SferaSceneArrayRuntime g_sfera_scene_array_runtime;
-inline SferaSceneBuildRuntime g_sfera_scene_build_runtime;
 inline SferaWeatherRuntime g_sfera_weather_runtime;
 inline SferaModelMaterialLookupRuntime g_sfera_model_material_lookup_runtime;
-inline SferaNatureRuntime g_sfera_nature_runtime;
 inline SferaControlOptionsRuntime g_sfera_control_options{.active_slot = UINT32_MAX};
 inline SferaSpriteRuntime g_sfera_sprite_runtime{.render_mode = UINT32_MAX};
 inline SferaErrorLogRuntime g_sfera_error_log_runtime;
@@ -777,10 +603,10 @@ inline SferaClientConfigRuntime g_sfera_client_config_runtime;
 inline SferaClientMainScalarRuntime g_sfera_client_main_scalar_runtime;
 inline SferaInterScalarRuntime g_sfera_inter_scalar_runtime;
 inline SferaInterfaceRuntime g_sfera_interface_runtime{.primary_gate = 1u, .secondary_gate = 1u, .cross_enabled = 1u, .sounds_enabled = 1u, .description_auto_popup = 1u, .invite_messages = 1u};
-inline SferaStdAllocator g_sfera_std_allocator;
 inline SferaCrtStartupRuntime g_sfera_crt_startup_runtime;
-inline SferaBloodEffectRuntime* g_sfera_blood_effect_instance;
-inline SferaEffectManager g_sfera_effect_manager{.deferred_lifecycle = 1u, .render_cycle = 31u, .last_processed_generation = UINT32_MAX};
-inline SferaMbcRuntime g_sfera_mbc_runtime_storage;
-inline SferaMbcRuntime* g_sfera_mbc_runtime = &g_sfera_mbc_runtime_storage;
+inline SferaEffectManager g_sfera_effect_manager{.render_cycle = 31u, .last_processed_generation = UINT32_MAX};
+inline SferaMbcRuntime g_sfera_mbc_runtime;
 inline SferaMbcInterpreterStorage g_sfera_mbc_interpreter_storage;
+
+// UI owners must be destroyed while the VM registration tables are still alive.
+inline SphereUI::InterfaceManager g_sfera_interface;

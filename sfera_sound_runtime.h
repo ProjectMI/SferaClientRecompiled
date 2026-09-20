@@ -3,6 +3,7 @@
 #include "sfera_sound.h"
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -11,12 +12,13 @@
 #include <memory>
 #include <optional>
 #include <vector>
+#include <string>
 
 class CSound;
 class CSoundStream;
 
 struct SferaSoundSource {
-    char* filename = nullptr;
+    std::string filename;
     bool silence = false;
     float silence_duration = 0.0f;
 };
@@ -30,65 +32,60 @@ struct SferaSoundTimeGroup {
 
 class CSoundEffect {
 public:
-    std::uint32_t effect_number;
-    std::uint32_t flags;
-    bool silence_active;
-    std::uint64_t silence_started_at;
-    float silence_duration;
-    float saved_play_time;
-    std::uint64_t transition_started_at;
-    SferaSoundSource* sources;
-    std::size_t source_count;
-    SferaSoundTimeGroup* time_groups;
-    std::size_t time_group_count;
-    bool distance_paused;
-    SferaEffectVec3F offset;
-    SferaEffectVec3F region_radius;
-    SferaEffectVec3F region_offset;
-    float mix_duration;
+    struct Definition {
+        std::vector<SferaSoundSource> sources;
+        std::vector<SferaSoundTimeGroup> time_groups;
+        std::uint32_t effect_number{}, flags{};
+        SferaVec3F offset{}, region_radius{};
+        float mix_duration = 1.0f;
+        int cache_lifetime = 4;
+        SferaSound3DParameters parameters{};
+    };
+    std::shared_ptr<const Definition> definition;
+    bool silence_active = false, distance_paused = false;
+    std::uint64_t silence_started_at{}, transition_started_at{};
+    float silence_duration{}, saved_play_time{};
+    SferaVec3F region_offset{}, last_position{};
     std::optional<std::size_t> last_source_index;
-    CSound* active_sound;
-    std::int32_t cache_lifetime;
-    bool shared_definition;
-    SferaSound3DParameters sound_parameters;
-    SferaEffectVec3F last_position;
+    std::shared_ptr<CSound> active_sound;
+    SferaSound3DParameters sound_parameters{};
 
-    void initialize();
-    bool loadDefinition(SferaSimpleParser& parser, const SferaParserRange& range);
-    CSoundEffect* clone() const;
-    void resetFrom(const CSoundEffect& source);
-    void destroy();
+    static std::shared_ptr<const Definition> loadDefinition(SferaSimpleParser& parser, const SferaParserRange& range);
+    explicit CSoundEffect(std::shared_ptr<const Definition> source);
+    ~CSoundEffect();
+    CSoundEffect(const CSoundEffect&) = delete;
+    CSoundEffect& operator=(const CSoundEffect&) = delete;
+    void reset();
     float startTime() const;
-    void start(const SferaEffectVec3F* frame, bool after_start_time);
-    void update(const SferaEffectVec3F* frame, float age);
+    void start(const SferaVec3F* frame, bool after_start_time);
+    void update(const SferaVec3F* frame, float age);
     void stop();
     bool isComplete() const;
 };
 
 class CSoundManager {
 public:
-    void detach(CSound& sound);
-    void setVolume(std::int32_t percent);
+    struct CachedSound {
+        std::shared_ptr<CSound> sound;
+        std::chrono::steady_clock::time_point idle_since{};
+        bool idle_started = false;
+    };
+    void setVolume(int percent);
     void update();
     void clear();
 
-    CSound* first;
-    CSound* last;
-    float volume;
-    bool enabled;
-    std::size_t count;
+    std::vector<std::unique_ptr<CSound>> sounds;
+    std::vector<CachedSound> cache;
+    float volume = 1.0f;
+    bool enabled = false;
 };
 
 class SoundEffectRegistry {
 public:
-    std::vector<CSoundEffect*> definitions;
-
-    SoundEffectRegistry();
-    ~SoundEffectRegistry();
-    CSoundEffect* add();
-    CSoundEffect* find(std::uint32_t id) const;
+    std::shared_ptr<const CSoundEffect::Definition> find(std::uint32_t id) const;
     bool load();
-    void clear();
+private:
+    std::vector<std::shared_ptr<const CSoundEffect::Definition>> definitions;
 };
 
 enum class SoundEventType : std::uint8_t { none, seek, wait, stop, playlist, end };
@@ -135,7 +132,7 @@ struct SferaSoundPlaybackState {
     SferaSoundEventList* current_list;
     std::size_t playlist_index;
     CSoundStream* stream;
-    char* source;
+    std::string source;
     bool finished;
     bool stopped;
     int volume_scale;
@@ -143,8 +140,8 @@ struct SferaSoundPlaybackState {
 };
 
 struct SferaSoundRuntime {
-    SoundEffectRegistry* effect_manager = nullptr;
-    CSoundManager* sound_manager = nullptr;
+    std::unique_ptr<SoundEffectRegistry> effect_manager;
+    std::unique_ptr<CSoundManager> sound_manager;
     std::list<std::unique_ptr<SferaSoundPlaybackState>> tracks;
     std::array<char, 512> requested_track{};
     SferaSoundPlaybackState* current_track = nullptr;
@@ -161,8 +158,7 @@ struct SferaSoundRuntime {
     void loadDefinitions();
     void clearDefinitions();
     bool interfaceAvailable() const;
-    CSoundEffect* createEffect(std::uint32_t effect_id);
-    void destroyEffect(CSoundEffect* effect);
+    std::unique_ptr<CSoundEffect> createEffect(std::uint32_t effect_id);
     std::uint32_t soundVolume() const;
     int musicVolume() const;
     bool hardwareMixing() const;

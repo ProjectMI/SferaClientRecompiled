@@ -594,9 +594,8 @@ CSoundStream* SI_StreamCreateFile(const char* filename, std::uint32_t) {
     stream->decode_event_position = UINT32_MAX;
     stream->play_event_position = UINT32_MAX;
     stream->applyVolume();
-    auto* result = stream.release();
-    g_interface->impl_->streams.push_back(result);
-    return result;
+    g_interface->impl_->streams.push_back(stream.get());
+    return stream.release();
 }
 
 void SI_StreamFree(CSoundStream* stream) {

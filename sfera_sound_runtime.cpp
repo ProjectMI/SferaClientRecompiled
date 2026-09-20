@@ -99,7 +99,7 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
     float sound_elapsed(std::uint64_t start) {
         return static_cast<float>(static_cast<std::int64_t>(sound_clock_ticks() - start)) * 0.0001f;
     }
-    std::uint32_t sound_flag(const char* token) {
+    std::uint32_t sound_flag(std::string_view token) {
         if (SferaSimpleParser::equalsIgnoreCase(token, "SF_TYPE_ENVIRONMENT")) return 1u << 0u;
         if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_RANDOM")) return 1u << 2u;
         if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_RANDOMMIX")) return 1u << 3u;
@@ -108,27 +108,14 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
         if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_TIMEGROUPS")) return 1u << 6u;
         return 0u;
     }
-    struct SemanticSoundCacheEntry {
-        CSound* sound;
-        std::chrono::steady_clock::time_point idle_since;
-        bool idle_started;
-    };
-    std::vector<SemanticSoundCacheEntry>& semantic_sound_cache() {
-        static std::vector<SemanticSoundCacheEntry> cache;
-        return cache;
-    }
-    void destroy_semantic_sound(CSound* sound) {
-        if (sound == nullptr) return;
-        if (sound->IsSoundPlaying() != 0) sound->CSound::Stop();
-        sound->~CSound();
-        std::free(sound);
-    }
     void service_semantic_sound_cache() {
-        auto& cache = semantic_sound_cache();
+        auto* manager = g_sfera_sound_runtime.sound_manager.get();
+        if (manager == nullptr) return;
+        auto& cache = manager->cache;
         const auto now = std::chrono::steady_clock::now();
         for (std::size_t index = 0u; index < cache.size();) {
             auto& entry = cache[index];
-            CSound* sound = entry.sound;
+            CSound* sound = entry.sound.get();
             if (sound == nullptr) {
                 cache.erase(cache.begin() + static_cast<std::ptrdiff_t>(index));
                 continue;
@@ -140,7 +127,7 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
                 ++index;
                 continue;
             }
-            const std::int32_t lifetime = sound->cache_lifetime_seconds;
+            const int lifetime = sound->cache_lifetime_seconds;
             if (lifetime < 0) {
                 ++index;
                 continue;
@@ -153,18 +140,14 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
                 ++index;
                 continue;
             }
-            destroy_semantic_sound(sound);
             cache.erase(cache.begin() + static_cast<std::ptrdiff_t>(index));
         }
     }
     void release_active_sound(CSoundEffect& effect) {
-        if (effect.active_sound == nullptr) return;
-        auto* sound = effect.active_sound;
-        if (sound != nullptr) {
-            if (!sound->playback_finished && sound->IsSoundPlaying() != 0) sound->CSound::Stop();
-            sound->cache_available = true;
-        }
-        effect.active_sound = nullptr;
+        auto sound = std::move(effect.active_sound);
+        if (sound == nullptr) return;
+        if (!sound->playback_finished && sound->IsSoundPlaying() != 0) sound->Stop();
+        sound->cache_available = true;
         service_semantic_sound_cache();
     }
     bool play_sound(CSound& sound, int looped, float position) {
@@ -174,44 +157,33 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
         sound.playback_finished = false;
         return true;
     }
-    CSound* find_cached_sound(const char* filename) {
+    std::shared_ptr<CSound> find_cached_sound(CSoundManager& manager, const char* filename) {
         if (filename == nullptr) return nullptr;
         service_semantic_sound_cache();
-        for (auto& entry : semantic_sound_cache()) {
-            CSound* sound = entry.sound;
+        for (auto& entry : manager.cache) {
+            CSound* sound = entry.sound.get();
             if (sound == nullptr || sound->IsSoundPlaying() != 0 || !sound->cache_available) continue;
             const char* name = sound->filename;
             if (name != nullptr && SferaSimpleParser::equalsIgnoreCase(filename, name)) {
                 entry.idle_started = false;
-                return sound;
+                return entry.sound;
             }
         }
         return nullptr;
     }
-    CSound* create_cached_sound(CSoundManager& manager, const char* filename, const SferaSound3DParameters* parameters, std::int32_t cache_lifetime) {
+    std::shared_ptr<CSound> create_cached_sound(CSoundManager& manager, const char* filename, const SferaSound3DParameters* parameters, int cache_lifetime) {
         if (!manager.enabled || filename == nullptr) return nullptr;
-        CSound* sound = find_cached_sound(filename);
+        auto sound = find_cached_sound(manager, filename);
         if (sound == nullptr) {
             FILE* file = nullptr;
             if (fopen_s(&file, filename, "rb") != 0 || file == nullptr) return nullptr;
             std::fclose(file);
-            void* memory = std::calloc(1u, sizeof(CSound));
-            if (memory == nullptr) return nullptr;
-            sound = ::new (memory) CSound();
-            sound->cache_idle_since = UINT64_MAX;
-            sound->cache_lifetime_seconds = 0u;
-            sound->cache_available = true;
-            sound->playback_finished = true;
-            sound->cache_next = nullptr;
-            sound->cache_previous = nullptr;
+            sound = std::make_shared<CSound>();
             const std::uint32_t load_flags = parameters == nullptr
                 ? (1u << 3u)
                 : ((1u << 0u) | (1u << 3u) | (1u << 5u));
-            if (sound->LoadSound(filename, load_flags) == 0) {
-                destroy_semantic_sound(sound);
-                return nullptr;
-            }
-            semantic_sound_cache().push_back({sound, {}, false});
+            if (sound->LoadSound(filename, load_flags) == 0) return nullptr;
+            manager.cache.push_back({sound});
         }
         sound->cache_lifetime_seconds = cache_lifetime;
         sound->cache_available = true;
@@ -219,60 +191,21 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
         sound->SetVolume(manager.volume);
         return sound;
     }
-    void release_sound_sources(CSoundEffect& effect) {
-        if (effect.sources != nullptr) {
-            auto* sources = effect.sources;
-            for (std::size_t index = 0u; index < effect.source_count; ++index) std::free(sources[index].filename);
-            std::free(sources);
-        }
-        effect.sources = nullptr;
-        effect.source_count = 0u;
-    }
-    bool allocate_sound_sources(CSoundEffect& effect, std::size_t count) {
-        release_sound_sources(effect);
-        if (count == 0u) return true;
-        auto* values = static_cast<SferaSoundSource*>(std::calloc(count, sizeof(SferaSoundSource)));
-        if (values == nullptr) return false;
-        effect.sources = values;
-        effect.source_count = count;
-        return true;
-    }
-    bool allocate_sound_time_groups(CSoundEffect& effect, std::size_t count) {
-        std::free(effect.time_groups);
-        effect.time_groups = nullptr;
-        effect.time_group_count = 0u;
-        if (count == 0u) return true;
-        auto* values = static_cast<SferaSoundTimeGroup*>(std::calloc(count, sizeof(SferaSoundTimeGroup)));
-        if (values == nullptr) return false;
-        effect.time_groups = values;
-        effect.time_group_count = count;
-        return true;
-    }
-    bool assign_sound_filename(SferaSoundSource& source, const char* filename) {
-        std::free(source.filename);
-        source.filename = nullptr;
-        if (filename == nullptr) return false;
-        const std::size_t size = std::strlen(filename) + 1u;
-        auto* copy = static_cast<char*>(std::calloc(1u, size));
-        if (copy == nullptr) return false;
-        std::memcpy(copy, filename, size);
-        source.filename = copy;
-        return true;
-    }
+
     bool sound_time_matches(float value, const SferaSoundTimeGroup& group) {
         return group.end < group.begin ? value < group.end || value >= group.begin : value >= group.begin && value < group.end;
     }
     std::size_t choose_sound_source(CSoundEffect& effect) {
-        if ((effect.flags & (1u << 6u)) != 0u && effect.time_groups != nullptr && effect.time_group_count != 0u) {
-            auto* groups = effect.time_groups;
-            std::size_t selected = effect.time_group_count;
-            for (std::size_t index = 0u; index < effect.time_group_count; ++index) if (sound_time_matches(g_sfera_graphics_runtime.environment_factor, groups[index])) {
+        if ((effect.definition->flags & (1u << 6u)) != 0u && effect.definition != nullptr && !effect.definition->time_groups.empty()) {
+            const auto& groups = effect.definition->time_groups;
+            std::size_t selected = groups.size();
+            for (std::size_t index = 0u; index < groups.size(); ++index) if (sound_time_matches(g_sfera_graphics_runtime.environment_factor, groups[index])) {
                 selected = index;
                 break;
             }
-            if (selected == effect.time_group_count) return 0u;
+            if (selected == groups.size()) return 0u;
             const auto& group = groups[selected];
-            if ((effect.flags & ((1u << 2u) | (1u << 3u))) != 0u && group.source_end >= group.source_begin && group.source_end - group.source_begin + 1u > 1u) {
+            if ((effect.definition->flags & ((1u << 2u) | (1u << 3u))) != 0u && group.source_end >= group.source_begin && group.source_end - group.source_begin + 1u > 1u) {
                 std::size_t value = group.source_begin;
                 do value = group.source_begin + static_cast<std::size_t>(std::rand()) % (group.source_end - group.source_begin + 1u);
                 while (effect.last_source_index == value);
@@ -280,21 +213,21 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
             }
             return group.source_begin;
         }
-        if ((effect.flags & ((1u << 2u) | (1u << 3u))) != 0u && effect.source_count > 1u) {
+        if ((effect.definition->flags & ((1u << 2u) | (1u << 3u))) != 0u && effect.definition->sources.size() > 1u) {
             std::size_t value = 0u;
-            do value = static_cast<std::size_t>(std::rand()) % effect.source_count;
+            do value = static_cast<std::size_t>(std::rand()) % effect.definition->sources.size();
             while (effect.last_source_index == value);
             return value;
         }
         return 0u;
     }
-    bool sound_distance_gate(CSoundEffect& effect, const SferaEffectVec3F* frame, float distance) {
-        if ((effect.flags & (1u << 0u)) != 0u) return true;
+    bool sound_distance_gate(CSoundEffect& effect, const SferaVec3F* frame, float distance) {
+        if ((effect.definition->flags & (1u << 0u)) != 0u) return true;
         if (distance > effect.sound_parameters.max_distance) {
             if (!effect.distance_paused) {
                 if (effect.active_sound != nullptr) {
-                    auto* sound = effect.active_sound;
-                    if ((effect.flags & ((1u << 2u) | (1u << 3u) | (1u << 4u))) == 0u) effect.saved_play_time = sound->GetPlayTimepos();
+                    auto sound = effect.active_sound;
+                    if ((effect.definition->flags & ((1u << 2u) | (1u << 3u) | (1u << 4u))) == 0u) effect.saved_play_time = sound->GetPlayTimepos();
                     release_active_sound(effect);
                 }
                 effect.silence_active = false;
@@ -305,8 +238,8 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
         }
         if (!effect.distance_paused) return true;
         const float elapsed = sound_elapsed(effect.transition_started_at);
-        if ((effect.flags & ((1u << 2u) | (1u << 3u) | (1u << 4u))) == 0u && effect.active_sound != nullptr) {
-            auto* sound = effect.active_sound;
+        if ((effect.definition->flags & ((1u << 2u) | (1u << 3u) | (1u << 4u))) == 0u && effect.active_sound != nullptr) {
+            auto sound = effect.active_sound;
             const float resume = effect.saved_play_time + elapsed;
             const float length = sound->duration_seconds;
             if (resume > length) {
@@ -322,86 +255,84 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
         effect.start(frame, false);
         return true;
     }
-    CSoundEffect* find_sound_definition(std::uint32_t effect_id) {
-        auto* registry = g_sfera_sound_runtime.effect_manager;
-        return registry == nullptr ? nullptr : registry->find(effect_id);
-    }
-    bool grow_sound_effect_pool() {
-        auto& pool = g_sfera_sound_effect_items;
-        if (!pool.grow(sizeof(CSoundEffect))) return false;
-        auto* objects = static_cast<CSoundEffect*>(pool.block_vector_end[-1]);
-        for (std::size_t index = 0; index < pool.growth_count; ++index) std::construct_at(&objects[index])->initialize();
-        return true;
-    }
+
+
 }
-void CSoundEffect::initialize() {
-    *this = {};
-    mix_duration = 1.0f;
-    cache_lifetime = 4;
-    shared_definition = false;
-    sound_parameters.inside_cone_angle = 360u;
-    sound_parameters.outside_cone_angle = 360u;
-    sound_parameters.cone_orientation = {0.0f, 0.0f, -1.0f};
-    sound_parameters.min_distance = 1.0f;
-    sound_parameters.max_distance = 1000000000.0f;
+CSoundEffect::CSoundEffect(std::shared_ptr<const Definition> source) : definition(std::move(source)) {
+    if (definition == nullptr) throw std::invalid_argument("Missing sound definition");
+    sound_parameters = definition->parameters;
 }
-bool CSoundEffect::loadDefinition(SferaSimpleParser& parser, const SferaParserRange& range) {
-    flags = 0u;
-    if (parser.findValue("eff_number", &range)) effect_number = parser.readInt(0u);
+
+CSoundEffect::~CSoundEffect() { stop(); }
+std::shared_ptr<const CSoundEffect::Definition> CSoundEffect::loadDefinition(SferaSimpleParser& parser, const SferaParserRange& range) {
+    auto data = std::make_shared<Definition>();
+    const auto integer = [&](std::size_t index) {
+        int value{};
+        if (!parser.tryReadInt(index, value)) throw std::invalid_argument("Invalid sound integer");
+        return value;
+    };
+    const auto real = [&](std::size_t index) {
+        float value{};
+        if (!parser.tryReadFloat(index, value) || !std::isfinite(value)) throw std::invalid_argument("Invalid sound number");
+        return value;
+    };
+    const auto vector = [&] { return SferaVec3F{real(0), real(1), real(2)}; };
+    data->flags = 0u;
+    if (parser.findValue("eff_number", &range)) data->effect_number = integer(0u);
     SferaParserRange block{};
-    char text[1024]{};
+    std::string text;
     if (parser.findBlock("audio_files", &block, &range, 1)) {
         parser.setScanRange(&block);
         std::size_t source_lines = 0u;
         while (parser.nextValue("source")) ++source_lines;
-        if (source_lines == 0u || !allocate_sound_sources(*this, source_lines)) {
+        if (source_lines == 0u) {
             parser.clearScanRange();
-            return false;
+            return nullptr;
         }
+        data->sources.resize(source_lines);
+        std::vector<bool> assigned(source_lines);
         parser.setScanRange(&block);
         while (parser.nextValue("source")) {
-            const std::int32_t index = parser.readInt(0u);
-            if (index < 0 || std::cmp_greater_equal(index, source_count)) {
+            const int index = integer(0u);
+            if (index < 0 || std::cmp_greater_equal(index, data->sources.size())) {
                 parser.clearScanRange();
-                return false;
+                return nullptr;
             }
-            auto& source = sources[index];
-            if (parser.readQuotedString(1u, text) == nullptr) {
+            auto& source = data->sources[index];
+            source = {};
+            assigned[static_cast<std::size_t>(index)] = true;
+            if (!parser.readQuotedString(1u, text)) {
                 parser.clearScanRange();
-                return false;
+                return nullptr;
             }
             if (SferaSimpleParser::equalsIgnoreCase(text, "silence")) {
                 source.silence = true;
-                source.silence_duration = parser.readFloat(2u);
-            } else if (!assign_sound_filename(source, text)) {
-                parser.clearScanRange();
-                return false;
-            }
+                source.silence_duration = real(2u);
+            } else source.filename = text;
         }
         parser.clearScanRange();
+        if (std::find(assigned.begin(), assigned.end(), false) != assigned.end()) return nullptr;
     } else if (parser.findValue("audio_file", &range)) {
-        if (!allocate_sound_sources(*this, 1u) || parser.readQuotedString(0u, text) == nullptr || !assign_sound_filename(sources[0], text)) return false;
-    } else return false;
+        if (!parser.readQuotedString(0u, text)) return nullptr;
+        data->sources.push_back({text});
+    } else return nullptr;
     if (parser.findBlock("time_groups", &block, &range, 1)) {
         parser.setScanRange(&block);
         std::size_t count = 0u;
         while (parser.nextValue("time")) ++count;
-        if (!allocate_sound_time_groups(*this, count)) {
-            parser.clearScanRange();
-            return false;
-        }
+        data->time_groups.resize(count);
         parser.setScanRange(&block);
         std::size_t index = 0u;
         while (parser.nextValue("time") && index < count) {
-            float begin = parser.readFloat(0u);
-            float end = parser.readFloat(1u);
-            std::int32_t source_begin = parser.readInt(2u);
-            std::int32_t source_end = parser.readInt(3u);
-            if (source_begin < 0 || source_end < 0 || std::cmp_greater_equal(source_begin, source_count) || std::cmp_greater_equal(source_end, source_count)) {
+            float begin = real(0u);
+            float end = real(1u);
+            int source_begin = integer(2u);
+            int source_end = integer(3u);
+            if (source_begin < 0 || source_end < 0 || std::cmp_greater_equal(source_begin, data->sources.size()) || std::cmp_greater_equal(source_end, data->sources.size())) {
                 parser.clearScanRange();
-                return false;
+                return nullptr;
             }
-            auto& group = time_groups[index++];
+            auto& group = data->time_groups[index++];
             group.begin = begin == 0.0f ? 1.0f : 1.0f - begin / 24.0f;
             group.end = end == 0.0f ? 1.0f : 1.0f - end / 24.0f;
             group.source_begin = std::min(source_begin, source_end);
@@ -411,119 +342,90 @@ bool CSoundEffect::loadDefinition(SferaSimpleParser& parser, const SferaParserRa
     }
     if (parser.findValue("flags", &range)) {
         for (std::size_t index = 0u; index < parser.tokenCount(); index += 2u) {
-            flags |= sound_flag(parser.readStringBounded(index, text, sizeof(text)));
+            data->flags |= sound_flag(parser.tokenAt(index));
         }
     }
-    if (parser.findValue("region_radius", &range)) parser.readFloatSequence(0u, &region_radius.x, 3u);
+    if (parser.findValue("region_radius", &range)) data->region_radius = vector();
     bool has_min = false;
     bool has_max = false;
     if (parser.findValue("min_distance", &range)) {
-        sound_parameters.min_distance = parser.readFloat(0u);
+        data->parameters.min_distance = real(0u);
         has_min = true;
     }
     if (parser.findValue("max_distance", &range)) {
-        sound_parameters.max_distance = parser.readFloat(0u);
+        data->parameters.max_distance = real(0u);
         has_max = true;
     }
-    if (parser.findValue("mix_duration", &range)) mix_duration = parser.readFloat(0u);
+    if (parser.findValue("mix_duration", &range)) data->mix_duration = real(0u);
     float barrier = 0.03f;
     if (parser.findValue("vol_barier", &range)) {
-        barrier = parser.readFloat(0u);
+        barrier = real(0u);
         barrier = barrier == 0.0f ? 0.01f : std::min(barrier / 100.0f, 1.0f);
     }
-    if (has_min && !has_max && barrier > 0.0f) sound_parameters.max_distance = sound_parameters.min_distance / barrier;
-    else if (has_max && !has_min) sound_parameters.min_distance = sound_parameters.max_distance * barrier;
-    if (parser.findValue("offset_vec", &range)) parser.readFloatSequence(0u, &offset.x, 3u);
-    if (parser.findValue("cache_lifetime", &range)) cache_lifetime = std::min(parser.readInt(0u), 10);
-    return true;
-}
-CSoundEffect* CSoundEffect::clone() const {
-    auto* result = static_cast<CSoundEffect*>(g_sfera_effect_manager.allocate(sizeof(CSoundEffect)));
-    if (result == nullptr) return nullptr;
-    result->initialize();
-    result->resetFrom(*this);
-    return result;
-}
-void CSoundEffect::resetFrom(const CSoundEffect& source) {
-    active_sound = nullptr;
-    last_position = {};
-    effect_number = source.effect_number;
-    flags = source.flags;
-    silence_active = source.silence_active;
-    silence_duration = source.silence_duration;
-    saved_play_time = source.saved_play_time;
-    sources = source.sources;
-    source_count = source.source_count;
-    time_groups = source.time_groups;
-    time_group_count = source.time_group_count;
-    distance_paused = source.distance_paused;
-    offset = source.offset;
-    region_radius = source.region_radius;
-    region_offset = source.region_offset;
-    mix_duration = source.mix_duration;
-    last_source_index = source.last_source_index;
-    cache_lifetime = source.cache_lifetime;
-    sound_parameters = source.sound_parameters;
-    shared_definition = true;
-}
-void CSoundEffect::destroy() {
-    if (!shared_definition) {
-        release_sound_sources(*this);
-        std::free(time_groups);
+    if (has_min && !has_max && barrier > 0.0f) data->parameters.max_distance = data->parameters.min_distance / barrier;
+    else if (has_max && !has_min) data->parameters.min_distance = data->parameters.max_distance * barrier;
+    if (parser.findValue("offset_vec", &range)) data->offset = vector();
+    if (parser.findValue("cache_lifetime", &range)) data->cache_lifetime = std::min(integer(0u), 10);
+    if (data->parameters.min_distance < 0.0f || data->parameters.max_distance < 0.0f ||
+        !std::isfinite(data->parameters.min_distance) || !std::isfinite(data->parameters.max_distance)) return nullptr;
+    for (const auto& source : data->sources) {
+        if (source.silence ? source.silence_duration < 0.0f : source.filename.empty()) return nullptr;
     }
-    release_active_sound(*this);
-    silence_active = false;
-    distance_paused = false;
-    sources = nullptr;
-    source_count = 0u;
-    time_groups = nullptr;
-    time_group_count = 0u;
-    shared_definition = false;
+    return data;
 }
+void CSoundEffect::reset() {
+    stop();
+    silence_started_at = transition_started_at = 0;
+    silence_duration = saved_play_time = 0.0f;
+    region_offset = last_position = {};
+    last_source_index.reset();
+    sound_parameters = definition->parameters;
+}
+
 float CSoundEffect::startTime() const {
     return sound_parameters.max_distance;
 }
-void CSoundEffect::start(const SferaEffectVec3F* frame, bool after_start_time) {
-    if (sources == nullptr || source_count == 0u || g_sfera_sound_runtime.sound_manager == nullptr) return;
+void CSoundEffect::start(const SferaVec3F* frame, bool after_start_time) {
+    if (definition == nullptr || definition->sources.empty() || g_sfera_sound_runtime.sound_manager == nullptr) return;
     release_active_sound(*this);
-    const auto index = std::min(choose_sound_source(*this), source_count - 1u);
+    const auto index = std::min(choose_sound_source(*this), definition->sources.size() - 1u);
     last_source_index = index;
-    const auto& source = sources[index];
+    const auto& source = definition->sources[index];
     if (source.silence) {
         silence_active = true;
         silence_duration = source.silence_duration;
         silence_started_at = sound_clock_ticks();
         return;
     }
-    const char* filename = source.filename;
-    auto* manager = g_sfera_sound_runtime.sound_manager;
+    const char* filename = source.filename.c_str();
+    auto* manager = g_sfera_sound_runtime.sound_manager.get();
     if (manager == nullptr || filename == nullptr) return;
-    if ((flags & (1u << 5u)) != 0u) {
+    if ((definition->flags & (1u << 5u)) != 0u) {
         auto random_component = [](float radius) {
             return static_cast<float>(std::rand() - std::rand()) * 3.0518509447574615e-05f * radius;
         };
-        region_offset = {random_component(region_radius.x), random_component(region_radius.y), random_component(region_radius.z)};
+        region_offset = {random_component(definition->region_radius.x), random_component(definition->region_radius.y), random_component(definition->region_radius.z)};
     }
     if (frame != nullptr) {
         const auto& position = *frame;
-        sound_parameters.position = {position.x - offset.x + region_offset.x, position.y - offset.y + region_offset.y, position.z - offset.z + region_offset.z};
+        sound_parameters.position = {position.x - definition->offset.x + region_offset.x, position.y - definition->offset.y + region_offset.y, position.z - definition->offset.z + region_offset.z};
         last_position = {sound_parameters.position.x, sound_parameters.position.y, sound_parameters.position.z};
     }
-    if (after_start_time && (flags & ((1u << 2u) | (1u << 3u) | (1u << 4u))) != 0u) {
+    if (after_start_time && (definition->flags & ((1u << 2u) | (1u << 3u) | (1u << 4u))) != 0u) {
         distance_paused = true;
         transition_started_at = sound_clock_ticks();
         return;
     }
-    auto* sound = create_cached_sound(*manager, filename, (flags & (1u << 0u)) != 0u ? nullptr : &sound_parameters, cache_lifetime);
+    auto sound = create_cached_sound(*manager, filename, (definition->flags & (1u << 0u)) != 0u ? nullptr : &sound_parameters, definition->cache_lifetime);
     if (sound != nullptr) {
         active_sound = sound;
         sound->cache_available = false;
-        if (!after_start_time) play_sound(*sound, static_cast<int>(flags & (1u << 4u)), 0.0f);
+        if (!after_start_time) play_sound(*sound, static_cast<int>(definition->flags & (1u << 4u)), 0.0f);
     }
     distance_paused = after_start_time ? 1u : 0u;
     if (after_start_time) transition_started_at = sound_clock_ticks();
 }
-void CSoundEffect::update(const SferaEffectVec3F* frame, float age) {
+void CSoundEffect::update(const SferaVec3F* frame, float age) {
     service_semantic_sound_cache();
     if (!sound_distance_gate(*this, frame, age)) return;
     if (silence_active) {
@@ -532,7 +434,7 @@ void CSoundEffect::update(const SferaEffectVec3F* frame, float age) {
             silence_active = false;
             return;
         }
-        if ((flags & (1u << 3u)) != 0u && elapsed >= silence_duration - mix_duration) {
+        if ((definition->flags & (1u << 3u)) != 0u && elapsed >= silence_duration - definition->mix_duration) {
             silence_active = false;
             start(frame, false);
             return;
@@ -541,7 +443,7 @@ void CSoundEffect::update(const SferaEffectVec3F* frame, float age) {
         return;
     }
     if (active_sound == nullptr) return;
-    auto* sound = active_sound;
+    auto sound = active_sound;
     if (sound == nullptr) {
         active_sound = nullptr;
         return;
@@ -552,19 +454,19 @@ void CSoundEffect::update(const SferaEffectVec3F* frame, float age) {
         service_semantic_sound_cache();
         return;
     }
-    if ((flags & (1u << 3u)) != 0u) {
+    if ((definition->flags & (1u << 3u)) != 0u) {
         const float length = sound->duration_seconds;
-        if (sound->GetPlayTimepos() >= length - mix_duration) {
+        if (sound->GetPlayTimepos() >= length - definition->mix_duration) {
             release_active_sound(*this);
             start(frame, false);
             if (active_sound == nullptr) return;
             sound = active_sound;
         }
     }
-    if ((flags & (1u << 0u)) != 0u || frame == nullptr || sound == nullptr) return;
+    if ((definition->flags & (1u << 0u)) != 0u || frame == nullptr || sound == nullptr) return;
     const auto& position = *frame;
-    const SferaEffectVec3F current{position.x - offset.x + region_offset.x, position.y - offset.y + region_offset.y, position.z - offset.z + region_offset.z};
-    const SferaEffectVec3F velocity{current.x - last_position.x, current.y - last_position.y, current.z - last_position.z};
+    const SferaVec3F current{position.x - definition->offset.x + region_offset.x, position.y - definition->offset.y + region_offset.y, position.z - definition->offset.z + region_offset.z};
+    const SferaVec3F velocity{current.x - last_position.x, current.y - last_position.y, current.z - last_position.z};
     if (velocity.x != 0.0f || velocity.y != 0.0f || velocity.z != 0.0f) {
         last_position = current;
         sound->SetVelocity(velocity.x, velocity.y, velocity.z, 0);
@@ -585,104 +487,64 @@ bool SferaSoundRuntime::interfaceAvailable() const {
     return SI_GetInterface() != nullptr;
 }
 
-CSoundEffect* SferaSoundRuntime::createEffect(std::uint32_t effect_id) {
-    CSoundEffect* definition = find_sound_definition(effect_id);
-    if (definition == nullptr) return nullptr;
-    if (g_sfera_sound_effect_items.free_count == 0u && !grow_sound_effect_pool()) return nullptr;
-    auto* result = static_cast<CSoundEffect*>(g_sfera_sound_effect_items.take());
-    if (result == nullptr) return nullptr;
-    result->resetFrom(*definition);
-    return result;
+std::unique_ptr<CSoundEffect> SferaSoundRuntime::createEffect(std::uint32_t effect_id) {
+    auto definition = effect_manager == nullptr ? nullptr : effect_manager->find(effect_id);
+    return definition == nullptr ? nullptr : std::make_unique<CSoundEffect>(std::move(definition));
 }
 
-void SferaSoundRuntime::destroyEffect(CSoundEffect* effect) {
-    if (effect == nullptr) return;
-    effect->stop();
-    g_sfera_sound_effect_items.put(effect);
-}
-
-
-SoundEffectRegistry::SoundEffectRegistry() {
-    definitions.reserve(100);
-}
-
-SoundEffectRegistry::~SoundEffectRegistry() {
-    clear();
-}
-
-void SoundEffectRegistry::clear() {
-    for (auto* effect : definitions) {
-        effect->destroy();
-        delete effect;
-    }
-    definitions.clear();
-}
-
-CSoundEffect* SoundEffectRegistry::add() {
-    auto effect = std::make_unique<CSoundEffect>();
-    effect->initialize();
-    definitions.push_back(effect.get());
-    return effect.release();
-}
-
-CSoundEffect* SoundEffectRegistry::find(std::uint32_t id) const {
-    const auto found = std::lower_bound(
-        definitions.begin(),
-        definitions.end(),
-        id,
-        [](const CSoundEffect* effect, std::uint32_t number) {
-            return effect->effect_number < number;
-        });
+std::shared_ptr<const CSoundEffect::Definition> SoundEffectRegistry::find(std::uint32_t id) const {
+    const auto found = std::lower_bound(definitions.begin(), definitions.end(), id, [](const auto& definition, auto number) {
+        return definition->effect_number < number;
+    });
     return found != definitions.end() && (*found)->effect_number == id ? *found : nullptr;
 }
 
 bool SoundEffectRegistry::load() {
+    std::vector<std::shared_ptr<const CSoundEffect::Definition>> loaded;
+    loaded.reserve(100);
     WIN32_FIND_DATAA found{};
     HANDLE search = ::FindFirstFileA("Sounds\\*.def", &found);
     if (search != INVALID_HANDLE_VALUE) {
-        do {
-            if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0u) continue;
-
-            SferaSimpleParser parser;
-            parser.initialize();
-            parser.load((std::string("Sounds\\") + found.cFileName).c_str());
-            parser.setBlockRange(nullptr);
-
-            SferaParserRange range{};
-            while (parser.nextBlock("soundeffect", &range)) {
-                SferaParserRange continuation{};
-                parser.getBlockRange(&continuation);
-
-                auto* effect = add();
-                if (!effect->loadDefinition(parser, range)) {
-                    definitions.pop_back();
-                    effect->destroy();
-                    delete effect;
+        struct SearchScope {
+            HANDLE handle;
+            ~SearchScope() { ::FindClose(handle); }
+        } close_search{search};
+        try {
+            do {
+                if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0u) continue;
+                SferaSimpleParser parser;
+                if (!parser.load((std::string("Sounds\\") + found.cFileName).c_str())) return false;
+                parser.setBlockRange(nullptr);
+                SferaParserRange range{};
+                while (parser.nextBlock("soundeffect", &range)) {
+                    SferaParserRange continuation{};
+                    parser.getBlockRange(&continuation);
+                    auto definition = CSoundEffect::loadDefinition(parser, range);
+                    if (definition == nullptr) return false;
+                    loaded.push_back(std::move(definition));
+                    parser.setBlockRange(&continuation);
                 }
-                parser.setBlockRange(&continuation);
-            }
-            parser.release();
-        } while (::FindNextFileA(search, &found));
-        ::FindClose(search);
+            } while (::FindNextFileA(search, &found));
+        } catch (const std::exception&) {
+            return false;
+        }
     }
-
-    std::sort(definitions.begin(), definitions.end(), [](const auto* first, const auto* second) {
+    std::sort(loaded.begin(), loaded.end(), [](const auto& first, const auto& second) {
         return first->effect_number < second->effect_number;
     });
+    definitions.swap(loaded);
     return true;
 }
 
 void SferaSoundRuntime::loadDefinitions() {
     if (effect_manager != nullptr) return;
 
-    auto* registry = new SoundEffectRegistry;
-    effect_manager = registry;
-    registry->load();
+    auto registry = std::make_unique<SoundEffectRegistry>();
+    if (registry->load()) effect_manager = std::move(registry);
 }
 
 void SferaSoundRuntime::clearDefinitions() {
-    delete effect_manager;
-    effect_manager = nullptr;
+    effect_manager.reset();
 }
 
 bool SferaSoundPlaybackState::queueEvent(
@@ -776,7 +638,6 @@ SferaSoundPlaybackState::SferaSoundPlaybackState()
       current_list(nullptr),
       playlist_index(0u),
       stream(nullptr),
-      source(nullptr),
       finished(false),
       stopped(true),
       volume_scale(1),
@@ -803,26 +664,18 @@ float SferaSoundPlaybackState::parseTime(const char* text) {
 
 bool SferaSoundPlaybackState::load(const char* filename) {
     SferaSimpleParser parser;
-    parser.initialize();
-    struct ParserRelease {
-        SferaSimpleParser& parser;
-        ~ParserRelease() { parser.release(); }
-    } release{parser};
 
     parser.load(filename);
     SferaParserRange track{};
     SferaParserRange block{};
-    char text[1024]{};
+    std::string text;
     if (!parser.findBlock("soundtrack", &track, nullptr, 1) ||
         !parser.findValue("audio_file", &track) ||
-        parser.readQuotedString(0u, text) == nullptr) {
+        !parser.readQuotedString(0u, text)) {
         return false;
     }
 
-    auto* filename_copy = new char[std::strlen(text) + 1u];
-    std::copy_n(text, std::strlen(text) + 1u, filename_copy);
-    delete[] source;
-    source = filename_copy;
+    source = text;
 
     if (parser.findValue("volume", &track)) {
         volume_scale = static_cast<int>(std::trunc(parser.readFloat(0u)));
@@ -845,11 +698,10 @@ bool SferaSoundPlaybackState::load(const char* filename) {
         const auto index = parser.readInt(0u);
         if (index <= 0 || std::cmp_greater(index, timings.size())) return false;
 
-        char start[128]{};
-        char end[128]{};
+        std::string start, end;
         parser.readString(1u, start);
         parser.readString(2u, end);
-        timings[static_cast<std::size_t>(index - 1)] = {parseTime(start), parseTime(end)};
+        timings[static_cast<std::size_t>(index - 1)] = {parseTime(start.c_str()), parseTime(end.c_str())};
     }
     parser.clearScanRange();
 
@@ -872,7 +724,7 @@ bool SferaSoundPlaybackState::load(const char* filename) {
 
         std::size_t group = 0u;
         for (std::size_t token = 1u; token < token_count; token += 2u) {
-            if (parser.readString(token, text) != nullptr) pattern.parseGroup(group++, text);
+            if (parser.readString(token, text)) pattern.parseGroup(group++, text.c_str());
         }
     }
     parser.clearScanRange();
@@ -884,14 +736,14 @@ bool SferaSoundPlaybackState::load(const char* filename) {
 }
 
 bool SferaSoundPlaybackState::start() {
-    if (source == nullptr || playlist_index >= playlists.size() ||
+    if (source.empty() || playlist_index >= playlists.size() ||
         playlists[playlist_index].groups.empty()) {
         current_list = nullptr;
         return false;
     }
 
     current_list = nullptr;
-    if (stream == nullptr) stream = SI_StreamCreateFile(source, 1u);
+    if (stream == nullptr) stream = SI_StreamCreateFile(source.c_str(), 1u);
     if (stream == nullptr) return false;
 
     stream->decode_callback = &sfera_sound_decode_callback;
@@ -925,8 +777,7 @@ void SferaSoundPlaybackState::clear() {
     if (stream != nullptr) SI_StreamFree(stream);
     stream = nullptr;
 
-    delete[] source;
-    source = nullptr;
+    source.clear();
     current_list = nullptr;
     playlists.clear();
     timings.clear();
@@ -1062,83 +913,36 @@ void SferaSoundRuntime::requestTrack(const char* filename) {
     if (current != nullptr) current->start();
 }
 
-void CSoundManager::detach(CSound& sound) {
-    if (count != 0u) --count;
-
-    if (sound.cache_previous == nullptr && sound.cache_next == nullptr) {
-        first = nullptr;
-        last = nullptr;
-        return;
-    }
-
-    if (last == &sound) {
-        last = sound.cache_previous;
-        if (last != nullptr) last->cache_next = nullptr;
-    } else if (first == &sound) {
-        first = sound.cache_next;
-        if (first != nullptr) first->cache_previous = nullptr;
-    } else {
-        sound.cache_previous->cache_next = sound.cache_next;
-        sound.cache_next->cache_previous = sound.cache_previous;
-    }
-    sound.cache_next = nullptr;
-    sound.cache_previous = nullptr;
-}
-
-void CSoundManager::setVolume(std::int32_t percent) {
+void CSoundManager::setVolume(int percent) {
     volume = static_cast<float>(std::clamp(percent, 0, 100)) * 0.01f;
-    for (auto* sound = first; sound != nullptr; sound = sound->cache_next) {
+    for (const auto& sound : sounds) {
         sound->SetVolume(volume);
     }
-    for (auto& entry : semantic_sound_cache()) {
+    for (auto& entry : cache) {
         if (entry.sound != nullptr) entry.sound->SetVolume(volume);
     }
 }
 
 void CSoundManager::update() {
-    for (auto* sound = first; sound != nullptr;) {
-        auto* next = sound->cache_next;
+    std::erase_if(sounds, [](const auto& sound) {
         if (sound->IsSoundPlaying() == 0) sound->playback_finished = true;
-
-        if (sound->playback_finished && sound->cache_available &&
-            sound->cache_lifetime_seconds >= 0) {
-            bool expired = sound->cache_lifetime_seconds == 0;
-            if (!expired) {
-                const auto now = WorldClock::nowTicks();
-                if (sound->cache_idle_since == UINT64_MAX) {
-                    sound->cache_idle_since = now;
-                } else {
-                    expired = (now - sound->cache_idle_since) / 10000u >=
-                        static_cast<std::uint64_t>(sound->cache_lifetime_seconds);
-                }
-            }
-
-            if (expired) {
-                detach(*sound);
-                sound->~CSound();
-                WorldMemory::release(sound);
-            }
-        }
-        sound = next;
-    }
-
+        if (!sound->playback_finished || !sound->cache_available || sound->cache_lifetime_seconds < 0) return false;
+        if (sound->cache_lifetime_seconds == 0) return true;
+        const auto now = WorldClock::nowTicks();
+        if (sound->cache_idle_since == UINT64_MAX) sound->cache_idle_since = now;
+        return (now - sound->cache_idle_since) / 10000u >= static_cast<std::uint64_t>(sound->cache_lifetime_seconds);
+    });
     service_semantic_sound_cache();
     if (auto* sound_interface = SI_GetInterface()) sound_interface->UpdateSettings();
 }
 
 void CSoundManager::clear() {
-    for (auto* sound = first; sound != nullptr;) {
-        auto* next = sound->cache_next;
-        sound->~CSound();
-        WorldMemory::release(sound);
-        sound = next;
+    sounds.clear();
+    for (auto& entry : cache) {
+        entry.sound->Stop();
+        entry.sound->playback_finished = true;
     }
-    first = nullptr;
-    last = nullptr;
-    count = 0u;
-
-    for (auto& entry : semantic_sound_cache()) destroy_semantic_sound(entry.sound);
-    semantic_sound_cache().clear();
+    cache.clear();
 }
 
 bool SferaSoundRuntime::initialize() {
@@ -1151,7 +955,7 @@ bool SferaSoundRuntime::initialize() {
     if (active_manager != nullptr) {
         active_manager->enabled = interfaceAvailable();
         if (!active_manager->enabled) {
-            for (auto* sound = active_manager->first; sound != nullptr; sound = sound->cache_next) {
+            for (const auto& sound : active_manager->sounds) {
                 sound->Stop();
             }
             active_manager->clear();
@@ -1171,13 +975,11 @@ bool SferaSoundRuntime::initialize() {
 }
 
 CSoundManager* SferaSoundRuntime::ensureManager() {
-    if (sound_manager != nullptr) return sound_manager;
+    if (sound_manager != nullptr) return sound_manager.get();
     if (!interfaceAvailable()) return nullptr;
 
-    void* storage = WorldMemory::allocate(sizeof(CSoundManager));
-    if (storage == nullptr) return nullptr;
-    sound_manager = ::new (storage) CSoundManager{nullptr, nullptr, 1.0f, false, 0u};
-    return sound_manager;
+    sound_manager = std::make_unique<CSoundManager>();
+    return sound_manager.get();
 }
 
 void SferaSoundRuntime::update() {
@@ -1224,16 +1026,14 @@ void SferaSoundRuntime::shutdown() {
     clearDefinitions();
     if (sound_manager != nullptr) {
         sound_manager->clear();
-        sound_manager->~CSoundManager();
-        WorldMemory::release(sound_manager);
-        sound_manager = nullptr;
+        sound_manager.reset();
     }
     clearTracks();
     SI_Close();
 }
 
 std::uint32_t SferaSoundRuntime::soundVolume() const {
-    const auto* manager = sound_manager;
+    const auto* manager = sound_manager.get();
     if (manager == nullptr) return 0u;
     return static_cast<std::uint32_t>(
         std::clamp(static_cast<int>(std::lround(manager->volume * 100.0f)), 0, 100));
@@ -1248,7 +1048,7 @@ bool SferaSoundRuntime::hardwareMixing() const {
 }
 
 void SferaSoundRuntime::setSoundVolume(std::uint32_t value) {
-    if (sound_manager != nullptr) sound_manager->setVolume(static_cast<std::int32_t>(std::min(value, 100u)));
+    if (sound_manager != nullptr) sound_manager->setVolume(static_cast<int>(std::min(value, 100u)));
 }
 
 void SferaSoundRuntime::setMusicVolume(std::uint32_t value) {
@@ -1268,42 +1068,26 @@ void SferaSoundRuntime::setHardwareMixing(bool enabled) {
 }
 
 void SferaSoundRuntime::playUiSound(const char* filename) {
-    auto* manager = sound_manager;
+    auto* manager = sound_manager.get();
     if (!g_sfera_interface_runtime.sounds_enabled || filename == nullptr || SI_GetInterface() == nullptr || manager == nullptr || !manager->enabled) return;
 
     CSound* sound = nullptr;
-    for (auto* candidate = manager->first; candidate != nullptr; candidate = candidate->cache_next) {
+    for (const auto& candidate : manager->sounds) {
         if (candidate->filename != nullptr && SferaSimpleParser::equalsIgnoreCase(candidate->filename, filename) && candidate->IsSoundPlaying() == 0) {
-            if (candidate->cache_available) sound = candidate;
+            if (candidate->cache_available) sound = candidate.get();
             break;
         }
     }
 
     if (sound == nullptr) {
-        void* storage = WorldMemory::allocate(sizeof(CSound));
-        if (storage == nullptr) return;
-        try {
-            sound = ::new (storage) CSound();
-            sound->cache_idle_since = UINT64_MAX;
-            sound->cache_lifetime_seconds = 0;
-            sound->cache_next = nullptr;
-            sound->cache_previous = nullptr;
-            sound->cache_available = true;
-            sound->playback_finished = true;
-            if (sound->LoadSound(filename, 8u) == 0) {
-                sound->~CSound();
-                WorldMemory::release(sound);
-                return;
-            }
-        } catch (...) {
-            WorldMemory::release(storage);
-            throw;
-        }
-        sound->cache_previous = manager->last;
-        if (manager->last != nullptr) manager->last->cache_next = sound;
-        else manager->first = sound;
-        manager->last = sound;
-        ++manager->count;
+        auto created = std::make_unique<CSound>();
+        created->cache_idle_since = UINT64_MAX;
+        created->cache_lifetime_seconds = 0;
+        created->cache_available = true;
+        created->playback_finished = true;
+        if (created->LoadSound(filename, 8u) == 0) return;
+        sound = created.get();
+        manager->sounds.push_back(std::move(created));
     }
 
     sound->cache_lifetime_seconds = 4;
