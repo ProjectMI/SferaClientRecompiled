@@ -13,6 +13,7 @@
 #include <optional>
 #include <vector>
 #include <string>
+#include <string_view>
 
 class CSound;
 class CSoundStream;
@@ -102,7 +103,7 @@ struct SferaSoundTiming {
 };
 
 struct SferaSoundEventList {
-    void parseGroup(std::size_t group, const char* text);
+    void parseGroup(std::size_t group, std::string_view text);
     std::vector<std::vector<SoundEventRecord>> groups;
     std::size_t item_index = 0u;
     std::size_t group_index = 0u;
@@ -112,8 +113,8 @@ struct SferaSoundPlaybackState {
     SferaSoundPlaybackState();
     ~SferaSoundPlaybackState();
 
-    static float parseTime(const char* text);
-    bool load(const char* filename);
+    static float parseTime(std::string_view text);
+    bool load(const std::string& filename);
     bool start();
     void stop();
     void clear();
@@ -147,14 +148,16 @@ struct SferaSoundRuntime {
     std::unique_ptr<SoundEffectRegistry> effect_manager;
     std::unique_ptr<CSoundManager> sound_manager;
     std::list<std::unique_ptr<SferaSoundPlaybackState>> tracks;
-    std::array<char, 512> requested_track{};
+    std::string requested_track;
     SferaSoundPlaybackState* current_track = nullptr;
+    bool listener_position_initialized = false;
 
-    SferaSoundPlaybackState* loadTrack(const char* filename);
+    SferaSoundPlaybackState* loadTrack(const std::string& filename);
     bool deleteTrack(SferaSoundPlaybackState* track);
     void clearTracks();
     bool updateTracks();
-    void requestTrack(const char* filename);
+    void requestTrack(std::optional<std::string_view> filename);
+    void requestTrack(std::nullptr_t) = delete;
     CSoundManager* ensureManager();
     bool initialize();
     void update();
@@ -171,7 +174,7 @@ struct SferaSoundRuntime {
     void adjustMusicVolume(int delta);
     void refreshMusicVolume();
     void setHardwareMixing(bool enabled);
-    void playUiSound(const char* filename);
+    void playUiSound(const std::string& filename);
 };
 
 extern SferaSoundRuntime g_sfera_sound_runtime;

@@ -596,7 +596,7 @@ int SferaZStream32::deflateReset() {
     if (this->state == nullptr) { return -2; }
     this->total_in = 0u;
     this->total_out = 0u;
-    this->msg = nullptr;
+    this->msg.reset();
     this->data_type = 2;
     state->pending = 0;
     state->pending_offset = 0u;

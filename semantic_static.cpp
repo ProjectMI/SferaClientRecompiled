@@ -66,7 +66,7 @@ float SferaClientApplication::measured_fps{};
 bool SferaClientApplication::interrupted{};
 bool SferaClientApplication::quit_requested{};
 bool SferaClientApplication::startup_complete{};
-char SferaClientApplication::locale[10]{};
+std::string SferaClientApplication::locale;
 uint32_t SferaClientApplication::desktop_width{};
 bool SferaClientApplication::application_active{};
 SferaClientApplication::Lifecycle SferaClientApplication::lifecycle = SferaClientApplication::Lifecycle::Dormant;
@@ -149,7 +149,7 @@ SferaScreenVertex GameInterface::sprite_quad[4]{};
 uint32_t GameInterface::active_window{};
 uint32_t GameInterface::loading_total{};
 uint32_t GameInterface::loading_guard{};
-char WorldDiagnostics::message[2048]{};
+std::string WorldDiagnostics::message;
 uint32_t WorldGuiControls::text_height{};
 uint32_t WorldGuiControls::text_width{};
 std::array<TerrainTextureEntry, 50> TerrainTextureCache::entries{};
@@ -158,16 +158,9 @@ uint8_t TerrainTextureCache::quantization_y[3072]{};
 uint8_t TerrainTextureCache::blend_lut[16385]{};
 
 
-const char* sfera_cursor_texture_name(uint32_t slot) {
-    const char* name = nullptr;
-    switch (slot) {
-        case 0u: name = "_cursor1"; break;
-        case 1u: name = "_cursor2"; break;
-        case 2u: name = "cursor2"; break;
-        case 3u: name = "cursor1"; break;
-        default: return nullptr;
-    }
-    return name;
+std::string_view sfera_cursor_texture_name(uint32_t slot) {
+    constexpr std::array<std::string_view, 4> names{"_cursor1", "_cursor2", "cursor2", "cursor1"};
+    return slot < names.size() ? names[slot] : std::string_view{};
 }
 
 namespace {
@@ -191,17 +184,16 @@ constexpr std::uint32_t kVisibilityRefreshPeriod = 32u;
 constexpr int kFlareAlphaStep = 35;
 constexpr int kMaximumAlpha = 255;
 constexpr float kDefaultLightRadius = 10.0f;
-constexpr std::array kEffectFailureNames{
+constexpr std::array<std::string_view, 9> kEffectFailureNames{
     "stopping", "active_limit", "sound_unavailable", "missing_definition", "factory",
     "filtered_type", "source_or_attachment", "listener", "allocation"
 };
 static_assert(kEffectFailureNames.size() == static_cast<std::size_t>(SferaEffectManager::CreateFailure::Count));
 }
 
-void SferaEffectManager::reportError(const char* message) const {
-    if (message == nullptr) return;
-    std::fprintf(stderr, "%s\n", message);
-    ::OutputDebugStringA(message);
+void SferaEffectManager::reportError(std::string_view message) const {
+    std::fprintf(stderr, "%.*s\n", static_cast<int>(std::min<std::size_t>(message.size(), INT_MAX)), message.empty() ? "" : message.data());
+    ::OutputDebugStringA(std::string(message).c_str());
     ::OutputDebugStringA("\n");
     // Effect loading can continue after an error; preserve the reason in the existing client log.
     g_sfera_log_runtime.write("Effects: ");
@@ -209,7 +201,7 @@ void SferaEffectManager::reportError(const char* message) const {
     g_sfera_log_runtime.write("\n");
 }
 void SferaEffectManager::traceFailure(CreateFailure failure, std::uint32_t effect,
-    std::uint32_t source, const char* name) noexcept {
+    std::uint32_t source, std::optional<std::string_view> name) noexcept {
     if (!diagnostics.enabled) return;
     const auto index = static_cast<std::size_t>(failure);
     if (index >= diagnostics.failures.size()) return;
@@ -217,30 +209,26 @@ void SferaEffectManager::traceFailure(CreateFailure failure, std::uint32_t effec
     if (diagnostics.details_written >= 24u) return;
     ++diagnostics.details_written;
     try {
-        char message[512]{};
-        std::snprintf(message, sizeof(message),
-            "EffectDiag reject=%s id=%u source=%u name=%.128s filter=%u definitions=%zu active=%zu\n",
-            kEffectFailureNames[index], effect, source, name ? name : "-",
-            unsigned(effects_enabled), definitions.size(), active_effects.size());
+        auto message = std::format(
+            "EffectDiag reject={} id={} source={} name={:.128} filter={} definitions={} active={}\n",
+            kEffectFailureNames[index], effect, source, name.value_or("-"), unsigned(effects_enabled), definitions.size(), active_effects.size());
         g_sfera_log_runtime.write(message);
     } catch (...) {
         // A diagnostic failure must not change the effect creation result.
     }
 }
 
-void SferaEffectManager::traceEffect(const char* event, const SferaActiveEffect& item) noexcept {
+void SferaEffectManager::traceEffect(std::string_view event, const SferaActiveEffect& item) noexcept {
     if (!diagnostics.enabled || !item.effect) return;
     try {
         const auto& effect = *item.effect;
         const auto position = item.position_source == 0
             ? g_sfera_world_objects.objectPosition(item.source_handle) : item.position;
-        char message[768]{};
-        std::snprintf(message, sizeof(message),
-            "EffectDiag %s id=%u source=%u name=%.96s age=%u lifetime=%u cycle=%u "
-            "flags=%u blocked=%u deactivated=%u distance=%.3f position=%.3f,%.3f,%.3f\n",
-            event, item.listener_key, item.source_handle, effect.script_name.c_str(), item.age_ticks,
-            effect.lifetime_ticks, effect.cycle_length, unsigned(item.state_flags), unsigned(effect.activation_blocked),
-            unsigned(effect.deactivated), double(item.viewer_distance),
+        auto message = std::format(
+            "EffectDiag {} id={} source={} name={:.96} age={} lifetime={} cycle={} flags={} blocked={} deactivated={} "
+            "distance={:.3f} position={:.3f},{:.3f},{:.3f}\n",
+            event, item.listener_key, item.source_handle, effect.script_name, item.age_ticks, effect.lifetime_ticks, effect.cycle_length,
+            unsigned(item.state_flags), unsigned(effect.activation_blocked), unsigned(effect.deactivated), double(item.viewer_distance),
             double(position.x), double(position.y), double(position.z));
         g_sfera_log_runtime.write(message);
     } catch (...) {
@@ -266,36 +254,25 @@ void SferaEffectManager::writeDiagnostics() noexcept {
         const auto liveLights = std::count_if(g_sfera_light_runtime.handles.begin(),
             g_sfera_light_runtime.handles.end(), [](const auto& light) { return bool(light); });
         const auto& fog = SphereRender::SceneRenderer::environment.fogParameters;
-        char message[2048]{};
-        std::snprintf(message, sizeof(message),
-            "EffectDiag sample=%llu ticks=%llu defs=%zu particle_defs=%zu light_defs=%zu "
-            "vm=%llu requests=%llu created=%llu active=%zu updates=%llu "
-            "far=%llu frustum=%llu activation=%llu daytime=%llu budget=%llu expired=%llu "
-            "render=%llu slots=%zu submitted_quads=%llu alpha_vertices=%llu "
-            "lights=%zu visible_lights=%zu light_enables=%llu fog=%.3f,%.3f filter=%u\n",
-            static_cast<unsigned long long>(diagnostics.samples), static_cast<unsigned long long>(now),
-            definitions.size(), particleDefinitions, lightDefinitions,
-            static_cast<unsigned long long>(diagnostics.vm_requests),
-            static_cast<unsigned long long>(diagnostics.create_requests),
-            static_cast<unsigned long long>(diagnostics.created), active_effects.size(),
-            static_cast<unsigned long long>(diagnostics.updates),
-            static_cast<unsigned long long>(diagnostics.distance_culled),
-            static_cast<unsigned long long>(diagnostics.frustum_culled),
-            static_cast<unsigned long long>(diagnostics.activation_rejected),
-            static_cast<unsigned long long>(diagnostics.daytime_rejected),
-            static_cast<unsigned long long>(diagnostics.budget_rejected),
-            static_cast<unsigned long long>(diagnostics.expired),
+        auto message = std::format(
+            "EffectDiag sample={} ticks={} defs={} particle_defs={} light_defs={} vm={} requests={} created={} "
+            "active={} updates={} far={} frustum={} activation={} daytime={} budget={} expired={} render={} slots={} "
+            "submitted_quads={} alpha_vertices={} lights={} visible_lights={} light_enables={} fog={:.3f},{:.3f} "
+            "filter={}\n",
+            static_cast<unsigned long long>(diagnostics.samples), static_cast<unsigned long long>(now), definitions.size(), particleDefinitions,
+            lightDefinitions, static_cast<unsigned long long>(diagnostics.vm_requests), static_cast<unsigned long long>(diagnostics.create_requests),
+            static_cast<unsigned long long>(diagnostics.created), active_effects.size(), static_cast<unsigned long long>(diagnostics.updates),
+            static_cast<unsigned long long>(diagnostics.distance_culled), static_cast<unsigned long long>(diagnostics.frustum_culled),
+            static_cast<unsigned long long>(diagnostics.activation_rejected), static_cast<unsigned long long>(diagnostics.daytime_rejected),
+            static_cast<unsigned long long>(diagnostics.budget_rejected), static_cast<unsigned long long>(diagnostics.expired),
             static_cast<unsigned long long>(diagnostics.render_calls), render_slot_count,
-            static_cast<unsigned long long>(diagnostics.submitted_quads),
-            static_cast<unsigned long long>(diagnostics.alpha_vertices), static_cast<std::size_t>(liveLights),
-            g_sfera_light_runtime.visible_handles.size(),
-            static_cast<unsigned long long>(diagnostics.light_activations),
-            double(fog.y), double(fog.z), unsigned(effects_enabled));
+            static_cast<unsigned long long>(diagnostics.submitted_quads), static_cast<unsigned long long>(diagnostics.alpha_vertices),
+            static_cast<std::size_t>(liveLights), g_sfera_light_runtime.visible_handles.size(),
+            static_cast<unsigned long long>(diagnostics.light_activations), double(fog.y), double(fog.z), unsigned(effects_enabled));
         g_sfera_log_runtime.write(message);
         for (std::size_t index = 0; index < diagnostics.failures.size(); ++index) {
             if (diagnostics.failures[index] == 0) continue;
-            std::snprintf(message, sizeof(message), "EffectDiag failures %s=%llu\n",
-                kEffectFailureNames[index], static_cast<unsigned long long>(diagnostics.failures[index]));
+            message = std::format("EffectDiag failures {}={}\n", kEffectFailureNames[index], static_cast<unsigned long long>(diagnostics.failures[index]));
             g_sfera_log_runtime.write(message);
         }
         std::size_t printed = 0;
@@ -393,15 +370,14 @@ std::shared_ptr<IEffect> SferaEffectManager::findDefinition(uint32_t effect_id) 
     return found == definitions.end() ? nullptr : *found;
 }
 
-std::shared_ptr<IEffect> SferaEffectManager::findDefinition(const char* script_name) const {
-    if (script_name == nullptr) return nullptr;
+std::shared_ptr<IEffect> SferaEffectManager::findDefinition(std::string_view script_name) const {
     const auto found = std::find_if(definitions.begin(), definitions.end(), [&](const auto& effect) {
-        return !effect->script_name.empty() && SferaText::asciiEqual(script_name, effect->script_name.c_str());
+        return !effect->script_name.empty() && SferaText::asciiEqual(script_name, effect->script_name);
     });
     return found == definitions.end() ? nullptr : *found;
 }
 
-int32_t SferaEffectManager::findDefinitionId(const char* script_name) const {
+int32_t SferaEffectManager::findDefinitionId(std::string_view script_name) const {
     const auto effect = findDefinition(script_name);
     return effect != nullptr ? static_cast<int32_t>(effect->effect_id) : -1;
 }
@@ -513,8 +489,7 @@ void SferaNatureManager::updateAmbientRainEffects() {
     }
 }
 
-void SferaEffectManager::registerEffectMeshFile(const char* filename) {
-    if (filename == nullptr) return;
+void SferaEffectManager::registerEffectMeshFile(const std::string& filename) {
     std::ifstream stream;
     for (const auto& path : g_sfera_files.candidatePaths(filename)) {
         stream.open(path, std::ios::binary);
@@ -529,7 +504,7 @@ void SferaEffectManager::registerEffectMeshFile(const char* filename) {
         || static_cast<std::uint64_t>(file_size) > bytes.max_size()) return;
     bytes.resize(static_cast<std::size_t>(file_size));
     stream.seekg(0, std::ios::beg);
-    if (!bytes.empty() && !stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()))) return;
+    if (!bytes.empty() && !SferaBinary::read(stream, bytes)) return;
     std::vector<std::shared_ptr<const SferaEffectMeshResource>> loaded;
     try {
         SferaBinary::Reader reader(bytes);
@@ -621,14 +596,14 @@ void SferaEffectManager::shutdownBloodEffect() {
 void SferaEffectManager::loadDefinitions() {
     namespace fs = std::filesystem;
     std::error_code error;
-    const auto enumerate = [&](const fs::path& directory, const char* extension, auto&& callback) {
+    const auto enumerate = [&](const fs::path& directory, std::string_view extension, auto&& callback) {
         if (!fs::exists(directory, error)) return;
         for (const auto& entry : fs::directory_iterator(directory, error)) {
             if (error || !entry.is_regular_file(error)) continue;
-            if (SferaText::asciiEqual(entry.path().extension().string().c_str(), extension)) callback(entry.path());
+            if (SferaText::asciiEqual(entry.path().extension().string(), extension)) callback(entry.path());
         }
     };
-    enumerate("Effects", ".ssm", [&](const fs::path& path) { const std::string value = path.string(); registerEffectMeshFile(value.c_str()); });
+    enumerate("Effects", ".ssm", [&](const fs::path& path) { const std::string value = path.string(); registerEffectMeshFile(value); });
     std::uint32_t total_count = 0u; enumerate("Effects", ".sef", [&](const fs::path&) { ++total_count; }); enumerate("Players", ".sef", [&](const fs::path&) { ++total_count; });
     const auto initial_count = definitions.size();
     std::uint32_t processed_count = 0u;
@@ -637,9 +612,9 @@ void SferaEffectManager::loadDefinitions() {
             auto effect = std::make_shared<CScriptedEffect>();
             effect->initializeScriptedState();
             try {
-                if (effect->loadScript(path.string().c_str())) appendDefinition(std::move(effect));
+                if (effect->loadScript(path.string())) appendDefinition(std::move(effect));
             } catch (const std::logic_error& error) {
-                reportError((path.string() + ": " + error.what()).c_str());
+                reportError(path.string() + ": " + error.what());
             }
             ++processed_count;
             const auto progress = total_count == 0u ? 30u : static_cast<std::uint32_t>(std::uint64_t{processed_count} * 30u / total_count);
@@ -651,7 +626,7 @@ void SferaEffectManager::loadDefinitions() {
     const auto status = "Effects: loaded " + std::to_string(loaded_count) + " of " + std::to_string(total_count)
         + " SEF files from " + fs::current_path(error).string() + "\n";
     ::OutputDebugStringA(status.c_str());
-    g_sfera_log_runtime.write(status.c_str());
+    g_sfera_log_runtime.write(status);
     if (total_count == 0) reportError("No SEF files found in Effects or Players.");
 }
 
@@ -775,7 +750,7 @@ SferaActiveEffect* SferaEffectManager::createActiveEffect(std::uint32_t effect_i
     }
 }
 
-SferaActiveEffect* SferaEffectManager::createActiveEffect(const char* script_name, std::uint32_t source_handle) {
+SferaActiveEffect* SferaEffectManager::createActiveEffect(std::string_view script_name, std::uint32_t source_handle) {
     const auto definition = findDefinition(script_name);
     if (definition != nullptr && static_cast<int>(definition->effect_id) > 0) return createActiveEffect(definition->effect_id, source_handle);
     if (diagnostics.enabled) ++diagnostics.create_requests;
@@ -1021,9 +996,9 @@ SferaNetworkRuntime g_sfera_network_runtime;
 
 // Process ownership, transport, platform input and application lifetime.
 namespace {
-auto openLogFile(const std::string& path, const char* mode) {
+auto openLogFile(const std::string& path, const std::string& mode) {
         FILE* file = nullptr;
-        if (fopen_s(&file, path.c_str(), mode) != 0) file = nullptr;
+        if (fopen_s(&file, path.c_str(), mode.c_str()) != 0) file = nullptr;
         return std::unique_ptr<FILE, decltype(&std::fclose)>(file, &std::fclose);
     }
 unsigned mbc_field_minimum_bits(std::int8_t format) {
@@ -1065,41 +1040,45 @@ void reset_pending_network_regions() noexcept {
         }
     }
 }
-void COutputLogDevice::setFilename(const char* path) {
-    filename = path == nullptr ? "" : path;
+void COutputLogDevice::setFilename(const std::string& path) {
+    filename = path;
     if (filename.empty()) return;
     auto file = openLogFile(filename, "wt");
     if (!file) return;
     const auto now = std::time(nullptr);
-    char created_at[32]{};
-    if (ctime_s(created_at, sizeof(created_at), &now) != 0) created_at[0] = '\0';
-    std::fprintf(file.get(), "Sphere log file\nCreated: %s\n", created_at);
+    std::string created_at(32, '\0');
+    if (ctime_s(created_at.data(), created_at.size(), &now) != 0) created_at.clear();
+    else created_at.resize(created_at.find('\0'));
+    std::fprintf(file.get(), "Sphere log file\nCreated: %s\n", created_at.c_str());
 }
-void COutputLogDevice::write(const char* text) {
-    if (filename.empty() || text == nullptr) return;
+void COutputLogDevice::write(std::string_view text) {
+    if (filename.empty()) return;
     auto file = openLogFile(filename, "a+t");
-    if (file) std::fprintf(file.get(), "- %s\n", text);
+    if (!file) return;
+    std::fputs("- ", file.get());
+    if (!text.empty()) std::fwrite(text.data(), 1u, text.size(), file.get());
+    std::fputc('\n', file.get());
 }
-void CSphereError::write(const char* text) {
+void CSphereError::write(std::string_view text) {
     SferaClientApplication::terminateWithError(text);
 }
-void SferaLogRuntime::write(const char* text) {
-    if (path.empty() || text == nullptr) return;
+void SferaLogRuntime::write(std::string_view text) {
+    if (path.empty()) return;
     auto file = openLogFile(path, "at");
     if (!file) return;
-    std::fputs(text, file.get());
+    if (!text.empty()) std::fwrite(text.data(), 1u, text.size(), file.get());
     std::fflush(file.get());
 }
 void SferaLogRuntime::write(int number) {
     const std::string line = std::to_string(number) + '\n';
-    write(line.c_str());
+    write(line);
 }
 SferaInputDevices::SferaInputDevices() = default;
 SferaInputDevices::~SferaInputDevices() { release(); }
 
 void SferaInputDevices::initialize(HWND window) {
     release();
-    const auto require = [](HRESULT result, const char* operation) { if (FAILED(result)) WorldDiagnostics::fail(operation); };
+    const auto require = [](HRESULT result, std::string_view operation) { if (FAILED(result)) WorldDiagnostics::fail(operation); };
     Microsoft::WRL::ComPtr<IDirectInput8A> input;
     Microsoft::WRL::ComPtr<IDirectInputDevice8A> keyboard, mouse;
     require(::DirectInput8Create(::GetModuleHandleW(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8A,
@@ -1188,25 +1167,16 @@ SferaMouseInputState SferaInputDevices::pollMouse() {
     return {state.lX, state.lY, buttons, state.lZ / WHEEL_DELTA};
 }
 
-namespace {
-    template<std::size_t Size> void appendDiagnosticText(char (&destination)[Size], std::string_view text) {
-        const auto end = std::find(destination, destination + Size, '\0');
-        const std::size_t used = end - destination;
-        if (used >= Size) { destination[Size - 1] = '\0'; return; }
-        const auto copied = text.copy(destination + used, Size - used - 1);
-        destination[used + copied] = '\0';
-    }
 
-}
 
-void WorldDiagnostics::appendScriptContext(const char* text) {
-    if (text) appendDiagnosticText(WorldDiagnostics::message, text);
+void WorldDiagnostics::appendScriptContext(std::string_view text) {
+    WorldDiagnostics::message.append(text);
 }
 
 void WorldDiagnostics::flushScriptContext() {
-    if (const auto* context = scriptContext()) {
+    if (const auto context = scriptContext()) {
         appendScriptContext("\n");
-        appendScriptContext(context);
+        appendScriptContext(*context);
     }
     warning(WorldDiagnostics::message);
     appendScriptContext("\n\n");
@@ -1234,7 +1204,7 @@ std::uint32_t WorldDiagnostics::inspectInstruction(std::uint16_t& module, std::u
 void WorldDiagnostics::describeScript(bool includeTime) {
     auto& vm = g_sfera_mbc_runtime;
     auto& output = vm.diagnostic_context;
-    output[0] = '\0';
+    output.clear();
     if (includeTime) {
         const auto now = std::time(nullptr);
         std::tm local{};
@@ -1243,27 +1213,30 @@ void WorldDiagnostics::describeScript(bool includeTime) {
 #else
         localtime_r(&now, &local);
 #endif
-        std::strftime(output, sizeof(output), "%H:%M:%S ", &local);
+        output = std::format("{:02}:{:02}:{:02} ", local.tm_hour, local.tm_min, local.tm_sec);
     }
     std::uint16_t module;
     std::uint32_t offset, count = 16;
     std::uint8_t bytes[16];
     const auto status = inspectInstruction(module, offset, bytes, count);
-    if ((status & ~codeBaseMismatch) == 1) { appendDiagnosticText(output, "PrcName,CodeOffs: unknown. (wrong pos)"); return; }
-    if ((status & ~codeBaseMismatch) == 2) { appendDiagnosticText(output, "PrcName,CodeOffs: unknown. (modulesNum == MAX_MODULES_IN_PRC)"); return; }
-    if ((status & ~codeBaseMismatch) == 3) { appendDiagnosticText(output, "PrcName,CodeOffs: unknown. (Offset not found)"); return; }
-    char text[256];
-    if (status & codeBaseMismatch) std::snprintf(text, sizeof(text), "Warn!!! pos = %d, sBaseCodePtr = %p, Prc[pos].baseCodePtr = %p. ", static_cast<int>(vm.process_index), static_cast<const void*>(vm.bytecode_base), static_cast<const void*>(vm.processes[vm.process_index].codeData()));
-    else std::snprintf(text, sizeof(text), "module:%d, code:%d. ", module, static_cast<int>(offset));
-    appendDiagnosticText(output, text);
+    if ((status & ~codeBaseMismatch) == 1) { output.append("PrcName,CodeOffs: unknown. (wrong pos)"); return; }
+    if ((status & ~codeBaseMismatch) == 2) { output.append("PrcName,CodeOffs: unknown. (modulesNum == MAX_MODULES_IN_PRC)"); return; }
+    if ((status & ~codeBaseMismatch) == 3) { output.append("PrcName,CodeOffs: unknown. (Offset not found)"); return; }
+    std::string text;
+    if (status & codeBaseMismatch) text = std::format(
+        "Warn!!! pos = {}, sBaseCodePtr = {:p}, Prc[pos].baseCodePtr = {:p}. ",
+        static_cast<int>(vm.process_index), static_cast<const void*>(vm.bytecode_base),
+        static_cast<const void*>(vm.processes[vm.process_index].codeData()));
+    else text = std::format("module:{}, code:{}. ", module, static_cast<int>(offset));
+    output.append(text);
     for (std::uint32_t index = 0; index < count; ++index) {
-        std::snprintf(text, sizeof(text), "%x ", bytes[index]);
-        appendDiagnosticText(output, text);
+        text = std::format("{:x} ", bytes[index]);
+        output.append(text);
     }
-    appendDiagnosticText(output, "\n");
+    output.append("\n");
 }
 
-void WorldDiagnostics::appendCallStack(char* output) {
+void WorldDiagnostics::appendCallStack(std::string& output) {
     const auto& vm = g_sfera_mbc_runtime;
     std::string text;
     for (auto index = static_cast<int>(vm.execution_context_depth) - 1; index >= 0; --index) {
@@ -1276,18 +1249,19 @@ void WorldDiagnostics::appendCallStack(char* output) {
         const auto& program = process.programs[context.program_index];
         text += "\nPrevious prc: "; text += process.name; text += "\nProgram: "; text += program.name; text += '\n';
     }
-    if (output == vm.diagnostic_context) appendDiagnosticText(g_sfera_mbc_runtime.diagnostic_context, text);
-    else std::memcpy(output + std::strlen(output), text.c_str(), text.size() + 1);
+    output.append(text);
 }
 
-const char* WorldDiagnostics::scriptContext() {
-    if (static_cast<int>(g_sfera_mbc_runtime.dispatch_slot) < 0) return nullptr;
+std::optional<std::string_view> WorldDiagnostics::scriptContext() {
+    if (static_cast<int>(g_sfera_mbc_runtime.dispatch_slot) < 0) return std::nullopt;
     auto& vm = g_sfera_mbc_runtime;
     describeScript(true);
     const auto& program = vm.program_table_base[vm.program_index];
-    char message[1024];
-    std::snprintf(message, sizeof(message), "MBC-file: %s\nProgram: %s\nCall's depth: %d\nAddress: 0x%08X\n", vm.processes[vm.process_index].name, program.name, program.callDepth, static_cast<std::uint32_t>(vm.current_instruction_address - vm.bytecode_base) + 32u);
-    appendDiagnosticText(vm.diagnostic_context, message);
+    auto message = std::format(
+        "MBC-file: {}\nProgram: {}\nCall's depth: {}\nAddress: 0x{:08X}\n",
+        vm.processes[vm.process_index].name, program.name, program.callDepth,
+        static_cast<std::uint32_t>(vm.current_instruction_address - vm.bytecode_base) + 32u);
+    vm.diagnostic_context.append(message);
     appendCallStack(vm.diagnostic_context);
     return vm.diagnostic_context;
 }
@@ -1377,7 +1351,7 @@ void GameInterface::registerNativeWindowClass() {
     windowClass.hIcon = ::LoadIconA(windowClass.hInstance, MAKEINTRESOURCEA(113));
     windowClass.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
     windowClass.hbrBackground = reinterpret_cast<HBRUSH>(::GetStockObject(BLACK_BRUSH));
-    windowClass.lpszClassName = nativeWindowClassName;
+    windowClass.lpszClassName = nativeWindowClassName.data();
     windowClass.hIconSm = windowClass.hIcon;
     if (::RegisterClassExA(&windowClass) == 0) WorldDiagnostics::fail("RegisterClassEx() failed! => init_main_window_class()");
     SferaClientApplication::window_class_registered = true;
@@ -1410,7 +1384,7 @@ void GameInterface::createNativeWindow() {
         }
     }
     const auto instance = SferaClientApplication::instance_handle;
-    const auto window = ::CreateWindowExA(0, nativeWindowClassName, "Sphere", style, left, top, width, height, nullptr, nullptr, instance, nullptr);
+    const auto window = ::CreateWindowExA(0, nativeWindowClassName.data(), "Sphere", style, left, top, width, height, nullptr, nullptr, instance, nullptr);
     SferaClientApplication::main_window = window;
     if (window == nullptr) WorldDiagnostics::fail("CreateWindowEx() failed! => init_main_window()");
     ::ShowWindow(window, SW_SHOWNORMAL);
@@ -1450,9 +1424,11 @@ const std::array<char32_t, 256>& SferaText::unicodeCp1251() {
     // Win32 remains authoritative for undefined code-page bytes; initialization is thread-safe.
     static const auto table = [] {
         std::array<char32_t, 256> result{};
+        std::string input(1u, '\0');
         for (std::size_t byte = 0; byte < result.size(); ++byte) {
-            const char input = static_cast<char>(byte); wchar_t character = 0;
-            if (::MultiByteToWideChar(1251u, 0u, &input, 1, &character, 1) != 1) character = static_cast<wchar_t>(byte);
+            std::as_writable_bytes(std::span(input)).front() = static_cast<std::byte>(byte);
+            wchar_t character = 0;
+            if (::MultiByteToWideChar(1251u, 0u, input.data(), 1, &character, 1) != 1) character = static_cast<wchar_t>(byte);
             result[byte] = character;
         }
         return result;
@@ -1478,22 +1454,38 @@ const std::array<std::uint8_t, 256>& SferaText::lowercaseCp1251() {
 std::string SferaText::resourceKey(std::string_view name) {
     std::string result(name);
     const auto& lowercase = lowercaseCp1251();
-    for (char& byte : result) byte = static_cast<char>(lowercase[static_cast<std::uint8_t>(byte)]);
+    transformBytes(result, [&](std::uint8_t byte) { return lowercase[byte]; });
     return result;
 }
 
-const char* SferaText::findInsensitive(const char* text, const char* needle) {
-    if (!text || !needle || !*needle) return nullptr;
-    const std::string_view source(text), pattern(needle);
-    const auto found = std::search(source.begin(), source.end(), pattern.begin(), pattern.end(),
-        [](unsigned char a, unsigned char b) { return asciiFold(a) == asciiFold(b); });
-    return found == source.end() ? nullptr : text + (found - source.begin());
+std::size_t SferaText::findInsensitive(std::string_view text, std::string_view needle) {
+    if (needle.empty()) return std::string_view::npos;
+    const auto found = std::search(text.begin(), text.end(), needle.begin(), needle.end(),
+        [](std::uint8_t first, std::uint8_t second) { return asciiFold(first) == asciiFold(second); });
+    return found == text.end() ? std::string_view::npos : static_cast<std::size_t>(found - text.begin());
 }
 
-const char* SferaText::fileName(const char* path) {
-    if (path == nullptr) return "";
-    const auto* separator = std::strrchr(path, '\\');
-    return separator == nullptr ? path : separator + 1;
+std::string_view SferaText::fileName(std::string_view path) {
+    const auto separator = path.find_last_of('\\');
+    return path.substr(separator == std::string_view::npos ? 0 : separator + 1);
+}
+
+namespace {
+    template<class Fold> int compareText(std::string_view first, std::string_view second, Fold fold) {
+        const auto count = std::min(first.size(), second.size());
+        for (std::size_t index = 0; index < count; ++index) {
+            const auto difference = fold(static_cast<std::uint8_t>(first[index])) - fold(static_cast<std::uint8_t>(second[index]));
+            if (difference != 0) return difference;
+        }
+        if (first.size() == second.size()) return 0;
+        return first.size() > count ? fold(static_cast<std::uint8_t>(first[count])) : -fold(static_cast<std::uint8_t>(second[count]));
+    }
+}
+int SferaText::compare(std::string_view first, std::string_view second) {
+    return compareText(first, second, [](std::uint8_t value) { return int(value); });
+}
+int SferaText::compareInsensitive(std::string_view first, std::string_view second) {
+    return compareText(first, second, [](std::uint8_t value) { return std::tolower(value); });
 }
 
 std::uint8_t* SferaMbcRuntime::memoryAt(std::uint32_t address, std::size_t size, SferaMbcProcessRecord* process) const {
@@ -1530,6 +1522,15 @@ std::span<std::uint8_t> SferaMbcRuntime::memoryRange(std::uint32_t address, Sfer
     if (offset > size) throw std::out_of_range("Invalid mapped memory range");
     return {memoryAt(address, size - offset), size - offset};
 }
+std::span<std::uint8_t> SferaMbcRuntime::memoryBytes(std::uint32_t address, std::size_t count, SferaMbcProcessRecord* process) const {
+    if (count == 0) return {};
+    return {memoryAt(address, count, process), count};
+}
+
+SferaText::Buffer SferaMbcRuntime::textBufferAt(std::uint32_t address, SferaMbcProcessRecord* process) const {
+    return SferaText::Buffer(memoryRange(address, process));
+}
+
 std::uint64_t SferaMbcRuntime::memoryLifetime(std::uint32_t address) const {
     if (address < mappedAddressBegin) return 0;
     auto entry = mapped_memory.upper_bound(address);
@@ -1538,8 +1539,8 @@ std::uint64_t SferaMbcRuntime::memoryLifetime(std::uint32_t address) const {
     if (address - entry->first >= entry->second.size) throw std::out_of_range("Invalid mapped memory lifetime");
     return entry->second.lifetime;
 }
-std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32& slice) const {
-    auto bytes = memoryRange(slice.base);
+std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32& slice, SferaMbcProcessRecord* process) const {
+    auto bytes = memoryRange(slice.base, process);
     if (slice.begin != 0) {
         if (slice.base < slice.begin || slice.base > slice.end) throw std::out_of_range("Invalid bounded script slice");
         const auto count = std::uint64_t(slice.end) - slice.base + 1;
@@ -1548,10 +1549,31 @@ std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32&
     return bytes;
 }
 
-char* SferaMbcRuntime::textAt(std::uint32_t address) const {
-    const auto bytes = memoryRange(address);
-    if (std::find(bytes.begin(), bytes.end(), 0) == bytes.end()) throw std::out_of_range("Unterminated script string");
-    return reinterpret_cast<char*>(bytes.data());
+std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32& slice, std::size_t count, SferaMbcProcessRecord* process) const {
+    if (count == 0) return {};
+    return SferaBinary::range(sliceBytes(slice, process), 0, count);
+}
+
+SferaText::Buffer SferaMbcRuntime::textBuffer(const SferaSliceReference32& slice, SferaMbcProcessRecord* process) const {
+    return SferaText::Buffer(sliceBytes(slice, process));
+}
+
+std::string SferaMbcRuntime::textIn(const SferaSliceReference32& slice, SferaMbcProcessRecord* process) const {
+    // Preserve the MBC string ABI: the declared extent may exclude the NUL or
+    // describe an addressed element. The owning memory region is the hard boundary.
+    return SferaText::terminated(memoryRange(slice.base, process));
+}
+
+std::string SferaMbcRuntime::textIn(const SferaSliceReference32& slice, std::size_t limit, SferaMbcProcessRecord* process) const {
+    if (limit == 0) return {};
+    return SferaText::prefix(memoryRange(slice.base, process), limit);
+}
+
+std::string SferaMbcRuntime::textAt(std::uint32_t address) const {
+    return textIn({address, 0, 0});
+}
+std::string SferaMbcRuntime::textAt(std::uint32_t address, std::size_t limit) const {
+    return textIn({address, 0, 0}, limit);
 }
 
 std::uint32_t SferaMbcRuntime::addMemoryRegion(MemoryRegion region) {
@@ -1612,9 +1634,14 @@ void SferaMbcRuntime::forgetNativeResource(const NativeResource& resource) {
 bool SferaSliceReference32::contains(std::uint32_t length, bool allowNull) const { return (allowNull || (base >= 4 && base < UINT32_MAX - 3)) && (begin == 0 || (base >= begin && base <= end && (length == 0 || length - 1 <= end - base))); }
 void SferaSliceReference32::diagnoseRange(std::uint32_t length) {
     WorldDiagnostics::describeScript(true);
-    char message[2048];
-    if (length == 0) std::snprintf(message, sizeof(message), "%s\n Slice out of range! ptr = %d, begin = %d, end = %d", g_sfera_mbc_runtime.diagnostic_context, static_cast<int>(base), static_cast<int>(begin), static_cast<int>(end + 1));
-    else std::snprintf(message, sizeof(message), "%s\n Slice out of range! ptr = %d, ptr+offset = %d, begin = %d, end = %d", g_sfera_mbc_runtime.diagnostic_context, static_cast<int>(base), static_cast<int>(base + length), static_cast<int>(begin), static_cast<int>(end + 1));
+    std::string message;
+    if (length == 0) message = std::format(
+        "{}\n Slice out of range! ptr = {}, begin = {}, end = {}",
+        g_sfera_mbc_runtime.diagnostic_context, static_cast<int>(base), static_cast<int>(begin), static_cast<int>(end + 1));
+    else message = std::format(
+        "{}\n Slice out of range! ptr = {}, ptr+offset = {}, begin = {}, end = {}",
+        g_sfera_mbc_runtime.diagnostic_context, static_cast<int>(base), static_cast<int>(base + length), static_cast<int>(begin),
+        static_cast<int>(end + 1));
     WorldDiagnostics::warning(message);
     // The interpreter diagnoses and extends the recorded bounds; it does not clamp the pointer.
     if (base == 0 || begin == 0 || (base >= begin && base <= end)) return;
@@ -1640,8 +1667,9 @@ void SferaMbcValue::setReal(float number) { value.base = std::bit_cast<std::uint
 void SferaMbcValue::detach() { source = {UINT32_MAX, 1, 1}; }
 SferaSliceReference32& SferaMbcValue::asSlice() { if (!isPointer()) value.begin = value.end = 0; return value; }
 
-bool SferaMbcRuntime::reportError(const char* message) {
+bool SferaMbcRuntime::reportError(std::string_view message) {
     WorldDiagnostics::scriptContext();
+    if (first_execution_error.empty()) first_execution_error = std::format("{}\n{}", message, diagnostic_context);
     auto& log = g_sfera_log_runtime;
     log.write("\n---exit_inter start---\nMBINTER MESSAGE:");
     log.write(message);
@@ -1652,7 +1680,7 @@ bool SferaMbcRuntime::reportError(const char* message) {
     if (process_index == 0) { CSphereError output; output.write(diagnostic_context); }
     return processes[0].activateProgram("EError");
 }
-bool SferaMbcRuntime::reportError(const char* prefix, const char* suffix) { const auto message = std::string(prefix) + suffix; return reportError(message.c_str()); }
+bool SferaMbcRuntime::reportError(std::string_view prefix, std::string_view suffix) { return reportError(std::format("{}{}", prefix, suffix)); }
 int SferaMbcRuntime::popInteger() {
     if (call_frame_depth >= std::size(frame_stack_base) || value_stack_size <= frame_stack_base[call_frame_depth]) { reportError("popint(): stack underflow"); return 0; }
     return g_sfera_mbc_runtime.values[--value_stack_size].asInteger();
@@ -1669,11 +1697,17 @@ float SferaMbcRuntime::nextReal() {
     if (argument_cursor >= argument_end) { reportError("Too few parameters"); return 0; }
     return g_sfera_mbc_runtime.values[argument_cursor++].asReal();
 }
-SferaSliceReference32& SferaMbcRuntime::nextSliceReference(const char* diagnostic) {
+SferaSliceReference32& SferaMbcRuntime::nextSliceReference(std::string_view diagnostic) {
     if (argument_cursor >= argument_end) { reportError(diagnostic); g_sfera_mbc_runtime.sliceup_fallback = {}; return g_sfera_mbc_runtime.sliceup_fallback; }
     return g_sfera_mbc_runtime.values[argument_cursor++].asSlice();
 }
 SferaSliceReference32 SferaMbcRuntime::nextSlice() { return nextSliceReference("popsliceup(): stack underflow"); }
+SferaSliceReference32 SferaMbcRuntime::nextAddress() {
+    if (argument_cursor >= argument_end) { reportError("Too few parameters"); return {}; }
+    const auto& argument = values[argument_cursor++];
+    if (argument.isPointer()) return argument.value;
+    return {static_cast<std::uint32_t>(argument.asInteger()), 0, 0};
+}
 void SferaMbcRuntime::pushInteger(std::uint32_t number) {
     if (value_stack_size >= std::size(g_sfera_mbc_runtime.values)) { reportError("Stack overflow"); return; }
     auto& slot = g_sfera_mbc_runtime.values[value_stack_size++];
@@ -1739,10 +1773,10 @@ bool SferaMbcProcessRecord::activateProgram(int index) {
     programs_queued = true;
     return true;
 }
-bool SferaMbcProcessRecord::activateProgram(const char* name) {
-    if (programs.data() == nullptr || name == nullptr) return false;
+bool SferaMbcProcessRecord::activateProgram(std::string_view name) {
+    if (programs.empty()) return false;
     for (std::uint32_t index = 0; index < programs.size(); ++index) {
-        if (std::strcmp(programs.data()[index].name, name) != 0) continue;
+        if (programs[index].name != name) continue;
         activateProgram(static_cast<int>(index));
         g_sfera_mbc_runtime.enqueueProcess(static_cast<int>(process_id), *this);
         return true;
@@ -1788,8 +1822,9 @@ bool SferaMbcRuntime::executeInstruction(Instruction instruction) {
             const auto count = signedCount < 0 ? 0u - static_cast<std::uint32_t>(signedCount) : static_cast<std::uint32_t>(signedCount);
             if (index < 0 || index >= static_cast<int>(count)) {
                 WorldDiagnostics::describeScript(true);
-                char message[2048];
-                std::snprintf(message, sizeof(message), source ? "%s\nArray2 boundary error: array size = %d, index = %d" : "%s\nArray boundary error: array size = %d, index = %d", diagnostic_context, static_cast<int>(count), index);
+                auto message = std::format(
+                    "{}\n{} boundary error: array size = {}, index = {}",
+                    diagnostic_context, source ? "Array2" : "Array", static_cast<int>(count), index);
                 WorldDiagnostics::warning(message);
                 if (source) index = index >= 0 && static_cast<int>(count - 1) < 0 ? 0 : static_cast<int>(count - 1);
                 else index = index < 0 ? 0 : static_cast<int>(count - 1);
@@ -2008,26 +2043,25 @@ bool SferaMbcRuntime::executeInstruction(Instruction instruction) {
     return true;
 }
 
-void SferaMbcRuntime::reportInvalidInstruction() { const char opcode[] = {static_cast<char>(*--instruction_cursor), 0}; reportError("Unknown script code: ", opcode); }
+void SferaMbcRuntime::reportInvalidInstruction() {
+    reportError("Unknown script code: ", SferaText::fromBytes(std::span(--instruction_cursor, 1u)));
+}
 
-std::uint32_t SferaText::copyString(char* destination, const char* source, int capacity) {
-    const std::uint32_t length = std::strlen(source) + 1;
-    if (capacity > 0 && length > static_cast<std::uint32_t>(capacity)) {
-        std::memcpy(destination, source, capacity - 1);
-        destination[capacity - 1] = '\0';
-        if (g_sfera_mbc_runtime.dispatch_slot >= 0) {
-            std::snprintf(g_sfera_mbc_runtime.diagnostic_context, sizeof(g_sfera_mbc_runtime.diagnostic_context), "MBINTER MESSAGE: Wrong string to copy: '%s', strlen: %d\n", source, static_cast<int>(std::strlen(source)));
-            g_sfera_log_runtime.write(g_sfera_mbc_runtime.diagnostic_context);
-        }
-        return capacity;
+std::uint32_t SferaText::copyString(Buffer destination, std::string_view source, int capacity) {
+    const auto limit = capacity > 0 ? std::min<std::size_t>(capacity, destination.size()) : destination.size();
+    if (limit == 0) throw std::out_of_range("Empty script string destination");
+    if (capacity <= 0 && source.size() >= limit) throw std::out_of_range("Script string destination is too small");
+    if (source.size() >= limit) {
+        g_sfera_mbc_runtime.diagnostic_context = std::format("MBINTER MESSAGE: Wrong string to copy: '{}', strlen: {}\n", source, source.size());
+        g_sfera_log_runtime.write(g_sfera_mbc_runtime.diagnostic_context);
     }
-    std::memcpy(destination, source, length);
-    return length;
+    const auto copied = destination.limited(limit).write(source);
+    return static_cast<std::uint32_t>(copied + 1);
 }
 
 bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
     switch (builtin) {
-        case Builtin::Fail: case Builtin::FailAlternate: { char message[256]{}; std::snprintf(message, sizeof(message), "MBInter:\n %f", nextReal()); SferaClientApplication::terminateWithError(message); }
+        case Builtin::Fail: case Builtin::FailAlternate: { std::string message; message = std::format("MBInter:\n {:f}", nextReal()); SferaClientApplication::terminateWithError(message); }
         case Builtin::Exit: {
             if (argument_count == 0) throw SferaClientApplication::ExitRequested{};
             if (argument_count > 1) g_sfera_mbc_runtime.dispatch_slot = UINT32_MAX;
@@ -2045,7 +2079,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             pushInteger(active_tag); break;
         }
         case Builtin::LinkProcess: { const auto name = nextSliceReference().base; if (name == 0) ::OutputDebugStringA("NULL-pointer dereferencing: ffprc_link\n"); active_tag = linkProcess(textAt(name)); pushInteger(active_tag); break; }
-        case Builtin::Connect: { const auto host = nextSliceReference().base; nextSliceReference(); const auto mode = argument_count > 2 ? static_cast<std::uint32_t>(nextInteger()) : 3u; pushInteger(g_sfera_network_runtime.initialize(textAt(host), mode)); break; }
+        case Builtin::Connect: { const auto host = nextSliceReference().base; nextSliceReference(); const auto mode = argument_count > 2 ? static_cast<std::uint32_t>(nextInteger()) : 3u; pushInteger(g_sfera_network_runtime.initialize(std::string(textAt(host)), mode)); break; }
         case Builtin::Disconnect: g_sfera_network_runtime.shutdown(); break;
         case Builtin::Send: buildRegion(); break;
         case Builtin::FormatText: case Builtin::BoundedFormatText: formatText(builtin == Builtin::BoundedFormatText); break;
@@ -2082,9 +2116,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                     } else if (type == SferaMbcValue::Byte || type == SferaMbcValue::Integer) {
                         value = std::to_string(nextInteger());
                     } else if (type == SferaMbcValue::Real) {
-                        char formatted[128];
-                        std::snprintf(formatted, sizeof(formatted), "%f", nextReal());
-                        value = formatted;
+                        value = std::format("{:f}", nextReal());
                     } else if (type == SferaMbcValue::BytePointer) {
                         const auto offset = nextInteger();
                         if (execution_failed) break;
@@ -2097,15 +2129,15 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                 case SferaConfigTextRuntime::Operation::Read: {
                     const auto keyReference = nextSliceReference();
                     if (execution_failed) break;
-                    const auto* key = textAt(keyReference.base);
+                    const auto key = textIn(keyReference);
                     if (argument_cursor >= argument_end) { reportError("Too few parameters"); break; }
                     const auto type = g_sfera_mbc_runtime.values[argument_cursor].type;
                     const auto destination = nextSliceReference();
                     const auto capacity = argument_count == 4 ? static_cast<std::uint32_t>(nextInteger()) : 10000000u;
                     if (execution_failed) break;
                     bool result = false;
-                    if (*key == '*') {
-                        auto bytes = sliceBytes(destination); result = config.readBinary(key, bytes.data(), std::min<std::size_t>(capacity, bytes.size()));
+                    if (key.starts_with('*')) {
+                        auto bytes = sliceBytes(destination); result = config.readBinary(key, bytes.first(std::min<std::size_t>(capacity, bytes.size())));
                     }
                     else if (type == SferaMbcValue::IntegerPointer) {
                         auto value = readMemory<int>(destination.base);
@@ -2116,10 +2148,14 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                         result = config.readFloat(key, value);
                         if (result) writeMemory(destination.base, value);
                     } else if (type == SferaMbcValue::BytePointer) {
-                        auto bytes = sliceBytes(destination); result = config.readString(key, reinterpret_cast<char*>(bytes.data()), std::min<std::size_t>(capacity, bytes.size()));
+                        auto output = textBuffer(destination);
+                        output = output.limited(capacity);
+                        if (const auto value = config.readString(key); value && !output.empty()) {
+                            result = output.write(*value) == value->size();
+                        }
                     }
                     else {
-                        const auto message = std::string("wrong parameter in cfg_get, '") + key + "'\n";
+                        const auto message = std::format("wrong parameter in cfg_get, '{}'\n", key);
                         ::OutputDebugStringA(message.c_str());
                     }
                     pushInteger(result ? 0u : UINT32_MAX);
@@ -2132,14 +2168,14 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                     const auto reference = nextSliceReference();
                     if (reference.base == 0) reportError("poppointerup(): unexpected NULL-pointer fetched");
                     if (execution_failed) break;
-                    auto* text = textAt(reference.base);
+                    const auto text = textIn(reference);
                     if (operation == SferaConfigTextRuntime::Operation::UseText) { config.useText(reference.base, sliceBytes(reference).size(), active_process); pushInteger(0); }
-                    else if (operation == SferaConfigTextRuntime::Operation::Load) pushInteger(config.load(text) ? 0u : UINT32_MAX);
+                    else if (operation == SferaConfigTextRuntime::Operation::Load) pushInteger(config.load(std::string(text)) ? 0u : UINT32_MAX);
                     else {
-                        const auto length = std::strlen(text);
+                        const auto length = text.size();
                         if (length >= SferaConfigTextRuntime::filename_capacity) { reportError("cfg: filename is too long"); break; }
-                        if (operation == SferaConfigTextRuntime::Operation::Clear) config.clear(text);
-                        else config.filename.assign(text, length);
+                        if (operation == SferaConfigTextRuntime::Operation::Clear) config.clear(std::string(text));
+                        else config.filename.assign(text);
                     }
                     break;
                 }
@@ -2158,7 +2194,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                     const auto destination = nextSliceReference();
                     if (destination.base == 0) reportError("poppointerup(): unexpected NULL-pointer fetched");
                     const std::uint32_t capacity = nextInteger();
-                    if (!execution_failed) pushInteger(static_cast<std::uint32_t>(config.copyTo(reinterpret_cast<char*>(sliceBytes(destination).data()), std::min<std::size_t>(capacity, sliceBytes(destination).size()))));
+                    if (!execution_failed) pushInteger(static_cast<std::uint32_t>(config.copyTo(sliceBytes(destination).first(std::min<std::size_t>(capacity, sliceBytes(destination).size())))));
                     break;
                 }
                 case SferaConfigTextRuntime::Operation::Length: if (std::in_range<std::uint32_t>(config.text().size())) pushInteger(static_cast<std::uint32_t>(config.text().size())); else reportError("cfg: text is too long for MBC"); break;
@@ -2170,15 +2206,15 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             const auto name = nextInteger();
             if (name == 0) WorldDiagnostics::warning(builtin == Builtin::CreateFile ? "NULL-pointer dereferencing: ffcreate\n" : "NULL-pointer dereferencing: ffopen\n");
             if (builtin == Builtin::CreateFile && execution_failed) break;
-            const auto* path = textAt(name);
-            ::_chmod(path, _S_IREAD | _S_IWRITE);
+            const auto path = textAt(name);
+            ::_chmod(path.data(), _S_IREAD | _S_IWRITE);
             if (execution_failed) break;
             int flags = _O_BINARY | _O_RDWR;
             int sharing = _SH_DENYNO;
             if (builtin == Builtin::CreateFile) flags |= _O_CREAT | (argument_count == 2 ? 0 : _O_TRUNC);
             else if (argument_count > 1 && nextInteger() == 1) flags = _O_BINARY | _O_RDONLY;
             int file = -1;
-            ::_sopen_s(&file, path, flags, sharing, _S_IREAD | _S_IWRITE);
+            ::_sopen_s(&file, path.data(), flags, sharing, _S_IREAD | _S_IWRITE);
             if (file >= 0) {
                 try { active_process->registerResource(file, ResourceKind::file); }
                 catch (...) { ::_close(file); throw; }
@@ -2196,25 +2232,29 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             if (builtin == Builtin::ReadFile && execution_failed) break;
             auto& buffer = nextSliceReference();
             const std::uint32_t size = nextInteger();
-            if (builtin == Builtin::WriteFile && execution_failed) break;
+            if (execution_failed) break;
             if (!buffer.contains(size)) buffer.diagnoseRange(size);
-            auto* data = memoryAt(buffer.base);
-            const auto result = builtin == Builtin::ReadFile ? ::_read(file, data, size) : file < 0 ? 0 : ::_write(file, data, size);
+            const auto data = memoryBytes(buffer.base, static_cast<std::size_t>(size));
+            if (size == 0) { pushInteger(0); break; }
+            const auto result = builtin == Builtin::ReadFile ? ::_read(file, data.data(), size) : file < 0 ? 0 : ::_write(file, data.data(), size);
             pushInteger(result);
             break;
         }
         case Builtin::ReadLine: {
             const auto file = nextInteger();
             if (execution_failed) break;
-            const auto destination = nextInteger();
-            if (destination == 0) WorldDiagnostics::warning("NULL-pointer dereferencing: ffread\n");
+            const auto destination = nextAddress();
+            if (destination.base == 0) WorldDiagnostics::warning("NULL-pointer dereferencing: ffread\n");
             const auto capacity = nextInteger();
-            auto* output = memoryAt(destination);
+            if (execution_failed) break;
+            if (capacity < 0) { reportError("Negative line buffer capacity"); break; }
+            const auto output = memoryBytes(destination.base, static_cast<std::size_t>(capacity));
             int size = 0;
+            // ReadLine has a byte-count ABI: a full buffer is not required to end in NUL.
             while (size < capacity) {
                 std::uint8_t character;
                 if (::_read(file, &character, sizeof(character)) != 1) break;
-                if (character == '\n' || character == '\0') { output[size] = '\0'; break; }
+                if (character == '\n' || character == '\0') { output[size] = 0; break; }
                 output[size++] = character;
             }
             pushInteger(size);
@@ -2247,8 +2287,8 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             if (!execution_failed) { __utimbuf64 times{time, time}; ::_futime64(file, &times); }
             break;
         }
-        case Builtin::RemoveFile: { const auto name = nextInteger(); if (!execution_failed) pushInteger(std::remove(textAt(name))); break; }
-        case Builtin::RenameFile: { const auto source = nextInteger(); const auto destination = nextInteger(); if (!execution_failed) pushInteger(std::rename(textAt(source), textAt(destination))); break; }
+        case Builtin::RemoveFile: { const auto name = nextInteger(); if (!execution_failed) pushInteger(std::remove(textAt(name).data())); break; }
+        case Builtin::RenameFile: { const auto source = nextInteger(); const auto destination = nextInteger(); if (!execution_failed) pushInteger(std::rename(textAt(source).data(), textAt(destination).data())); break; }
         case Builtin::SetAnimation: case Builtin::SetFrame: {
             const auto handle = nextInteger();
             const auto value = nextInteger();
@@ -2271,26 +2311,26 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             const auto destination = nextInteger();
             if (destination == 0 && builtin != Builtin::ModuleName) WorldDiagnostics::warning(builtin == Builtin::ThisProcessName ? "NULL-pointer dereferencing: thisname\n" : "NULL-pointer dereferencing: prc_name\n");
             if (execution_failed) break;
-            const char* name = nullptr;
+            std::optional<std::string_view> name;
             if (builtin == Builtin::ThisProcessName) name = active_process->name;
             else if (builtin == Builtin::ProcessName && id < std::size(processes) && processes[id].chain_prev_index >= 0) name = processes[id].name;
             else if (builtin == Builtin::ModuleName && id < std::size(g_sfera_mbc_runtime.modules)) name = g_sfera_mbc_runtime.modules[id].name;
-            if (name != nullptr) std::copy_n(name, std::strlen(name) + 1, textAt(destination));
-            if (builtin != Builtin::ThisProcessName) pushInteger(name != nullptr && (builtin != Builtin::ModuleName || *name != '\0') ? 0 : UINT32_MAX);
+            if (name) copyText({static_cast<std::uint32_t>(destination), 0, 0}, *name);
+            if (builtin != Builtin::ThisProcessName) pushInteger(name && (builtin != Builtin::ModuleName || !name->empty()) ? 0 : UINT32_MAX);
             break;
         }
         case Builtin::FindModule: {
             const auto name = nextInteger();
             if (execution_failed) break;
             const auto& modules = g_sfera_mbc_runtime.modules;
-            const auto found = std::find_if(std::begin(modules), std::end(modules), [&](const auto& module) { return module.name[0] != '\0' && ::_stricmp(module.name, textAt(name)) == 0; });
+            const auto found = std::find_if(std::begin(modules), std::end(modules), [&](const auto& module) { return !module.name.empty() && SferaText::compareInsensitive(module.name, textAt(name)) == 0; });
             pushInteger(found == std::end(modules) ? UINT32_MAX : static_cast<std::uint32_t>(found - std::begin(modules)));
             break;
         }
         case Builtin::FontSettings: {
             const auto& suffix = g_sfera_font_runtime.language_suffix;
-            const auto offset = mapMemory(suffix, suffix != nullptr ? std::strlen(suffix) + 1 : 0);
-            pushSlice({offset, offset, offset + static_cast<std::uint32_t>(sizeof(suffix)) - 1}, SferaMbcValue::BytePointer);
+            const auto offset = mapMemory(suffix.c_str(), suffix.size() + 1);
+            pushSlice({offset, offset, offset + static_cast<std::uint32_t>(suffix.size())}, SferaMbcValue::BytePointer);
             break;
         }
         case Builtin::DestroyObject: case Builtin::DestroyText: case Builtin::DestroySprite: {
@@ -2323,10 +2363,10 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             if (execution_failed) break;
             static constexpr std::array<std::uint32_t, 11> factories{0, 1, 2, 3, 1, 4, 5, 6, 4, 5, 3};
             const auto factory = kind < factories.size() ? factories[kind] : 0;
-            const auto* filename = textAt(name);
+            const auto filename = textAt(name);
             const auto handle = g_sfera_world_objects.create(filename, independent == 1 ? nullptr : active_process, factory, independent != 1);
             pushInteger(handle);
-            if (static_cast<int>(handle) < 0) { reportError((std::string("Error creating object: ") + filename).c_str()); execution_failed = false; break; }
+            if (static_cast<int>(handle) < 0) { reportError(std::format("Error creating object: {}", filename)); execution_failed = false; break; }
             auto* object = g_sfera_mbc_runtime.current_object = g_sfera_world_objects.object(handle, "GetObjectPointer");
             if (object->extended()) {
                 auto& extended = *object->extended();
@@ -2475,7 +2515,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             const auto name = nextInteger();
             const auto value = builtin == Builtin::SetNamedValue ? nextInteger() : 0;
             const auto index = argument_count > (builtin == Builtin::SetNamedValue ? 2u : 1u) ? nextInteger() : 0;
-            const auto* text = textAt(name);
+            const auto text = textAt(name);
             if (builtin == Builtin::SetNamedValue) setNamedValue(text, static_cast<std::uint32_t>(value), index);
             else pushInteger(namedValue(text, index));
             break;
@@ -2501,15 +2541,20 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             const std::uint32_t sourceProcess = nextInteger();
             const auto& source = nextSliceReference();
             const auto count = builtin == Builtin::CopyProcessMemory || argument_count == 5 ? nextInteger() : 0;
-            if (builtin == Builtin::CopyProcessMemory && !destination.contains(static_cast<std::uint32_t>(count))) destination.diagnoseRange(static_cast<std::uint32_t>(count));
             if (execution_failed) break;
             auto* target = findProcess(destinationProcess);
             auto* origin = findProcess(sourceProcess);
             if (target == nullptr || origin == nullptr) { active_tag = UINT32_MAX; pushInteger(UINT32_MAX); break; }
-            auto* output = memoryAt(destination.base, 1, target);
-            const auto* input = memoryAt(source.base, 1, origin);
-            if (builtin == Builtin::CopyProcessMemory) std::memcpy(output, input, static_cast<std::uint32_t>(count));
-            else { const auto copied = SferaText::copyString(reinterpret_cast<char*>(output), reinterpret_cast<const char*>(input), count); if (!destination.contains(copied, true)) destination.diagnoseRange(copied); }
+            if (builtin == Builtin::CopyProcessMemory) {
+                if (count < 0) { reportError("Negative process copy length"); break; }
+                const auto input = memoryBytes(source.base, static_cast<std::size_t>(count), origin);
+                if (!destination.contains(static_cast<std::uint32_t>(count))) destination.diagnoseRange(static_cast<std::uint32_t>(count));
+                const auto output = memoryBytes(destination.base, static_cast<std::size_t>(count), target);
+                SferaBinary::copy(output, input);
+            } else {
+                const auto text = textIn(source, origin);
+                SferaText::copyString(textBuffer(destination, target), text, count);
+            }
             break;
         }
 
@@ -2537,11 +2582,10 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             }
             if (argument_count == 9) nextInteger();
             if (execution_failed) break;
-            const auto* text = textAt(first);
-            const auto length = std::strlen(text);
-            if (length >= std::size(text_buffer)) { reportError("Script text exceeds text buffer capacity"); break; }
-            std::copy_n(text, length + 1, text_buffer);
-            if (length == 0) { text_buffer[0] = '?'; text_buffer[1] = '\0'; }
+            const auto text = textAt(first);
+            const auto length = text.size();
+            if (length >= text_capacity) { reportError("Script text exceeds text buffer capacity"); break; }
+            text_buffer = text.empty() ? std::string_view{"?"} : text;
             const auto handle = WorldGuiControls::createText(x, y, text_buffer, static_cast<std::uint32_t>(parent));
             pushInteger(handle);
             if (handle != UINT32_MAX) {
@@ -2591,7 +2635,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                 if (handle == 0) reportError("Effect attached to zero handle!", "");
                 created = g_sfera_effect_manager.createActiveEffect(textAt(effect), handle);
             } else {
-                if (handle <= 0) { char message[256]; std::snprintf(message, sizeof(message), "Wrong Handler for Effect %s\n", active_process->name); ::OutputDebugStringA(message); pushInteger(UINT32_MAX); break; }
+                if (handle <= 0) { std::string message; message = std::format("Wrong Handler for Effect {}\n", active_process->name); ::OutputDebugStringA(message.c_str()); pushInteger(UINT32_MAX); break; }
                 if (argument_count >= 3 && parameter != 0) {
                     SferaEffectParameter value;
                     switch (effect) {
@@ -2661,12 +2705,12 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             break;
         }
         case Builtin::CompareMemory: {
-            const auto left = nextSliceReference().base;
-            if (left == 0) reportError("poppointerup(): unexpected NULL-pointer fetched");
-            const auto right = nextSliceReference().base;
-            if (right == 0) reportError("poppointerup(): unexpected NULL-pointer fetched");
+            const auto left = nextSlice();
+            if (left.base == 0) reportError("poppointerup(): unexpected NULL-pointer fetched");
+            const auto right = nextSlice();
+            if (right.base == 0) reportError("poppointerup(): unexpected NULL-pointer fetched");
             const std::uint32_t size = nextInteger();
-            if (!execution_failed) { const auto result = std::memcmp(memoryAt(left), memoryAt(right), size); pushInteger((result > 0) - (result < 0)); }
+            if (!execution_failed) { const auto result = size == 0 ? 0 : std::memcmp(memoryBytes(left.base, size).data(), memoryBytes(right.base, size).data(), size); pushInteger((result > 0) - (result < 0)); }
             break;
         }
         case Builtin::PlayerLists: {
@@ -2674,7 +2718,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             if (command < 1 || command > 11) break;
             auto& manager = g_sfera_player_lists;
             const auto text = [&](int offset) { return textAt(offset); };
-            const auto name = [&](int offset) { const auto* value = text(offset); return std::string_view(value, ::strnlen(value, 149)); };
+            const auto name = [&](int offset) { return textAt(offset, 149); };
             const auto lookup = [&](int offset) { return manager.find(name(offset)); };
             const auto copyName = [&](std::uint32_t address, std::string_view value) {
                 auto* output = memoryAt(address, value.size() + 1);
@@ -2714,19 +2758,19 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                 case 5: case 6: case 7: {
                     const auto first = nextInteger();
                     const auto second = command == 6 ? 0 : nextInteger();
-                    const char* operation = command == 5 ? "L_FFITEM" : command == 6 ? "L_FNITEM" : "L_FINDITEM";
+                    const std::string_view operation = command == 5 ? "L_FFITEM" : command == 6 ? "L_FNITEM" : "L_FINDITEM";
                     std::array<int, 4> fields;
                     for (std::size_t index = 0; index < fields.size(); ++index) {
                         fields[index] = nextInteger();
-                        if (fields[index] == 0 && !(command == 7 && index == 3)) { char message[128]; std::snprintf(message, sizeof(message), "NULL-pointer dereferencing: list, %s, %u\n", operation, static_cast<unsigned>(index + 1)); WorldDiagnostics::warning(message); }
+                        if (fields[index] == 0 && !(command == 7 && index == 3)) { std::string message; message = std::format("NULL-pointer dereferencing: list, {}, {}\n", operation, static_cast<unsigned>(index + 1)); WorldDiagnostics::warning(message); }
                     }
                     const auto payload = nextInteger();
                     if (execution_failed) break;
                     auto* current = command == 6 ? manager.currentList() : manager.selectList(name(first));
                     const auto nameOutput = command == 6 ? first : second;
-                    if (current == nullptr) { if (command != 7) *text(nameOutput) = '\0'; pushInteger(-1); break; }
+                    if (current == nullptr) { if (command != 7) copyName(nameOutput, {}); pushInteger(-1); break; }
                     auto* item = command == 7 ? current->find(name(second)) : command == 5 ? current->first() : current->next();
-                    if (item == nullptr) { if (command != 7) *text(nameOutput) = '\0'; pushInteger(-2); break; }
+                    if (item == nullptr) { if (command != 7) copyName(nameOutput, {}); pushInteger(-2); break; }
                     if (command != 7) copyName(nameOutput, item->name);
                     writeMemory(fields[0], item->attributes[0]); writeMemory(fields[1], item->attributes[1]); writeMemory(fields[2], item->attributes[2]);
                     if (command != 7) writeMemory(fields[3], static_cast<std::uint32_t>(item->payload.size()));
@@ -2758,7 +2802,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
                 case 10: {
                     const auto listName = nextInteger(); const auto itemName = nextInteger();
                     std::array<int, 3> outputs;
-                    for (std::size_t index = 0; index < outputs.size(); ++index) { outputs[index] = nextInteger(); if (outputs[index] == 0) { char message[128]; std::snprintf(message, sizeof(message), "NULL-pointer dereferencing: list, L_FINDITEM, %u\n", static_cast<unsigned>(index + 1)); WorldDiagnostics::warning(message); } }
+                    for (std::size_t index = 0; index < outputs.size(); ++index) { outputs[index] = nextInteger(); if (outputs[index] == 0) { std::string message; message = std::format("NULL-pointer dereferencing: list, L_FINDITEM, {}\n", static_cast<unsigned>(index + 1)); WorldDiagnostics::warning(message); } }
                     if (execution_failed) break;
                     auto* list = manager.selectList(name(listName));
                     if (list == nullptr) { pushInteger(-2); break; }
@@ -2773,9 +2817,9 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
         }
         case Builtin::FindProcess: {
             const bool byName = g_sfera_mbc_runtime.values[argument_cursor].type == SferaMbcValue::BytePointer;
-            const char* name = nullptr;
+            std::string name;
             std::uint32_t module = 0;
-            if (byName) { const auto slice = nextSliceReference(); if (slice.base == 0) WorldDiagnostics::warning("NULL-pointer dereferencing: ffprc_id\n"); name = textAt(slice.base); }
+            if (byName) { const auto slice = nextSliceReference(); if (slice.base == 0) WorldDiagnostics::warning("NULL-pointer dereferencing: ffprc_id\n"); name = textIn(slice); }
             else module = nextInteger();
             auto index = process_chain_first;
             if (argument_count > 1) {
@@ -2788,7 +2832,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             for (std::size_t visited = 0; visited < std::size(processes) && index >= 0 && static_cast<std::size_t>(index) < std::size(processes); ++visited) {
                 const auto& process = processes[index];
                 if (process.chain_prev_index == -1) break;
-                if (byName ? std::strcmp(name, process.name) == 0 : module == 0 || process.module_tag == module) { result = process.process_id; break; }
+                if (byName ? name == process.name : module == 0 || process.module_tag == module) { result = process.process_id; break; }
                 if (process.chain_next_index == index) break;
                 index = process.chain_next_index;
             }
@@ -2882,28 +2926,28 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             auto& source = nextSliceReference();
             const auto count = builtin == Builtin::CopyStringCount ? nextInteger() : 0;
             if (!source.contains()) { source.diagnoseRange(0); ++value_stack_size; break; }
-            auto* output = textAt(destination.base);
-            const auto* input = textAt(source.base);
+            if (count < 0) { reportError("Negative string length"); break; }
+            const auto input = builtin == Builtin::CopyStringCount ? textIn(source, count) : textIn(source);
+            auto output = textBuffer(destination);
             std::uint32_t length = 0;
             if (builtin == Builtin::AppendString) {
-                if (!destination.contains()) destination.diagnoseRange(0);
-                const auto prefix = std::strlen(output);
-                length = prefix + std::strlen(input) + 1;
-                if (!destination.contains(length)) destination.diagnoseRange(length);
+                if (!destination.contains()) { destination.diagnoseRange(0); break; }
+                const auto prefix = output.length();
+                const auto required = prefix + input.size() + 1;
+                if (required > UINT32_MAX || required > output.size()) { destination.diagnoseRange(static_cast<std::uint32_t>(std::min<std::size_t>(required, UINT32_MAX))); break; }
+                length = static_cast<std::uint32_t>(required);
                 if (argument_count > 2 && static_cast<int>(length) > nextInteger()) { WorldDiagnostics::warning("Size mismatch: ffstrcat\n"); ++value_stack_size; break; }
                 if (execution_failed) break;
-                std::memmove(output + prefix, input, length - prefix);
+                output.append(input);
             } else {
                 const auto capacity = builtin == Builtin::CopyString && argument_count == 3 ? nextInteger() : 0;
                 if (execution_failed) break;
                 if (builtin == Builtin::CopyString) length = SferaText::copyString(output, input, capacity);
                 else {
-                    if (count < 0) { reportError("Negative string length"); break; }
-                    std::size_t copied = 0;
-                    while (copied < static_cast<std::uint32_t>(count) && input[copied] != '\0') ++copied;
-                    std::memcpy(output, input, copied);
-                    std::memset(output + copied, 0, static_cast<std::uint32_t>(count) - copied + 1);
-                    length = copied + 1;
+                    const auto required = static_cast<std::size_t>(count) + 1;
+                    if (required > output.size()) { destination.diagnoseRange(static_cast<std::uint32_t>(required)); break; }
+                    const auto copied = output.writePadded(input, static_cast<std::size_t>(count));
+                    length = static_cast<std::uint32_t>(copied + 1);
                 }
                 if (!destination.contains(length)) destination.diagnoseRange(length);
             }
@@ -2914,35 +2958,36 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             auto& haystack = nextSliceReference();
             const auto needle = nextSliceReference();
             if (execution_failed) break;
-            const auto* text = textAt(haystack.base);
-            const auto* match = textAt(needle.base);
-            const auto* found = builtin == Builtin::FindString ? std::strstr(text, match) : SferaText::findInsensitive(text, match);
-            if (found == nullptr) pushSlice({}, SferaMbcValue::BytePointer);
-            else { haystack.base += static_cast<std::uint32_t>(found - text); pushSlice(haystack, SferaMbcValue::BytePointer); }
+            const auto text = textIn(haystack);
+            const auto match = textIn(needle);
+            const auto found = builtin == Builtin::FindString ? text.find(match) : SferaText::findInsensitive(text, match);
+            if (found == std::string_view::npos) pushSlice({}, SferaMbcValue::BytePointer);
+            else { haystack.base += static_cast<std::uint32_t>(found); pushSlice(haystack, SferaMbcValue::BytePointer); }
             break;
         }
         case Builtin::StringLength: {
             const auto slice = nextSliceReference();
             if (slice.base == 0) WorldDiagnostics::warning("ffstrlen(): NULL-pointer dereferencing\n");
-            const auto* text = textAt(slice.base);
             std::uint32_t length = 0;
             if (argument_count > 1) {
                 const auto limit = nextInteger();
-                while (static_cast<int>(length) < limit && text[length] != '\0') ++length;
-                if (static_cast<int>(length) == limit) { char message[128]; std::snprintf(message, sizeof(message), "ffstrlen(): end of string was not found in buffer of size %d\n", limit); WorldDiagnostics::warning(message); }
-            } else length = std::strlen(text);
+                if (limit > 0) length = static_cast<std::uint32_t>(SferaText::length(memoryRange(slice.base), limit));
+                if (static_cast<int>(length) == limit) WorldDiagnostics::warning(std::format("ffstrlen(): end of string was not found in buffer of size {}\n", limit));
+            } else length = static_cast<std::uint32_t>(SferaText::length(memoryRange(slice.base)));
             pushInteger(length);
             break;
         }
         case Builtin::CompareStrings: case Builtin::CompareStringsInsensitive: case Builtin::CompareStringsCount: case Builtin::CompareStringsCountInsensitive: {
-            const auto first = nextInteger();
-            const auto second = nextInteger();
-            const auto* left = textAt(first);
-            const auto* right = textAt(second);
-            int result;
-            if (builtin == Builtin::CompareStrings) { const auto comparison = std::strcmp(left, right); result = (comparison > 0) - (comparison < 0); }
-            else if (builtin == Builtin::CompareStringsInsensitive) result = ::_stricmp(left, right);
-            else { const std::uint32_t count = nextInteger(); result = builtin == Builtin::CompareStringsCount ? std::strncmp(left, right, count) : ::_strnicmp(left, right, count); }
+            const auto first = nextAddress();
+            const auto second = nextAddress();
+            const bool bounded = builtin == Builtin::CompareStringsCount || builtin == Builtin::CompareStringsCountInsensitive;
+            const auto count = bounded ? static_cast<std::uint32_t>(nextInteger()) : 0u;
+            if (execution_failed) break;
+            const auto left = bounded ? textIn(first, count) : textIn(first);
+            const auto right = bounded ? textIn(second, count) : textIn(second);
+            int result = builtin == Builtin::CompareStringsInsensitive || builtin == Builtin::CompareStringsCountInsensitive
+                ? SferaText::compareInsensitive(left, right) : SferaText::compare(left, right);
+            if (builtin == Builtin::CompareStrings) result = (result > 0) - (result < 0);
             pushInteger(result);
             break;
         }
@@ -2951,10 +2996,10 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             const auto source = builtin == Builtin::FillMemory ? SferaSliceReference32{static_cast<std::uint32_t>(nextInteger()), 0, 0} : nextSliceReference();
             const std::uint32_t count = nextInteger();
             if (execution_failed) break;
-            if (count && (!destination.contains(count))) destination.diagnoseRange(count);
-            auto* output = memoryAt(destination.base);
-            if (builtin == Builtin::FillMemory) std::memset(output, static_cast<std::uint8_t>(source.base), count);
-            else { const auto* input = memoryAt(source.base); if (builtin == Builtin::MoveMemory) std::memmove(output, input, count); else std::memcpy(output, input, count); }
+            if (count != 0 && !destination.contains(count)) destination.diagnoseRange(count);
+            const auto output = memoryBytes(destination.base, static_cast<std::size_t>(count));
+            if (builtin == Builtin::FillMemory) std::fill(output.begin(), output.end(), static_cast<std::uint8_t>(source.base));
+            else SferaBinary::copy(output, memoryBytes(source.base, static_cast<std::size_t>(count)));
             break;
         }
         case Builtin::WriteByte: case Builtin::WriteShort: case Builtin::WriteThreeBytes: case Builtin::WriteWord: case Builtin::WriteReal: {
@@ -2963,7 +3008,7 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             const std::size_t width = builtin == Builtin::WriteByte ? 1 : builtin == Builtin::WriteShort ? 2 : builtin == Builtin::WriteThreeBytes ? 3 : sizeof(std::uint32_t);
             if (execution_failed) break;
             if (!destination.contains(width)) destination.diagnoseRange(width);
-            else { std::memcpy(memoryAt(destination.base), &value, width); destination.base += width; }
+            else { std::memcpy(sliceBytes(destination, width).data(), &value, width); destination.base += width; }
             pushSlice(destination, SferaMbcValue::BytePointer);
             break;
         }
@@ -2975,8 +3020,13 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             if (!source.contains(width)) { source.diagnoseRange(width); if (builtin == Builtin::ReadReal) break; }
             else if (!destination.contains(width)) { destination.diagnoseRange(width); if (builtin == Builtin::ReadReal) break; }
             else {
-                if (builtin == Builtin::ReadShort || builtin == Builtin::ReadThreeBytes) writeMemory(destination.base, std::uint32_t{});
-                std::memcpy(memoryAt(destination.base), memoryAt(source.base), width);
+                const auto input = sliceBytes(source, width);
+                const auto outputWidth = builtin == Builtin::ReadShort || builtin == Builtin::ReadThreeBytes ? sizeof(std::uint32_t) : width;
+                const auto output = memoryBytes(destination.base, outputWidth);
+                // Stage the word before clearing a potentially overlapping destination.
+                std::uint32_t value = 0;
+                std::memcpy(&value, input.data(), width);
+                std::memcpy(output.data(), &value, outputWidth);
                 source.base += width;
             }
             pushSlice(source, SferaMbcValue::BytePointer);
@@ -2990,9 +3040,9 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
             auto& destination = writing ? cursor : argument;
             if (!source.contains()) { source.diagnoseRange(0); break; }
             if (execution_failed) break;
-            const auto* input = textAt(source.base);
-            const std::uint32_t length = std::strlen(input) + 1;
-            std::memcpy(memoryAt(destination.base), input, length);
+            const auto input = textIn(source);
+            const auto length = static_cast<std::uint32_t>(input.size() + 1);
+            copyText(destination, input);
             if (!cursor.contains(length)) cursor.diagnoseRange(length);
             else cursor.base += length;
             pushSlice(cursor, SferaMbcValue::BytePointer);
@@ -3242,12 +3292,12 @@ void SferaScriptContainer::execute(SferaMbcRuntime& runtime) {
             else if constexpr (std::is_integral_v<T>) return static_cast<T>(runtime.nextInteger());
             else {
                 auto& source = runtime.nextSliceReference();
-                if constexpr (std::is_same_v<T, std::string>) return std::string(runtime.textAt(source.base));
+                if constexpr (std::is_same_v<T, std::string>) return runtime.textIn(source);
                 else {
                     const std::uint32_t length = runtime.nextInteger();
                     if (!source.contains(length)) source.diagnoseRange(length);
-                    const auto* begin = runtime.memoryAt(source.base);
-                    T result(begin, begin + length);
+                    const auto bytes = runtime.memoryBytes(source.base, static_cast<std::size_t>(length));
+                    T result(bytes.begin(), bytes.end());
                     if (result.empty()) result.reserve(1);
                     return result;
                 }
@@ -3436,21 +3486,19 @@ std::size_t SferaConfigTextRuntime::copyText(std::string_view source) {
     storage_ = std::move(next); filename.clear();
     return count;
 }
-std::span<char> SferaConfigTextRuntime::borrowedBytes(const BorrowedText& view) const {
+std::span<std::uint8_t> SferaConfigTextRuntime::borrowedBytes(const BorrowedText& view) const {
     if (view.process && (view.process->chain_prev_index < 0 || view.process->lifetime != view.process_lifetime))
         throw std::out_of_range("Configuration source process is no longer alive");
     if (g_sfera_mbc_runtime.memoryLifetime(view.address) != view.mapping_lifetime)
         throw std::out_of_range("Configuration source mapping was replaced");
     auto bytes = g_sfera_mbc_runtime.memoryRange(view.address, view.process);
     if (view.capacity > bytes.size()) throw std::out_of_range("Configuration source buffer shrank");
-    return {reinterpret_cast<char*>(bytes.data()), view.capacity};
+    return bytes.first(view.capacity);
 }
-std::string_view SferaConfigTextRuntime::text() const {
+std::string SferaConfigTextRuntime::text() const {
     if (const auto* owned = std::get_if<std::string>(&storage_)) return *owned;
     const auto bytes = borrowedBytes(std::get<BorrowedText>(storage_));
-    const auto end = std::find(bytes.begin(), bytes.end(), '\0');
-    if (end == bytes.end()) throw std::out_of_range("Unterminated borrowed configuration");
-    return {bytes.data(), static_cast<std::size_t>(end - bytes.begin())};
+    return SferaText::terminated(bytes);
 }
 
 void SferaConfigTextRuntime::useText(std::uint32_t address, std::size_t capacity, SferaMbcProcessRecord* process) {
@@ -3458,11 +3506,11 @@ void SferaConfigTextRuntime::useText(std::uint32_t address, std::size_t capacity
     BorrowedText view{address, std::min(capacity, text_capacity), process, process ? process->lifetime : 0,
                       g_sfera_mbc_runtime.memoryLifetime(address)};
     const auto bytes = borrowedBytes(view);
-    if (std::find(bytes.begin(), bytes.end(), '\0') == bytes.end()) throw std::out_of_range("Unterminated configuration source");
+    (void)SferaText::length(bytes);
     storage_ = view; filename.clear();
 }
 
-std::optional<std::string_view> SferaConfigTextRuntime::find(std::string_view key) const {
+std::optional<std::string> SferaConfigTextRuntime::find(std::string_view key) const {
     if (key.size() >= 4096) return std::nullopt;
     const auto input = text();
     const auto offset = SferaText::configValueOffset(input, key);
@@ -3479,52 +3527,63 @@ bool SferaConfigTextRuntime::readFloat(std::string_view key, float& value) const
     return input && SferaText::readNumber(*input, value);
 }
 
-bool SferaConfigTextRuntime::readString(std::string_view key, char* destination, std::size_t capacity) const {
+std::optional<std::string> SferaConfigTextRuntime::readString(std::string_view key) const {
     const auto input = find(key);
-    if (!input || input->empty() || input->front() != '"' || !destination || capacity == 0) return false;
-    std::size_t written = 0;
-    destination[0] = 0;
-    for (char character : input->substr(1)) {
-        if (character == '"' || character == '\0') { destination[written] = 0; return true; }
-        if (character == '\n') continue;
-        if (written + 1 >= capacity) { destination[written] = 0; return false; }
-        destination[written++] = character == '\r' ? ' ' : character;
+    if (!input || input->empty() || input->front() != '"') return std::nullopt;
+    std::string result;
+    for (const auto character : input->substr(1)) {
+        if (character == '"' || character == '\0') break;
+        if (character != '\n') result.push_back(character == '\r' ? ' ' : character);
     }
-    destination[written] = 0;
-    return true;
+    return result;
 }
 
-bool SferaConfigTextRuntime::readBinary(std::string_view key, std::uint8_t* destination, std::size_t capacity) const {
+bool SferaConfigTextRuntime::readBinary(std::string_view key, std::span<std::uint8_t> destination) const {
     const auto input = find(key);
     if (!input) return false;
-    std::size_t output_byte = 0;
-    unsigned output_bit = 0;
+    std::vector<std::uint8_t> decoded;
+    unsigned pending = 0, bits = 0;
     const auto append = [&](unsigned value, unsigned count) {
-        if (!destination || output_byte >= capacity || (count > CHAR_BIT - output_bit && capacity - output_byte < 2)) return false;
-        for (unsigned bit = 0; bit < count; ++bit) {
-            const unsigned mask = 1u << output_bit;
-            auto& byte = destination[output_byte];
-            byte = static_cast<std::uint8_t>((byte & ~mask) | (((value >> bit) & 1u) << output_bit));
-            if (++output_bit == CHAR_BIT) { output_bit = 0; ++output_byte; }
+        const auto required = (bits + count + 7u) / 8u;
+        if (decoded.size() > destination.size() || required > destination.size() - decoded.size()) return false;
+        pending |= value << bits;
+        bits += count;
+        if (bits >= 8u) {
+            decoded.push_back(static_cast<std::uint8_t>(pending));
+            pending >>= 8u;
+            bits -= 8u;
         }
         return true;
     };
     std::size_t cursor = 0;
-    while (cursor < input->size() && (*input)[cursor] != '\0' && (*input)[cursor] != '#')
-        if (!append(static_cast<unsigned char>((*input)[cursor++]) - '0', 6)) return false;
+    while (cursor < input->size() && (*input)[cursor] != '\0' && (*input)[cursor] != '#') {
+        const auto value = static_cast<std::uint8_t>((*input)[cursor++]);
+        if (value < '0' || value > '0' + 63 || !append(value - '0', 6u)) return false;
+    }
     if (cursor < input->size() && (*input)[cursor] == '#') {
         if (++cursor == input->size()) return false;
-        const int count = static_cast<signed char>((*input)[cursor++]) - '0';
-        if (count > 0 && (count > CHAR_BIT || cursor == input->size() || (*input)[cursor] == '\0' ||
-            !append(static_cast<unsigned char>((*input)[cursor]) - '0', static_cast<unsigned>(count)))) return false;
+        const auto marker = static_cast<std::uint8_t>((*input)[cursor++]);
+        if (marker < '0' || marker > '8') return false;
+        const auto count = static_cast<unsigned>(marker - '0');
+        if (count != 0) {
+            if (cursor == input->size()) return false;
+            const auto value = static_cast<std::uint8_t>((*input)[cursor]);
+            if (value < '0' || static_cast<unsigned>(value - '0') >= (1u << count) || !append(value - '0', count)) return false;
+        }
     }
+    if (bits != 0) {
+        if (decoded.size() == destination.size()) return false;
+        const auto mask = (1u << bits) - 1u;
+        decoded.push_back(static_cast<std::uint8_t>((destination[decoded.size()] & ~mask) | (pending & mask)));
+    }
+    SferaBinary::copy(destination, decoded);
     return true;
 }
 
-std::size_t SferaConfigTextRuntime::copyTo(char* destination, std::size_t capacity) const {
+std::size_t SferaConfigTextRuntime::copyTo(std::span<std::uint8_t> destination) const {
     const auto input = text();
-    const auto count = std::min(capacity, input.size());
-    if (count != 0) { if (!destination) throw std::invalid_argument("Null configuration destination"); std::memmove(destination, input.data(), count); }
+    const auto count = std::min(destination.size(), input.size());
+    if (count != 0) std::memmove(destination.data(), input.data(), count);
     return count;
 }
 
@@ -3550,7 +3609,7 @@ void SferaErrorLogRuntime::clear() {
     owned_error.reset();
 }
 
-void SferaFileManager::keepTail(const char* filename, std::size_t size) {
+void SferaFileManager::keepTail(const std::string& filename, std::size_t size) {
     const auto length = fileSize(filename);
     if (length < 0 || std::cmp_less_equal(length, size) || size > std::size_t{std::numeric_limits<std::ptrdiff_t>::max()}) return;
     std::vector<std::uint8_t> tail(size);
@@ -3560,17 +3619,17 @@ void SferaFileManager::keepTail(const char* filename, std::size_t size) {
     if (seek(file.get(), 0, SEEK_SET) >= 0 && write(file.get(), tail.data(), size) == static_cast<std::ptrdiff_t>(size)) ::_chsize_s(file.get(), size);
 }
 
-const char* SferaClientApplication::commandLineArguments(const char* commandLine) {
-    if (commandLine == nullptr) return "";
+std::string_view SferaClientApplication::commandLineArguments(std::string_view commandLine) {
+    commandLine = commandLine.substr(0, commandLine.find('\0'));
     bool quoted = false;
-    auto* cursor = reinterpret_cast<const unsigned char*>(commandLine);
-    while (*cursor != '\0' && (*cursor > ' ' || quoted)) {
-        if (*cursor == '"') quoted = !quoted;
-        if (::_ismbblead(*cursor) && cursor[1] != '\0') ++cursor;
+    std::size_t cursor = 0;
+    while (cursor < commandLine.size() && (static_cast<std::uint8_t>(commandLine[cursor]) > ' ' || quoted)) {
+        if (commandLine[cursor] == '"') quoted = !quoted;
+        if (::_ismbblead(static_cast<std::uint8_t>(commandLine[cursor])) && cursor + 1 < commandLine.size()) ++cursor;
         ++cursor;
     }
-    while (*cursor != '\0' && *cursor <= ' ') ++cursor;
-    return reinterpret_cast<const char*>(cursor);
+    while (cursor < commandLine.size() && static_cast<std::uint8_t>(commandLine[cursor]) <= ' ') ++cursor;
+    return commandLine.substr(cursor);
 }
 
 void SferaClientApplication::initializeStorage() {
@@ -3628,8 +3687,7 @@ SferaMbcProcessRecord* SferaMbcRuntime::findProcess(std::uint32_t id) {
     return process.process_id == id && process.chain_prev_index >= 0 ? &process : nullptr;
 }
 
-std::uint32_t SferaMbcRuntime::namedValue(const char* name, int index) {
-    if (name == nullptr) return 0;
+std::uint32_t SferaMbcRuntime::namedValue(std::string_view name, int index) {
     const auto found = named_vectors.find(name);
     if (found == named_vectors.end()) return 0;
     const auto& values = found->second;
@@ -3638,12 +3696,12 @@ std::uint32_t SferaMbcRuntime::namedValue(const char* name, int index) {
     return offset < values.size() ? values[offset] : 0;
 }
 
-void SferaMbcRuntime::setNamedValue(const char* name, std::uint32_t value, int index) {
-    if (name == nullptr || index < 0) return;
+void SferaMbcRuntime::setNamedValue(std::string_view name, std::uint32_t value, int index) {
+    if (index < 0) return;
     auto found = named_vectors.find(name);
     if (found == named_vectors.end()) {
         if (named_vectors.size() >= 1000u) return;
-        found = named_vectors.try_emplace(name).first;
+        found = named_vectors.try_emplace(std::string(name)).first;
     }
     auto& values = found->second;
     const auto offset = static_cast<std::size_t>(index);
@@ -3661,24 +3719,25 @@ std::size_t SferaMbcValue::elementSize() const {
     return storageSize(static_cast<Type>(type - 1));
 }
 
-void SferaText::encodeUri(char* destination, const char* source, std::size_t capacity) {
-    if (destination == nullptr || capacity == 0) return;
-    constexpr char digits[] = "0123456789ABCDEF";
-    std::size_t used = 0;
-    while (used < capacity) {
-        const unsigned char value = *source;
-        if (value == 0) { destination[used++] = '\0'; break; }
+std::string SferaText::encodeUri(std::string_view source, std::size_t capacity) {
+    if (capacity == 0) return {};
+    constexpr std::string_view digits = "0123456789ABCDEF";
+    std::string result;
+    result.reserve(std::min(source.size(), capacity - 1));
+    for (std::size_t index = 0; index < source.size(); ++index) {
+        const auto value = static_cast<std::uint8_t>(source[index]);
+        if (value == 0 || result.size() == capacity) break;
         const bool ordinary = (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') || (value >= '0' && value <= '9') || value == '-' || value == '_' || value == '.' || value == '~';
-        if (ordinary) destination[used++] = value;
+        if (ordinary) result.append(source.substr(index, 1u));
         else {
-            if (capacity - used < 3) break;
-            destination[used++] = '%';
-            destination[used++] = digits[value / 16];
-            destination[used++] = digits[value % 16];
+            if (capacity - result.size() < 3) break;
+            result.push_back('%');
+            result.push_back(digits[value / 16]);
+            result.push_back(digits[value % 16]);
         }
-        ++source;
     }
-    destination[std::min(used, capacity - 1)] = '\0';
+    if (result.size() == capacity) result.pop_back();
+    return result;
 }
 
 std::shared_ptr<const std::vector<std::uint8_t>> SferaMbcRuntime::cacheBytecode(
@@ -3692,27 +3751,23 @@ std::shared_ptr<const std::vector<std::uint8_t>> SferaMbcRuntime::findBytecode(
     return found == bytecode_cache.end() ? nullptr : found->second;
 }
 
-void SferaLogRuntime::writeFormatted(const char* format, std::va_list arguments) {
-    char message[912]{};
-    std::vsnprintf(message, sizeof(message), format, arguments);
-    write(message);
-}
+
 
 void SferaNetworkRuntime::updateTcpStatistics() {
     connection_info = connection ? connection->statistics() : SferaNetworkStatistics{};
 }
 
-bool SferaText::matchesWildcard(const char* text, const char* pattern) {
-    const char* star = nullptr;
-    const char* candidate = nullptr;
-    while (*text != '\0') {
-        if (*pattern == '*') { star = ++pattern; candidate = text; }
-        else if (*pattern == '?' || *pattern == *text) { ++pattern; ++text; }
-        else if (star != nullptr) { pattern = star; text = ++candidate; }
+bool SferaText::matchesWildcard(std::string_view text, std::string_view pattern) {
+    std::size_t position = 0, token = 0, candidate = 0;
+    auto star = std::string_view::npos;
+    while (position < text.size()) {
+        if (token < pattern.size() && pattern[token] == '*') { star = ++token; candidate = position; }
+        else if (token < pattern.size() && (pattern[token] == '?' || pattern[token] == text[position])) { ++token; ++position; }
+        else if (star != std::string_view::npos) { token = star; position = ++candidate; }
         else return false;
     }
-    while (*pattern == '*') ++pattern;
-    return *pattern == '\0';
+    while (token < pattern.size() && pattern[token] == '*') ++token;
+    return token == pattern.size();
 }
 
 int SferaNetworkRuntime::tickDifference(std::uint32_t current, std::uint32_t previous) {
@@ -3737,11 +3792,11 @@ void SferaNetworkRuntime::encodePayload(std::uint8_t* data, int length) {
 
 void SferaMbcRuntime::resetBytecodeCache() { bytecode_cache.clear(); }
 
-bool SferaConfigTextRuntime::load(const char* path) {
-    if (!path || std::strlen(path) >= filename_capacity) return false;
+bool SferaConfigTextRuntime::load(const std::string& path) {
+    if (path.empty() || path.size() >= filename_capacity) return false;
     const std::string nextPath(path);
     clear(nextPath);
-    auto bytes = SferaFileManager::readBounded(nextPath.c_str(), text_capacity);
+    auto bytes = SferaFileManager::readBounded(nextPath, text_capacity);
     if (!bytes) return false;
     try {
         if (SferaZStream32::hasEnvelope(*bytes)) {
@@ -3750,23 +3805,25 @@ bool SferaConfigTextRuntime::load(const char* path) {
             if (SferaZStream32::decompressEnvelope(decoded.data(), count, *bytes) != 0) { clear(); return false; }
             decoded.resize(count); bytes = std::move(decoded);
         }
-        storage_ = bytes->empty() ? std::string{} : std::string(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+        storage_ = SferaText::fromBytes(*bytes);
         return true;
     } catch (const std::exception&) { clear(); return false; }
 }
 bool SferaConfigTextRuntime::save(bool compressed) const {
     if (filename.empty()) return false;
     const auto input = text();
-    if (!compressed) return SferaFileManager::writeFile(filename.c_str(), input.data(), input.size());
+    if (!compressed) return SferaFileManager::writeFile(filename, input.data(), input.size());
     try {
         std::vector<std::uint8_t> encoded(text_capacity);
         std::uint32_t count = static_cast<std::uint32_t>(encoded.size() - 1);
-        if (SferaZStream32::compressEnvelope(encoded.data(), count,
-            {reinterpret_cast<const std::uint8_t*>(input.data()), input.size()}) != 0) return false;
-        return SferaFileManager::writeFile(filename.c_str(), encoded.data(), count);
+        const std::vector<std::uint8_t> source(input.begin(), input.end());
+        if (SferaZStream32::compressEnvelope(encoded.data(), count, source) != 0) return false;
+        return SferaFileManager::writeFile(filename, encoded.data(), count);
     } catch (const std::bad_alloc&) { return false; }
 }
 std::string SferaConfigTextRuntime::encodeBinary(std::span<const std::uint8_t> input) {
+    constexpr std::string_view alphabet = "0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmno";
+    static_assert(alphabet.size() == 64u);
     std::string result;
     result.reserve(input.size() * CHAR_BIT / 6 + 3);
     std::uint32_t pending = 0;
@@ -3775,14 +3832,14 @@ std::string SferaConfigTextRuntime::encodeBinary(std::span<const std::uint8_t> i
         pending |= static_cast<std::uint32_t>(byte) << count;
         count += CHAR_BIT;
         while (count >= 6) {
-            result.push_back(static_cast<char>('0' + (pending & 63u)));
+            result.push_back(alphabet[pending & 63u]);
             pending >>= 6u;
             count -= 6u;
         }
     }
     result.push_back('#');
-    result.push_back(static_cast<char>('0' + count));
-    if (count != 0) result.push_back(static_cast<char>('0' + pending));
+    result.push_back(alphabet[count]);
+    if (count != 0) result.push_back(alphabet[pending]);
     return result;
 }
 bool SferaConfigTextRuntime::writeValue(std::string_view key, std::string_view value, bool quoted) {
@@ -3797,16 +3854,19 @@ bool SferaConfigTextRuntime::writeValue(std::string_view key, std::string_view v
     return true;
 }
 
-void SferaMbcValue::storeAs(Type destinationType, void* destination) const {
+void SferaMbcValue::storeAs(Type destinationType, std::span<std::uint8_t> destination) const {
+    const auto required = destinationType == Byte ? sizeof(std::uint8_t)
+        : destinationType == Integer || destinationType == Real ? sizeof(std::uint32_t) : sizeof(SferaSliceReference32);
+    if (destination.size() < required) throw std::out_of_range("Script parameter destination is too small");
     const auto sourceType = type;
     const auto integerValue = sourceType == Real ? truncate(real()) : integer();
     switch (destinationType) {
-        case Byte: { const std::uint8_t number = integerValue; std::memcpy(destination, &number, sizeof(number)); break; }
-        case Integer: std::memcpy(destination, &integerValue, sizeof(integerValue)); break;
-        case Real: { const auto number = sourceType == Real ? real() : static_cast<float>(integer()); std::memcpy(destination, &number, sizeof(number)); break; }
+        case Byte: { const std::uint8_t number = integerValue; std::memcpy(destination.data(), &number, sizeof(number)); break; }
+        case Integer: std::memcpy(destination.data(), &integerValue, sizeof(integerValue)); break;
+        case Real: { const auto number = sourceType == Real ? real() : static_cast<float>(integer()); std::memcpy(destination.data(), &number, sizeof(number)); break; }
         default: {
             const auto reference = sourceType == Byte || sourceType == Integer || sourceType == Real ? SferaSliceReference32{static_cast<std::uint32_t>(integerValue), 0, 0} : value;
-            std::memcpy(destination, &reference, sizeof(reference));
+            std::memcpy(destination.data(), &reference, sizeof(reference));
             break;
         }
     }
@@ -3816,7 +3876,7 @@ void SferaMbcRuntime::bindParameters() {
     const auto declaration = readOperand<std::int8_t>();
     const int capacity = declaration < 0 ? -declaration : declaration;
     if (argument_count < 0 || (declaration >= 0 && argument_count != capacity) || argument_count > capacity) {
-        std::snprintf(text_buffer, sizeof(text_buffer), "Wrong number of parameters (must be %d, present %d)", int(declaration), argument_count);
+        text_buffer = std::format("Wrong number of parameters (must be {}, present {})", int(declaration), argument_count);
         reportError(text_buffer);
         return;
     }
@@ -3826,14 +3886,14 @@ void SferaMbcRuntime::bindParameters() {
     for (int index = 0; index < capacity; ++index) {
         const auto type = readOperand<SferaMbcValue::Type>();
         const auto offset = readOperand<std::uint32_t>();
-        if (index < supplied) stack[argument_cursor + index].storeAs(type, memoryAt(offset));
-        else { const SferaMbcValue zero{}; zero.storeAs(type, memoryAt(offset)); }
+        if (index < supplied) stack[argument_cursor + index].storeAs(type, memoryRange(offset));
+        else { const SferaMbcValue zero{}; zero.storeAs(type, memoryRange(offset)); }
     }
 }
 
 SferaMbcFunctionRecord* SferaMbcProcessRecord::findFunction(std::string_view name) {
     if (functions.empty()) return nullptr;
-    for (std::uint32_t index = 0; index < functions.size(); ++index) if (functions[index].program_index >= 0 && name == std::string_view(functions[index].name, std::find(std::begin(functions[index].name), std::end(functions[index].name), '\0') - std::begin(functions[index].name))) return &functions[index];
+    for (std::uint32_t index = 0; index < functions.size(); ++index) if (functions[index].program_index >= 0 && name == functions[index].name) return &functions[index];
     return nullptr;
 }
 
@@ -3849,8 +3909,8 @@ void SferaMbcRuntime::callFunction(bool mainProcess) {
     SferaMbcFunctionRecord* function = nullptr;
     if (g_sfera_mbc_runtime.values[argument_cursor].type == SferaMbcValue::BytePointer) {
         const auto name = nextSlice();
-        const auto* text = textAt(name.base);
-        function = target->findFunction(std::string_view(text, std::find(text, text + 31, '\0') - text));
+        const auto text = textIn(name, 31);
+        function = target->findFunction(text);
     } else {
         const std::uint32_t tag = nextInteger();
         if (tag < SferaMbcModuleImage::functionSlotCount) {
@@ -3866,7 +3926,7 @@ void SferaMbcRuntime::callFunction(bool mainProcess) {
     active_program_record = &program_table_base[program_index];
     active_program_record->instruction_offset = instruction_cursor - bytecode_base;
     auto& targetProgram = target->programs.data()[function->program_index];
-    if (targetProgram.executing && !function->allow_reentry) { char message[256]; std::snprintf(message, sizeof(message), "Double \"func\" call, prob. stack corruption: %s (prc %d, tag %d), called from (prc %d, tag %d).\n", function->name, static_cast<int>(targetIndex), static_cast<int>(target->module_tag), static_cast<int>(process_index), static_cast<int>(active_process->module_tag)); WorldDiagnostics::warning(message); }
+    if (targetProgram.executing && !function->allow_reentry) { std::string message; message = std::format("Double \"func\" call, prob. stack corruption: {} (prc {}, tag {}), called from (prc {}, tag {}).\n", function->name, static_cast<int>(targetIndex), static_cast<int>(target->module_tag), static_cast<int>(process_index), static_cast<int>(active_process->module_tag)); WorldDiagnostics::warning(message); }
     bytecode_base = target->codeData();
     program_table_base = target->programs.data();
     process_memory_base = target->memory.data();
@@ -3935,67 +3995,92 @@ void SferaMbcRuntime::calculateDistance() {
 }
 
 void SferaMbcRuntime::scanText() {
-    const std::uint32_t source = nextInteger();
-    const std::uint32_t format = nextInteger();
+    const auto source = nextAddress();
+    const auto format = nextAddress();
     const auto type = argument_cursor < argument_end ? g_sfera_mbc_runtime.values[argument_cursor].type : SferaMbcValue::Byte;
     using Number = std::variant<std::monostate, std::int8_t, std::uint8_t, std::int16_t, std::uint16_t, int, std::uint32_t, std::int64_t, std::uint64_t, float, double>;
     std::array<Number, 4> numbers{};
     std::array<void*, 4> destinations{};
     std::array<SferaSliceReference32, 4> references{};
     std::array<unsigned, 4> capacities{};
+    std::array<int, 4> completed; completed.fill(-1);
+    std::array<std::size_t, 4> characterCounts{};
+    std::array<std::variant<std::monostate, std::string, std::wstring>, 4> textOutputs{};
     const auto count = std::min(argument_count > 2 ? argument_count - 2 : 1u, 4u);
     for (std::uint32_t index = 0; index < count; ++index) {
-        if (argument_cursor < argument_end) references[index] = g_sfera_mbc_runtime.values[argument_cursor].value;
-        references[index].base = nextInteger();
+        references[index] = nextAddress();
     }
     if (execution_failed) return;
-    if (argument_count < 3 || argument_count > 6 || (argument_count == 3 && type != SferaMbcValue::IntegerPointer && type != SferaMbcValue::RealPointer && type != SferaMbcValue::BytePointer)) { pushInteger(source); return; }
-    const auto* text = textAt(source);
-    const auto* pattern = textAt(format);
+    if (argument_count < 3 || argument_count > 6 || (argument_count == 3 && type != SferaMbcValue::IntegerPointer && type != SferaMbcValue::RealPointer && type != SferaMbcValue::BytePointer)) { pushInteger(source.base); return; }
+    const auto text = textIn(source);
+    if (text.size() > INT_MAX) { reportError("Scan input is too large"); return; }
+    const auto pattern = textIn(format);
     std::string normalized;
     std::size_t output = 0;
     const auto number = [&]<class T>() {
         auto& reference = references[output];
         if (!reference.contains(sizeof(T))) { reference.diagnoseRange(sizeof(T)); execution_failed = true; return; }
-        numbers[output] = readMemory<T>(reference.base);
+        T value{};
+        const auto bytes = sliceBytes(reference, sizeof(T));
+        std::memcpy(&value, bytes.data(), sizeof(T));
+        numbers[output] = value;
         destinations[output] = &std::get<T>(numbers[output]);
     };
-    for (const char* token = pattern; *token != '\0'; ++token) {
-        if (*token != '%') { normalized += *token; continue; }
-        const char* start = token++;
-        if (*token == '%') { normalized += "%%"; continue; }
-        const bool suppressed = *token == '*';
+    const auto character = [&](std::size_t position) { return position < pattern.size() ? pattern[position] : '\0'; };
+    for (std::size_t token = 0; token < pattern.size(); ++token) {
+        if (character(token) != '%') { normalized += character(token); continue; }
+        const auto start = token++;
+        if (character(token) == '%') { normalized += "%%"; continue; }
+        const bool suppressed = character(token) == '*';
         if (suppressed) ++token;
-        while (*token >= '0' && *token <= '9') ++token;
-        normalized.append(start, token);
-        const char* lengthStart = token;
-        while (*token != '\0' && std::strchr("hljztLwI", *token) != nullptr) if (*token++ == 'I') while (*token >= '0' && *token <= '9') ++token;
-        const std::string_view length(lengthStart, token);
-        const char conversion = *token;
+        const auto widthStart = token;
+        while (character(token) >= '0' && character(token) <= '9') ++token;
+        std::optional<unsigned> fieldWidth;
+        if (token != widthStart) {
+            unsigned width = 0;
+            if (std::from_chars(pattern.data() + widthStart, pattern.data() + token, width).ec != std::errc{} || width == 0 || width > INT_MAX) {
+                reportError("Invalid scan field width"); return;
+            }
+            fieldWidth = width;
+        }
+        normalized.append(pattern.substr(start, token - start));
+        const auto lengthStart = token;
+        while (character(token) != '\0' && std::string_view("hljztLwI").find(character(token)) != std::string_view::npos) if (character(token++) == 'I') while (character(token) >= '0' && character(token) <= '9') ++token;
+        const auto length = pattern.substr(lengthStart, token - lengthStart);
+        const auto conversion = character(token);
         if (conversion == '\0') { reportError("Incomplete scan format"); return; }
         if (!suppressed && output >= count) { reportError("Too few scan destinations"); return; }
-        if (std::strchr("cCsS[", conversion) != nullptr) {
-            const char* conversionStart = token;
+        if (std::string_view("cCsS[").find(conversion) != std::string_view::npos) {
+            if (!length.empty() && length != "h" && length != "l" && length != "w") { reportError("Invalid scan text modifier"); return; }
+            const auto conversionStart = token;
             if (conversion == '[') {
-                if (token[1] == '^') ++token;
-                if (token[1] == ']') ++token;
-                do { ++token; } while (*token != '\0' && *token != ']');
-                if (*token == '\0') { reportError("Incomplete scan character set"); return; }
+                if (character(token + 1) == '^') ++token;
+                if (character(token + 1) == ']') ++token;
+                do { ++token; } while (character(token) != '\0' && character(token) != ']');
+                if (character(token) == '\0') { reportError("Incomplete scan character set"); return; }
             }
             normalized.append(length);
-            normalized.append(conversionStart, token + 1);
+            normalized.append(pattern.substr(conversionStart, token + 1 - conversionStart));
             if (!suppressed) {
                 const auto& reference = references[output];
-                std::size_t bytes = 0;
-                if (reference.begin != 0 && reference.base >= reference.begin && reference.base <= reference.end) bytes = std::size_t(reference.end) - reference.base + 1;
-                else if (reference.begin == 0 && active_process != nullptr && reference.base < active_process->memory.size()) bytes = active_process->memory.size() - reference.base;
-                if (bytes == 0 || bytes > UINT_MAX) { reportError("Invalid scan destination range"); return; }
-                destinations[output] = memoryAt(reference.base, bytes);
+                const auto bytes = sliceBytes(reference);
                 const bool wide = length != "h" && (length == "l" || length == "w" || conversion == 'C' || conversion == 'S');
-                capacities[output] = static_cast<unsigned>(bytes / (wide ? sizeof(wchar_t) : 1));
-                if (capacities[output] == 0) { reportError("Invalid scan destination range"); return; }
+                const auto count = bytes.size() / (wide ? sizeof(std::uint16_t) : 1u);
+                if (count == 0 || count > UINT_MAX) { reportError("Invalid scan destination range"); return; }
+                capacities[output] = static_cast<unsigned>(count);
+                if (conversion == 'c' || conversion == 'C') characterCounts[output] = fieldWidth.value_or(1u);
+                if (wide) {
+                    SferaBinary::Reader reader(bytes);
+                    std::wstring value(count, L'\0');
+                    for (auto& character : value) character = static_cast<wchar_t>(reader.read<std::uint16_t>());
+                    textOutputs[output] = std::move(value);
+                    destinations[output] = std::get<std::wstring>(textOutputs[output]).data();
+                } else {
+                    textOutputs[output] = SferaText::fromBytes(bytes);
+                    destinations[output] = std::get<std::string>(textOutputs[output]).data();
+                }
             }
-        } else if (std::strchr("diouxXnp", conversion) != nullptr) {
+        } else if (std::string_view("diouxXnp").find(conversion) != std::string_view::npos) {
             // Script integers and addresses remain 32-bit even for native-size scanf modifiers.
             const bool signedValue = conversion == 'd' || conversion == 'i' || conversion == 'n';
             const bool wide = conversion != 'p' && (length == "ll" || length == "I64" || length == "j");
@@ -4018,102 +4103,138 @@ void SferaMbcRuntime::scanText() {
                     else number.template operator()<std::uint32_t>();
                 }
             }
-        } else if (std::strchr("aAeEfFgG", conversion) != nullptr) {
+        } else if (std::string_view("aAeEfFgG").find(conversion) != std::string_view::npos) {
             const bool wide = length == "l" || length == "L";
             if (wide) normalized += 'l';
             normalized += conversion;
             if (!suppressed) { if (wide) number.template operator()<double>(); else number.template operator()<float>(); }
         } else { reportError("Unsupported scan conversion"); return; }
         if (execution_failed) return;
-        if (!suppressed) ++output;
+        if (!suppressed) { normalized += "%n"; ++output; }
     }
     const auto scan = [&]<std::size_t Index>(auto&& self, auto... arguments) -> int {
-        if constexpr (Index == 4) return ::sscanf_s(text, normalized.c_str(), arguments...);
-        else if (capacities[Index] != 0) return self.template operator()<Index + 1>(self, arguments..., destinations[Index], capacities[Index]);
-        else return self.template operator()<Index + 1>(self, arguments..., destinations[Index]);
+        if constexpr (Index == 4) return ::sscanf_s(text.c_str(), normalized.c_str(), arguments...);
+        else if (capacities[Index] != 0) return self.template operator()<Index + 1>(self, arguments..., destinations[Index], capacities[Index], &completed[Index]);
+        else return self.template operator()<Index + 1>(self, arguments..., destinations[Index], &completed[Index]);
     };
     const auto result = scan.template operator()<0>(scan);
-    for (std::size_t index = 0; index < output; ++index) std::visit([&](const auto& value) { if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(value)>, std::monostate>) writeMemory(references[index].base, value); }, numbers[index]);
+    for (std::size_t index = 0; index < output; ++index) {
+        if (completed[index] < 0) continue;
+        std::visit([&](const auto& value) {
+            if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(value)>, std::monostate>) {
+                const auto bytes = sliceBytes(references[index], sizeof(value));
+                std::memcpy(bytes.data(), &value, sizeof(value));
+            }
+        }, numbers[index]);
+        std::visit([&](const auto& value) {
+            using T = std::remove_cvref_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::wstring>) {
+                const auto characters = characterCounts[index];
+                const auto end = characters != 0 ? characters : value.find(typename T::value_type{});
+                if (end > value.size() || (characters == 0 && end == value.size()))
+                    throw std::out_of_range("Invalid scan result length");
+                const auto count = characters != 0 ? end : end + 1;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    const auto bytes = sliceBytes(references[index], count);
+                    if (count != 0) std::memmove(bytes.data(), value.data(), count);
+                } else {
+                    const auto bytes = sliceBytes(references[index], count * sizeof(std::uint16_t));
+                    for (std::size_t character = 0; character < count; ++character)
+                        SferaBinary::writeLittleEndian<std::uint16_t>(bytes.data() + character * sizeof(std::uint16_t), static_cast<std::uint16_t>(value[character]));
+                }
+            }
+        }, textOutputs[index]);
+    }
     pushInteger(static_cast<std::uint32_t>(result));
 }
 
-char* SferaMbcRuntime::nextText(bool allowNull) {
+std::string SferaMbcRuntime::nextText() {
     const auto slice = nextSlice();
-    if (slice.base == 0) { if (!allowNull) reportError("poppointerup(): unexpected NULL-pointer fetched"); return nullptr; }
-    return textAt(slice.base);
+    if (slice.base == 0) { reportError("poppointerup(): unexpected NULL-pointer fetched"); return {}; }
+    return textIn(slice);
 }
 
-void SferaMbcRuntime::pushText(const char* text) {
-    const auto offset = mapMemory(text, text != nullptr ? std::strlen(text) + 1 : 0);
-    pushSlice({offset, text == nullptr ? 0u : offset, text == nullptr ? 0u : offset + static_cast<std::uint32_t>(std::strlen(text))}, SferaMbcValue::BytePointer);
-}
-
-void SferaMbcRuntime::copyText(const SferaSliceReference32& destination, const char* text) {
-    const auto length = std::strlen(text) + 1;
-    if (length > UINT32_MAX || !destination.contains(static_cast<std::uint32_t>(length))) { auto invalid = destination; invalid.diagnoseRange(static_cast<std::uint32_t>(std::min<std::size_t>(length, UINT32_MAX))); return; }
-    std::copy_n(text, length, textAt(destination.base));
+void SferaMbcRuntime::copyText(const SferaSliceReference32& destination, std::string_view text) {
+    const auto length = text.size() + 1;
+    if (length > UINT32_MAX || !destination.contains(static_cast<std::uint32_t>(length))) {
+        auto invalid = destination;
+        invalid.diagnoseRange(static_cast<std::uint32_t>(std::min<std::size_t>(length, UINT32_MAX)));
+        return;
+    }
+    auto output = textBuffer(destination);
+    if (length > output.size()) throw std::out_of_range("Script string destination is too small");
+    output.assign(text);
 }
 
 void SferaMbcRuntime::parseText() {
     const auto operation = nextInteger();
     if (operation < 0 || operation > 7) { reportError("ffparse(). Invalid parsing type"); return; }
-    char* destination = operation < 2 ? nextText() : nullptr;
-    const char* cursor = nextText();
-    const char* limit = nextText(true);
+    const auto destination = operation < 2 ? nextSlice() : SferaSliceReference32{};
+    const auto source = nextSlice();
+    const auto limit = nextSlice();
     if (execution_failed) return;
-    const char* result = reinterpret_cast<const char*>(process_memory_base);
-    const auto digit = [](unsigned char value) { return value >= '0' && value <= '9'; };
-    const auto letter = [](unsigned char value) { return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') || value == '_'; };
-    const auto space = [](unsigned char value) { return value == ' ' || value == '\t'; };
-    if (cursor != limit) {
+    if (source.base == 0 || (operation < 2 && destination.base == 0)) { reportError("poppointerup(): unexpected NULL-pointer fetched"); return; }
+    const auto text = textIn(source);
+    const auto end = limit.base != 0 && limit.base >= source.base ? std::min<std::size_t>(text.size(), limit.base - source.base) : text.size();
+    std::size_t cursor = 0;
+    std::optional<std::size_t> result;
+    const auto digit = [](std::uint8_t value) { return value >= '0' && value <= '9'; };
+    const auto letter = [](std::uint8_t value) { return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') || value == '_'; };
+    const auto space = [](std::uint8_t value) { return value == ' ' || value == '\t'; };
+    if (cursor < end) {
         if (operation < 2) {
-            const bool negative = *cursor == '-';
+            const bool negative = text[cursor] == '-';
             if (negative) ++cursor;
-            if (cursor != limit && digit(*cursor)) {
+            if (cursor < end && digit(text[cursor])) {
+                if (!destination.contains(sizeof(std::uint32_t))) { auto invalid = destination; invalid.diagnoseRange(sizeof(std::uint32_t)); return; }
                 if (operation == 0) {
                     std::uint32_t value = 0;
-                    do { value = value * 10u + static_cast<unsigned char>(*cursor++) - '0'; } while (cursor != limit && digit(*cursor));
-                    if (negative) value = 0u - value;
-                    std::memcpy(destination, &value, sizeof(value));
+                    do { value = value * 10u + static_cast<std::uint8_t>(text[cursor++]) - '0'; } while (cursor < end && digit(text[cursor]));
+                    writeMemory(destination.base, negative ? 0u - value : value);
                 } else {
                     float value = 0.0f;
-                    do { value = double(value) * 10.0 + (*cursor++ - '0'); } while (cursor != limit && digit(*cursor));
-                    if (cursor != limit && *cursor == '.') {
+                    do { value = double(value) * 10.0 + (text[cursor++] - '0'); } while (cursor < end && digit(text[cursor]));
+                    if (cursor < end && text[cursor] == '.') {
                         ++cursor;
                         float scale = 0.1f;
-                        while (cursor != limit && digit(*cursor)) { value = double(*cursor++ - '0') * scale + value; scale = double(scale) / 10.0; }
+                        while (cursor < end && digit(text[cursor])) { value = double(text[cursor++] - '0') * scale + value; scale = double(scale) / 10.0; }
                     }
-                    if (negative) value = -value;
-                    std::memcpy(destination, &value, sizeof(value));
+                    writeMemory(destination.base, negative ? -value : value);
                 }
                 result = cursor;
             }
-        } else if (operation == 2 && static_cast<unsigned char>(*cursor) > ' ') {
-            do { ++cursor; } while (cursor != limit && static_cast<unsigned char>(*cursor) > ' ');
+        } else if (operation == 2 && static_cast<std::uint8_t>(text[cursor]) > ' ') {
+            do { ++cursor; } while (cursor < end && static_cast<std::uint8_t>(text[cursor]) > ' ');
             result = cursor;
-        } else if (operation == 3 && *cursor == '"') {
+        } else if (operation == 3 && text[cursor] == '"') {
             ++cursor;
-            while (cursor != limit && *cursor != '\0' && *cursor != '\r' && *cursor != '\n' && *cursor != '"') ++cursor;
-            if (cursor != limit && *cursor == '"') result = cursor + 1;
-        } else if (operation == 4 && letter(*cursor)) {
-            do { ++cursor; } while (cursor != limit && (letter(*cursor) || digit(*cursor)));
+            while (cursor < end && text[cursor] != '\r' && text[cursor] != '\n' && text[cursor] != '"') ++cursor;
+            if (cursor < end && text[cursor] == '"') result = cursor + 1;
+        } else if (operation == 4 && letter(text[cursor])) {
+            do { ++cursor; } while (cursor < end && (letter(text[cursor]) || digit(text[cursor])));
             result = cursor;
-        } else if (operation == 5 && space(*cursor)) {
-            do { ++cursor; } while (cursor != limit && space(*cursor));
+        } else if (operation == 5 && space(text[cursor])) {
+            do { ++cursor; } while (cursor < end && space(text[cursor]));
             result = cursor;
         } else if (operation >= 6) {
-            while (cursor != limit && (operation == 6 ? space(*cursor) : *cursor != '\0' && *cursor != '\r' && *cursor != '\n')) ++cursor;
-            if (cursor != limit && *cursor == '\r') { ++cursor; if (cursor != limit && *cursor == '\n') result = cursor + 1; }
+            while (cursor < end && (operation == 6 ? space(text[cursor]) : text[cursor] != '\r' && text[cursor] != '\n')) ++cursor;
+            if (cursor < end && text[cursor] == '\r') { ++cursor; if (cursor < end && text[cursor] == '\n') result = cursor + 1; }
         }
     }
-    pushText(result);
+    if (!result) pushSlice({}, SferaMbcValue::BytePointer);
+    else {
+        // Return an address in the original script region, never in the decoded text copy.
+        const auto remaining = text.size() - *result;
+        const auto address = mapMemory(memoryAt(source.base, text.size() + 1) + *result, remaining + 1);
+        pushSlice({address, address, address + static_cast<std::uint32_t>(remaining)}, SferaMbcValue::BytePointer);
+    }
 }
 
 void SferaMbcRuntime::chatUtility() {
     const auto operation = nextInteger();
     if (operation < 0 || operation > 4) { reportError("ffchat_utility(). Invalid Chat utility function type"); return; }
     std::string input{}, output{}, plain{};
-    const auto* source = nextText();
+    const auto source = nextText();
     if (execution_failed) return;
     input.assign(source);
     if (operation == 0) {
@@ -4123,12 +4244,12 @@ void SferaMbcRuntime::chatUtility() {
         const auto destination = nextSlice();
         if (execution_failed) return;
         output = SphereUI::HyperTextParser::buildLink(input, target, caption);
-        copyText(destination, output.data());
+        copyText(destination, output);
     } else if (operation == 1) {
         const auto destination = nextSlice();
         if (execution_failed) return;
         output = SphereUI::HyperTextParser::plainText(input);
-        copyText(destination, output.data());
+        copyText(destination, output);
     } else {
         std::uint32_t first = 0, last = 0;
         if (operation == 4) { first = nextInteger(); last = nextInteger(); }
@@ -4140,8 +4261,8 @@ void SferaMbcRuntime::chatUtility() {
         else if (operation == 3) success = SphereUI::HyperTextParser::removePlayerPrefix(input, &output, &plain);
         else success = SphereUI::HyperTextParser::eraseRange(input, first, last, &output, &plain);
         if (!success) { pushInteger(UINT32_MAX); return; }
-        if (plainDestination.base != 0) copyText(plainDestination, plain.data());
-        if (markupDestination.base != 0) copyText(markupDestination, output.data());
+        if (plainDestination.base != 0) copyText(plainDestination, plain);
+        if (markupDestination.base != 0) copyText(markupDestination, output);
     }
     pushInteger(0);
 }
@@ -4160,36 +4281,16 @@ struct MbcScrollParameters32 {
 static_assert(sizeof(MbcScrollParameters32) == 28u);
 static_assert(sizeof(SphereUI::ScrollParameters) == sizeof(MbcScrollParameters32));
 
-struct MbcUiRect32 {
-    std::int32_t left;
-    std::int32_t top;
-    std::int32_t right;
-    std::int32_t bottom;
-};
-struct MbcImageDescriptionParameters32 {
-    char texture_name[64];
-    std::int32_t width;
-    std::int32_t height;
-    MbcUiRect32 rectangle;
-    std::uint32_t flags;
-};
-struct MbcImageDescription32 {
-    char name[64];
-    MbcImageDescriptionParameters32 image;
-};
-static_assert(sizeof(MbcImageDescription32) == 156u);
-static_assert(sizeof(SphereUI::ImageDescription) == sizeof(MbcImageDescription32));
-
 class MbcUiMessageCodec {
     SferaMbcRuntime& runtime_;
     std::uint32_t flags_;
 
-    static std::string_view cString(const char* text) {
-        return text == nullptr ? std::string_view{} : std::string_view{text};
+    std::string text(std::uint32_t address) const {
+        return address == 0u ? std::string{} : runtime_.textAt(address);
     }
 
-    std::string_view text(std::uint32_t address) const {
-        return address == 0u ? std::string_view{} : cString(runtime_.textAt(address));
+    std::optional<std::string> optionalText(std::uint32_t address) const {
+        return address == 0u ? std::nullopt : std::optional<std::string>{text(address)};
     }
 
     std::span<std::uint8_t> bytes(std::uint32_t address, std::size_t size) const {
@@ -4235,9 +4336,7 @@ class MbcUiMessageCodec {
         auto destination = runtime_.memoryRange(address);
         const auto capacity = std::min(destination.size(), explicit_capacity);
         if (capacity == 0u) return;
-        const auto count = std::min({value.size(), content_limit, capacity - 1u});
-        if (count != 0u) std::memcpy(destination.data(), value.data(), count);
-        destination[count] = 0u;
+        SferaText::Buffer(destination.first(capacity)).write(value.substr(0, content_limit));
     }
 
     SphereUI::ToolTipCtrl* tooltip(SphereUI::Window* window) const {
@@ -4250,16 +4349,19 @@ class MbcUiMessageCodec {
     }
 
     SphereUI::ImageDescription imageDescription(std::uint32_t address) const {
-        const auto wire = read<MbcImageDescription32>(address);
         SphereUI::ImageDescription result{};
-        std::memcpy(result.name, wire.name, sizeof(result.name));
-        std::memcpy(result.image.texture_name, wire.image.texture_name, sizeof(result.image.texture_name));
-        result.name[sizeof(result.name) - 1u] = '\0';
-        result.image.texture_name[sizeof(result.image.texture_name) - 1u] = '\0';
-        result.image.width = wire.image.width;
-        result.image.height = wire.image.height;
-        result.image.rectangle = {wire.image.rectangle.left, wire.image.rectangle.top, wire.image.rectangle.right, wire.image.rectangle.bottom};
-        result.image.flags = wire.image.flags;
+        if (address == 0u) return result;
+        SferaBinary::Reader reader(bytes(address, 156u));
+        // The on-wire names have 64 bytes; the final byte has always been reserved for NUL.
+        result.name = SferaText::prefix(reader.take(64u), 63u);
+        result.image.texture_name = SferaText::prefix(reader.take(64u), 63u);
+        result.image.width = reader.read<std::int32_t>();
+        result.image.height = reader.read<std::int32_t>();
+        result.image.rectangle.left = reader.read<std::int32_t>();
+        result.image.rectangle.top = reader.read<std::int32_t>();
+        result.image.rectangle.right = reader.read<std::int32_t>();
+        result.image.rectangle.bottom = reader.read<std::int32_t>();
+        result.image.flags = reader.read<std::uint32_t>();
         return result;
     }
 
@@ -4270,7 +4372,7 @@ public:
         using SphereUI::UiMessage;
 
         if (message == UiMessage::showHelpPage) {
-            g_sfera_interface.showHelpPage(first == 0u ? nullptr : runtime_.textAt(first));
+            g_sfera_interface.showHelpPage(optionalText(first));
             return 1u;
         }
         if (message == UiMessage::beginModal) {
@@ -4355,13 +4457,13 @@ public:
                 if (const auto* control = dynamic_cast<const SphereUI::ListItemCtrl*>(window)) writeSize(first, control->items.size());
                 return 1u;
             case UiMessage::setTooltipLine:
-                if (auto* control = tooltip(window)) control->setLine(first, second == 0u ? nullptr : runtime_.textAt(second));
+                if (auto* control = tooltip(window)) control->setLine(first, optionalText(second));
                 return 1u;
             case UiMessage::getTooltipLine:
                 if (const auto* control = tooltip(window); control != nullptr && second < control->lines.size()) writeText(first, control->lines.at(second));
                 return 1u;
             case UiMessage::appendTooltipLine:
-                if (auto* control = tooltip(window)) control->appendLine(first == 0u ? nullptr : runtime_.textAt(first));
+                if (auto* control = tooltip(window)) control->appendLine(text(first));
                 return 1u;
             case UiMessage::getProgressRange:
                 if (const auto* control = dynamic_cast<const SphereUI::ProgressBar*>(window)) { write(first, static_cast<std::int32_t>(control->minimum)); write(second, static_cast<std::int32_t>(control->maximum)); }
@@ -4404,23 +4506,23 @@ public:
                 if (const auto* control = dynamic_cast<const SphereUI::SpinButton*>(window)) write(first, static_cast<std::int32_t>(control->current));
                 return 1u;
             case UiMessage::appendMenuItem:
-                if (auto* control = dynamic_cast<SphereUI::CMenuListControl*>(window)) control->addItem(first == 0u ? nullptr : runtime_.textAt(first), second != 0u);
+                if (auto* control = dynamic_cast<SphereUI::CMenuListControl*>(window)) control->addItem(text(first), second != 0u);
                 return 1u;
             case UiMessage::setMenuItemText:
-                if (auto* control = dynamic_cast<SphereUI::CMenuListControl*>(window); control != nullptr && first < control->items.size()) control->items.at(first).text.assign(second == 0u ? "" : runtime_.textAt(second));
+                if (auto* control = dynamic_cast<SphereUI::CMenuListControl*>(window); control != nullptr && first < control->items.size()) control->items.at(first).text.assign(second == 0u ? std::string_view{} : runtime_.textAt(second));
                 return 1u;
             case UiMessage::setSlotItem:
-                if (auto* control = dynamic_cast<SphereUI::SlotCtrl*>(window)) control->setItem(first == 0u ? nullptr : runtime_.textAt(first));
+                if (auto* control = dynamic_cast<SphereUI::SlotCtrl*>(window)) control->setItem(optionalText(first));
                 return 1u;
             case UiMessage::setSlotDescription:
-                if (auto* control = dynamic_cast<SphereUI::SlotCtrl*>(window)) control->description.assign(first == 0u ? "" : runtime_.textAt(first));
+                if (auto* control = dynamic_cast<SphereUI::SlotCtrl*>(window)) control->description.assign(first == 0u ? std::string_view{} : runtime_.textAt(first));
                 return 1u;
             case UiMessage::setSlotTopLeftOverlay:
             case UiMessage::setSlotBottomRightOverlay:
             case UiMessage::setSlotBottomLeftOverlay:
                 if (auto* control = dynamic_cast<SphereUI::SlotCtrl*>(window)) {
                     auto& target = message == UiMessage::setSlotTopLeftOverlay ? control->top_left_overlay : message == UiMessage::setSlotBottomRightOverlay ? control->bottom_right_overlay : control->bottom_left_overlay;
-                    control->setOverlay(target, first == 0u ? nullptr : runtime_.textAt(first));
+                    control->setOverlay(target, optionalText(first));
                 }
                 return 1u;
             case UiMessage::setRichEditContent:
@@ -4430,7 +4532,7 @@ public:
                 if (const auto* control = dynamic_cast<const SphereUI::RichEditCtrl*>(window); control != nullptr && first != 0u && second != 0u) {
                     auto destination = runtime_.memoryRange(first);
                     const auto capacity = std::min<std::size_t>(destination.size(), second);
-                    control->copyContent(std::span<char>(reinterpret_cast<char*>(destination.data()), capacity));
+                    SferaText::Buffer(destination.first(capacity)).write(control->content(capacity == 0 ? 0 : capacity - 1));
                 }
                 return 1u;
             case UiMessage::loadHyperTextPage:
@@ -4439,7 +4541,7 @@ public:
             case UiMessage::loadHyperTextBuffer:
                 if (auto* control = dynamic_cast<SphereUI::HyperTextCtrl*>(window); control != nullptr && first != 0u && second != 0u) {
                     const auto source = bytes(first, second);
-                    control->queueBuffer(std::string_view(reinterpret_cast<const char*>(source.data()), source.size()));
+                    control->queueBuffer(SferaText::fromBytes(source));
                 }
                 return 1u;
             case UiMessage::appendChatMessage:
@@ -4496,8 +4598,9 @@ void SferaMbcRuntime::windowCommand() {
     const auto operation = static_cast<WindowOperation>(nextInteger());
     std::array<std::int32_t, 6> arguments{};
     const auto read = [this, &arguments](std::size_t count) { for (std::size_t index = 0; index < count; ++index) arguments[index] = nextInteger(); return !execution_failed; };
-    const auto inputText = [this](std::int32_t offset) { return textAt(static_cast<std::uint32_t>(offset)); };
-    const auto warnNull = [operation](std::int32_t offset, std::uint32_t argument) { if (offset == 0) { char message[128]; std::snprintf(message, sizeof(message), "NULL-pointer dereferencing: window, command %u, argument %u\n", static_cast<std::uint32_t>(operation), argument); WorldDiagnostics::warning(message); } };
+    const auto inputText = [this](std::int32_t offset) { return offset == 0 ? std::string{} : textAt(static_cast<std::uint32_t>(offset)); };
+    const auto optionalInputText = [&inputText](std::int32_t offset) -> std::optional<std::string> { return offset == 0 ? std::nullopt : std::optional<std::string>{inputText(offset)}; };
+    const auto warnNull = [operation](std::int32_t offset, std::uint32_t argument) { if (offset == 0) { std::string message; message = std::format("NULL-pointer dereferencing: window, command {}, argument {}\n", static_cast<std::uint32_t>(operation), argument); WorldDiagnostics::warning(message); } };
     switch (operation) {
         case WindowOperation::Create: {
             if (!read(6)) return;
@@ -4590,8 +4693,8 @@ void SferaMbcRuntime::windowCommand() {
                 if (auto* cursor = g_sfera_interface.cursor.get()) { cursor->setImage(2, inputText(arguments[0]), 8, 32); cursor->setImageSize(2, 16, 16); }
                 break;
             }
-            g_sfera_interface.setCursorImage(arguments[0] != 0 ? inputText(arguments[0]) : nullptr, arguments[0] != 0 ? positioned ? arguments[1] : 8 : 0, arguments[0] != 0 ? positioned ? arguments[2] : 16 : 0);
-            if (auto* cursor = g_sfera_interface.cursor.get()) cursor->setImage(2, nullptr, 0, 0);
+            g_sfera_interface.setCursorImage(optionalInputText(arguments[0]), arguments[0] != 0 ? positioned ? arguments[1] : 8 : 0, arguments[0] != 0 ? positioned ? arguments[2] : 16 : 0);
+            if (auto* cursor = g_sfera_interface.cursor.get()) cursor->setImage(2, std::nullopt, 0, 0);
             break;
         }
         case WindowOperation::CursorText:
@@ -4687,14 +4790,14 @@ void SferaMbcRuntime::windowCommand() {
             {
                 const auto size = static_cast<std::size_t>(static_cast<std::uint32_t>(arguments[1]));
                 const auto* data = memoryAt(static_cast<std::uint32_t>(arguments[0]), size);
-                g_sfera_interface.readSavedPositions(std::span<const std::byte>(reinterpret_cast<const std::byte*>(data), size));
+                g_sfera_interface.readSavedPositions(std::as_bytes(std::span(data, size)));
             }
             break;
         case WindowOperation::WriteSavedPositions: {
             if (!read(1)) return;
             const auto size = g_sfera_interface.savedPositionsSize();
             if (!std::in_range<std::uint32_t>(size)) { reportError("Saved window positions exceed the MBC buffer limit"); break; }
-            g_sfera_interface.writeSavedPositions(std::span<std::byte>(reinterpret_cast<std::byte*>(memoryAt(static_cast<std::uint32_t>(arguments[0]), size)), size));
+            g_sfera_interface.writeSavedPositions(std::as_writable_bytes(std::span(memoryAt(static_cast<std::uint32_t>(arguments[0]), size), size)));
             break;
         }
         case WindowOperation::Position: case WindowOperation::Size: {
@@ -4711,7 +4814,7 @@ void SferaMbcRuntime::windowCommand() {
             break;
         case WindowOperation::Tooltip:
             if (!read(1)) return;
-            g_sfera_interface.setTooltipText(arguments[0] == 0 ? nullptr : inputText(arguments[0]));
+            g_sfera_interface.setTooltipText(optionalInputText(arguments[0]));
             break;
         case WindowOperation::Options:
             if (!SferaClientApplication::resources_loaded) { pushInteger(0); return; }
@@ -4804,15 +4907,15 @@ SferaNetworkStatistics SferaTcpConnectionContext::statistics() const {
     return statistics_;
 }
 
-bool SferaTcpConnectionContext::acceptPacket(std::span<const std::uint8_t> packet, std::stop_token stop) {
-    const auto header = SferaTcpIncomingHeader::decode(packet.data());
+bool SferaTcpConnectionContext::acceptPacket(std::string_view packet, std::stop_token stop) {
+    const auto header = SferaTcpIncomingHeader::decode(std::as_bytes(std::span(packet)));
     switch (static_cast<TcpMessage>(header.message)) {
     case TcpMessage::connection_limit:
         fail();
         return false;
     case TcpMessage::handshake: {
         if (packet.size() < SferaTcpHandshakePacket::encodedSize) { fail(); return false; }
-        const auto handshake = SferaTcpHandshakePacket::decode(packet.data());
+        const auto handshake = SferaTcpHandshakePacket::decode(std::as_bytes(std::span(packet)));
         if (handshake.remote_id == 0) { fail(); return false; }
         {
             std::lock_guard lock(send_mutex_);
@@ -4857,9 +4960,8 @@ bool SferaTcpConnectionContext::acceptPacket(std::span<const std::uint8_t> packe
 
 void SferaTcpConnectionContext::receive(std::stop_token stop) noexcept {
     try {
-        std::vector<std::uint8_t> bytes;
+        std::string bytes;
         bytes.reserve(kTcpReceiveBufferCapacity);
-        std::array<std::uint8_t, 8192> chunk{};
         std::size_t first = 0;
         auto stats_tick = WorldClock::milliseconds();
         const auto handshake_started = stats_tick;
@@ -4874,27 +4976,29 @@ void SferaTcpConnectionContext::receive(std::stop_token stop) noexcept {
             if (selected > 0) {
                 const auto available = kTcpReceiveBufferCapacity - (bytes.size() - first);
                 if (available == 0) { fail(); break; }
-                const int count = ::recv(socket_.value, reinterpret_cast<char*>(chunk.data()),
-                    static_cast<int>(std::min(available, chunk.size())), 0);
+                const auto requested = std::min<std::size_t>(available, 8192u);
+                if (bytes.size() + requested > kTcpReceiveBufferCapacity && first != 0) {
+                    bytes.erase(0, first);
+                    first = 0;
+                }
+                const auto previous_size = bytes.size();
+                bytes.resize(previous_size + requested);
+                const int count = ::recv(socket_.value, bytes.data() + previous_size, static_cast<int>(requested), 0);
+                const int error = count == SOCKET_ERROR ? ::WSAGetLastError() : 0;
+                bytes.resize(previous_size + (count > 0 ? static_cast<std::size_t>(count) : 0u));
                 if (count == 0) { if (!stop.stop_requested()) fail(); break; }
                 if (count == SOCKET_ERROR) {
-                    const auto error = ::WSAGetLastError();
                     if (error != WSAEWOULDBLOCK && error != WSAEINTR) { if (!stop.stop_requested()) fail(); break; }
                 } else {
-                    // Compact only when appending would exceed the reserved buffer.
-                    if (bytes.size() + static_cast<std::size_t>(count) > kTcpReceiveBufferCapacity && first != 0) {
-                        bytes.erase(bytes.begin(), bytes.begin() + static_cast<std::ptrdiff_t>(first));
-                        first = 0;
-                    }
-                    bytes.insert(bytes.end(), chunk.begin(), chunk.begin() + count);
-                    { std::lock_guard lock(statistics_mutex_); received_bytes_window_ += static_cast<std::uint32_t>(count); }
+                    std::lock_guard lock(statistics_mutex_);
+                    received_bytes_window_ += static_cast<std::uint32_t>(count);
                 }
             }
             while (bytes.size() - first >= SferaTcpIncomingHeader::encodedSize) {
-                const auto header = SferaTcpIncomingHeader::decode(bytes.data() + first);
+                const auto header = SferaTcpIncomingHeader::decode(std::as_bytes(std::span(bytes)).subspan(first));
                 if (header.size < SferaTcpIncomingHeader::encodedSize || header.size > kTcpReceiveBufferCapacity) { fail(); break; }
                 if (bytes.size() - first < header.size) break;
-                if (!acceptPacket(std::span<const std::uint8_t>(bytes).subspan(first, header.size), stop)) break;
+                if (!acceptPacket(std::string_view(bytes).substr(first, header.size), stop)) break;
                 first += header.size;
             }
             if (first == bytes.size()) { bytes.clear(); first = 0; }
@@ -4980,9 +5084,10 @@ void SferaTcpConnectionContext::sendPending() noexcept {
         std::lock_guard lock(send_mutex_);
         while (connected_ && !outgoing_.empty()) {
             const auto& packet = outgoing_.front();
+            if (outgoing_offset_ > packet.size()) throw std::out_of_range("Invalid outgoing packet offset");
             const auto remaining = packet.size() - outgoing_offset_;
-            const int sent = ::send(socket_.value, reinterpret_cast<const char*>(packet.data() + outgoing_offset_),
-                static_cast<int>(remaining), 0);
+            if (remaining == 0) { fail(); return; }
+            const int sent = ::send(socket_.value, packet.data() + outgoing_offset_, static_cast<int>(remaining), 0);
             if (sent == SOCKET_ERROR) {
                 const auto error = ::WSAGetLastError();
                 if (error != WSAEWOULDBLOCK && error != WSAEINTR) fail();
@@ -5005,15 +5110,16 @@ bool SferaTcpConnectionContext::queuePacket(std::uint32_t payloadSize, TcpMessag
             payloadSize + SferaTcpOutgoingHeader::encodedSize > sendCapacity - outgoing_bytes_ ||
             (payloadSize != 0 && payload == nullptr)) { fail(); return false; }
         const auto packet_size = payloadSize + SferaTcpOutgoingHeader::encodedSize;
-        std::vector<std::uint8_t> packet(packet_size);
+        std::string packet(packet_size, '\0');
+        const auto wire = std::as_writable_bytes(std::span(packet));
         const auto next_sequence = static_cast<std::uint16_t>(sequence_ + std::rand() % 4 + 1);
         SferaTcpOutgoingHeader{static_cast<std::uint16_t>(packet_size), 0u, next_sequence,
-            static_cast<std::uint16_t>(message)}.encode(packet.data());
+            static_cast<std::uint16_t>(message)}.encode(wire);
         if (payloadSize != 0) std::memcpy(packet.data() + SferaTcpOutgoingHeader::encodedSize, payload, payloadSize);
         std::uint16_t checksum = 0;
         for (std::size_t i = SferaTcpOutgoingHeader::checksumPayloadOffset; i < packet.size(); ++i)
-            checksum = static_cast<std::uint16_t>(checksum + std::bit_cast<std::int8_t>(packet[i]));
-        SferaBinary::writeLittleEndian(packet.data() + SferaTcpOutgoingHeader::checksumOffset,
+            checksum = static_cast<std::uint16_t>(checksum + std::bit_cast<std::int8_t>(wire[i]));
+        SferaBinary::writeLittleEndian(wire.data() + SferaTcpOutgoingHeader::checksumOffset,
             static_cast<std::uint16_t>(checksum_seed_ ^ checksum));
         outgoing_.push_back(std::move(packet));
         outgoing_bytes_ += packet_size;
@@ -5186,7 +5292,7 @@ void SferaMbcRuntime::sendRegion(int slotIndex, std::uint32_t region, std::uint3
     auto payload = std::span<std::uint8_t>(reliable ? slot.reliable_payload : slot.unreliable_payload, sizeof(slot.reliable_payload));
     const auto captureOrigin = [this, &slot]() {
         SferaVec3F position;
-        std::memcpy(&position, memoryAt(active_process->field_084), sizeof(position));
+        std::memcpy(&position, memoryAt(active_process->field_084, sizeof(position)), sizeof(position));
         slot.origin[0] = SferaMbcValue::truncate(position.x); slot.origin[1] = SferaMbcValue::truncate(position.y); slot.origin[2] = SferaMbcValue::truncate(position.z);
     };
     if (!reliable && bitCount == 0) captureOrigin();
@@ -5233,57 +5339,55 @@ void SferaMbcRuntime::sendRegion(int slotIndex, std::uint32_t region, std::uint3
 }
 
 bool SferaMbcModuleImage::read(std::span<const std::uint8_t> data, bool linking) {
-    const auto take = [&data](std::size_t size) { if (size > data.size()) throw std::out_of_range("Truncated MBC module"); const auto result = data.first(size); data = data.subspan(size); return result; };
-    const auto value = [&take]<class T>() { return SferaBinary::readLittleEndian<T>(take(sizeof(T)).data()); };
-    const auto name = [&take, &data](auto& destination) { const auto end = std::find(data.begin(), data.end(), std::uint8_t{}); const std::size_t size = end - data.begin(); if (end == data.end() || size >= std::size(destination)) throw std::out_of_range("Invalid MBC name"); const auto bytes = take(size + 1); std::copy(bytes.begin(), bytes.end(), destination); };
+    SferaBinary::Reader reader(data);
     try {
-        const auto signature = take(16);
+        const auto signature = reader.take(16);
         const auto version = (int(signature[12]) - '0') * 10 + int(signature[14]) - '0';
-        value.operator()<std::uint32_t>(); // Reserved header word remains part of the encoded image.
-        module_tag = value.operator()<std::uint32_t>();
-        const auto codeSize = value.operator()<std::uint32_t>();
-        const auto memorySize = value.operator()<std::uint32_t>();
+        reader.read<std::uint32_t>(); // Reserved header word remains part of the encoded image.
+        module_tag = reader.read<std::uint32_t>();
+        const auto codeSize = reader.read<std::uint32_t>();
+        const auto memorySize = reader.read<std::uint32_t>();
         if (module_tag >= 4096 || codeSize > UINT32_MAX - 2) return false;
-        bytecode = take(codeSize);
-        memory = take(memorySize);
-        const auto programCount = value.operator()<std::uint32_t>();
-        if (programCount > 32766 || programCount > data.size() / 15) return false;
+        bytecode = reader.take(codeSize);
+        memory = reader.take(memorySize);
+        const auto programCount = reader.read<std::uint32_t>();
+        if (programCount > 32766 || programCount > reader.remaining() / 15) return false;
         programs.assign(programCount, {});
         for (auto& program : programs) {
-            name(program.name);
-            program.entry_offset = value.operator()<std::uint32_t>();
-            program.stop_offset = value.operator()<std::uint32_t>();
-            program.state = value.operator()<std::int8_t>();
-            program.priority = value.operator()<std::uint8_t>();
-            (void)value.operator()<std::uint32_t>(); // Reserved local-memory word in the module format.
+            program.name = reader.readTerminated(32u);
+            program.entry_offset = reader.read<std::uint32_t>();
+            program.stop_offset = reader.read<std::uint32_t>();
+            program.state = reader.read<std::int8_t>();
+            program.priority = reader.read<std::uint8_t>();
+            (void)reader.read<std::uint32_t>(); // Reserved local-memory word in the module format.
             program.instruction_offset = program.entry_offset;
             program.caller_program = -1;
             if (program.priority >= 4) return false;
         }
-        const auto functionCount = value.operator()<std::uint32_t>();
-        if (functionCount > 65535 || functionCount > data.size() / 13) return false;
+        const auto functionCount = reader.read<std::uint32_t>();
+        if (functionCount > 65535 || functionCount > reader.remaining() / 13) return false;
         functions.assign(functionCount, {});
         for (auto& function : functions) {
-            name(function.name);
-            function.entry_offset = value.operator()<std::uint32_t>();
-            function.program_index = value.operator()<int>();
-            function.allow_reentry = value.operator()<std::uint32_t>() != 0;
+            function.name = reader.readTerminated(32u);
+            function.entry_offset = reader.read<std::uint32_t>();
+            function.program_index = reader.read<int>();
+            function.allow_reentry = reader.read<std::uint32_t>() != 0;
         }
         // Older modules store only the first 30 function slots.
         function_map.fill(UINT16_MAX);
-        const auto mapBytes = take((version <= 22 ? 30 : function_map.size()) * sizeof(std::uint16_t));
+        const auto mapBytes = reader.take((version <= 22 ? 30 : function_map.size()) * sizeof(std::uint16_t));
         for (std::size_t index = 0; index < mapBytes.size() / sizeof(std::uint16_t); ++index) function_map[index] = SferaBinary::readLittleEndian<std::uint16_t>(mapBytes.data() + index * sizeof(std::uint16_t));
-        region_definitions = take(value.operator()<std::uint32_t>());
-        position_memory_offset = value.operator()<std::uint32_t>();
-        take(2 * sizeof(std::uint32_t)); // Reserved exports; consume without storing runtime mirrors.
+        region_definitions = reader.take(reader.read<std::uint32_t>());
+        position_memory_offset = reader.read<std::uint32_t>();
+        reader.take(2 * sizeof(std::uint32_t)); // Reserved exports; consume without storing runtime mirrors.
         if (linking) for (auto& table : relocations) {
-            const auto count = value.operator()<std::uint32_t>();
-            if (count > data.size() / sizeof(std::uint32_t)) return false;
+            const auto count = reader.read<std::uint32_t>();
+            if (count > reader.remaining() / sizeof(std::uint32_t)) return false;
             table.resize(count);
-            for (auto& offset : table) offset = value.operator()<std::uint32_t>();
+            for (auto& offset : table) offset = reader.read<std::uint32_t>();
         }
         return true;
-    } catch (const std::out_of_range&) { return false; }
+    } catch (const SferaBinary::ReadError&) { return false; }
 }
 
 void SferaMbcProcessRecord::readRegions(std::span<const std::uint8_t> definitions, std::uint32_t firstProgram) {
@@ -5311,18 +5415,16 @@ void SferaMbcProcessRecord::readRegions(std::span<const std::uint8_t> definition
 }
 
 std::uint32_t SferaMbcRuntime::loadProcess(std::string_view name, std::uint32_t requestedIndex) {
-    text_buffer[0] = 0;
+    text_buffer.clear();
     if (name.starts_with('@')) {
         const auto end = name.find('@', 1);
         if (end == std::string_view::npos) return UINT32_MAX;
-        std::size_t used = 0;
-        for (const char character : name.substr(1, end - 1)) {
+        for (const auto character : name.substr(1, end - 1)) {
             const auto needed = character == ';' ? 2u : 1u;
-            if (needed >= sizeof(text_buffer) - used) return UINT32_MAX;
-            if (character == ';') { text_buffer[used++] = '\r'; text_buffer[used++] = '\n'; }
-            else text_buffer[used++] = character == '\'' ? '"' : character;
+            if (needed >= text_capacity - text_buffer.size()) return UINT32_MAX;
+            if (character == ';') text_buffer += "\r\n";
+            else text_buffer.push_back(character == '\'' ? '"' : character);
         }
-        text_buffer[used] = 0;
         name.remove_prefix(end + 1);
     }
     if (name.size() >= 32 || !quick_files) return UINT32_MAX;
@@ -5345,8 +5447,7 @@ std::uint32_t SferaMbcRuntime::loadProcess(std::string_view name, std::uint32_t 
     SferaMbcProcessRecord replacement{};
     replacement.linked_modules.fill(0);
     replacement.linked_modules.front() = file->module_id;
-    std::copy(name.begin(), name.end(), replacement.name);
-    replacement.name[name.size()] = '\0';
+    replacement.name = name;
     replacement.module_tag = module.module_tag;
     replacement.bytecode = findBytecode(replacement.linked_modules, static_cast<std::uint32_t>(module.memory.size()));
     if (!replacement.bytecode) {
@@ -5394,7 +5495,7 @@ std::uint32_t SferaMbcRuntime::linkProcess(std::string_view name) {
     if (process.chain_prev_index < 0 || !process.bytecode) return UINT32_MAX;
     auto modules = process.linked_modules;
     const auto freeModule = std::find(modules.begin(), modules.end(), std::uint16_t{});
-    if (freeModule == modules.end()) { reportError("Cannot link a process - increase MAX_LINKED_PRCS! Linked prc: ", filename.c_str()); return UINT32_MAX; }
+    if (freeModule == modules.end()) { reportError("Cannot link a process - increase MAX_LINKED_PRCS! Linked prc: ", filename); return UINT32_MAX; }
     const auto codeOffset = process.codeSize();
     if (process.memory.size() > mappedAddressBegin - 4u) return UINT32_MAX;
     const auto memoryOffset = static_cast<std::uint32_t>((process.memory.size() + 3u) & ~std::size_t{3});
@@ -5456,7 +5557,7 @@ std::uint32_t SferaMbcRuntime::linkProcess(std::string_view name) {
                 if (declaration.program_index != -1) continue;
                 for (auto target = targetFirst; target < targetLast; ++target) {
                     const auto& implementation = functions[target];
-                    if (implementation.program_index == -1 || std::strcmp(declaration.name, implementation.name) != 0) continue;
+                    if (implementation.program_index == -1 || declaration.name != implementation.name) continue;
                     if (declaration.entry_offset <= writable->size() && writable->size() - declaration.entry_offset >= 5) {
                         auto* instruction = writable->data() + declaration.entry_offset;
                         *instruction = 'G';
@@ -5738,34 +5839,39 @@ void SferaTcpConnectionContext::shutdown() noexcept {
     keepalive_started_at_ = 0; keepalive_answered_ = false;
 }
 
-int SferaTcpConnectionContext::initialize(const char* hostname, std::uint16_t port) {
+int SferaTcpConnectionContext::initialize(const std::string& hostname, std::uint16_t port) {
     shutdown();
-    if (hostname == nullptr || *hostname == '\0' || !winsock_.start()) return -1;
+    if (hostname.empty() || !winsock_.start()) return -1;
     try {
         socket_.reset(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
         if (socket_.value == INVALID_SOCKET) { shutdown(); return -1; }
         const int no_delay = 1;
-        (void)::setsockopt(socket_.value, IPPROTO_TCP, TCP_NODELAY,
-            reinterpret_cast<const char*>(&no_delay), sizeof(no_delay));
+        std::string option(sizeof(no_delay), '\0');
+        std::memcpy(option.data(), &no_delay, sizeof(no_delay));
+        (void)::setsockopt(socket_.value, IPPROTO_TCP, TCP_NODELAY, option.data(), static_cast<int>(option.size()));
         addrinfo hints{};
         hints.ai_family = AF_INET; hints.ai_socktype = SOCK_STREAM; hints.ai_protocol = IPPROTO_TCP;
+        hints.ai_flags = AI_NUMERICSERV;
+        const auto service = std::to_string(port);
         addrinfo* raw = nullptr;
-        const auto status = ::getaddrinfo(hostname, nullptr, &hints, &raw);
+        const auto status = ::getaddrinfo(hostname.c_str(), service.c_str(), &hints, &raw);
         std::unique_ptr<addrinfo, decltype(&::freeaddrinfo)> resolved(raw, &::freeaddrinfo);
-        if (status != 0 || !resolved) { shutdown(); return -1; }
-        auto address = *reinterpret_cast<const sockaddr_in*>(resolved->ai_addr);
-        address.sin_port = ::htons(port);
+        if (status != 0 || !resolved || !std::in_range<int>(resolved->ai_addrlen)) { shutdown(); return -1; }
         // Bounded connect, then all worker send/recv calls remain nonblocking.
         u_long nonblocking = 1;
         if (::ioctlsocket(socket_.value, FIONBIO, &nonblocking) != 0) { shutdown(); return -1; }
-        if (::connect(socket_.value, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
+        if (::connect(socket_.value, resolved->ai_addr, static_cast<int>(resolved->ai_addrlen)) != 0) {
             if (::WSAGetLastError() != WSAEWOULDBLOCK) { shutdown(); return -1; }
             fd_set writable{}, failed{};
             FD_SET(socket_.value, &writable); FD_SET(socket_.value, &failed);
             timeval timeout{15, 0};
             if (::select(0, nullptr, &writable, &failed, &timeout) <= 0 || FD_ISSET(socket_.value, &failed)) { shutdown(); return -1; }
-            int error = 0, size = sizeof(error);
-            if (::getsockopt(socket_.value, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &size) != 0 || error != 0) { shutdown(); return -1; }
+            int size = static_cast<int>(option.size());
+            if (::getsockopt(socket_.value, SOL_SOCKET, SO_ERROR, option.data(), &size) != 0 ||
+                size != static_cast<int>(sizeof(int))) { shutdown(); return -1; }
+            int error = 0;
+            std::memcpy(&error, option.data(), sizeof(error));
+            if (error != 0) { shutdown(); return -1; }
         }
         connected_ = true;
         workers_[0] = std::jthread([this](std::stop_token stop) { receive(stop); });
@@ -5777,11 +5883,11 @@ int SferaTcpConnectionContext::initialize(const char* hostname, std::uint16_t po
 
 SferaNetworkRuntime::~SferaNetworkRuntime() { connection.reset(); }
 
-int SferaNetworkRuntime::initialize(const char* hostname, std::uint32_t mode) {
+int SferaNetworkRuntime::initialize(const std::string& hostname, std::uint32_t mode) {
     if (connection_lost) shutdown();
     const auto result = initialization_result.load();
     if (std::bit_cast<std::int32_t>(result) >= 0) return static_cast<int>(result);
-    if (hostname == nullptr) return 0;
+    if (hostname.empty()) return 0;
     shutdown();
     client_mode = mode;
     connection_lost = false;
@@ -5857,7 +5963,7 @@ std::uint32_t SferaGameCalendar::advance(std::uint32_t calendar) {
     return withComponent(calendar, Year, component(calendar, Year) + 1);
 }
 
-int SferaFileManager::transformEnvelope(const char* destination, const char* source, bool compress) {
+int SferaFileManager::transformEnvelope(const std::string& destination, const std::string& source, bool compress) {
     struct ReportingScope {
         SferaFileManager& owner;
         bool previous;
@@ -5884,7 +5990,7 @@ int SferaFileManager::transformEnvelope(const char* destination, const char* sou
             if (SferaZStream32::decompressEnvelope(transformed.data(), size, input) != 0) return -1;
             output = std::span<const std::uint8_t>(transformed.data(), size);
         }
-        ::_chmod(destination, _S_IREAD | _S_IWRITE);
+        ::_chmod(destination.c_str(), _S_IREAD | _S_IWRITE);
         ScopedFile outputFile(*this, create(destination)); if (outputFile.get() < 0) return -1;
         const auto written = write(outputFile.get(), output.data(), output.size());
         if (haveTimes) { __utimbuf64 times{information.st_mtime, information.st_mtime}; ::_futime64(outputFile.get(), &times); }
@@ -5894,34 +6000,34 @@ int SferaFileManager::transformEnvelope(const char* destination, const char* sou
     return transform();
 }
 
-std::string SferaMbcRuntime::formatArguments(const char* pattern, std::size_t limit) {
-    using Argument = std::variant<int, double, const char*>;
+std::string SferaMbcRuntime::formatArguments(std::string_view pattern, std::size_t limit) {
+    using Argument = std::variant<int, double, SferaSliceReference32>;
     std::vector<Argument> arguments;
     while (argument_count > 0) {
         if (argument_cursor >= argument_end) { reportError("Too few parameters"); break; }
         const auto& argument = g_sfera_mbc_runtime.values[argument_cursor];
-        if (argument.isPointer()) { arguments.emplace_back(argument.value.base == 0 ? nullptr : textAt(argument.value.base)); ++argument_cursor; }
+        if (argument.isPointer()) { arguments.emplace_back(argument.value); ++argument_cursor; }
         else if (argument.type == SferaMbcValue::Byte || argument.type == SferaMbcValue::Integer) arguments.emplace_back(nextInteger());
         else arguments.emplace_back(static_cast<double>(nextReal()));
         --argument_count;
     }
     ++value_stack_size;
-    if (execution_failed || pattern == nullptr) return {};
+    if (execution_failed) return {};
     std::string result; std::size_t next = 0;
     const auto invalid = [&]() { reportError("Invalid format arguments"); };
     const auto word = [&]() -> std::uint32_t {
         if (next >= arguments.size()) { invalid(); return 0; }
         const auto& value = arguments[next++];
         if (const auto* integer = std::get_if<int>(&value)) return static_cast<std::uint32_t>(*integer);
-        if (const auto* pointer = std::get_if<const char*>(&value)) return mapMemory(*pointer, 1);
+        if (const auto* pointer = std::get_if<SferaSliceReference32>(&value)) return pointer->base;
         invalid(); return 0;
     };
-    const auto pointer = [&]() -> const void* {
-        if (next >= arguments.size()) { invalid(); return nullptr; }
+    const auto pointer = [&]() -> SferaSliceReference32 {
+        if (next >= arguments.size()) { invalid(); return {}; }
         const auto& value = arguments[next++];
-        if (const auto* text = std::get_if<const char*>(&value)) return *text;
-        if (const auto* integer = std::get_if<int>(&value)) return *integer == 0 ? nullptr : memoryAt(static_cast<std::uint32_t>(*integer));
-        invalid(); return nullptr;
+        if (const auto* slice = std::get_if<SferaSliceReference32>(&value)) return *slice;
+        if (const auto* integer = std::get_if<int>(&value)) return {static_cast<std::uint32_t>(*integer), 0, 0};
+        invalid(); return {};
     };
     const auto append = [&](const std::string& specifier, auto value) {
         const auto required = std::snprintf(nullptr, 0, specifier.c_str(), value);
@@ -5931,44 +6037,75 @@ std::string SferaMbcRuntime::formatArguments(const char* pattern, std::size_t li
         const auto offset = result.size(); result.resize(offset + count + 1);
         std::snprintf(result.data() + offset, count + 1, specifier.c_str(), value); result.resize(offset + count);
     };
-    for (const char* cursor = pattern; *cursor != '\0' && !execution_failed;) {
-        if (*cursor != '%') { if (result.size() < limit) result.push_back(*cursor); ++cursor; continue; }
+    const auto characterAt = [&](std::size_t position) { return position < pattern.size() ? pattern[position] : '\0'; };
+    for (std::size_t cursor = 0; cursor < pattern.size() && !execution_failed;) {
+        if (characterAt(cursor) != '%') { if (result.size() < limit) result.push_back(characterAt(cursor)); ++cursor; continue; }
         ++cursor;
-        if (*cursor == '%') { if (result.size() < limit) result.push_back('%'); ++cursor; continue; }
+        if (characterAt(cursor) == '%') { if (result.size() < limit) result.push_back('%'); ++cursor; continue; }
         std::string specifier = "%";
-        while (*cursor != '\0' && std::strchr("-+ #0", *cursor) != nullptr) specifier.push_back(*cursor++);
-        if (*cursor == '*') {
+        while (characterAt(cursor) != '\0' && std::string_view("-+ #0").find(characterAt(cursor)) != std::string_view::npos) specifier.push_back(characterAt(cursor++));
+        if (characterAt(cursor) == '*') {
             ++cursor; const int width = word(); if (width < 0) specifier.push_back('-');
             specifier += std::to_string(width < 0 ? -static_cast<std::int64_t>(width) : width);
-        } else while (*cursor >= '0' && *cursor <= '9') specifier.push_back(*cursor++);
-        if (*cursor == '.') {
+        } else while (characterAt(cursor) >= '0' && characterAt(cursor) <= '9') specifier.push_back(characterAt(cursor++));
+        std::optional<std::size_t> precision;
+        if (characterAt(cursor) == '.') {
             ++cursor;
-            if (*cursor == '*') { ++cursor; const int precision = word(); if (precision >= 0) specifier += "." + std::to_string(precision); }
-            else { specifier.push_back('.'); while (*cursor >= '0' && *cursor <= '9') specifier.push_back(*cursor++); }
+            if (characterAt(cursor) == '*') {
+                ++cursor;
+                const int value = word();
+                if (value >= 0) { precision = static_cast<std::size_t>(value); specifier += "." + std::to_string(value); }
+            } else {
+                specifier.push_back('.');
+                const auto first = cursor;
+                while (characterAt(cursor) >= '0' && characterAt(cursor) <= '9') specifier.push_back(characterAt(cursor++));
+                std::size_t value = 0;
+                if (cursor != first && std::from_chars(pattern.data() + first, pattern.data() + cursor, value).ec != std::errc{}) { invalid(); break; }
+                precision = value;
+            }
         }
         std::string length;
-        if (*cursor == 'h' || *cursor == 'l') { length.push_back(*cursor++); if (*cursor == length.front()) length.push_back(*cursor++); }
-        else if (*cursor == 'I') { ++cursor; if (cursor[0] == '6' && cursor[1] == '4') { length = "ll"; cursor += 2; } else if (cursor[0] == '3' && cursor[1] == '2') cursor += 2; }
-        else if (*cursor != '\0' && std::strchr("jztLw", *cursor) != nullptr) length.push_back(*cursor++);
-        if (*cursor == '\0') { invalid(); break; }
-        const auto conversion = *cursor++;
-        if (std::strchr("diuoxX", conversion) != nullptr) {
+        if (characterAt(cursor) == 'h' || characterAt(cursor) == 'l') { length.push_back(characterAt(cursor++)); if (characterAt(cursor) == length.front()) length.push_back(characterAt(cursor++)); }
+        else if (characterAt(cursor) == 'I') { ++cursor; if (characterAt(cursor) == '6' && characterAt(cursor + 1) == '4') { length = "ll"; cursor += 2; } else if (characterAt(cursor) == '3' && characterAt(cursor + 1) == '2') cursor += 2; }
+        else if (characterAt(cursor) != '\0' && std::string_view("jztLw").find(characterAt(cursor)) != std::string_view::npos) length.push_back(characterAt(cursor++));
+        if (characterAt(cursor) == '\0') { invalid(); break; }
+        const auto conversion = characterAt(cursor++);
+        if (std::string_view("diuoxX").find(conversion) != std::string_view::npos) {
             const bool wide = length == "ll" || length == "j";
             const auto low = word(); const auto bits = wide ? std::uint64_t(low) | (std::uint64_t(word()) << 32) : low;
             if (execution_failed) break;
             if (wide) { specifier += "ll"; specifier.push_back(conversion); if (conversion == 'd' || conversion == 'i') append(specifier, static_cast<long long>(std::bit_cast<std::int64_t>(bits))); else append(specifier, static_cast<unsigned long long>(bits)); }
             else { if (length == "h" || length == "hh") specifier += length; specifier.push_back(conversion); if (conversion == 'd' || conversion == 'i') append(specifier, static_cast<int>(low)); else append(specifier, low); }
-        } else if (std::strchr("aAeEfFgG", conversion) != nullptr) {
+        } else if (std::string_view("aAeEfFgG").find(conversion) != std::string_view::npos) {
             if (next >= arguments.size() || !std::holds_alternative<double>(arguments[next])) { invalid(); break; }
             specifier.push_back(conversion); append(specifier, std::get<double>(arguments[next++]));
         } else if (conversion == 's' || conversion == 'S') {
-            const auto* string = static_cast<const char*>(pointer()); if (execution_failed) break;
-            if (length == "l" || length == "w" || (conversion == 'S' && length != "h")) { specifier += "ls"; append(specifier, reinterpret_cast<const wchar_t*>(string)); }
-            else { specifier.push_back('s'); append(specifier, string); }
+            const auto reference = pointer();
+            const auto address = reference.base;
+            if (execution_failed) break;
+            if (length == "l" || length == "w" || (conversion == 'S' && length != "h")) {
+                specifier += "ls";
+                std::wstring value;
+                if (address != 0) {
+                    const auto bytes = memoryRange(reference.base);
+                    SferaBinary::Reader reader(bytes);
+                    while (!precision || value.size() < *precision) {
+                        const auto character = reader.read<std::uint16_t>();
+                        if (character == 0) break;
+                        value.push_back(static_cast<wchar_t>(character));
+                    }
+                } else value = L"(null)";
+                append(specifier, value.c_str());
+            } else {
+                specifier.push_back('s');
+                const auto text = address != 0 ? (precision ? textIn(reference, *precision) : textIn(reference)) : std::string("(null)");
+                // textIn checked either the terminator or the same precision passed to the CRT.
+                append(specifier, text.empty() ? "" : text.data());
+            }
         } else if (conversion == 'c' || conversion == 'C') {
             if (length == "l" || length == "w" || (conversion == 'C' && length != "h")) specifier.push_back('l');
-            specifier.push_back('c'); const auto character = word(); if (!execution_failed) append(specifier, character);
-        } else if (conversion == 'p') { specifier.push_back('p'); const auto* address = pointer(); if (!execution_failed) append(specifier, address); }
+            specifier.push_back('c'); const auto character = word(); if (!execution_failed) append(specifier, static_cast<int>(character));
+        } else if (conversion == 'p') { specifier.push_back('p'); const auto address = word(); if (!execution_failed) append(specifier, address != 0 ? static_cast<const void*>(memoryAt(address, 1)) : nullptr); }
         else invalid();
     }
     return result;
@@ -5977,14 +6114,22 @@ std::string SferaMbcRuntime::formatArguments(const char* pattern, std::size_t li
 void SferaMbcRuntime::formatText(bool bounded) {
     const std::uint32_t required = bounded ? 3 : 2;
     if (argument_count < static_cast<int>(required)) { reportError(bounded ? "Wrong number of parameters: ffsnprintf" : "Wrong number of parameters: ffsprintf"); return; }
-    const std::uint32_t destination = nextInteger(); const auto capacity = bounded ? static_cast<std::uint32_t>(nextInteger()) : UINT32_MAX; const auto pattern = nextInteger();
+    const auto destination = nextAddress();
+    const auto capacity = bounded ? static_cast<std::uint32_t>(nextInteger()) : UINT32_MAX;
+    const auto pattern = nextAddress();
     if (execution_failed) return;
     argument_count -= required;
-    const auto value = formatArguments(textAt(pattern), capacity == 0 ? 0 : capacity - 1);
-    if (execution_failed || capacity == 0) return;
-    auto* output = textAt(destination);
-    std::copy_n(value.c_str(), value.size() + 1, output);
-    if (bounded) output[capacity - 1] = '\0';
+    std::optional<SferaText::Buffer> output;
+    std::size_t limit = 0;
+    if (capacity != 0) {
+        output.emplace(textBufferAt(destination.base));
+        if (bounded && capacity > output->size()) throw std::out_of_range("Formatted script string exceeds destination");
+        limit = bounded ? capacity - 1 : output->size();
+    }
+    const auto value = formatArguments(textIn(pattern), limit);
+    if (execution_failed || !output) return;
+    if (bounded) output->writeBounded(value, capacity);
+    else output->assign(value);
 }
 
 void SferaMbcRuntime::writeFormattedLog(bool named) {
@@ -6000,14 +6145,14 @@ void SferaMbcRuntime::writeFormattedLog(bool named) {
     }
     const auto patternOffset = nextInteger();
     --argument_count;
-    const auto* pattern = textAt(patternOffset);
+    const auto pattern = textAt(patternOffset);
     if (execution_failed) return;
     (void)formatArguments(pattern, named ? std::numeric_limits<std::size_t>::max() : 4095u);
 }
 
 void SferaMbcRuntime::systemCommand() {
     const auto operation = nextInteger();
-    const auto address = [this](const char* name) { const std::uint32_t offset = nextInteger(); if (offset == 0) ::OutputDebugStringA((std::string("NULL-pointer dereferencing: ffsys, ") + name + "\n").c_str()); return offset; };
+    const auto address = [this](std::string_view name) { const std::uint32_t offset = nextInteger(); if (offset == 0) ::OutputDebugStringA(std::format("NULL-pointer dereferencing: ffsys, {}\n", name).c_str()); return offset; };
     const auto text = [this](std::uint32_t offset) { return textAt(offset); };
     const auto selectedObject = [this]() -> WorldObject* { const auto handle = nextInteger(); if (handle < 0) return nullptr; auto* object = g_sfera_world_objects.object(handle, "GetObjectPointer"); g_sfera_mbc_runtime.current_object = object; if (object == nullptr) active_tag = UINT32_MAX; return object; };
     switch (operation) {
@@ -6026,7 +6171,12 @@ void SferaMbcRuntime::systemCommand() {
             return;
         }
         case 2: g_sfera_graphics_runtime.environment_factor = nextReal(); return;
-        case 4: g_sfera_world_objects.controlled_object_handle = nextInteger(); if (execution_failed) g_sfera_world_objects.controlled_object_handle = UINT32_MAX; return;
+        case 4: {
+            const auto handle = nextInteger();
+            // A script can bind a handle before its object is recreated during a transition.
+            g_sfera_world_objects.controlled_object_handle = execution_failed ? UINT32_MAX : static_cast<std::uint32_t>(handle);
+            return;
+        }
         case 5: g_sfera_mbc_runtime.game_calendar = nextInteger(); return;
         case 6: pushInteger(g_sfera_mbc_runtime.game_calendar); return;
         case 7: {
@@ -6042,7 +6192,7 @@ void SferaMbcRuntime::systemCommand() {
         case 9: pushInteger(SferaGameCalendar::component(g_sfera_mbc_runtime.game_calendar, nextInteger())); return;
         case 10: if (selectedObject() != nullptr) { nextInteger(); nextInteger(); nextInteger(); } return;
         case 11: { const auto value = nextInteger(); if (value < 0) pushInteger(g_sfera_direct_input_runtime.text_filter); else g_sfera_direct_input_runtime.text_filter = value; return; }
-        case 12: { const auto destination = address("G_ERRMSG"); if (!execution_failed) std::copy_n(diagnostic_context, std::strlen(diagnostic_context) + 1, text(destination)); return; }
+        case 12: { const auto destination = address("G_ERRMSG"); if (!execution_failed) copyText({destination, 0, 0}, diagnostic_context); return; }
         case 14: pushInteger(g_sfera_direct_input_runtime.text_filter == 0 && g_sfera_direct_input_runtime.binding_capture == 0 && !g_sfera_interface.options.binding_dialog_open); return;
         case 18: {
             const auto object = nextInteger(); const auto handle = nextInteger(); if (execution_failed) return;
@@ -6055,7 +6205,7 @@ void SferaMbcRuntime::systemCommand() {
         }
         case 19: case 20: {
             const auto patternOrHandle = nextInteger(); const auto destination = address(operation == 19 ? "FINDFIRST" : "FINDNEXT"); if (execution_failed) return;
-            const auto result = operation == 19 ? ::_findfirst64i32(text(patternOrHandle), &script_find_data) : ::_findnext64i32(nativeResource<std::intptr_t>(static_cast<std::uint32_t>(patternOrHandle)), &script_find_data);
+            const auto result = operation == 19 ? ::_findfirst64i32(text(patternOrHandle).data(), &script_find_data) : ::_findnext64i32(nativeResource<std::intptr_t>(static_cast<std::uint32_t>(patternOrHandle)), &script_find_data);
             std::uint32_t value = UINT32_MAX;
             if (result != -1) {
                 if (operation == 19) {
@@ -6068,8 +6218,8 @@ void SferaMbcRuntime::systemCommand() {
                         throw;
                     }
                 } else value = static_cast<std::uint32_t>(result);
-                std::copy_n(script_find_data.name, std::strlen(script_find_data.name) + 1, text(destination));
-            } else *text(destination) = '\0';
+                copyText({destination, 0, 0}, script_find_data.name);
+            } else copyText({destination, 0, 0}, {});
             pushInteger(value); return;
         }
         case 21: { const auto handle = nextInteger(); if (!execution_failed) { const auto search = nativeResource<std::intptr_t>(static_cast<std::uint32_t>(handle)); if (search != -1) { ::_findclose(search); forgetNativeResource(search); } active_process->unregisterResource(handle, ResourceKind::fileSearch); } return; }
@@ -6093,7 +6243,7 @@ void SferaMbcRuntime::systemCommand() {
             SferaCursorPosition position{}; CCursorManager::instance().activeCursor()->getPosition(&position); writeMemory(x, static_cast<float>(position.x)); writeMemory(y, static_cast<float>(position.y)); return;
         }
         case 34: case 37: pushInteger(g_sfera_direct_input_runtime.mouse.buttons & (operation == 34 ? 1 : 2)); return;
-        case 35: { const auto cursor = nextInteger(); const auto mask = nextInteger(); if (execution_failed) return; if (cursor) SferaText::copyString(g_sfera_interface.default_cursor_name, text(cursor), sizeof(g_sfera_interface.default_cursor_name)); SphereRender::SceneRenderer::visible_character_parts = mask; return; }
+        case 35: { const auto cursor = nextInteger(); const auto mask = nextInteger(); if (execution_failed) return; if (cursor) g_sfera_interface.default_cursor_name = text(cursor); SphereRender::SceneRenderer::visible_character_parts = mask; return; }
         case 36: { const auto destination = address("G_CURSDIR"); if (execution_failed) return; float distance = 0; SferaVec3F direction{}; g_sfera_motion.pick(&distance, &direction); writeMemory(destination, direction); return; }
         case 39: { const float x = nextReal(); const float y = nextReal(); if (!execution_failed) CCursorManager::instance().activeCursor()->setPosition(static_cast<int>(x), static_cast<int>(y)); return; }
         case 41: { const auto value = nextInteger(); if (!execution_failed) g_sfera_motion.orientation_blocked = value; return; }
@@ -6123,7 +6273,7 @@ void SferaMbcRuntime::systemCommand() {
                 case 4: pushInteger(local.tm_wday); return;
                 case 5: pushInteger(local.tm_min); return;
                 case 7: pushInteger(static_cast<std::uint32_t>(WorldClock::nowTicks())); return;
-                case 8: { auto* value = reinterpret_cast<tm*>(nextText()); if (value != nullptr) pushInteger(static_cast<std::uint32_t>(::_mktime64(value))); return; }
+                case 8: { const auto source = nextSlice(); if (source.base != 0 && !execution_failed) { auto value = readMemory<tm>(source.base); pushInteger(static_cast<std::uint32_t>(::_mktime64(&value))); writeMemory(source.base, value); } return; }
                 case 9: { const auto first = static_cast<__time64_t>(nextInteger()); const auto second = static_cast<__time64_t>(nextInteger()); pushInteger(static_cast<int>(::_difftime64(first, second))); return; }
                 default: pushInteger(static_cast<std::uint32_t>(timestamp)); return;
             }
@@ -6133,9 +6283,9 @@ void SferaMbcRuntime::systemCommand() {
         case 60: pushInteger(SferaClientApplication::server_number); return;
         case 61: active_process->flags |= SferaMbcProcessRecord::markedForUnload; return;
         case 63: nextInteger(); nextReal(); return;
-        case 64: { const auto track = address("PLAY_MUSIC"); if (!execution_failed) g_sfera_sound_runtime.requestTrack(track != 0 && *text(track) != '\0' ? text(track) : nullptr); return; }
+        case 64: { const auto track = address("PLAY_MUSIC"); if (!execution_failed) g_sfera_sound_runtime.requestTrack(track != 0 && !text(track).empty() ? std::optional<std::string_view>{text(track)} : std::nullopt); return; }
         case 65: g_sfera_world_objects.contours->rebuildServerWall(); return;
-        case 66: case 67: { const auto destination = address(operation == 66 ? "GZ_PACK, 1" : "GZ_UNPACK, 1"); const auto source = address(operation == 66 ? "GZ_PACK, 2" : "GZ_UNPACK, 2"); if (!execution_failed) pushInteger(g_sfera_files.transformEnvelope(text(destination), text(source), operation == 66)); return; }
+        case 66: case 67: { const auto destination = address(operation == 66 ? "GZ_PACK, 1" : "GZ_UNPACK, 1"); const auto source = address(operation == 66 ? "GZ_PACK, 2" : "GZ_UNPACK, 2"); if (!execution_failed) pushInteger(g_sfera_files.transformEnvelope(std::string(text(destination)), std::string(text(source)), operation == 66)); return; }
         case 68: case 69: nextInteger(); return;
         case 70: { nextInteger(); const auto x = nextInteger(); const auto y = nextInteger(); if (!execution_failed) { if (x != 0) writeMemory(x, std::uint8_t{}); if (y != 0) writeMemory(y, std::uint8_t{}); } return; }
         case 71: nextInteger(); nextInteger(); return;
@@ -6170,7 +6320,25 @@ void SferaMbcRuntime::systemCommand() {
         case 86: pushInteger(101); return;
         case 87: { const auto server = nextInteger(); const float x = nextReal(); const float y = nextReal(); if (!execution_failed) pushInteger(g_sfera_world_objects.contours->nearServer(x, y, server)); return; }
         case 88: { const float x = nextReal(); const float y = nextReal(); if (!execution_failed) pushInteger(g_sfera_world_objects.contours->serverAt(x, y)); return; }
-        case 89: { const auto ids = nextInteger(); const auto types = nextInteger(); const auto count = nextInteger(); g_sfera_world_objects.contours->setServerMap(reinterpret_cast<const int*>(text(ids)), reinterpret_cast<const int*>(text(types)), count); return; }
+        case 89: {
+            const auto ids = nextAddress();
+            const auto types = nextAddress();
+            const auto count = nextInteger();
+            if (execution_failed) return;
+            if (count <= 0 || static_cast<std::size_t>(count) > SIZE_MAX / sizeof(std::int32_t)) {
+                reportError("Invalid server map size"); return;
+            }
+            const auto readArray = [&](const SferaSliceReference32& reference) {
+                SferaBinary::Reader reader(memoryBytes(reference.base, static_cast<std::size_t>(count) * sizeof(std::int32_t)));
+                std::vector<int> values(static_cast<std::size_t>(count));
+                for (auto& value : values) value = reader.read<std::int32_t>();
+                return values;
+            };
+            const auto identifiers = readArray(ids);
+            const auto serverTypes = readArray(types);
+            if (g_sfera_world_objects.contours != nullptr) g_sfera_world_objects.contours->setServerMap(identifiers, serverTypes);
+            return;
+        }
         case 92:
             reloadQuickFiles();
             return;
@@ -6203,7 +6371,7 @@ void SferaMbcRuntime::systemCommand() {
             if (values[6] > 0) appearance.parts[4] = values[6]; if (values[7] > 0) appearance.parts[5] = values[7];
             models->setAppearance(handle, appearance); return;
         }
-        case 100: { if (SphereRender::SceneRenderer::characters == nullptr) { pushInteger(0); return; } const auto sex = nextInteger(); const auto part = nextInteger(); if (!execution_failed) pushInteger(part == 0 || part == 1 ? SphereRender::CharacterModels::textureVariants(sex != 0, part == 0 ? 'f' : 'r') : part == 2 || part == 3 ? 4 : 0); return; }
+        case 100: { if (SphereRender::SceneRenderer::characters == nullptr) { pushInteger(0); return; } const auto sex = nextInteger(); const auto part = nextInteger(); if (!execution_failed) pushInteger(part == 0 || part == 1 ? SphereRender::CharacterModels::textureVariants(sex != 0, part == 0 ? "f" : "r") : part == 2 || part == 3 ? 4 : 0); return; }
         case 103: { const auto destination = address("G_VERSION"); if (!execution_failed) writeMemory(destination, std::uint32_t{3}); return; }
         case 106: { nextSlice(); nextInteger(); nextInteger(); return; }
         case 107: { const auto enabled = nextInteger() != 0; if (!execution_failed) SphereRender::SceneRenderer::use_default_environment = enabled; return; }
@@ -6220,14 +6388,36 @@ void SferaMbcRuntime::systemCommand() {
         }
         case 111: return;
         case 112: pushInteger(1); return;
-        case 113: { const auto variable = nextInteger(); const auto destination = nextInteger(); if (execution_failed) return; char* value = nullptr; std::size_t length = 0; if (::_dupenv_s(&value, &length, text(variable)) == 0 && value != nullptr) { std::copy_n(value, length, text(destination)); std::free(value); } else *text(destination) = '\0'; return; }
+        case 113: {
+            const auto variable = nextInteger();
+            const auto destination = nextInteger();
+            if (execution_failed) return;
+            const auto name = text(variable);
+            std::string value;
+            std::size_t required = 0;
+            if (::getenv_s(&required, nullptr, 0, name.c_str()) == 0 && required != 0) {
+                for (unsigned attempt = 0; ; ++attempt) {
+                    if (attempt == 8u) throw std::runtime_error("Environment value changed repeatedly while reading");
+                    value.resize(required);
+                    const auto status = ::getenv_s(&required, value.data(), value.size(), name.c_str());
+                    if (status == ERANGE && required > value.size()) continue;
+                    if (status != 0 || required == 0) { value.clear(); break; }
+                    if (required > value.size() || value[required - 1] != '\0')
+                        throw std::out_of_range("Invalid environment value length");
+                    value.resize(required - 1);
+                    break;
+                }
+            }
+            copyText({static_cast<std::uint32_t>(destination), 0, 0}, value);
+            return;
+        }
         case 114: pushInteger(0); return;
         case 115: { const auto name = nextInteger(); if (!execution_failed) pushInteger(g_sfera_textures.find(text(name)) != 0); return; }
         case 116: { const auto name = nextInteger(); if (execution_failed) return; const auto definition = g_sfera_effect_manager.findDefinitionId(text(name)); pushInteger(definition == UINT32_MAX ? 0 : definition); return; }
         case 119: { const auto handle = nextInteger(); auto* object = g_sfera_world_objects.object(handle, "GetObjectPointer"); g_sfera_mbc_runtime.current_object = object; pushInteger(object == nullptr ? UINT32_MAX : 0); return; }
         case 120: { nextInteger(); const std::uint32_t effect = nextInteger(); if (!execution_failed) g_sfera_effect_manager.removeActiveEffect(nativeResource<SferaActiveEffect*>(effect)); return; }
-        case 121: { const auto source = nextInteger(); const auto destination = nextInteger(); if (!execution_failed) { writeMemory(destination, ::_atoi64(text(source))); pushInteger(0); } return; }
-        case 122: { const auto source = nextInteger(); const auto destination = nextInteger(); if (!execution_failed) { const auto value = std::to_string(readMemory<std::uint64_t>(source)); std::copy_n(value.c_str(), value.size() + 1, text(destination)); pushInteger(0); } return; }
+        case 121: { const auto source = nextInteger(); const auto destination = nextInteger(); if (!execution_failed) { writeMemory(destination, ::_atoi64(text(source).data())); pushInteger(0); } return; }
+        case 122: { const auto source = nextInteger(); const auto destination = nextInteger(); if (!execution_failed) { const auto value = std::to_string(readMemory<std::uint64_t>(source)); copyText({static_cast<std::uint32_t>(destination), 0, 0}, value); pushInteger(0); } return; }
         case 123: case 124: case 127: {
             const auto destination = nextInteger(); const std::uint64_t operand = static_cast<std::int64_t>(nextInteger()); if (execution_failed) return;
             auto value = readMemory<std::uint64_t>(destination); value = operation == 123 ? value + operand : operation == 124 ? value - operand : value * operand; writeMemory(destination, value);
@@ -6238,11 +6428,11 @@ void SferaMbcRuntime::systemCommand() {
             const auto first = readMemory<std::int64_t>(firstAddress); const auto second = operation == 125 ? static_cast<std::int64_t>(argument) : readMemory<std::int64_t>(argument); pushInteger(first < second ? UINT32_MAX : first > second ? 1 : 0); return;
         }
         case 126: { const auto source = nextInteger(); const float multiplier = nextReal(); if (!execution_failed) pushInteger(readMemory<std::uint32_t>(source) * static_cast<std::uint32_t>(SferaMbcValue::truncateReal(multiplier))); return; }
-        case 131: { const auto destination = nextInteger(); if (execution_failed) return; SYSTEMTIME time{}; ::GetLocalTime(&time); char date[32]{}; std::snprintf(date, sizeof(date), "%d-%02d-%02d %02d:%02d:%02d", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond); std::copy_n(date, std::strlen(date) + 1, text(destination)); pushInteger(0); return; }
+        case 131: { const auto destination = nextInteger(); if (execution_failed) return; SYSTEMTIME time{}; ::GetLocalTime(&time); std::string date; date = std::format("{}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond); copyText({static_cast<std::uint32_t>(destination), 0, 0}, date); pushInteger(0); return; }
         case 132: nextInteger(); pushInteger(0); return;
         case 133: case 134: case 138: pushInteger(0); return;
-        case 136: { const auto path = nextInteger(); if (execution_failed) return; _finddata64i32_t information{}; const auto handle = ::_findfirst64i32(text(path), &information); if (handle == -1) pushInteger(errno == ENOENT ? 0 : UINT32_MAX); else { ::_findclose(handle); pushInteger((information.attrib & _A_SUBDIR) != 0); } return; }
-        case 140: { const auto name = address("SYS_SET_USER_NAME, 1"); SferaText::copyString(g_sfera_error_log_runtime.user_name, text(name), sizeof(g_sfera_error_log_runtime.user_name)); pushInteger(1); return; }
+        case 136: { const auto path = nextInteger(); if (execution_failed) return; _finddata64i32_t information{}; const auto handle = ::_findfirst64i32(text(path).data(), &information); if (handle == -1) pushInteger(errno == ENOENT ? 0 : UINT32_MAX); else { ::_findclose(handle); pushInteger((information.attrib & _A_SUBDIR) != 0); } return; }
+        case 140: { const auto name = address("SYS_SET_USER_NAME, 1"); g_sfera_error_log_runtime.user_name = text(name).substr(0, 127); pushInteger(1); return; }
         case 150: { g_sfera_network_runtime.connection_lost = nextInteger() != 0; pushInteger(0); return; }
         case 152: g_sfera_interface.initializeResources(); return;
         case 206:
@@ -6258,7 +6448,7 @@ void SferaMbcRuntime::systemCommand() {
         case 220: { const auto message = nextInteger(); if (!execution_failed) pushInteger(SphereUI::ChatFilter::invalidIdentifier(text(message))); return; }
         case 221: g_sfera_interface.ui_enabled = g_sfera_interface.saved_ui_enabled; return;
         case 224: { const auto handle = nextInteger(); if (handle < 0) return; auto* object = SphereRender::CharacterModels::checkedExtended(g_sfera_world_objects.object(handle, "GetObjectPointer")); if (object == nullptr) return; const SferaVec3F velocity{nextReal(), nextReal(), nextReal()}; if (!execution_failed) object->physical_velocity = velocity; return; }
-        case 225: { const __time64_t timestamp = nextInteger(); auto* destination = nextText(); if (destination == nullptr) return; tm local{}; if (::_localtime64_s(&local, &timestamp) == 0) std::memcpy(destination, &local, sizeof(local)); return; }
+        case 225: { const __time64_t timestamp = nextInteger(); const auto destination = nextSlice(); if (destination.base == 0 || execution_failed) return; tm local{}; if (::_localtime64_s(&local, &timestamp) == 0) writeMemory(destination.base, local); return; }
         case 226: pushInteger(::GetTickCount()); return;
         case 227: {
             const auto x = nextInteger(); const auto y = nextInteger(); const auto z = nextInteger(); const auto result = nextInteger(); if (execution_failed) return;
@@ -6267,16 +6457,28 @@ void SferaMbcRuntime::systemCommand() {
             writeMemory(result, length); pushInteger(0); return;
         }
         case 228: { copyText(nextSliceReference(), ""); pushInteger(0); return; }
-        case 229: { const auto source = nextSliceReference(); const auto destination = nextSliceReference(); SferaText::encodeUri(text(destination.base), text(source.base), destination.end - destination.base); pushInteger(0); return; }
+        case 229: { const auto source = nextSliceReference(); const auto destination = nextSliceReference(); const auto capacity = std::min<std::size_t>(textBuffer(destination).size(), destination.end - destination.base); if (capacity != 0) copyText(destination, SferaText::encodeUri(text(source.base), capacity)); pushInteger(0); return; }
         case 230: return;
         case 231: if (!execution_failed) { pushInteger(g_sfera_motion.moved_since_query); g_sfera_motion.moved_since_query = 0; } return;
         case 508: {
-            const auto processIndex = nextInteger(); const auto first = nextInteger(); const auto* pattern = nextText(); auto* output = nextText(true);
-            if (processIndex < 0 || processIndex >= static_cast<int>(std::size(processes)) || processes[processIndex].functions.empty() || pattern == nullptr || first < 0) { pushInteger(UINT32_MAX); return; }
+            const auto processIndex = nextInteger();
+            const auto first = nextInteger();
+            const auto pattern = nextText();
+            const auto output = nextSlice();
+            if (execution_failed || processIndex < 0 || processIndex >= static_cast<int>(std::size(processes)) || processes[processIndex].functions.empty() || first < 0) { pushInteger(UINT32_MAX); return; }
             const auto& process = processes[processIndex];
-            for (std::uint32_t index = first; index < process.functions.size(); ++index) { const auto* name = process.functions[index].name; if (SferaText::matchesWildcard(name, pattern)) { if (output != nullptr) std::copy_n(name, std::strlen(name) + 1, output); pushInteger(index + 1); return; } }
-            if (output != nullptr) *output = '\0'; pushInteger(UINT32_MAX); return;
+            for (std::uint32_t index = first; index < process.functions.size(); ++index) {
+                const auto& name = process.functions[index].name;
+                if (!SferaText::matchesWildcard(name, pattern)) continue;
+                if (output.base != 0) copyText(output, name);
+                pushInteger(index + 1);
+                return;
+            }
+            if (output.base != 0) copyText(output, {});
+            pushInteger(UINT32_MAX);
+            return;
         }
+
         case 509: g_sfera_network_runtime.connection_slot = nextInteger(); return;
         case 510: pushInteger(g_sfera_network_runtime.connection_slot); return;
         default: return;
@@ -6312,6 +6514,7 @@ void SferaMbcRuntime::initialize() {
     std::srand(::timeGetTime());
     g_sfera_player_lists.clear();
     shutdown();
+    first_execution_error.clear();
     final_shutdown = false;
     reloadQuickFiles();
     next_native_handle = 1;
@@ -6323,7 +6526,7 @@ void SferaMbcRuntime::initialize() {
     g_sfera_mbc_runtime.active_world_slot = 400;
     auto& slot = g_sfera_mbc_runtime.world_slots[400]; slot.primary_state = UINT32_MAX; slot.state = 2; slot.object_handle = 1; slot.reliable_bit_count = 0; slot.unreliable_bit_count = 0;
     std::fill(std::begin(slot.reliable_payload), std::end(slot.reliable_payload), 0); std::fill(std::begin(slot.unreliable_payload), std::end(slot.unreliable_payload), 0); slot.reliable_process = UINT32_MAX; slot.unreliable_process = UINT32_MAX;
-    for (auto& module : g_sfera_mbc_runtime.modules) module.name[0] = '\0';
+    for (auto& module : g_sfera_mbc_runtime.modules) module.name.clear();
     _finddata64i32_t file{}; const auto search = ::_findfirst64i32("mbc\\*.mbc", &file);
     if (search != -1) {
         do {
@@ -6333,8 +6536,10 @@ void SferaMbcRuntime::initialize() {
             if (read != sizeof(tag) || tag >= std::size(g_sfera_mbc_runtime.modules)) continue;
             if (tag == 0) ::OutputDebugStringA((std::string("Null tag ") + file.name).c_str());
             auto& name = g_sfera_mbc_runtime.modules[tag].name;
-            SferaText::copyString(name, file.name, sizeof(name));
-            auto* extension = std::strrchr(name, '.'); const auto* separator = std::strrchr(name, '\\'); if (extension != nullptr && (separator == nullptr || extension > separator)) *extension = '\0';
+            name = std::string_view(file.name).substr(0, 31);
+            const auto extension = name.find_last_of('.');
+            const auto separator = name.find_last_of('\\');
+            if (extension != std::string::npos && (separator == std::string::npos || extension > separator)) name.resize(extension);
         } while (::_findnext64i32(search, &file) == 0);
         ::_findclose(search);
     }
@@ -6401,7 +6606,15 @@ void SferaMbcRuntime::tick() {
                                 break;
                             }
                             ++instruction_cursor;
-                            if (!executeInstruction(current_opcode)) reportInvalidInstruction();
+                            try {
+                                if (!executeInstruction(current_opcode)) reportInvalidInstruction();
+                            } catch (const std::out_of_range& error) {
+                                reportError(error.what());
+                            } catch (const std::length_error& error) {
+                                reportError(error.what());
+                            } catch (const SferaBinary::ReadError& error) {
+                                reportError(error.what());
+                            }
                             if (execution_failed) { unload = true; break; }
                         }
                     }
@@ -6462,7 +6675,7 @@ void SferaMbcRuntime::buildRegion() {
         if (elementWidth > 32 || !array.isPointer()) { reportError("Wrong data for 'send' function"); return; }
         const auto elementSize = array.elementSize(); ++argument_cursor;
         if (elementSize > 4) { reportError("Wrong data for 'send' function"); return; }
-        const auto* data = memoryAt(array.value.base);
+        const auto* data = memoryBytes(array.value.base, static_cast<std::size_t>(count) * elementSize).data();
         for (int index = 0; index < count; ++index) { std::uint32_t item = 0; std::memcpy(&item, data, elementSize); data += elementSize; if (!emit(item, static_cast<std::uint8_t>(elementWidth))) return; }
     }
     sendRegion(400, static_cast<std::uint32_t>(region), static_cast<std::uint32_t>(definition.flags));
@@ -6473,21 +6686,25 @@ void SferaClientApplication::configureResourceDirectory() {
     std::filesystem::path root;
     const DWORD required = ::GetEnvironmentVariableW(L"SFERA_CLIENT_ROOT", nullptr, 0);
     if (required != 0) {
-        std::vector<wchar_t> configured(required);
+        std::wstring configured(required, L'\0');
         const DWORD length = ::GetEnvironmentVariableW(L"SFERA_CLIENT_ROOT", configured.data(), required);
         if (length == 0 || length >= required) throw std::runtime_error("Cannot read SFERA_CLIENT_ROOT");
-        root = std::filesystem::absolute(std::filesystem::path(configured.data()));
+        configured.resize(length);
+        root = std::filesystem::absolute(std::filesystem::path(configured));
         if (!containsClient(root)) throw std::runtime_error("SFERA_CLIENT_ROOT does not contain mbc\\_main.mbc");
     } else {
-        std::vector<wchar_t> executable(512);
+        std::wstring executable(512, L'\0');
         for (;;) {
             const DWORD length = ::GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
             if (length == 0) throw std::runtime_error("Cannot determine the client executable path");
-            if (length + 1 < executable.size()) break;
+            if (length + 1 < executable.size()) {
+                executable.resize(length);
+                break;
+            }
             if (executable.size() >= 32768) throw std::length_error("Client executable path is too long");
             executable.resize(std::min<std::size_t>(executable.size() * 2, 32768));
         }
-        const std::array<std::filesystem::path, 2> starts{std::filesystem::current_path(), std::filesystem::path(executable.data()).parent_path()};
+        const std::array<std::filesystem::path, 2> starts{std::filesystem::current_path(), std::filesystem::path(executable).parent_path()};
         for (auto candidate : starts) {
             for (unsigned depth = 0; depth < 12 && !candidate.empty(); ++depth) {
                 if (containsClient(candidate)) { root = candidate; break; }
@@ -6512,24 +6729,26 @@ int SferaClientApplication::run(HINSTANCE instance) {
 
         SferaClientApplication::initializeStorage();
         ::SetThreadAffinityMask(::GetCurrentThread(), 1);
-        const char* arguments = SferaClientApplication::commandLineArguments(::GetCommandLineA());
-        if (std::strstr(arguments, "/15FCE220-0246-58ec-3EH2-968B3072ACF8") != nullptr) {
+        const auto arguments = SferaClientApplication::commandLineArguments(::GetCommandLineA());
+        if (arguments.find("/15FCE220-0246-58ec-3EH2-968B3072ACF8") != std::string_view::npos) {
             ::MessageBoxA(nullptr, "\307\340\357\363\361\352 \357\360\356\350\347\342\356\344\350\362\361\377 \357\360\356\343\360\340\354\354\356\351 Sphere.exe.", "\316\370\350\341\352\340 \347\340\357\363\361\352\340.", MB_ICONERROR);
             SferaClientApplication::releaseStorage();
             return 0;
         }
-        const auto readArgument = [arguments](const char* name, auto& output, std::size_t limit) {
-            std::fill(std::begin(output), std::end(output), '\0');
-            const char* value = std::strstr(arguments, name);
-            if (value == nullptr) return false;
-            value += std::strlen(name);
-            value += std::strspn(value, " \t");
-            const auto length = std::min({std::strcspn(value, " \t"), limit, std::size(output) - 1});
-            std::copy_n(value, length, output);
+        const auto readArgument = [arguments](std::string_view name, std::string& output, std::size_t limit) {
+            output.clear();
+            const auto position = arguments.find(name);
+            if (position == std::string_view::npos) return false;
+            auto value = arguments.substr(position + name.size());
+            const auto first = value.find_first_not_of(" \t");
+            if (first == std::string_view::npos) return true;
+            value.remove_prefix(first);
+            output = value.substr(0, std::min(value.find_first_of(" \t"), limit));
             return true;
         };
+
         readArgument("/locale", SferaClientApplication::locale, 9);
-        for (const char* directory : {".\\logs", ".\\players"}) ::CreateDirectoryA(directory, nullptr);
+        for (const std::string_view directory : {".\\logs", ".\\players"}) ::CreateDirectoryA(directory.data(), nullptr);
         SphereRender::SceneRenderer::buildColorRemap(1.0, static_cast<double>(0.3f));
         SferaClientApplication::instance_handle = instance;
         if (application.initialize()) { resetWorld(); application.runMainLoop(); }
@@ -6559,17 +6778,18 @@ void SferaLogRuntime::initialize() {
     writeTimestamp("**** Start: ");
 }
 
-void SferaLogRuntime::writeTimestamp(const char* prefix) {
+void SferaLogRuntime::writeTimestamp(std::string_view prefix) {
     write(prefix);
     const auto timestamp = ::_time64(nullptr);
     tm local{};
     ::_localtime64_s(&local, &timestamp);
-    char date[128]{};
-    std::strftime(date, sizeof(date), "%A, %d %B %Y", &local);
+    std::string date(128, '\0');
+    date.resize(std::strftime(date.data(), date.size(), "%A, %d %B %Y", &local));
     write(date);
     write("  ");
-    char time[9]{};
-    ::_strtime_s(time, sizeof(time));
+    std::string time(9, '\0');
+    if (::_strtime_s(time.data(), time.size()) != 0) time.clear();
+    else time.resize(time.find('\0'));
     write(time);
     write("\n");
 }
@@ -6577,7 +6797,7 @@ void SferaLogRuntime::writeTimestamp(const char* prefix) {
 bool SferaClientApplication::initialize() {
 
     auto& settings = g_sfera_config_text_runtime;
-    const auto readInteger = [&settings]<class T>(const char* name, T& output) { int value = 0; if (!settings.readInteger(name, value)) return false; output = static_cast<T>(value); return true; };
+    const auto readInteger = [&settings]<class T>(std::string_view name, T& output) { int value = 0; if (!settings.readInteger(name, value)) return false; output = static_cast<T>(value); return true; };
     g_sfera_files.setErrorReporting(true);
     g_sfera_files.addSearchPath("params");
     g_sfera_files.addSearchPath("mbc");
@@ -6588,13 +6808,13 @@ bool SferaClientApplication::initialize() {
     settings.load("config.cfg");
     SferaClientApplication::language = 0;
     readInteger("LANG", SferaClientApplication::language);
-    if (SferaClientApplication::locale[0] != '\0') {
-        constexpr const char* locales[]{"ru", "en", "pt", "it", "de", "es", "fr"};
+    if (!SferaClientApplication::locale.empty()) {
+        constexpr std::string_view locales[]{"ru", "en", "pt", "it", "de", "es", "fr"};
         SferaClientApplication::language = 1;
-        for (std::uint32_t index = 0; index < std::size(locales); ++index) if (std::strncmp(SferaClientApplication::locale, locales[index], 2) == 0) { SferaClientApplication::language = index; break; }
+        for (std::uint32_t index = 0; index < std::size(locales); ++index) if (std::string_view(SferaClientApplication::locale).substr(0, 2) == locales[index]) { SferaClientApplication::language = index; break; }
     }
-    constexpr const char* suffixes[]{"", "_e", "_p", "_i", "_d", "_spa", "_f"};
-    SferaText::copyString(g_sfera_font_runtime.language_suffix, SferaClientApplication::language < std::size(suffixes) ? suffixes[SferaClientApplication::language] : "", sizeof(g_sfera_font_runtime.language_suffix));
+    constexpr std::string_view suffixes[]{"", "_e", "_p", "_i", "_d", "_spa", "_f"};
+    g_sfera_font_runtime.language_suffix = SferaClientApplication::language < std::size(suffixes) ? suffixes[SferaClientApplication::language] : "";
     readInteger("AUTOFOG", g_sfera_graphics_runtime.auto_fog);
     settings.readFloat("FOGDIST", g_sfera_graphics_runtime.fog_distance);
     g_sfera_graphics_runtime.reflection_quality = 2;
@@ -6633,8 +6853,8 @@ bool SferaClientApplication::initialize() {
     readInteger("POSTEFFECTS", g_sfera_graphics_runtime.post_effects_enabled);
     if (g_sfera_graphics_runtime.minimum_lod_distance == 0.0f) g_sfera_graphics_runtime.minimum_lod_distance = 23.0f;
     if (g_sfera_graphics_runtime.lod_distance == 0.0f) g_sfera_graphics_runtime.lod_distance = 20.0f;
-    const std::array<std::pair<const char*, bool*>, 3> landscapes{{{"landscape_hr", &TerrainAssets::high_resolution_assets}, {"landscape_ph", &TerrainAssets::alternate_ph_assets}, {"landscape_rd", &TerrainAssets::alternate_rd_assets}}};
-    for (const auto& [path, enabled] : landscapes) { const DWORD attributes = ::GetFileAttributesA(path); *enabled = attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
+    const std::array<std::pair<std::string_view, bool*>, 3> landscapes{{{"landscape_hr", &TerrainAssets::high_resolution_assets}, {"landscape_ph", &TerrainAssets::alternate_ph_assets}, {"landscape_rd", &TerrainAssets::alternate_rd_assets}}};
+    for (const auto& [path, enabled] : landscapes) { const DWORD attributes = ::GetFileAttributesA(path.data()); *enabled = attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0; }
     GameInterface::createNativeWindow();
     g_sfera_files.addSearchPath("landscape");
     for (const auto& [path, enabled] : landscapes) if (*enabled != 0) g_sfera_files.addSearchPath(path);
@@ -6648,8 +6868,8 @@ bool SferaClientApplication::initialize() {
     ::ShowCursor(TRUE);
     SphereUI::Runtime::setSystemCursorVisible(false);
     for (std::uint32_t index = 0; index < 2; ++index) {
-        char path[64]{};
-        std::snprintf(path, sizeof(path), "fonts\\font%u%s.pcx", index + 1, SferaClientApplication::language != 0 && SferaClientApplication::language != 1 ? g_sfera_font_runtime.language_suffix : "");
+        const std::string path = "fonts\\font" + std::to_string(index + 1) +
+            (SferaClientApplication::language != 0 && SferaClientApplication::language != 1 ? g_sfera_font_runtime.language_suffix : "") + ".pcx";
         g_sfera_font_runtime.load(index, path, 1, 1, index == 0 ? 5 : 3);
     }
     SphereRender::ModelPose::coordinate_basis = {};
@@ -6710,7 +6930,7 @@ void SferaClientApplication::resetWorld() {
     ShadowMap::initialize(1);
     WorldGuiControls::destroyAllText();
 
-    SferaText::copyString(g_sfera_interface.default_cursor_name, "cursor1", sizeof(g_sfera_interface.default_cursor_name));
+    g_sfera_interface.default_cursor_name = "cursor1";
     g_sfera_world_objects.controlled_object_handle = UINT32_MAX;
     g_sfera_interface.world_interaction_enabled = false;
     g_sfera_motion.acceleration = {};
@@ -6869,7 +7089,7 @@ void SferaClientApplication::loadResources() {
     g_sfera_interface.showLoadingScreen(true, g_sfera_graphics_runtime.display_width, g_sfera_graphics_runtime.display_height, SferaClientApplication::language != 0); ::Sleep(50);
     for (int refresh = 0; refresh < 2; ++refresh) { g_sfera_graphics_runtime.rebuild_percent = UINT32_MAX; GameInterface::updateLoadingProgress(0); }
     ::Sleep(50); g_sfera_effect_manager.initialize(); ::Sleep(50); g_sfera_materials.load("models\\materls.mtr"); ::Sleep(50); TerrainAssets::loadMap(); ::Sleep(50);
-    const auto loadConfiguration = []<class T>(std::unique_ptr<T>& owner, const char* path) {
+    const auto loadConfiguration = []<class T>(std::unique_ptr<T>& owner, const std::string& path) {
         auto replacement = std::make_unique<T>();
         replacement->load(path);
         owner = std::move(replacement);
@@ -6881,7 +7101,7 @@ void SferaClientApplication::loadResources() {
     if (TerrainAssets::alternate_ph_assets) g_sfera_models.addFolder("models_ph\\");
     if (TerrainAssets::alternate_rd_assets) g_sfera_models.addFolder("models_rd\\");
     g_sfera_models.finishRegistration();
-    const char* folders[]{"xadd\\"};
+    constexpr std::string_view folders[]{"xadd\\"};
     auto characters = std::make_unique<SphereRender::CharacterModels>();
     characters->load(folders);
     characters->setDistances(g_sfera_graphics_runtime.lod_distance, g_sfera_graphics_runtime.minimum_lod_distance);
@@ -6894,10 +7114,18 @@ void SferaClientApplication::loadResources() {
     ::Sleep(50);
     loadConfiguration(g_sfera_weather_runtime.standard, "landscape\\weather.txt");
     if (TerrainAssets::high_resolution_assets) loadConfiguration(g_sfera_weather_runtime.highres, "landscape_hr\\weather_hr.txt");
-    ::Sleep(50); g_sfera_world_objects.create("cam_cube", nullptr, 0, true);
-    auto* camera = SphereRender::CharacterModels::checkedExtended(g_sfera_world_objects.object(0));
-    if (camera == nullptr) terminateWithError("Camera object was not created");
-    camera->render_enabled = false; g_sfera_world_objects.create("cam_cube", nullptr, 5, true); g_sfera_vegetation.initialize(); ::Sleep(50);
+    ::Sleep(50);
+    for (std::uint32_t expectedHandle = 0u; expectedHandle < 2u; ++expectedHandle) {
+        const auto handle = g_sfera_world_objects.create("cam_cube", nullptr, expectedHandle == 0u ? 0u : 5u, true);
+        if (handle != expectedHandle) {
+            terminateWithError(std::format("Camera initialization: expected handle {}, got {}", expectedHandle, handle));
+        }
+        auto* camera = g_sfera_world_objects.extendedObject(handle);
+        if (camera == nullptr) terminateWithError(std::format("Camera object {} was not created", handle));
+        if (expectedHandle == 0u) camera->render_enabled = false;
+    }
+    g_sfera_vegetation.initialize();
+    ::Sleep(50);
     g_sfera_interface.chat_filter = std::make_unique<SphereUI::ChatFilter>(); SferaClientApplication::resources_loaded = true;
 }
 
@@ -6954,7 +7182,7 @@ void SferaClientApplication::shutdown() noexcept {
     g_sfera_graphics_runtime.d3d_runtime.reset();
     if (main_window != nullptr) ::DestroyWindow(std::exchange(main_window, nullptr));
     if (window_class_registered) {
-        ::UnregisterClassA(GameInterface::nativeWindowClassName, instance_handle);
+        ::UnregisterClassA(GameInterface::nativeWindowClassName.data(), instance_handle);
         window_class_registered = false;
     }
     if (com_initialized) { ::CoUninitialize(); com_initialized = false; }
@@ -6968,18 +7196,18 @@ void SferaClientApplication::shutdown() noexcept {
     lifecycle = Lifecycle::Stopped;
 }
 
-[[noreturn]] void SferaClientApplication::terminateWithError(const char* message) {
-    if (fatal_error_in_progress) throw std::runtime_error(message == nullptr ? "Client error" : message);
+[[noreturn]] void SferaClientApplication::terminateWithError(std::string_view message) {
+    if (fatal_error_in_progress) throw std::runtime_error(message.empty() ? std::string("Client error") : std::string(message));
     fatal_error_in_progress = true;
-    std::string description = "ServerN=" + std::to_string(static_cast<int>(server_number)) + "  " + (message == nullptr ? "" : message);
-    if (const auto* context = WorldDiagnostics::scriptContext()) { description += '\n'; description += context; }
+    std::string description = "ServerN=" + std::to_string(static_cast<int>(server_number)) + "  " + std::string(message);
+    if (const auto context = WorldDiagnostics::scriptContext()) { description += '\n'; description += *context; }
     throw std::runtime_error(description);
 }
 
 [[noreturn]] void SferaClientApplication::arrayBoundsError(int index) {
-    char message[128]{};
-    if (index < 0) std::snprintf(message, sizeof(message), "BoundCheckArray error: index less than zero\n");
-    else std::snprintf(message, sizeof(message), "BoundCheckArray error: index out of range %d\n", index);
+    std::string message;
+    if (index < 0) message = std::format("BoundCheckArray error: index less than zero\n");
+    else message = std::format("BoundCheckArray error: index out of range {}\n", index);
     terminateWithError(message);
 }
 
@@ -6999,11 +7227,11 @@ namespace {
         if (auto* child = optionChild(window, index)) child->handleMessage(message, first, second);
     }
 
-    void optionText(Window* window, std::uint32_t index, const char* text) {
+    void optionText(Window* window, std::uint32_t index, std::string_view text) {
         if (auto* child = optionChild(window, index)) child->setText(text);
     }
 
-    void optionLabel(Window* window, std::uint32_t index, const char* key) {
+    void optionLabel(Window* window, std::uint32_t index, std::string_view key) {
         optionText(window, index, g_sfera_interface.localizedText(key));
     }
 
@@ -7015,7 +7243,7 @@ namespace {
     void setInterfaceOptionsVisible(bool show);
     void setGraphicsOptionsVisible(bool show);
     void setFontOptionsVisible(bool show);
-    Window* beginOptionsDialog(const char* name, WindowEventHandler handler, bool show) {
+    Window* beginOptionsDialog(std::string_view name, WindowEventHandler handler, bool show) {
         auto* window = g_sfera_interface.findWindow(name);
         if (!show) {
             if (window != nullptr) {
@@ -7072,9 +7300,9 @@ namespace {
         return count;
     }
 
-    const char* bindingName(std::uint32_t key) {
-        const auto* name = SphereUI::Runtime::keyName(key);
-        return name == nullptr ? "???" : name;
+    std::string_view bindingName(std::uint32_t key) {
+        const auto name = SphereUI::Runtime::keyName(key);
+        return name.empty() ? "???" : name;
     }
 
     Window* bindingRow(Window* window, std::uint32_t slot) {
@@ -7112,7 +7340,7 @@ namespace {
             optionLabel(window, 4u, g_sfera_direct_input_runtime.key_bindings[63] == 0u ? "UISTR_WT_OPT23" : "UISTR_WT_OPT24");
             for (std::size_t slot = 0u; slot < count; ++slot) {
                 optionMessage(window, 5u, UiMessage::appendListItem);
-                std::snprintf(g_sfera_interface.options.binding_key_name, sizeof(g_sfera_interface.options.binding_key_name), "UISTR_WT_KEY%02zu", slot + 1u);
+                g_sfera_interface.options.binding_key_name = std::string("UISTR_WT_KEY") + (slot < 9u ? "0" : "") + std::to_string(slot + 1u);
                 optionLabel(bindingRow(window, slot), 2u, g_sfera_interface.options.binding_key_name);
                 refreshBindingLabel(window, slot);
             }
@@ -7127,7 +7355,7 @@ namespace {
     }
 
     constexpr std::uint32_t interfaceControlIds[] = {7u, 8u, 9u, 11u, 12u, 15u, 16u, 19u, 21u};
-    constexpr const char* interfaceSettingKeys[] = {"ISSN", "ISAD", "INSN", "INAW", "IAPM", "MBST", "BALR"};
+    constexpr std::string_view interfaceSettingKeys[] = {"ISSN", "ISAD", "INSN", "INAW", "IAPM", "MBST", "BALR"};
     void setInterfaceOptionsVisible(bool show) {
         auto* window = beginOptionsDialog("interface_options", WindowEventHandler::interface_options, show);
         if (window == nullptr) return;
@@ -7230,10 +7458,10 @@ namespace {
     void setOptionsModeLabel(Window* window, std::uint32_t index) {
         const auto mode = g_sfera_graphics_runtime.d3d_runtime->display_modes.at(index);
         const auto text = std::to_string(static_cast<int>(mode.width)) + "x" + std::to_string(static_cast<int>(mode.height)) + " " + std::to_string(static_cast<int>(mode.depth));
-        optionText(window, 7u, text.c_str());
+        optionText(window, 7u, text);
     }
 
-    const char* graphicsBooleanLabel(std::uint32_t value) {
+    std::string_view graphicsBooleanLabel(std::uint32_t value) {
         return value < 2u ? g_sfera_interface.options.labels[5u + value] : g_sfera_interface.options.unknown_graphics_label;
     }
 
@@ -7273,9 +7501,9 @@ namespace {
             values[9] = g_sfera_graphics_runtime.auto_fog;
             values[8] = g_sfera_effect_manager.effects_enabled;
             g_sfera_interface.options.graphics_page = g_sfera_graphics_runtime.reflection_quality;
-            constexpr const char* label_keys[] = {"UISTR_WT_OPT21", "UISTR_WT_OPT20", "UISTR_WT_OPT19", "UISTR_WT_OPT18", "UISTR_WT_OPT17", "UISTR_WT_OPT17", "UISTR_WT_OPT16"};
-            for (std::size_t index = 0u; index < std::size(label_keys); ++index) SferaText::copy(g_sfera_interface.options.labels[index], g_sfera_interface.localizedText(label_keys[index]));
-            SferaText::copy(g_sfera_interface.options.unknown_graphics_label, g_sfera_interface.localizedText("UISTR_WT_OPT36"));
+            constexpr std::string_view label_keys[] = {"UISTR_WT_OPT21", "UISTR_WT_OPT20", "UISTR_WT_OPT19", "UISTR_WT_OPT18", "UISTR_WT_OPT17", "UISTR_WT_OPT17", "UISTR_WT_OPT16"};
+            for (std::size_t index = 0u; index < std::size(label_keys); ++index) g_sfera_interface.options.labels[index] = g_sfera_interface.localizedText(label_keys[index]);
+            g_sfera_interface.options.unknown_graphics_label = g_sfera_interface.localizedText("UISTR_WT_OPT36");
             InterfaceConfiguration::open("config.cfg");
             OptionsDisplayMode mode{static_cast<unsigned int>(graphics.display_width), static_cast<unsigned int>(graphics.display_height), g_sfera_graphics_runtime.display_depth_bits};
             mode.width = InterfaceConfiguration::readInteger("XRES", mode.width);
@@ -7320,7 +7548,7 @@ namespace {
         SferaClientApplication::windowed = values[4];
         InterfaceConfiguration::open("config.cfg");
         const auto mode = g_sfera_graphics_runtime.d3d_runtime->display_modes.at(values[5]);
-        const std::pair<const char*, std::uint32_t> settings[] = { {
+        const std::pair<std::string_view, std::uint32_t> settings[] = { {
             "XRES", mode.width
         }, {"YRES", mode.height}, {"DEPTH", mode.depth}, {"GRASS", values[3]}, {"WINDOWED", values[4]}, {"SHAD", values[2]}, {"AUTOFOG", g_sfera_graphics_runtime.auto_fog}, {"FOGDIST", static_cast<std::uint32_t>(static_cast<int>(std::trunc(graphics.fog_distance)))}, {"REFLQUAL", g_sfera_graphics_runtime.reflection_quality}, {"EFFECTS", g_sfera_effect_manager.effects_enabled}, {"LODS", graphics.lods_enabled}, {"LOD_DISTANCE", static_cast<std::uint32_t>(static_cast<int>(std::trunc(g_sfera_graphics_runtime.minimum_lod_distance)))}, {"MIN_LOD_DIST", static_cast<std::uint32_t>(static_cast<int>(std::trunc(g_sfera_graphics_runtime.lod_distance)))}, {"POSTEFFECTS", values[6]}};
         for (const auto& setting : settings) InterfaceConfiguration::writeInteger(setting.first, setting.second);
@@ -7332,7 +7560,7 @@ namespace {
 
     void handleHelpEvent(Window* window, const WindowEvent& event) {
         if (event.message == UiMessage::close) {
-            g_sfera_interface.showHelpPage(nullptr);
+            g_sfera_interface.showHelpPage(std::nullopt);
             return;
         }
         if (event.message == UiMessage::leftClick) {
@@ -7344,8 +7572,7 @@ namespace {
         auto* control = static_cast<HyperTextCtrl*>(event.source);
         if (control == nullptr) return;
         const auto* document = control->document.get();
-        const auto* name = document == nullptr ? nullptr : document->name.c_str();
-        if (name != nullptr && SferaText::asciiEqual(name, "Language\\helpindex.hts")) control->handleMessage(UiMessage::clearHyperTextHistory, 0u, 0u);
+        if (document != nullptr && SferaText::asciiEqual(document->name, "Language\\helpindex.hts")) control->handleMessage(UiMessage::clearHyperTextHistory, 0u, 0u);
         optionMessage(window, 2u, UiMessage::setEnabled, control->history.size() == 0u ? 0u : 1u);
     }
 

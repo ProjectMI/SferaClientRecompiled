@@ -38,7 +38,7 @@ struct HyperTextRun {
         std::string parameters;
         std::string target;
         std::uint32_t link_kind{};
-        const char* linkValue() const;
+        std::string_view linkValue() const;
     };
 
     std::string text;
@@ -81,6 +81,7 @@ namespace SphereUI {
         mutable std::uint8_t character;
 
         std::uint32_t key_modifiers;
+        std::string text() const { return SferaText::fromBytes(std::span(&character, 1u)); }
     };
 
     struct WindowEvent {
@@ -129,7 +130,7 @@ namespace SphereUI {
         float u[4]{};
         float v[4]{};
         UiRect rectangle{};
-        void setTexture(const char* texture_name, const UiRect* texture_rectangle, const UiRect* sprite_rectangle);
+        void setTexture(std::string_view texture_name, const UiRect* texture_rectangle, const UiRect* sprite_rectangle);
     };
 
     struct UiSprite {
@@ -139,8 +140,8 @@ namespace SphereUI {
         std::vector<SpritePart> parts;
         void drawNatural(float left, float top, std::uint32_t color) const;
         void draw(float left, float top, float right, float bottom, std::uint32_t color, float rotation = 0.0f) const;
-        void setImage(const char* name);
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range);
+        void setImage(std::string_view name);
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range);
         void resetParts(std::size_t count);
         void setDescription(const struct ImageDescription& description);
     private:
@@ -243,11 +244,11 @@ namespace SphereUI {
         void animateVisibility(bool hide);
         void drawToolTips();
 
-        std::unique_ptr<Window> createControl(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range, SphereUI::UiControlKind kind, std::uint32_t id);
+        std::unique_ptr<Window> createControl(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range, SphereUI::UiControlKind kind, std::uint32_t id);
         void appendChild(std::unique_ptr<Window> child);
         void appendResource(std::shared_ptr<const UiSprite> resource);
-        std::shared_ptr<const UiSprite> findResource(const char* resource_name) const;
-        std::shared_ptr<const UiSprite> getResource(const char* resource_name);
+        std::shared_ptr<const UiSprite> findResource(std::string_view resource_name) const;
+        std::shared_ptr<const UiSprite> getResource(std::string_view resource_name);
         void setParent(Window* new_parent);
         void setInputFocus(bool focused, bool submit_on_blur = false);
         void getAbsolutePosition(int& screen_x, int& screen_y) const;
@@ -257,18 +258,18 @@ namespace SphereUI {
         void queueEvent(const WindowEvent& event);
         bool pollEvent(WindowEvent& event);
         void processEvents();
-        void setText(const char* value);
-        const char* getText() const;
-        const char* getHelp() const;
-        void setHelp(const char* value);
-        void setName(const char* value);
+        void setText(std::string_view value);
+        const std::string& getText() const;
+        const std::string& getHelp() const;
+        void setHelp(std::string_view value);
+        void setName(std::string_view value);
         Window* controlAt(std::size_t index) const;
         void addModalReference(Window& window);
         void beginModal(Window* owner);
-        const char* getName() const;
-        const char* getResourceName() const;
-        void setResourceName(const char* value);
-        virtual bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range);
+        const std::string& getName() const;
+        const std::string& getResourceName() const;
+        void setResourceName(std::string_view value);
+        virtual bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range);
         virtual std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second);
         virtual void setPosition(int x, int y);
         virtual void draw();
@@ -301,7 +302,7 @@ namespace SphereUI {
         ButtonCtrl();
 
         void click();
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -326,7 +327,7 @@ namespace SphereUI {
         void copyCheckState(const CheckBox& source);
         CheckBox();
 
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -355,8 +356,8 @@ namespace SphereUI {
         void update();
         void handleEvent(const WindowEvent& event);
         SferaCursorPosition* calculatePosition(SferaCursorPosition* output) const;
-        void showDescription(const char* text, const Window* source, std::uint32_t duration, bool pin);
-        void requestDescription(const char* text, bool force, const Window* source);
+        void showDescription(std::string_view text, const Window* source, std::uint32_t duration, bool pin);
+        void requestDescription(std::string_view text, bool force, const Window* source);
         void draw() override;
         ~CDescriptionWindow() override;
     private:
@@ -384,7 +385,7 @@ namespace SphereUI {
         void setEditText(std::string_view value);
         EditCtrl();
 
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -424,9 +425,9 @@ namespace SphereUI {
         void updateLayout();
         void updateVisibleRange();
         std::size_t physicalIndex(std::size_t logical_index) const;
-        void appendLine(const char* text, std::uint32_t color);
-        void appendFormattedLine(const char* text, std::uint32_t color);
-        void addText(const char* text, std::uint32_t color);
+        void appendLine(std::string_view text, std::uint32_t color);
+        void appendFormattedLine(std::string_view text, std::uint32_t color);
+        void addText(std::string_view text, std::uint32_t color);
         void appendMessageText(std::string_view text, std::uint32_t color);
         bool setRowText(std::size_t index, std::string_view text);
         std::string_view rowText(std::size_t index) const;
@@ -435,7 +436,7 @@ namespace SphereUI {
         void selectRow(int index);
         void alignRow(std::size_t index, std::uint32_t flags);
         void drawSelection(int x, int y, int row_y, bool restore_viewport);
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -455,7 +456,7 @@ namespace SphereUI {
         FilterListCtrl();
 
         void clearHistory();
-        void appendHistory(const char* text, std::uint32_t color, std::uint32_t mask);
+        void appendHistory(std::string_view text, std::uint32_t color, std::uint32_t mask);
         void appendFilteredText(std::string_view text, std::uint32_t packed_color);
         void applyFilter(std::uint32_t mask);
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
@@ -468,7 +469,7 @@ namespace SphereUI {
         std::unique_ptr<Window> preview;
         FontPicker();
 
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -491,7 +492,7 @@ namespace SphereUI {
         std::uint32_t color{};
         std::vector<HyperTextRun> elements;
         std::vector<UiIndexRange> rows;
-        void initialize(const char* text, std::uint32_t channel, std::uint32_t color);
+        void initialize(std::string_view text, std::uint32_t channel, std::uint32_t color);
         void layout(int width, int font);
     };
 
@@ -520,7 +521,7 @@ namespace SphereUI {
             std::size_t row_index{};
         };
         std::vector<RenderedRow> rendered_rows;
-        void addMessage(const char* text, std::uint32_t channel, std::uint32_t color);
+        void addMessage(std::string_view text, std::uint32_t channel, std::uint32_t color);
         void addChannel(std::uint32_t channel);
         void setChannels(std::span<const std::uint32_t> values);
         void clearChannels();
@@ -529,11 +530,11 @@ namespace SphereUI {
         bool visibleRowRange(std::size_t message, std::size_t drawn, std::size_t rows, std::size_t* first, std::size_t* last) const;
         void updateScroll(bool reset);
         void readScroll();
-        const char* messageText(std::size_t index, bool plain) const;
+        std::string_view messageText(std::size_t index, bool plain) const;
         void drawElement(HyperTextRun& element, int x, int y, std::uint32_t color);
         HyperTextChatListControl();
 
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -578,9 +579,9 @@ namespace SphereUI {
         void queueBuffer(std::string_view buffer);
         void updateDocument(bool resize_to_content);
         void updateScroll();
-        void openLink(const char* target);
-        static std::uint32_t parseTextFormat(const char* name);
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        void openLink(std::string_view target);
+        static std::uint32_t parseTextFormat(std::string_view name);
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -612,9 +613,9 @@ namespace SphereUI {
         std::size_t maximum_hyper_length{};
         std::size_t visible_first{};
         std::size_t visible_last{};
-        void setContent(const char* text, std::uint32_t mode = 0u);
-        void insertPlainText(const char* text);
-        void insertCharacter(std::uint8_t character);
+        void setContent(std::string_view text, std::uint32_t mode = 0u);
+        void insertPlainText(std::string_view text);
+        void insertCharacter(std::string_view glyph);
         void eraseCharacter(bool backspace);
         void moveCaret(std::uint32_t key);
         void updateVisibleStart();
@@ -629,10 +630,10 @@ namespace SphereUI {
         void saveHistory() const;
         static void historyProfile(std::string& result);
         static void transformHistory(std::string& result, const std::string& source, bool decode);
-        static std::size_t fitText(const char* text, int font, int pixels, bool reverse);
+        static std::size_t fitText(std::string_view text, int font, int pixels, bool reverse);
         HyperTextEditControl();
 
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -654,7 +655,7 @@ namespace SphereUI {
         void setImage(const struct ImageDescription* description);
         void setImageName(std::string_view name);
         void setRotationDegrees(float degrees);
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -693,7 +694,7 @@ namespace SphereUI {
         void updateLayout();
         void updateVisibleRange();
         void copyItemState(const ListItemCtrl& source, CloneContext& context);
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -731,7 +732,7 @@ namespace SphereUI {
         std::size_t hovered_index{};
         CMenuListControl();
 
-        void addItem(const char* text, bool enabled);
+        void addItem(std::string_view text, bool enabled);
         void clearItems();
         void closeMenu();
         void updateParentPosition();
@@ -740,7 +741,7 @@ namespace SphereUI {
         void drawHeader();
         void drawItem(std::size_t index, const std::shared_ptr<const UiSprite>& sprite, std::uint32_t color);
         void drawFooter();
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -774,9 +775,10 @@ namespace SphereUI {
         void showAt(int x, int y);
         void updateFade();
         void updateLayout();
-        void appendLine(const char* text);
-        void setLine(std::uint32_t index, const char* text);
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        void appendLine(std::string_view text);
+        void setLine(std::uint32_t index, std::optional<std::string_view> text);
+        void setLine(std::uint32_t, std::nullptr_t) = delete;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -807,7 +809,7 @@ namespace SphereUI {
         void setProgressValue(int value);
         void setProgressRange(int new_minimum, int new_maximum);
         void refreshProgressDisplay();
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -841,15 +843,15 @@ namespace SphereUI {
         void updateScroll();
         void ensureCaretVisible();
         void moveCaret(std::uint32_t key);
-        void setContent(const char* text);
-        void copyContent(std::span<char> destination) const;
-        void insertCharacter(std::uint8_t character);
-        void insertAt(std::uint32_t column, std::uint8_t character, std::uint32_t row);
+        void setContent(std::string_view text);
+        std::string content(std::size_t limit = std::numeric_limits<std::size_t>::max()) const;
+        void insertCharacter(std::string_view glyph);
+        void insertAt(std::uint32_t column, std::string glyph, std::uint32_t row);
         std::uint32_t mergeRows(std::uint32_t destination, std::uint32_t source);
         void eraseCharacter(bool backward);
         void splitLine();
         void drawCaret(float left, float top);
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -898,7 +900,7 @@ namespace SphereUI {
 
         void setParameters(const struct ScrollParameters& parameters);
         void getParameters(struct ScrollParameters& parameters) const;
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -915,7 +917,7 @@ namespace SphereUI {
         int status_y{};
         SliderCtrl();
 
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         void draw() override;
         void updateControlState() override;
@@ -951,10 +953,12 @@ namespace SphereUI {
         std::shared_ptr<const UiSprite> bottom_left_overlay{};
         SlotCtrl();
 
-        void setItem(const char* image);
+        void setItem(std::optional<std::string_view> image);
+        void setItem(std::nullptr_t) = delete;
         void setItemCount(std::uint32_t count);
-        void setOverlay(std::shared_ptr<const UiSprite>& destination, const char* image);
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        void setOverlay(std::shared_ptr<const UiSprite>& destination, std::optional<std::string_view> image);
+        void setOverlay(std::shared_ptr<const UiSprite>&, std::nullptr_t) = delete;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -981,7 +985,7 @@ namespace SphereUI {
         void setCurrentValue(int value);
         void setStep(int step);
         int currentValue() const;
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
@@ -994,7 +998,7 @@ namespace SphereUI {
         std::uint32_t text_style{};
         TextCtrl();
 
-        bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
+        bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
@@ -1007,9 +1011,9 @@ namespace SphereUI::detail {
     void enqueueWindowEvent(std::deque<WindowEvent>& events, const WindowEvent& event);
     void serializeHyperTextElements(std::span<const HyperTextRun> elements, std::string& hyper_text, std::string& plain);
     std::string escapeHyperText(std::string_view source);
-    SphereUI::UiControlKind controlKind(const char* name);
-    SphereUI::WindowAnimation::Kind animationKind(const char* name);
-    std::uint32_t alignmentFlag(const char* name);
+    SphereUI::UiControlKind controlKind(std::string_view name);
+    SphereUI::WindowAnimation::Kind animationKind(std::string_view name);
+    std::uint32_t alignmentFlag(std::string_view name);
 }
 
 namespace SphereUI::Runtime {
@@ -1217,7 +1221,7 @@ enum class UiControlKind {
 namespace SphereUI::Runtime { void setTextInputActive(bool active); }
 
 namespace SphereUI::Runtime {
-    const char* keyName(std::uint32_t key);
+    std::string_view keyName(std::uint32_t key);
     std::uint32_t scanCode(std::uint32_t virtualKey);
     std::uint32_t virtualKey(std::uint32_t scanCode);
     void setSystemCursorVisible(bool visible);

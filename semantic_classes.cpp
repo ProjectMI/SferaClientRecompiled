@@ -51,14 +51,15 @@ namespace {
 
 
 
-    bool simple_parser_whitespace(char value) {
-        return value <= ' ';
+    bool simple_parser_whitespace(std::string_view text, std::size_t index = 0) {
+        // Preserve the original signed code-unit comparison used by this grammar.
+        return text[index] <= ' ';
     }
 
 }
-bool SferaSimpleParser::load(const char* filename) {
+bool SferaSimpleParser::load(const std::string& filename) {
     *this = {};
-    if (filename == nullptr || *filename == '\0') return false;
+    if (filename.empty()) return false;
     std::ifstream stream;
     for (const auto& path : g_sfera_files.candidatePaths(filename)) {
         stream.open(path, std::ios::binary | std::ios::ate);
@@ -82,7 +83,7 @@ void SferaSimpleParser::assign(std::string source) {
     std::vector<std::size_t> lines{0};
     // CRLF is one separator. LF and lone CR must not hide the remaining declarations.
     for (std::size_t index = 0; index < source.size(); ++index) {
-        const char separator = source[index];
+        const auto separator = source[index];
         if (separator != '\r' && separator != '\n') continue;
         source[index] = '\0';
         if (separator == '\r' && index + 1 < source.size() && source[index + 1] == '\n')
@@ -108,7 +109,7 @@ std::string_view SferaSimpleParser::lineAt(std::ptrdiff_t index) const {
 }
 
 std::string_view SferaSimpleParser::firstToken(std::string_view line) {
-    while (!line.empty() && simple_parser_whitespace(line.front())) line.remove_prefix(1);
+    while (!line.empty() && simple_parser_whitespace(line)) line.remove_prefix(1);
     return line.starts_with("//") ? std::string_view{} : line;
 }
 
@@ -128,7 +129,7 @@ std::ptrdiff_t SferaSimpleParser::findClosingBrace(std::ptrdiff_t begin, std::pt
 std::ptrdiff_t SferaSimpleParser::parseBlockAt(std::string_view first, std::ptrdiff_t line, std::ptrdiff_t end, SferaParserRange* output) {
     if (first.empty() || line >= end) return -1;
     std::size_t length = 0;
-    while (length < first.size() && !simple_parser_whitespace(first[length])) ++length;
+    while (length < first.size() && !simple_parser_whitespace(first, length)) ++length;
     if (length > maximumValueLength) return -1;
     token_.assign(first.substr(0, length));
     auto open = line;
@@ -147,8 +148,8 @@ std::ptrdiff_t SferaSimpleParser::parseBlockAt(std::string_view first, std::ptrd
     return close - open + 1;
 }
 
-bool SferaSimpleParser::findBlock(const char* name, SferaParserRange* output, const SferaParserRange* search, std::ptrdiff_t occurrence) {
-    if (name == nullptr || output == nullptr) return false;
+bool SferaSimpleParser::findBlock(std::string_view name, SferaParserRange* output, const SferaParserRange* search, std::ptrdiff_t occurrence) {
+    if (name.empty() || output == nullptr) return false;
     const auto range = boundedRange(search);
     std::ptrdiff_t matched = 0;
     for (auto line = range.begin; line < range.end;) {
@@ -160,7 +161,7 @@ bool SferaSimpleParser::findBlock(const char* name, SferaParserRange* output, co
     return false;
 }
 
-std::ptrdiff_t SferaSimpleParser::countBlocks(const char* name, const SferaParserRange* search) {
+std::ptrdiff_t SferaSimpleParser::countBlocks(std::string_view name, const SferaParserRange* search) {
     auto range = boundedRange(search);
     SferaParserRange block{};
     std::ptrdiff_t count = 0;
@@ -168,8 +169,8 @@ std::ptrdiff_t SferaSimpleParser::countBlocks(const char* name, const SferaParse
     return count;
 }
 
-bool SferaSimpleParser::findValueFrom(const char* name, std::ptrdiff_t& line, std::ptrdiff_t end) {
-    if (name == nullptr) return false;
+bool SferaSimpleParser::findValueFrom(std::string_view name, std::ptrdiff_t& line, std::ptrdiff_t end) {
+    if (name.empty()) return false;
     while (line < end) {
         const auto first = firstToken(lineAt(line));
         if (first.empty()) { ++line; continue; }
@@ -179,7 +180,7 @@ bool SferaSimpleParser::findValueFrom(const char* name, std::ptrdiff_t& line, st
             continue;
         }
         std::size_t length = 0;
-        while (length < first.size() && !simple_parser_whitespace(first[length])) ++length;
+        while (length < first.size() && !simple_parser_whitespace(first, length)) ++length;
         token_.assign(first.substr(0, std::min(length, maximumValueLength)));
         if (SferaText::asciiEqual(token_, name)) {
             token_.assign(first.substr(length, maximumValueLength));
@@ -191,19 +192,19 @@ bool SferaSimpleParser::findValueFrom(const char* name, std::ptrdiff_t& line, st
     return false;
 }
 
-bool SferaSimpleParser::findValue(const char* name, const SferaParserRange* search) {
+bool SferaSimpleParser::findValue(std::string_view name, const SferaParserRange* search) {
     auto range = boundedRange(search);
     return findValueFrom(name, range.begin, range.end);
 }
 void SferaSimpleParser::setScanRange(const SferaParserRange* range) { scan_ = boundedRange(range); }
 void SferaSimpleParser::setBlockRange(const SferaParserRange* range) { block_ = boundedRange(range); }
-bool SferaSimpleParser::nextValue(const char* name) {
+bool SferaSimpleParser::nextValue(std::string_view name) {
     auto next = scan_.begin;
     if (!findValueFrom(name, next, scan_.end)) return false;
     scan_.begin = next;
     return true;
 }
-bool SferaSimpleParser::nextBlock(const char* name, SferaParserRange* output) {
+bool SferaSimpleParser::nextBlock(std::string_view name, SferaParserRange* output) {
     if (!findBlock(name, output, &block_, 1)) return false;
     block_.begin = output->end;
     return true;
@@ -214,7 +215,7 @@ std::size_t SferaSimpleParser::tokenCount() const {
     std::size_t count = 0;
     while (!(rest = firstToken(rest)).empty()) {
         ++count;
-        while (!rest.empty() && !simple_parser_whitespace(rest.front())) {
+        while (!rest.empty() && !simple_parser_whitespace(rest)) {
             if (rest.starts_with("//")) return count;
             rest.remove_prefix(1);
         }
@@ -225,10 +226,10 @@ std::size_t SferaSimpleParser::tokenCount() const {
 std::size_t SferaSimpleParser::tokenStart(std::size_t index) const {
     std::size_t offset = 0;
     for (std::size_t current = 0; offset < token_.size(); ++current) {
-        while (offset < token_.size() && simple_parser_whitespace(token_[offset])) ++offset;
+        while (offset < token_.size() && simple_parser_whitespace(token_, offset)) ++offset;
         if (offset == token_.size() || std::string_view(token_).substr(offset).starts_with("//")) break;
         if (current == index) return offset;
-        while (offset < token_.size() && !simple_parser_whitespace(token_[offset])) ++offset;
+        while (offset < token_.size() && !simple_parser_whitespace(token_, offset)) ++offset;
     }
     return std::string::npos;
 }
@@ -236,7 +237,7 @@ std::string_view SferaSimpleParser::tokenAt(std::size_t index) const {
     const auto start = tokenStart(index);
     if (start == std::string::npos) return {};
     auto end = start;
-    while (end < token_.size() && !simple_parser_whitespace(token_[end])) ++end;
+    while (end < token_.size() && !simple_parser_whitespace(token_, end)) ++end;
     return std::string_view(token_).substr(start, end - start);
 }
 
@@ -578,7 +579,7 @@ void SferaBloodEffectRuntime::onEffectChanged(std::uint32_t , IEffect& effect, S
     const auto points = collectBloodSceneTriangles(effect.position, radius + 0.2f);
     for (std::size_t index = 0; index < selected && runtime.active_count < 30; ++index) createBloodSpot(runtime, origins[index], points);
 }
-void IEffect::assignScriptName(const char* name) { script_name = name == nullptr ? "" : name; }
+void IEffect::assignScriptName(std::string_view name) { script_name.assign(name); }
 void IEffect::initializeBaseState(Kind kind) {
     script_name.clear();
     effect_id = std::numeric_limits<std::uint32_t>::max();
@@ -598,11 +599,11 @@ void CScriptedEffect::initializeScriptedState() {
     initializeBaseState(Kind::Scripted);
 }
 
-bool CScriptedEffect::loadScript(const char* filename) {
-    if (filename == nullptr || !meshes.empty() || !lights.empty() || !particle_systems.empty()) return false;
+bool CScriptedEffect::loadScript(const std::string& filename) {
+    if (filename.empty() || !meshes.empty() || !lights.empty() || !particle_systems.empty()) return false;
     SferaSimpleParser parser;
     if (!parser.load(filename)) {
-        g_sfera_effect_manager.reportError((std::string("Cannot read effect script: ") + filename).c_str());
+        g_sfera_effect_manager.reportError((std::string("Cannot read effect script: ") + filename));
         return false;
     }
     try {
@@ -616,7 +617,7 @@ bool CScriptedEffect::loadScript(const char* filename) {
             });
             return found == definitions.end() ? -1 : found - definitions.begin();
         };
-        const auto load_blocks = [&](const char* name, const SferaParserRange* scope, auto load) {
+        const auto load_blocks = [&](std::string_view name, const SferaParserRange* scope, auto load) {
             parser.setBlockRange(scope);
             SferaParserRange block;
             while (parser.nextBlock(name, &block)) {
@@ -641,14 +642,14 @@ bool CScriptedEffect::loadScript(const char* filename) {
         load_blocks("effectmesh_def", nullptr, [&](const SferaParserRange& block) {
             auto mesh = std::make_shared<SferaEffectMeshDefinition>();
             if (!mesh->loadDefinition(filename, parser, block))
-                g_sfera_effect_manager.reportError((std::string("CScriptedEffect::LoadScript(") + filename + "): Can't load effectmesh_def block").c_str());
+                g_sfera_effect_manager.reportError((std::string("CScriptedEffect::LoadScript(") + filename + "): Can't load effectmesh_def block"));
             add_budget(mesh->renderSlotCount());
             data->meshes.push_back(std::move(mesh));
         });
         load_blocks("psystem_def", nullptr, [&](const SferaParserRange& block) {
             auto particle = std::make_shared<SferaParticleSystemDefinition>();
             if (!particle->loadDefinition(filename, parser, block))
-                g_sfera_effect_manager.reportError((std::string("CScriptedEffect::LoadScript(") + filename + "): Can't load psystem_def block").c_str());
+                g_sfera_effect_manager.reportError((std::string("CScriptedEffect::LoadScript(") + filename + "): Can't load psystem_def block"));
             prepare_particle_definition(particle);
             particles.push_back(std::move(particle));
         });
@@ -700,7 +701,7 @@ bool CScriptedEffect::loadScript(const char* filename) {
         SferaParserRange range;
         if (parser.findBlock("effect_def", &range, nullptr, 1)) {
             std::string text;
-            if (parser.findValue("effect_name", &range) && parser.readQuotedString(0, text)) parsed.assignScriptName(text.c_str());
+            if (parser.findValue("effect_name", &range) && parser.readQuotedString(0, text)) parsed.assignScriptName(text);
             if (parser.findValue("effect_number", &range)) parsed.effect_id = effect_integer(parser, 0);
             if (parser.findValue("effect_time", &range)) parsed.cycle_length = parsed.lifetime_ticks = effect_integer(parser, 0);
             if (parser.findValue("effect_timelimit", &range)) parsed.cycle_length = effect_integer(parser, 0);
@@ -727,7 +728,7 @@ bool CScriptedEffect::loadScript(const char* filename) {
             load_blocks("light_def", &range, [&](const SferaParserRange& light_range) {
                 auto light = std::make_shared<SferaLightDefinition>();
                 if (!light->load(parser, light_range))
-                    g_sfera_effect_manager.reportError((std::string("CScriptedEffect::LoadScript(") + filename + "): Can't load light_def block").c_str());
+                    g_sfera_effect_manager.reportError((std::string("CScriptedEffect::LoadScript(") + filename + "): Can't load light_def block"));
                 data->lights.push_back(std::move(light));
             });
             if (parser.findValue("subeffects_num", &range)) {
@@ -762,7 +763,7 @@ bool CScriptedEffect::loadScript(const char* filename) {
         return true;
     } catch (const std::exception& error) {
         const auto message = std::string("CScriptedEffect::LoadScript(") + filename + "): " + error.what();
-        g_sfera_effect_manager.reportError(message.c_str());
+        g_sfera_effect_manager.reportError(message);
         return false;
     }
 }
@@ -1375,11 +1376,10 @@ CLightEffect::~CLightEffect() { g_sfera_light_runtime.release(light_index); }
 
 void GrassMapMngr::loadGrassMap(int column, int row, std::span<std::uint8_t> destination) {
     if (destination.empty()) return;
-    char filename[64]{};
-    std::snprintf(filename, sizeof(filename), "Landscape\\GrassMap\\GrassMap_%02d_%02d.bin", column, row);
+    auto filename = std::format("Landscape\\GrassMap\\GrassMap_{:02d}_{:02d}.bin", column, row);
     std::ifstream stream;
     for (const std::string& path : g_sfera_files.candidatePaths(filename, true)) { stream.open(path, std::ios::binary); if (stream.is_open()) break; stream.clear(); }
-    if (stream.is_open()) stream.read(reinterpret_cast<char*>(destination.data()), static_cast<std::streamsize>(destination.size()));
+    if (stream.is_open()) SferaBinary::read(stream, destination);
 }
 PlayerList::PlayerList(std::string list_name, std::size_t minimum, std::uint32_t mode, bool notify)
     : name(std::move(list_name)), minimum_size(minimum), publish_mode(mode), notify_relationships(notify), entries_(30) {}
@@ -1518,7 +1518,7 @@ namespace {
 std::uint32_t effect_flag(std::string_view token) {
         if (token.empty()) return 0u;
         struct Flag {
-            const char* name;
+            std::string_view name;
             std::uint32_t value;
         };
         static constexpr Flag flags[] = {
@@ -1553,8 +1553,8 @@ std::uint32_t effect_flag(std::string_view token) {
         return 0u;
     }
 
-    std::shared_ptr<const SferaEffectMeshResource> find_mesh_resource(const char* name) {
-        if (name == nullptr) return nullptr;
+    std::shared_ptr<const SferaEffectMeshResource> find_mesh_resource(std::string_view name) {
+        if (name.empty()) return nullptr;
         const auto& resources = g_sfera_effect_manager.mesh_resources;
         const auto found = std::find_if(resources.begin(), resources.end(), [&](const auto& resource) {
             return SferaText::asciiEqual(resource->name, name);
@@ -1663,7 +1663,7 @@ std::uint32_t effect_flag(std::string_view token) {
         if (SferaText::asciiEqual(name, "EMITSHAPE_DISK2")) return SferaParticleSystemDefinition::Shape::Annulus;
         return SferaParticleSystemDefinition::Shape::Points;
     }
-    void load_track_array(SferaSimpleParser& parser, const SferaParserRange& range, const char* block_name, std::vector<std::shared_ptr<const SferaEffectTrack>>& tracks, bool color) {
+    void load_track_array(SferaSimpleParser& parser, const SferaParserRange& range, std::string_view block_name, std::vector<std::shared_ptr<const SferaEffectTrack>>& tracks, bool color) {
         if (tracks.empty() || parser.countBlocks(block_name, &range) <= 0) return;
         const bool scalar = SferaText::asciiEqual(block_name, "size_track");
         SferaParserRange block{};
@@ -1815,7 +1815,7 @@ std::uint32_t effect_flag(std::string_view token) {
     }
 }
 
-bool SferaEffectMeshDefinition::loadDefinition(const char*, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SferaEffectMeshDefinition::loadDefinition(const std::string&, SferaSimpleParser& parser, const SferaParserRange& range) {
     SferaParserRange previous{};
     parser.getBlockRange(&previous);
     std::string text;
@@ -1825,7 +1825,7 @@ bool SferaEffectMeshDefinition::loadDefinition(const char*, SferaSimpleParser& p
     }
     if (parser.findValue("effectmesh_ssm", &range)) {
         parser.readQuotedString(0u, text);
-        mesh_resource = find_mesh_resource(text.c_str());
+        mesh_resource = find_mesh_resource(text);
     }
     if (parser.findValue("effectmesh_flags", &range)) for (std::size_t index = 0u; index < parser.tokenCount(); index += 2u) flags |= effect_flag(parser.tokenAt(index));
     if (parser.findValue("self_illumination", &range)) self_illumination = effect_integer(parser, 0u);
@@ -1867,7 +1867,7 @@ void SferaEffectMeshInstance::reset() {
     random_row = std::rand() % 255;
     random_offset = std::rand();
     random_state = std::rand();
-    texture_id = definition->texture_name.empty() ? -1 : g_sfera_textures.find(definition->texture_name.c_str());
+    texture_id = definition->texture_name.empty() ? -1 : g_sfera_textures.find(definition->texture_name);
 }
 
 void SferaEffectMeshInstance::update(const SferaVec3F* spatial_frame, const SferaMatrix4x4F* world_frame, float age) {
@@ -1965,7 +1965,7 @@ void SferaEffectMeshInstance::commit() {
     }
 }
 
-bool SferaParticleSystemDefinition::loadDefinition(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SferaParticleSystemDefinition::loadDefinition(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     SferaParserRange caller_range{};
     parser.getBlockRange(&caller_range);
     SferaParserRange nested{};
@@ -2049,7 +2049,7 @@ bool SferaParticleSystemDefinition::loadDefinition(const char* filename, SferaSi
         if (parser.findBlock("lifetime_track", &nested, &block, 1)) lifetime_track = sfera_load_scalar_effect_track(&parser, &nested);
     }
     if (parser.findBlock("particletracks_def", &block, &range, 1)) {
-        const auto setup_tracks = [&](const char* count_name, auto& tracks) {
+        const auto setup_tracks = [&](std::string_view count_name, auto& tracks) {
             if (!parser.findValue(count_name, &block)) return;
             const int count = parser.readInt(0u);
             if (count > 0) tracks.resize(static_cast<std::size_t>(count));
@@ -2112,7 +2112,7 @@ bool SferaParticleSystemDefinition::loadDefinition(const char* filename, SferaSi
                     }
                 }
             }
-            const auto assign_track = [&](const char* key, auto member, const auto& tracks) {
+            const auto assign_track = [&](std::string_view key, auto member, const auto& tracks) {
                 if (!parser.findValue(key, &particle_range) || tracks.empty()) return;
                 const int parsed = parser.readInt(0u);
                 if (parsed < 0 || static_cast<std::size_t>(parsed) >= tracks.size()) return;
@@ -2162,7 +2162,7 @@ void SferaParticleSystemInstance::initializeClone() {
     runtime_random_seed_1 = std::rand();
     texture_ids.clear();
     texture_ids.reserve(definition->texture_frames.size());
-    for (const auto& frame : definition->texture_frames) texture_ids.push_back(frame.texture_name.empty() ? -1 : g_sfera_textures.find(frame.texture_name.c_str()));
+    for (const auto& frame : definition->texture_frames) texture_ids.push_back(frame.texture_name.empty() ? -1 : g_sfera_textures.find(frame.texture_name));
 }
 void SferaParticleSystemInstance::reset() {
     restoreSettings();
@@ -2378,14 +2378,14 @@ int SferaFileManager::ScopedFile::close() {
 }
 
 bool SferaFileManager::setErrorReporting(bool enabled) { return std::exchange(error_reporting_enabled, enabled); }
-std::vector<std::string> SferaFileManager::candidatePaths(const char* filename, bool search_nested_paths) const {
-    if (filename == nullptr) return {};
+std::vector<std::string> SferaFileManager::candidatePaths(const std::string& filename, bool search_nested_paths) const {
     std::vector<std::string> candidates{filename};
-    if (search_nested_paths || std::strchr(filename, '\\') == nullptr) for (const std::string& directory : search_paths) candidates.push_back(directory + filename);
+    if (search_nested_paths || filename.find('\\') == std::string::npos)
+        for (const std::string& directory : search_paths) candidates.push_back(directory + filename);
     return candidates;
 }
-void SferaFileManager::addSearchPath(const char* directory) {
-    if (directory == nullptr || *directory == '\0') return;
+void SferaFileManager::addSearchPath(std::string_view directory) {
+    if (directory.empty()) return;
     if (search_paths.size() == maximum_search_paths) { CSphereError error; error.write("File manager search path limit exceeded (100 paths)."); return; }
     std::string path(directory);
     if (path.back() != '\\') path.push_back('\\');
@@ -2398,7 +2398,7 @@ int SferaFileManager::registerDescriptor(int descriptor, const std::string& file
     catch (...) { ::_close(descriptor); throw; }
     return descriptor;
 }
-int SferaFileManager::open(const char* filename, int flags) {
+int SferaFileManager::open(const std::string& filename, int flags) {
     for (const std::string& candidate : candidatePaths(filename)) {
         if (candidate.empty()) continue;
         int descriptor = -1;
@@ -2407,16 +2407,16 @@ int SferaFileManager::open(const char* filename, int flags) {
     if (error_reporting_enabled) reportError("Unable to open file: ", filename);
     return -1;
 }
-int SferaFileManager::create(const char* filename) {
-    if (filename != nullptr && *filename != '\0') {
-        ::_chmod(filename, _S_IREAD | _S_IWRITE);
+int SferaFileManager::create(const std::string& filename) {
+    if (!filename.empty()) {
+        ::_chmod(filename.c_str(), _S_IREAD | _S_IWRITE);
         int descriptor = -1;
-        if (::_sopen_s(&descriptor, filename, _O_RDWR | _O_CREAT | _O_TRUNC | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE) == 0) return registerDescriptor(descriptor, filename);
+        if (::_sopen_s(&descriptor, filename.c_str(), _O_RDWR | _O_CREAT | _O_TRUNC | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE) == 0) return registerDescriptor(descriptor, filename);
     }
     if (error_reporting_enabled) reportError("Unable to create file: ", filename);
     return -1;
 }
-const std::string* SferaFileManager::filenameFor(int descriptor, const char* invalid_handle_message) const {
+const std::string* SferaFileManager::filenameFor(int descriptor, std::string_view invalid_handle_message) const {
     const auto found = open_files.find(descriptor);
     if (found != open_files.end()) return &found->second;
     CSphereError error;
@@ -2442,7 +2442,7 @@ std::ptrdiff_t SferaFileManager::read(int descriptor, void* destination, std::si
     if (filename == nullptr) return -1;
     const auto transferred = transferFileBytes(descriptor, static_cast<std::byte*>(destination), size, ::_read);
     if (std::cmp_equal(transferred, size)) return transferred;
-    if (error_reporting_enabled) reportError(transferred == -1 ? "Unable to read file: " : "Unexpected end of file: ", filename->c_str());
+    if (error_reporting_enabled) reportError(transferred == -1 ? "Unable to read file: " : "Unexpected end of file: ", *filename);
     return -1;
 }
 std::ptrdiff_t SferaFileManager::write(int descriptor, const void* source, std::size_t size) {
@@ -2450,30 +2450,30 @@ std::ptrdiff_t SferaFileManager::write(int descriptor, const void* source, std::
     if (filename == nullptr) return -1;
     const auto transferred = transferFileBytes(descriptor, static_cast<const std::byte*>(source), size, ::_write);
     if (std::cmp_equal(transferred, size)) return transferred;
-    if (error_reporting_enabled) reportError(transferred == -1 ? "Unable to write file: " : "Incomplete file write (possibly insufficient disk space): ", filename->c_str());
+    if (error_reporting_enabled) reportError(transferred == -1 ? "Unable to write file: " : "Incomplete file write (possibly insufficient disk space): ", *filename);
     return -1;
 }
 std::int64_t SferaFileManager::seek(int descriptor, std::int64_t offset, int origin) {
     const std::string* filename = filenameFor(descriptor, "Attempt of seeking in the file with the wrong handle.");
     if (filename == nullptr) return -1;
     const auto position = ::_lseeki64(descriptor, offset, origin);
-    if (position == -1 && error_reporting_enabled) reportError("Unable to seek in file: ", filename->c_str());
+    if (position == -1 && error_reporting_enabled) reportError("Unable to seek in file: ", *filename);
     return position;
 }
 int SferaFileManager::close(int descriptor) {
     const std::string* filename = filenameFor(descriptor, "Attempt of closing the file with the wrong handle.");
     if (filename == nullptr) return -1;
     if (::_close(descriptor) == 0) { open_files.erase(descriptor); return 0; }
-    if (error_reporting_enabled) reportError("Unable to close file: ", filename->c_str());
+    if (error_reporting_enabled) reportError("Unable to close file: ", *filename);
     return -1;
 }
-std::int64_t SferaFileManager::fileSize(const char* filename) {
+std::int64_t SferaFileManager::fileSize(const std::string& filename) {
     ScopedFile file(*this, open(filename, _O_RDONLY));
     return file.get() < 0 ? -1 : ::_filelengthi64(file.get());
 }
-std::optional<std::vector<std::uint8_t>> SferaFileManager::readBounded(const char* filename, std::size_t capacity) {
-    if (!filename) return std::nullopt;
-    std::unique_ptr<std::FILE, decltype(&std::fclose)> file(::_fsopen(filename, "rb", _SH_DENYNO), &std::fclose);
+std::optional<std::vector<std::uint8_t>> SferaFileManager::readBounded(const std::string& filename, std::size_t capacity) {
+    if (filename.empty()) return std::nullopt;
+    std::unique_ptr<std::FILE, decltype(&std::fclose)> file(::_fsopen(filename.c_str(), "rb", _SH_DENYNO), &std::fclose);
     if (!file) return std::nullopt;
     const auto length = ::_filelengthi64(::_fileno(file.get()));
     if (length < 0 || std::cmp_greater_equal(length, capacity)) return std::nullopt;
@@ -2482,25 +2482,25 @@ std::optional<std::vector<std::uint8_t>> SferaFileManager::readBounded(const cha
     return bytes;
 }
 
-void SferaFileManager::reportError(const char* description, const char* filename) const {
+void SferaFileManager::reportError(std::string_view description, const std::string& filename) const {
     std::string message(description);
-    if (filename != nullptr) message += filename;
+    message += filename;
     CSphereError error;
-    error.write(message.c_str());
+    error.write(message);
 }
 
 
-QuickFile* QuickFile::initialize(const char* directory) {
+QuickFile* QuickFile::initialize(const std::string& directory) {
     release();
     files.reserve(file_capacity);
     index.reserve(file_capacity);
-    if (directory == nullptr || directory[0] == '\0') return this;
+    if (directory.empty()) return this;
     std::error_code error;
     std::filesystem::directory_iterator cursor(std::filesystem::path(directory), error);
     const std::filesystem::directory_iterator end;
     while (!error && cursor != end) {
         const auto path = cursor->path();
-        if (SferaText::resourceKey(path.extension().string()) == ".mbc" && cursor->is_regular_file(error)) load(path.string().c_str(), 0);
+        if (SferaText::resourceKey(path.extension().string()) == ".mbc" && cursor->is_regular_file(error)) load(path.string(), 0);
         cursor.increment(error);
     }
     return this;
@@ -2511,9 +2511,9 @@ void QuickFile::release() {
     std::vector<QuickFileEntry>().swap(files);
 }
 
-int QuickFile::load(const char* filename, std::size_t size) {
-    if (filename == nullptr || *filename == '\0') return 2;
-    std::unique_ptr<std::FILE, decltype(&std::fclose)> stream(::_fsopen(filename, "rb", _SH_DENYNO), &std::fclose);
+int QuickFile::load(const std::string& filename, std::size_t size) {
+    if (filename.empty()) return 2;
+    std::unique_ptr<std::FILE, decltype(&std::fclose)> stream(::_fsopen(filename.c_str(), "rb", _SH_DENYNO), &std::fclose);
     if (!stream) return 2;
     if (files.size() >= file_capacity) return -1;
     if (size == 0) {
@@ -2540,7 +2540,7 @@ const QuickFileEntry* QuickFile::find(std::string_view filename) const {
     return found == index.end() ? nullptr : &files[found->second];
 }
 
-SferaFileMap::SferaFileMap(const char* path) {
+SferaFileMap::SferaFileMap(const std::string& path) {
     open(path);
 }
 
@@ -2552,27 +2552,30 @@ bool SferaFileMap::isOpen() const noexcept {
     return mapped_view != nullptr;
 }
 
-void SferaFileMap::reportError(const char* format) const noexcept {
-    char message[160];
-    std::snprintf(message, sizeof(message), format, filename.c_str());
-    std::fprintf(stderr, "%s\n", message);
-    ::OutputDebugStringA(message);
+void SferaFileMap::reportError(std::string_view operation) const noexcept {
+    try {
+        const auto message = std::format("{} {}", operation, filename);
+        std::fprintf(stderr, "%s\n", message.c_str());
+        ::OutputDebugStringA(message.c_str());
+    } catch (...) {
+        ::OutputDebugStringA("File mapping cleanup failed");
+    }
 }
 
 void SferaFileMap::close() noexcept {
-    if (mapped_view && !::UnmapViewOfFile(mapped_view)) reportError("Error unmapping file %s");
+    if (mapped_view && !::UnmapViewOfFile(mapped_view)) reportError("Error unmapping file");
     mapped_view = nullptr;
     file_size = 0u;
     filename.clear();
 }
 
-bool SferaFileMap::open(const char* path) {
+bool SferaFileMap::open(const std::string& path) {
     close();
-    if (path == nullptr) return false;
-    const char* separator = std::strrchr(path, '\\');
-    filename = separator == nullptr ? path : separator + 1;
+    if (path.empty()) return false;
+    const auto separator = path.find_last_of('\\');
+    filename = path.substr(separator == std::string::npos ? 0u : separator + 1u);
     using NativeHandle = std::unique_ptr<std::remove_pointer_t<HANDLE>, decltype(&::CloseHandle)>;
-    HANDLE opened = ::CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+    HANDLE opened = ::CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
     NativeHandle file(opened == INVALID_HANDLE_VALUE ? nullptr : opened, &::CloseHandle);
     if (!file) return false;
     LARGE_INTEGER length{};
@@ -2848,9 +2851,9 @@ SferaViewProjectionScratchRuntime SferaViewProjectionScratchRuntime::translated(
     return result;
 }
 
-std::vector<std::uint8_t> SferaFileManager::readAll(const char* filename) {
+std::vector<std::uint8_t> SferaFileManager::readAll(const std::string& filename) {
     ScopedFile file(*this, open(filename, _O_RDONLY));
-    const auto path = filename == nullptr ? "<null>" : filename;
+    const auto& path = filename;
     if (file.get() < 0) throw std::runtime_error(std::string("Unable to open file: ") + path);
     const auto length = seek(file.get(), 0, SEEK_END);
     if (length < 0 || seek(file.get(), 0, SEEK_SET) != 0) throw std::runtime_error(std::string("Unable to measure file: ") + path);
@@ -2863,6 +2866,7 @@ std::vector<std::uint8_t> SferaFileManager::readAll(const char* filename) {
 SphereRender::ConfigDocument::StorageMode SphereRender::ConfigDocument::storage_mode_ = StorageMode::Plain;
 
 class SphereRender::ConfigDocument::Parser {
+    auto peek() const { return position_ < source_.size() ? source_[position_] : '\0'; }
 public:
     explicit Parser(std::string_view source) : source_(source) {}
     ConfigDocument document(bool nested = false) {
@@ -2876,13 +2880,13 @@ public:
             Value value;
             value.name = identifier();
             if (result.find(value.name) != nullptr) throw std::runtime_error("openCfg: duplicate name: " + value.name);
-            require('<', 5);
+            require("<", 5);
             const bool array = peek() == 'a' || peek() == 'A';
             if (array) ++position_;
-            const char type = peek();
+            const auto type = peek();
             if (type != '\0') ++position_;
-            require('>', 8, false);
-            require('=', 10);
+            require(">", 8, false);
+            require("=", 10);
             if (!skipSpace()) fail(11);
             switch (type) {
             case 'i': case 'I':
@@ -2918,7 +2922,7 @@ public:
                 value.type = array ? Type::ObjectArray : Type::Object;
                 std::vector<ConfigDocument> items;
                 do {
-                    require('{', array ? 35 : 33);
+                    require("{", array ? 35 : 33);
                     items.push_back(document(true));
                 } while (array && separator());
                 value.data = std::move(items);
@@ -2932,7 +2936,6 @@ public:
         return result;
     }
 private:
-    char peek() const { return position_ < source_.size() ? source_[position_] : '\0'; }
     bool skipSpace() {
         while (position_ < source_.size()) {
             if (source_[position_] == '\0') return false;
@@ -2947,10 +2950,10 @@ private:
         }
         return false;
     }
-    void require(char character, int error, bool skip = true) {
+    void require(std::string_view token, int error, bool skip = true) {
         if (skip) skipSpace();
-        if (peek() != character) fail(error);
-        ++position_;
+        if (!source_.substr(position_).starts_with(token)) fail(error);
+        position_ += token.size();
     }
     bool separator() {
         skipSpace();
@@ -2960,7 +2963,7 @@ private:
         return true;
     }
     std::string identifier() {
-        const auto letter = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; };
+        const auto letter = [](auto c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; };
         if (!letter(peek())) fail(2);
         const auto begin = position_++;
         while (letter(peek()) || (peek() >= '0' && peek() <= '9')) ++position_;
@@ -2988,7 +2991,7 @@ private:
         return value;
     }
     std::string text() {
-        require('"', 23);
+        require("\"", 23);
         const auto begin = position_;
         while (peek() != '"') {
             if (peek() == '\0') fail(24);
@@ -3001,7 +3004,7 @@ private:
     std::vector<std::uint8_t> binary() {
         if (peek() < '0' || peek() > '9') fail(28);
         const std::size_t length = integer();
-        require(':', 30, false);
+        require(":", 30, false);
         if (!skipSpace() && length != 0) fail(31);
         const auto encoded_length = (length / 7) * 8 + ((length % 7) * 8 + 6) / 7;
         if (encoded_length > source_.size() - position_) fail(39);
@@ -3011,8 +3014,8 @@ private:
             const auto first = index + index / 7;
             const auto shift = static_cast<unsigned>(index % 7);
             if (encoded[first] == '\0' || encoded[first + 1] == '\0') fail(39);
-            const auto low = static_cast<unsigned char>(encoded[first]) - static_cast<unsigned>('0');
-            const auto high = static_cast<unsigned char>(encoded[first + 1]) - static_cast<unsigned>('0');
+            const auto low = static_cast<std::uint8_t>(encoded[first]) - static_cast<unsigned>('0');
+            const auto high = static_cast<std::uint8_t>(encoded[first + 1]) - static_cast<unsigned>('0');
             bytes[index] = (low >> shift) | (high << (7 - shift));
         }
         position_ += encoded_length;
@@ -3026,14 +3029,14 @@ private:
 
 SphereRender::ConfigDocument SphereRender::ConfigDocument::parse(std::string_view source) { return Parser(source).document(); }
 
-SphereRender::ConfigDocument SphereRender::ConfigDocument::open(const char* path) {
+SphereRender::ConfigDocument SphereRender::ConfigDocument::open(const std::string& path) {
     try {
         auto bytes = g_sfera_files.readAll(path);
         if (bytes.empty()) throw std::runtime_error(std::string("openCfg: wrong format of Cfg ") + path);
-        constexpr std::string_view leadingCharacters = "\r /";
+        constexpr auto leadingByte = [](std::uint8_t byte) { return byte == '\r' || byte == ' ' || byte == '/'; };
         constexpr auto transformByte = [](std::uint8_t byte) { return byte ^ storageKey; };
-        const bool encoded = leadingCharacters.find(static_cast<char>(transformByte(bytes.front()))) != std::string_view::npos;
-        if (!encoded && leadingCharacters.find(static_cast<char>(bytes.front())) == std::string_view::npos) throw std::runtime_error(std::string("openCfg: wrong format of Cfg ") + path);
+        const bool encoded = leadingByte(transformByte(bytes.front()));
+        if (!encoded && !leadingByte(bytes.front())) throw std::runtime_error(std::string("openCfg: wrong format of Cfg ") + path);
         if (encoded) std::transform(bytes.begin(), bytes.end(), bytes.begin(), transformByte);
         const bool rewrite = (encoded && storage_mode_ == StorageMode::Plain) || (!encoded && storage_mode_ == StorageMode::Encoded);
         if (rewrite) {
@@ -3044,7 +3047,7 @@ SphereRender::ConfigDocument SphereRender::ConfigDocument::open(const char* path
             if (g_sfera_files.write(file.get(), stored.data(), stored.size()) != std::ssize(stored)) throw std::runtime_error(std::string("Incomplete Cfg write: ") + path);
             file.close();
         }
-        return parse(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
+        return parse(SferaText::fromBytes(bytes));
     } catch (const std::exception& exception) {
         CSphereError error;
         error.write(exception.what());
@@ -3054,8 +3057,7 @@ SphereRender::ConfigDocument SphereRender::ConfigDocument::open(const char* path
 
 void SphereRender::ConfigDocument::setStorageMode(StorageMode mode) { storage_mode_ = mode; }
 const SphereRender::ConfigDocument::Value* SphereRender::ConfigDocument::find(std::string_view name) const {
-    const std::string query(name);
-    for (const auto& value : values_) if (SferaText::asciiEqual(value.name.c_str(), query.c_str())) return &value;
+    for (const auto& value : values_) if (SferaText::asciiEqual(value.name, name)) return &value;
     return nullptr;
 }
 std::optional<int> SphereRender::ConfigDocument::integer(std::string_view name) const {
@@ -3070,11 +3072,11 @@ std::optional<float> SphereRender::ConfigDocument::real(std::string_view name) c
     if (value->type != Type::Float) throw std::runtime_error("getCfg: wrong type of parameter. Name: " + value->name);
     return std::get<float>(value->data);
 }
-const char* SphereRender::ConfigDocument::text(std::string_view name) const {
+std::optional<std::string_view> SphereRender::ConfigDocument::text(std::string_view name) const {
     const auto* value = find(name);
-    if (value == nullptr) return nullptr;
+    if (value == nullptr) return std::nullopt;
     if (value->type != Type::Text) throw std::runtime_error("getCfg: wrong type of parameter. Name: " + value->name);
-    return std::get<std::string>(value->data).c_str();
+    return std::get<std::string>(value->data);
 }
 std::optional<std::size_t> SphereRender::ConfigDocument::arraySize(std::string_view name) const {
     const auto* value = find(name);
@@ -3099,11 +3101,11 @@ std::optional<float> SphereRender::ConfigDocument::realAt(std::string_view name,
     if (value->type != Type::FloatArray) throw std::runtime_error("getCfg: wrong type of parameter. Name: " + value->name);
     return std::get<std::vector<float>>(value->data).at(index);
 }
-const char* SphereRender::ConfigDocument::textAt(std::string_view name, std::size_t index) const {
+std::optional<std::string_view> SphereRender::ConfigDocument::textAt(std::string_view name, std::size_t index) const {
     const auto* value = find(name);
-    if (value == nullptr) return nullptr;
+    if (value == nullptr) return std::nullopt;
     if (value->type != Type::TextArray) throw std::runtime_error("getCfg: wrong type of parameter. Name: " + value->name);
-    return std::get<std::vector<std::string>>(value->data).at(index).c_str();
+    return std::get<std::vector<std::string>>(value->data).at(index);
 }
 const SphereRender::ConfigDocument* SphereRender::ConfigDocument::object(std::string_view name) const {
     const auto* value = find(name);
@@ -3125,11 +3127,11 @@ std::span<const std::uint8_t> SphereRender::ConfigDocument::binary(std::string_v
 }
 const std::vector<SphereRender::ConfigDocument::Value>& SphereRender::ConfigDocument::values() const { return values_; }
 
-void SphereRender::ModelParameters::load(const char* path) {
+void SphereRender::ModelParameters::load(const std::string& path) {
     if (initialized_) { CSphereError error; error.write("CObjParamManager::Open: object already initialized"); }
     try {
         const auto bytes = g_sfera_files.readAll(path);
-        parse(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
+        parse(SferaText::fromBytes(bytes));
     } catch (const std::exception& exception) { CSphereError error; error.write(exception.what()); throw; }
 }
 void SphereRender::ModelParameters::parse(std::string_view source) {
@@ -3174,15 +3176,13 @@ void SphereRender::ModelParameters::parse(std::string_view source) {
 }
 void SphereRender::ModelParameters::clear() { objects_.clear(); initialized_ = false; }
 const SphereRender::ModelParameters::Object* SphereRender::ModelParameters::findObject(std::string_view name) const {
-    const std::string query(name);
-    for (const auto& object : objects_) if (SferaText::asciiEqual(object.name.c_str(), query.c_str())) return &object;
+    for (const auto& object : objects_) if (SferaText::asciiEqual(object.name, name)) return &object;
     return nullptr;
 }
 const SphereRender::ModelParameters::Parameter* SphereRender::ModelParameters::findParameter(std::string_view model, std::string_view parameter) const {
     const auto* object = findObject(model);
     if (object == nullptr) return nullptr;
-    const std::string query(parameter);
-    for (const auto& value : object->parameters) if (SferaText::asciiEqual(value.name.c_str(), query.c_str())) return &value;
+    for (const auto& value : object->parameters) if (SferaText::asciiEqual(value.name, parameter)) return &value;
     return nullptr;
 }
 bool SphereRender::ModelParameters::contains(std::string_view model, std::string_view parameter) const { return findParameter(model, parameter) != nullptr; }
@@ -3193,27 +3193,23 @@ std::optional<std::string_view> SphereRender::ModelParameters::stringValue(std::
     if (!value->value) throw std::runtime_error("CObjParamManager::GetObjParam: wrong file format");
     return *value->value;
 }
+namespace {
+    template<class Number> std::optional<Number> modelNumber(std::optional<std::string_view> source) {
+        if (!source) return std::nullopt;
+        auto text = *source;
+        while (!text.empty() && std::isspace(static_cast<std::uint8_t>(text.front())) != 0) text.remove_prefix(1);
+        if (text.starts_with('+')) text.remove_prefix(1);
+        Number value{};
+        if (text.empty() || std::from_chars(text.data(), text.data() + text.size(), value).ec != std::errc{})
+            throw std::runtime_error("CObjParamManager::GetObjParam: wrong file format");
+        return value;
+    }
+}
 std::optional<float> SphereRender::ModelParameters::floatValue(std::string_view model, std::string_view parameter) const {
-    const auto source = stringValue(model, parameter);
-    if (!source) return std::nullopt;
-    float value = 0.0f;
-    const char* begin = source->data();
-    const char* end = source->data() + source->size();
-    while (begin < end && std::isspace(static_cast<unsigned char>(*begin)) != 0) ++begin;
-    if (begin < end && *begin == '+') ++begin;
-    if (std::from_chars(begin, end, value).ec != std::errc{}) throw std::runtime_error("CObjParamManager::GetObjParam: wrong file format");
-    return value;
+    return modelNumber<float>(stringValue(model, parameter));
 }
 std::optional<int> SphereRender::ModelParameters::intValue(std::string_view model, std::string_view parameter) const {
-    const auto source = stringValue(model, parameter);
-    if (!source) return std::nullopt;
-    int value = 0;
-    const char* begin = source->data();
-    const char* end = source->data() + source->size();
-    while (begin < end && std::isspace(static_cast<unsigned char>(*begin)) != 0) ++begin;
-    if (begin < end && *begin == '+') ++begin;
-    if (std::from_chars(begin, end, value).ec != std::errc{}) throw std::runtime_error("CObjParamManager::GetObjParam: wrong file format");
-    return value;
+    return modelNumber<int>(stringValue(model, parameter));
 }
 
 std::uint32_t SphereRender::Material::randomColor(const std::array<float, 3>& variation) {
@@ -3239,7 +3235,7 @@ const SphereRender::Material* SphereRender::MaterialLibrary::at(std::size_t inde
 const SphereRender::Material* SphereRender::MaterialLibrary::defaultMaterial() const { return default_index_ ? at(*default_index_) : nullptr; }
 std::size_t SphereRender::MaterialLibrary::size() const { return materials_ ? materials_->size() : 0u; }
 
-void SphereRender::MaterialLibrary::load(const char* binary_path, const char* configuration_path) {
+void SphereRender::MaterialLibrary::load(const std::string& binary_path, const std::string& configuration_path) {
     try {
         ConfigDocument::setStorageMode(ConfigDocument::StorageMode::Plain);
         const auto configuration = ConfigDocument::open(configuration_path);
@@ -3270,7 +3266,7 @@ void SphereRender::MaterialLibrary::load(const char* binary_path, const char* co
         for (std::size_t index = 0; index < count; ++index) {
             Material material;
             material.name = name();
-            if (SferaText::asciiEqual(material.name.c_str(), "default")) default_index = index;
+            if (SferaText::asciiEqual(material.name, "default")) default_index = index;
             const auto texture_count = integer();
             if (texture_count > 16) throw std::runtime_error("MaterialLibrary: invalid texture count");
             material.textures.reserve(texture_count);
@@ -3279,16 +3275,16 @@ void SphereRender::MaterialLibrary::load(const char* binary_path, const char* co
                 auto texture_name = name();
                 if (texture_name.size() < 2) throw std::runtime_error("MaterialLibrary: invalid texture name");
                 texture_name.resize(texture_name.size() - 2);
-                material.textures.push_back(g_sfera_textures.find(texture_name.c_str()));
+                material.textures.push_back(g_sfera_textures.find(texture_name));
             }
             for (auto& channel : material.color) channel = std::bit_cast<float>(integer());
             take(22);
             for (std::size_t configured = 0; configured < count_configured; ++configured) {
                 const auto* record = configuration.objectAt("materials", configured);
                 if (record == nullptr) throw std::runtime_error("Can't go into material struct " + std::to_string(configured));
-                const auto* configured_name = record->text("name");
-                if (configured_name == nullptr) throw std::runtime_error("Field name is absent in material " + std::to_string(configured));
-                if (!SferaText::asciiEqual(configured_name, material.name.c_str())) continue;
+                const auto configured_name = record->text("name");
+                if (!configured_name) throw std::runtime_error("Field name is absent in material " + std::to_string(configured));
+                if (!SferaText::asciiEqual(*configured_name, material.name)) continue;
                 const auto red = record->realAt("rgbRand", 0);
                 if (red) {
                     const auto green = record->realAt("rgbRand", 1);
@@ -3306,11 +3302,10 @@ void SphereRender::MaterialLibrary::load(const char* binary_path, const char* co
     } catch (const std::exception& exception) { CSphereError error; error.write(exception.what()); throw; }
 }
 
-std::unique_ptr<SphereRender::Model> SphereRender::Model::load(const char* model_name, const char* directory, const ModelParameters& parameters, const MaterialLibrary& materials) {
+std::unique_ptr<SphereRender::Model> SphereRender::Model::load(std::string_view model_name, std::string_view directory, const ModelParameters& parameters, const MaterialLibrary& materials) {
     try {
-        if (model_name == nullptr || directory == nullptr) throw std::invalid_argument("Model path is missing");
-        const std::string path = std::string(directory) + model_name + ".mdl";
-        const std::vector<std::uint8_t> bytes = g_sfera_files.readAll(path.c_str());
+        const std::string path = std::format("{}{}.mdl", directory, model_name);
+        const std::vector<std::uint8_t> bytes = g_sfera_files.readAll(path);
         return decode(model_name, bytes, parameters, materials);
     } catch (const std::exception& exception) {
         CSphereError error;
@@ -3394,9 +3389,7 @@ std::unique_ptr<SphereRender::Model> SphereRender::Model::decode(std::string_vie
         if (cursor == source_vertices) fail("missing material name");
         const std::size_t length = byte(cursor++);
         if (length > source_vertices - cursor) fail("material name exceeds its section");
-        std::string material_name;
-        material_name.reserve(length);
-        for (std::size_t character = 0u; character < length && byte(cursor + character) != 0u; ++character) material_name.push_back(static_cast<char>(byte(cursor + character)));
+        const std::string material_name(SferaText::prefix(std::span(bytes).subspan(cursor, length), length));
         const auto material = materials.find(material_name);
         if (!material) fail("material is absent from the material library: " + material_name);
         model->materials[index] = material;
@@ -3440,10 +3433,9 @@ std::unique_ptr<SphereRender::Model> SphereRender::Model::decode(std::string_vie
     for (std::size_t index = 0u; index < source_bone_count; ++index) {
         const std::size_t offset = source_bones + index * 39u;
         Bone& bone = model->bones[index];
-        std::size_t length = 0u;
-        while (length < 32u && byte(offset + length) != 0u) ++length;
-        if (length == 32u) fail("unterminated bone name");
-        bone.name.assign(reinterpret_cast<const char*>(bytes.data() + offset), length);
+        const auto boneName = std::span(bytes).subspan(offset, 32u);
+        if (std::find(boneName.begin(), boneName.end(), std::uint8_t{}) == boneName.end()) fail("unterminated bone name");
+        bone.name.assign(SferaText::prefix(boneName, boneName.size()));
         bone.has_geometry = byte(offset + 32u) != 2u;
         bone.child_count = byte(offset + 33u);
         bone.first_child = byte(offset + 34u);
@@ -3455,7 +3447,7 @@ std::unique_ptr<SphereRender::Model> SphereRender::Model::decode(std::string_vie
             bone.animation().suppress_secondary_animation = byte(offset + 38u);
             if (bone.animation().pose_index >= (bone.animation().animated ? animation_frame_count : keyframe_count)) fail("invalid bone animation offset");
             const std::string_view name = bone.name;
-            const auto equal = [&](const char* value) { return SferaText::asciiEqual(bone.name.c_str(), value); };
+            const auto equal = [&](std::string_view value) { return SferaText::asciiEqual(bone.name, value); };
             if (equal("back_swo")) bone.animation().attachment_slot = 0u;
             else if (equal("back_ara")) bone.animation().attachment_slot = 1u;
             else if (equal("back_axe")) bone.animation().attachment_slot = 2u;
@@ -3464,7 +3456,7 @@ std::unique_ptr<SphereRender::Model> SphereRender::Model::decode(std::string_vie
             else if (equal("finl_m1o1") || equal("fingl_m1o1")) bone.animation().attachment_slot = 100u;
             else if (equal("finr_m1o1") || equal("fingr_m1o1")) bone.animation().attachment_slot = 101u;
             else if (equal("neck_m1o1")) bone.animation().attachment_slot = 102u;
-            else if (name.size() >= 4u && SferaText::asciiEqual(std::string(name.substr(0u, 4u)).c_str(), "head")) bone.animation().attachment_slot = 103u;
+            else if (name.size() >= 4u && SferaText::asciiEqual(std::string(name.substr(0u, 4u)), "head")) bone.animation().attachment_slot = 103u;
         } else {
             const std::size_t bounds_offset = source_bone_bounds + index * 24u;
             bone.bounds().minimum = point(bounds_offset);
@@ -3748,8 +3740,8 @@ void SphereRender::TextureRepository::initialize() {
     initialized = true;
 }
 
-void SphereRender::TextureRepository::addFolder(const char* directory) {
-    if (directory == nullptr) return;
+void SphereRender::TextureRepository::addFolder(const std::string& directory) {
+    if (directory.empty()) return;
     const std::filesystem::path folder(directory);
     std::error_code error;
     for (std::filesystem::directory_iterator iterator(folder, error), end; !error && iterator != end; iterator.increment(error)) {
@@ -3778,9 +3770,9 @@ void SphereRender::TextureRepository::clear() {
     initialized = false;
 }
 
-int SphereRender::TextureRepository::find(const char* name) const {
+int SphereRender::TextureRepository::find(std::string_view name) const {
     // The existing texture lookup contract uses entry zero for an unknown name.
-    if (!initialized || name == nullptr || *name == '\0') return 0;
+    if (!initialized || name.empty()) return 0;
     const auto found = names.find(SferaText::resourceKey(name));
     return found == names.end() ? 0 : found->second;
 }
@@ -3794,7 +3786,7 @@ IDirect3DBaseTexture9* SphereRender::TextureRepository::resource(int index) {
     auto* entry = resolve(index);
     if (entry == nullptr) return nullptr;
     if (entry->texture != nullptr) return entry->texture.Get();
-    const auto bytes = g_sfera_files.readAll(entry->filename.string().c_str());
+    const auto bytes = g_sfera_files.readAll(entry->filename.string());
     load(*entry, bytes);
     return entry->texture.Get();
 }
@@ -3818,8 +3810,8 @@ void SphereRender::ModelRepository::initialize() {
     parameters.load("models\\mdlparam.txt");
 }
 
-void SphereRender::ModelRepository::addFolder(const char* directory) {
-    if (directory == nullptr) return;
+void SphereRender::ModelRepository::addFolder(const std::string& directory) {
+    if (directory.empty()) return;
     const std::filesystem::path folder(directory);
     std::error_code error;
     for (std::filesystem::directory_iterator iterator(folder, error), end; !error && iterator != end; iterator.increment(error)) {
@@ -3836,8 +3828,8 @@ void SphereRender::ModelRepository::finishRegistration() {
     if (entries.size() >= 5000u) throw std::length_error("Model repository exceeds the model ID range");
 }
 
-int SphereRender::ModelRepository::find(const char* name) const {
-    if (name == nullptr) return -1;
+int SphereRender::ModelRepository::find(std::string_view name) const {
+    if (name.empty()) return -1;
     const auto found = names.find(SferaText::resourceKey(name));
     return found == names.end() ? -1 : found->second;
 }
@@ -3846,7 +3838,7 @@ std::shared_ptr<SphereRender::Model> SphereRender::ModelRepository::model(int in
     if (index < 0 || std::size_t(index) >= entries.size()) throw std::out_of_range("Model repository: invalid model ID");
     auto& entry = entries[index];
     entry.last_used = std::chrono::steady_clock::now();
-    if (entry.model == nullptr) entry.model = Model::load(entry.name.c_str(), entry.directory.c_str(), parameters, g_sfera_materials);
+    if (entry.model == nullptr) entry.model = Model::load(entry.name, entry.directory, parameters, g_sfera_materials);
     if (++requests_since_scan > 100000u) {
         requests_since_scan = 0u;
         evictUnused();
@@ -4014,8 +4006,8 @@ std::pair<bool, std::array<std::uint8_t, 8>> CShaderMgr::instanceCode(std::strin
     for (unsigned pin = 0u; ; ++pin) {
         if (pin == 8u) throw std::invalid_argument("Too many shader pins: " + std::string(filename));
         if (position + 1u >= filename.size()) throw std::invalid_argument("Incomplete shader pin: " + std::string(filename));
-        const char tens = filename[position];
-        const char units = filename[position + 1u];
+        const auto tens = filename[position];
+        const auto units = filename[position + 1u];
         if (tens < '0' || tens > '9' || units < '0' || units > '9') throw std::invalid_argument("Invalid shader pin: " + std::string(filename));
         code.second[pin] = (tens - '0') * 10 + units - '0';
         position += 2u;
@@ -4080,14 +4072,14 @@ CShaderMgr::WaterParameters CShaderMgr::waterParameters(float environment, float
     return result;
 }
 
-void CShaderMgr::loadFolder(const char* directory, bool pixel) {
+void CShaderMgr::loadFolder(const std::string& directory, bool pixel) {
     std::error_code error;
     std::filesystem::directory_iterator files(directory, error);
     if (error) return;
     for (const auto& file : files) {
         if (!file.is_regular_file()) continue;
         std::string extension = file.path().extension().string();
-        std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char character) { return std::tolower(character); });
+        SferaText::lowercaseLocale(extension);
         if (extension != (pixel ? ".psc" : ".vsc")) continue;
         const std::string filename = file.path().filename().string();
         const auto code = instanceCode(filename, pixel);
@@ -4097,10 +4089,10 @@ void CShaderMgr::loadFolder(const char* directory, bool pixel) {
     }
 }
 
-CShaderMgr::CShaderMgr(CD3D9Device& owner, const char* vertex_path, const char* pixel_path) : vertex_directory(vertex_path), pixel_directory(pixel_path), device(owner) {
+CShaderMgr::CShaderMgr(CD3D9Device& owner, std::string vertex_path, std::string pixel_path) : vertex_directory(std::move(vertex_path)), pixel_directory(std::move(pixel_path)), device(owner) {
     try {
-        loadFolder(vertex_directory.c_str(), false);
-        loadFolder(pixel_directory.c_str(), true);
+        loadFolder(vertex_directory, false);
+        loadFolder(pixel_directory, true);
         wave_samples = makeWaveSamples();
         downsample_offsets = makeDownsampleOffsets(static_cast<float>(g_sfera_graphics_runtime.display_width), static_cast<float>(g_sfera_graphics_runtime.display_height));
     } catch (const std::exception& error) {
@@ -4108,11 +4100,11 @@ CShaderMgr::CShaderMgr(CD3D9Device& owner, const char* vertex_path, const char* 
     }
 }
 
-static std::unordered_map<std::string, int> sfera_shader_constants(std::span<const std::uint8_t> code) {
+static std::unordered_map<std::string, int, SferaText::Hash, std::equal_to<>> sfera_shader_constants(std::span<const std::uint8_t> code) {
     constexpr std::uint32_t comment_opcode = 0xfffeu;
     constexpr std::uint32_t end_opcode = 0x0000ffffu;
     constexpr std::uint32_t ctab_signature = 0x42415443u;
-    std::unordered_map<std::string, int> constants;
+    std::unordered_map<std::string, int, SferaText::Hash, std::equal_to<>> constants;
     if (code.size() < 8 || code.size() % 4 != 0) throw std::runtime_error("Truncated compiled shader");
     const bool explicit_lengths = ((SferaBinary::readLittleEndian<std::uint32_t>(code.data()) >> 8u) & 0xffu) >= 2u;
     if (!explicit_lengths && SferaBinary::readLittleEndian<std::uint32_t>(code.data() + code.size() - 4) != end_opcode) {
@@ -4150,7 +4142,7 @@ static std::unordered_map<std::string, int> sfera_shader_constants(std::span<con
             const auto name = table.subspan(name_offset);
             const auto end = std::find(name.begin(), name.end(), std::uint8_t{0});
             if (end == name.end()) throw std::runtime_error("Unterminated shader constant name");
-            constants[std::string(reinterpret_cast<const char*>(name.data()), end - name.begin())] = register_index;
+            constants[std::string(SferaText::fromBytes(name.first(static_cast<std::size_t>(end - name.begin()))))] = register_index;
         }
     }
     if (!explicit_lengths) return constants;
@@ -4160,17 +4152,17 @@ static std::unordered_map<std::string, int> sfera_shader_constants(std::span<con
 CShaderMgr::Variant& CShaderMgr::loadVariant(const std::pair<bool, std::array<std::uint8_t, 8>>& code) {
     auto found = variants.find(code);
     if (found == variants.end()) {
-        CSphereError{}.write(("Unexpected shader group: " + std::to_string(code.second.front())).c_str());
+        CSphereError{}.write(("Unexpected shader group: " + std::to_string(code.second.front())));
         throw std::out_of_range("Shader variant does not exist");
     }
     Variant& variant = found->second;
     if (variant.pixel_shader) return variant;
 
     const std::string filename = (std::filesystem::path(pixel_directory) / variant.filename).string();
-    SferaFileMap file(filename.c_str());
+    SferaFileMap file(filename);
     const auto mapped = file.bytes();
     if (!file.isOpen() || mapped.size() < sizeof(DWORD) || mapped.size() % sizeof(DWORD) != 0u) {
-        CSphereError{}.write(("Invalid compiled shader: " + filename).c_str());
+        CSphereError{}.write(("Invalid compiled shader: " + filename));
         throw std::runtime_error("Compiled shader could not be read");
     }
 
@@ -4183,7 +4175,7 @@ CShaderMgr::Variant& CShaderMgr::loadVariant(const std::pair<bool, std::array<st
     replacement.filename = variant.filename;
     device.checkResult(device.native_device->CreatePixelShader(words.data(),
         replacement.pixel_shader.GetAddressOf()), "CreatePixelShader");
-    const auto resolve = [&](const char* name) {
+    const auto resolve = [&](std::string_view name) {
         const auto iterator = constants.find(name);
         return iterator == constants.end() ? -1 : iterator->second;
     };
@@ -4199,7 +4191,7 @@ CShaderMgr::Variant& CShaderMgr::loadVariant(const std::pair<bool, std::array<st
 void CShaderMgr::setPixelShader(std::uint32_t group) {
     if (group == 10u || group == 11u) return;
     if (group > 13u) {
-        CSphereError{}.write(("Unknown pixel shader group: " + std::to_string(group)).c_str());
+        CSphereError{}.write(("Unknown pixel shader group: " + std::to_string(group)));
         return;
     }
 
@@ -4357,11 +4349,10 @@ CD3D9Device::~CD3D9Device() {
     unmanaged_resources.clear();
 }
 
-HRESULT CD3D9Device::checkResult(HRESULT result, const char* operation) {
+HRESULT CD3D9Device::checkResult(HRESULT result, std::string_view operation) {
     last_hresult = result;
     if (FAILED(result)) {
-        char message[512];
-        std::snprintf(message, sizeof(message), "%s failed (HRESULT 0x%08X)", operation, static_cast<unsigned int>(result));
+        auto message = std::format("{} failed (HRESULT 0x{:08X})", operation, static_cast<unsigned int>(result));
         CSphereError error;
         error.write(message);
     }
@@ -4491,14 +4482,13 @@ void CD3D9Device::initialize(HWND window, std::uint32_t width, std::uint32_t hei
         result = create();
     }
     if (FAILED(result)) {
-        char operation[448]{};
-        std::snprintf(operation, sizeof(operation),
-            "CreateDevice [%ux%u, windowed=%u, adapterFormat=%u, backBuffer=%u, depthStencil=%u, "
-            "behavior=0x%08X, flags=0x%08X, refresh=%u, interval=0x%08X, HWND=%p, firstHRESULT=0x%08X]",
-            width, height, windowed ? 1u : 0u, static_cast<unsigned>(windowed ? display.Format : back_buffer),
-            static_cast<unsigned>(back_buffer), static_cast<unsigned>(depth_format), static_cast<unsigned>(behavior),
-            static_cast<unsigned>(requested.Flags), requested.FullScreen_RefreshRateInHz,
-            static_cast<unsigned>(requested.PresentationInterval), static_cast<void*>(window), static_cast<unsigned>(first_result));
+        auto operation = std::format(
+            "CreateDevice [{}x{}, windowed={}, adapterFormat={}, backBuffer={}, depthStencil={}, behavior=0x{:08X}, "
+            "flags=0x{:08X}, refresh={}, interval=0x{:08X}, HWND={:p}, firstHRESULT=0x{:08X}]",
+            width, height, windowed ? 1u : 0u, static_cast<unsigned>(windowed ? display.Format : back_buffer), static_cast<unsigned>(back_buffer),
+            static_cast<unsigned>(depth_format), static_cast<unsigned>(behavior), static_cast<unsigned>(requested.Flags),
+            requested.FullScreen_RefreshRateInHz, static_cast<unsigned>(requested.PresentationInterval), static_cast<void*>(window),
+            static_cast<unsigned>(first_result));
         checkResult(result, operation);
     }
     native_device = std::move(created);
@@ -5074,22 +5064,22 @@ SferaVec3F SferaVec3F::normalized(int diagnosticCode) const {
     const float length = std::sqrt(double(squareLength));
     if (length < 9.999999747378752e-6f) {
         if (diagnosticCode == 0) return {};
-        WorldDiagnostics::fail((std::string("normalize: normal with extra short length found. Code:") + std::to_string(diagnosticCode)).c_str());
+        WorldDiagnostics::fail((std::string("normalize: normal with extra short length found. Code:") + std::to_string(diagnosticCode)));
     }
     return *this * static_cast<float>(1.0 / double(length));
 }
 
-void WorldDiagnostics::report(const char* message) { SphereUI::InterfaceRenderer::reportError(message == nullptr ? "" : message); }
-[[noreturn]] void WorldDiagnostics::fail(const char* message) { report(message); throw std::runtime_error(message == nullptr ? "World operation failed" : message); }
-void WorldDiagnostics::warning(const char* message) {
-    ::OutputDebugStringA(message == nullptr ? "" : message);
+void WorldDiagnostics::report(std::string_view message) { SphereUI::InterfaceRenderer::reportError(message); }
+[[noreturn]] void WorldDiagnostics::fail(std::string_view message) { report(message); throw std::runtime_error(std::string(message.empty() ? std::string_view{"World operation failed"} : message)); }
+void WorldDiagnostics::warning(std::string_view message) {
+    ::OutputDebugStringA(std::string(message).c_str());
     ::OutputDebugStringA("\n");
 }
 
-WorldObject* WorldObjects::object(std::uint32_t handle, const char* operation) const {
+WorldObject* WorldObjects::object(std::uint32_t handle, std::optional<std::string_view> operation) const {
     auto* result = handle < object_handles.size() ? object_handles[handle].get() : nullptr;
-    if (result == nullptr && operation != nullptr) {
-        std::snprintf(WorldDiagnostics::message, sizeof(WorldDiagnostics::message), "%s: wrong handle", operation);
+    if (result == nullptr && operation) {
+        WorldDiagnostics::message = std::format("{}: wrong handle", *operation);
         WorldDiagnostics::flushScriptContext();
     }
     return result;
@@ -5100,6 +5090,10 @@ ExtendedWorldObject* WorldObjects::extendedObject(std::uint32_t handle) const {
     if (!result->extended()) WorldDiagnostics::fail("Try to get extended from superstatic");
     return result->extended();
 }
+WorldObject* WorldObjects::controlledObject() const {
+    if (clearing || destroying_handles.contains(controlled_object_handle)) return nullptr;
+    return object(controlled_object_handle);
+}
 SphereRender::Model* WorldObjects::model(const WorldObject& object) const {
     if (const auto* reference = std::get_if<WorldObject::ModelReference>(&object.model_source)) {
         if (reference->asset == nullptr) reference->asset = g_sfera_models.model(reference->id);
@@ -5107,11 +5101,11 @@ SphereRender::Model* WorldObjects::model(const WorldObject& object) const {
     }
     return std::get<std::unique_ptr<SphereRender::Model>>(object.model_source).get();
 }
-std::uint32_t WorldObjects::create(const char* name, SferaMbcProcessRecord* process, std::uint32_t kind, bool dynamic) {
+std::uint32_t WorldObjects::create(std::string_view name, SferaMbcProcessRecord* process, std::uint32_t kind, bool dynamic) {
     if (clearing) return UINT32_MAX;
-    const auto modelHandle = g_sfera_models.find(name);
+    const auto modelHandle = name.empty() ? -1 : g_sfera_models.find(name);
     if (modelHandle < 0) {
-        WorldDiagnostics::warning((std::string("CreateObject: no model with such name: ") + (name == nullptr ? "" : name)).c_str());
+        WorldDiagnostics::warning(std::format("CreateObject: no model with such name: {}", name));
         return UINT32_MAX;
     }
     auto handle = next_object_handle;
@@ -5264,7 +5258,7 @@ void SferaMbcProcessRecord::appendCommand(std::string_view command) {
     physics_commands += "\r\n";
     physics_commands.append(command);
 }
-void WorldObjects::appendCommand(std::uint32_t handle, const char* command) { if (auto* item = extendedObject(handle); item != nullptr && item->process_handle != nullptr) item->process_handle->appendCommand(command == nullptr ? "" : command); }
+void WorldObjects::appendCommand(std::uint32_t handle, std::string_view command) { if (auto* item = extendedObject(handle); item != nullptr && item->process_handle != nullptr) item->process_handle->appendCommand(command); }
 bool WorldObjects::actorActive(std::uint32_t handle) const {
     (void)extendedObject(handle);
     return false; // This executable has no subscriber producer.
@@ -5274,11 +5268,11 @@ void WorldObjects::activateTrap(const WorldObject& obstacle) {
     const auto now = WorldClock::nowTicks();
     if (resource == nullptr || now - g_sfera_world_objects.material_refresh_tick <= 10000u) return;
     const std::string_view name(resource->name), pattern("trap");
-    if (std::search(name.begin(), name.end(), pattern.begin(), pattern.end(), [](unsigned char first, unsigned char second) { return std::tolower(first) == std::tolower(second); }) == name.end()) return;
+    if (std::search(name.begin(), name.end(), pattern.begin(), pattern.end(), [](std::uint8_t first, std::uint8_t second) { return std::tolower(first) == std::tolower(second); }) == name.end()) return;
     if (auto* controlled = extendedObject(controlled_object_handle); controlled != nullptr && controlled->process_handle != nullptr) {
         for (auto* effect : obstacle.attached_effects) if (effect) {
             const auto id = effect == nullptr ? 0u : effect->listener_key;
-            appendCommand(controlled_object_handle, (std::string("trap ") + std::to_string(id)).c_str()); break;
+            appendCommand(controlled_object_handle, (std::string("trap ") + std::to_string(id))); break;
         }
     }
     g_sfera_world_objects.material_refresh_tick = now;
@@ -5302,7 +5296,7 @@ void SferaLightRuntime::setActive(std::uint32_t index, bool enabled, std::uint32
     if (index >= active_lights.size()) WorldDiagnostics::fail("Light slot is outside the device light table");
     auto& active = active_lights[index];
     if (active == enabled) return;
-    if (enabled && active_count >= 8) WorldDiagnostics::fail((std::string("ActivateLight: num of active lights > 8. Source line = ") + std::to_string(sourceLine)).c_str());
+    if (enabled && active_count >= 8) WorldDiagnostics::fail((std::string("ActivateLight: num of active lights > 8. Source line = ") + std::to_string(sourceLine)));
     auto& device = *g_sfera_graphics_runtime.d3d_runtime;
     device.checkResult(device.native_device->LightEnable(index, enabled), "LightEnable");
     if (enabled && index != 0u && g_sfera_effect_manager.diagnostics.enabled)
@@ -5347,12 +5341,12 @@ std::vector<std::uint8_t> terrainReadFile(const std::string& path, bool optional
     if (optional) {
         const bool previous = g_sfera_files.setErrorReporting(false);
         std::int64_t size;
-        try { size = g_sfera_files.fileSize(path.c_str()); }
+        try { size = g_sfera_files.fileSize(path); }
         catch (...) { g_sfera_files.setErrorReporting(previous); throw; }
         g_sfera_files.setErrorReporting(previous);
         if (size < 0) return {};
     }
-    return g_sfera_files.readAll(path.c_str());
+    return g_sfera_files.readAll(path);
 }
 
 void terrainSmoothNormals(const std::vector<TerrainVertex*>& vertices) {
@@ -5600,7 +5594,7 @@ void smoothTerrainNeighborhood(TerrainPatch& current, const std::array<TerrainPa
     valid = smooth(4, 0, 1) && valid;
     valid = smooth(7, 3, 2) && valid;
     valid = smooth(6, 2, 3) && valid;
-    if (!valid) WorldDiagnostics::fail(("Smooth error in " + name + "! Look at lndbug.tga").c_str());
+    if (!valid) WorldDiagnostics::fail(("Smooth error in " + name + "! Look at lndbug.tga"));
     constexpr std::array<std::array<std::size_t, 6>, 4> corners{{{3, 4, 6, 3, 2, 1}, {2, 4, 7, 2, 3, 0}, {0, 5, 6, 1, 0, 3}, {1, 5, 7, 0, 1, 2}}};
     for (std::size_t index = 0; index < corners.size(); ++index) {
         if (patch.cornerSmoothed[index]) continue;
@@ -5625,14 +5619,14 @@ void TerrainRegion::loadPatch(int row, int column) {
     if (row < 0 || row >= rows || row >= 10 || column < 0 || column >= columns || column >= 10) throw std::out_of_range("Landscape patch coordinates");
     auto& slot = slots[row * 10 + column];
     if (slot.patch) return;
-    const std::string stem = name + "_" + char('0' + row) + char('0' + column);
+    const std::string stem = std::format("{}_{}{}", name, row, column);
     const std::string prefix = directory + stem;
     const auto masks = terrainReadFile(prefix + ".msk");
     const auto water = terrainReadFile(prefix + ".wtr", true);
     auto texture = TerrainTextureImage::decode(terrainReadFile(prefix + ".dds"));
     auto owned = std::make_unique<TerrainPatch>();
-    owned->readGeometry(g_sfera_files.readAll((stem + ".lnd").c_str()), masks, water, TerrainAssets::microtexture_remap, static_cast<std::uint16_t>(g_sfera_graphics_runtime.base_microtexture_id));
-    const auto textureId = g_sfera_textures.find(stem.c_str());
+    owned->readGeometry(g_sfera_files.readAll((stem + ".lnd")), masks, water, TerrainAssets::microtexture_remap, static_cast<std::uint16_t>(g_sfera_graphics_runtime.base_microtexture_id));
+    const auto textureId = g_sfera_textures.find(stem);
     const std::array<TerrainPatch*, 8> neighbors{patch(row - 1, column - 1), patch(row + 1, column - 1), patch(row + 1, column + 1), patch(row - 1, column + 1), patch(row, column + 1), patch(row, column - 1), patch(row - 1, column), patch(row + 1, column)};
     smoothTerrainNeighborhood(*owned, neighbors, name);
     slot.patch = std::move(owned);
@@ -5642,15 +5636,14 @@ void TerrainRegion::loadPatch(int row, int column) {
 }
 
 namespace {
-void appendTerrainCatalog(std::deque<TerrainRegion>& regions, const char* directory) {
-    if (!directory) throw std::invalid_argument("Missing landscape directory");
+void appendTerrainCatalog(std::deque<TerrainRegion>& regions, const std::string& directory) {
     std::error_code error;
     const auto root = std::filesystem::path(directory);
     bool found = false;
     for (const auto& entry : std::filesystem::directory_iterator(root, error)) {
         if (!entry.is_regular_file()) continue;
         auto extension = entry.path().extension().string();
-        std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return std::tolower(c); });
+        SferaText::lowercaseLocale(extension);
         if (extension != ".siz") continue;
         found = true;
         if (regions.size() >= 300u) throw std::runtime_error("Too many landscape files");
@@ -5667,9 +5660,9 @@ void appendTerrainCatalog(std::deque<TerrainRegion>& regions, const char* direct
     }
     if (error || !found) WorldDiagnostics::fail("*.siz files not found");
 }
-void appendTerrainMicrotextures(const char* pattern, std::vector<TerrainAssets::Microtexture>& microtextures, std::array<std::uint16_t, 65536>& remap, std::uint32_t& baseIndex) {
+void appendTerrainMicrotextures(const std::string& pattern, std::vector<TerrainAssets::Microtexture>& microtextures, std::array<std::uint16_t, 65536>& remap, std::uint32_t& baseIndex) {
     _finddata64i32_t found{};
-    const auto search = _findfirst64i32(pattern, &found);
+    const auto search = _findfirst64i32(pattern.c_str(), &found);
     if (search == -1) return;
     try {
         do {
@@ -5693,9 +5686,9 @@ void appendTerrainMicrotextures(const char* pattern, std::vector<TerrainAssets::
 }
 
 namespace {
-bool terrainNamesEqual(const char* first, const char* second) { if (!first || !second) return first == second; while (*first && *second) { if (std::tolower(static_cast<unsigned char>(*first++)) != std::tolower(static_cast<unsigned char>(*second++))) return false; } return *first == *second; }
-TerrainRegion* terrainFindRegion(std::deque<TerrainRegion>& regions, const char* name) {
-    for (auto& region : regions) if (terrainNamesEqual(region.name.c_str(), name)) return &region;
+bool terrainNamesEqual(std::string_view first, std::string_view second) { return SferaText::compareInsensitive(first, second) == 0; }
+TerrainRegion* terrainFindRegion(std::deque<TerrainRegion>& regions, std::string_view name) {
+    for (auto& region : regions) if (terrainNamesEqual(region.name, name)) return &region;
     return nullptr;
 }
 }
@@ -5706,9 +5699,9 @@ void TerrainAssets::loadMap() {
     remap->fill(UINT16_MAX);
     std::uint32_t baseIndex = UINT32_MAX;
     std::vector<std::string> directories{"landscape\\"}; if (TerrainAssets::high_resolution_assets) directories.emplace_back("landscape_hr\\"); if (TerrainAssets::alternate_ph_assets) directories.emplace_back("landscape_ph\\"); if (TerrainAssets::alternate_rd_assets) directories.emplace_back("landscape_rd\\");
-    for (const auto& directory : directories) appendTerrainMicrotextures((directory + "*.mtx").c_str(), loadedMicrotextures, *remap, baseIndex);
+    for (const auto& directory : directories) appendTerrainMicrotextures((directory + "*.mtx"), loadedMicrotextures, *remap, baseIndex);
     if (baseIndex == UINT32_MAX) { WorldDiagnostics::fail("Base microtexture not found: landscape\\??_.mtx"); }
-    for (const auto& directory : directories) appendTerrainCatalog(loadedRegions, directory.c_str());
+    for (const auto& directory : directories) appendTerrainCatalog(loadedRegions, directory);
     const auto data = terrainReadFile("landscape\\map.bin");
     constexpr std::size_t encodedCellSize = 22;
     if (data.size() != map.size() * encodedCellSize) throw std::runtime_error("Invalid landscape map file size");
@@ -5721,7 +5714,7 @@ void TerrainAssets::loadMap() {
         const std::string name(encodedName.begin(), terminator);
         cell.tile_x = reader.read<std::uint8_t>();
         cell.tile_y = reader.read<std::uint8_t>();
-        cell.region = terrainFindRegion(loadedRegions, name.c_str());
+        cell.region = terrainFindRegion(loadedRegions, name);
         if (cell.region == nullptr) {
             cell.region = terrainFindRegion(loadedRegions, "FILL_EMPT");
             cell.tile_x = cell.tile_y = 0;
@@ -5815,18 +5808,18 @@ bool Contours::sameEdge(int first_contour, int first_edge, int second_contour, i
     return (equal(first_edge, second_edge) && equal(first_next, second_next)) || (equal(first_edge, second_next) && equal(first_next, second_edge));
 }
 
-void Contours::setServerMap(const int* types, const int* servers, int count) {
-    if (types == nullptr || servers == nullptr || count <= 0) throw std::invalid_argument("Contours: empty server map");
+void Contours::setServerMap(std::span<const int> types, std::span<const int> servers) {
+    if (types.empty() || types.size() != servers.size()) throw std::invalid_argument("Contours: invalid server map");
     std::vector<std::pair<int, int>> replacement;
-    replacement.reserve(count);
-    for (int i = 0; i < count; ++i) replacement.emplace_back(types[i], servers[i]);
+    replacement.reserve(types.size());
+    for (std::size_t i = 0; i < types.size(); ++i) replacement.emplace_back(types[i], servers[i]);
     server_map.swap(replacement);
     invalidateGrid();
 }
 
 int Contours::serverByType(int type) const {
     for (const auto& entry : server_map) if (entry.first == type) return entry.second;
-    SphereUI::InterfaceRenderer::reportError(("Contours: no server for type " + std::to_string(type)).c_str());
+    SphereUI::InterfaceRenderer::reportError(("Contours: no server for type " + std::to_string(type)));
     return 0;
 }
 
@@ -6391,7 +6384,7 @@ namespace {
     float vegetationRandom(double scale, double offset = 0) { return static_cast<double>(std::rand()) * scale / 32767.0 + offset; }
     std::uint32_t vegetationChoice(std::uint32_t count) { return static_cast<std::uint32_t>(std::rand()) * count / 32768u; }
     float vegetationJitter(float center) { return (static_cast<double>(std::rand()) * 0.5 / 32767.0 - 0.25) * 8.33329963684082 + center; }
-    void vegetationError(const std::string& message) { WorldDiagnostics::fail(message.c_str()); }
+    void vegetationError(const std::string& message) { WorldDiagnostics::fail(message); }
 
 }
 
@@ -6494,7 +6487,7 @@ std::unique_ptr<SphereRender::Model> GrassGeometry::build(std::span<const GrassI
     return result;
 }
 
-void VegetationPatterns::addGrass(std::uint32_t id, const std::array<const char*, 10>& variants) {
+void VegetationPatterns::addGrass(std::uint32_t id, const std::array<std::string_view, 10>& variants) {
     if (grass_patterns_.size() >= 30u) { vegetationError("GRASS_PATTERNS_NUM exeeded"); return; }
     GrassPattern pattern{id, {}};
     std::copy(variants.begin(), variants.end(), pattern.variants.begin());
@@ -6716,7 +6709,7 @@ void Vegetation::createCell(int cell_x, int cell_z, GrassCell& cell) {
         float height = 0;
         if (TerrainQueries::placementOrientation(x, z, angles, height, plane) == 1u) {
             const auto name = "grass" + last_pattern->variants[vegetationChoice(5)];
-            model_handles[count] = g_sfera_models.find(name.c_str());
+            model_handles[count] = g_sfera_models.find(name);
             placements[count++] = {nullptr, {x, height, z}, angles, 1, plane.normal};
         } else {
             for (std::uint32_t attempt = 0; attempt < 8u; ++attempt) {
@@ -6724,8 +6717,8 @@ void Vegetation::createCell(int cell_x, int cell_z, GrassCell& cell) {
                 const float dz = vegetationJitter(z);
                 if (!TerrainQueries::surface(dx, dz, height, plane)) continue;
                 scattered = true;
-                const auto name = std::string("grass_s0") + static_cast<char>('0' + vegetationChoice(4));
-                model_handles[count] = g_sfera_models.find(name.c_str());
+                const auto name = std::format("grass_s0{}", vegetationChoice(4));
+                model_handles[count] = g_sfera_models.find(name);
                 auto& instance = placements[count++];
                 instance.model = nullptr;
                 instance.position = {dx, height, dz};
@@ -6749,7 +6742,7 @@ void Vegetation::createCell(int cell_x, int cell_z, GrassCell& cell) {
             const auto& variant = last_pattern->variants[vegetationChoice(5) + 5];
             if (variant.empty()) continue;
             const auto name = "flower" + variant;
-            model_handles[count] = g_sfera_models.find(name.c_str());
+            model_handles[count] = g_sfera_models.find(name);
             placements[count++] = {nullptr, {x, height, z}, {vegetationRandom(6.283185958862305), 0, 0}, 1, plane.normal};
         }
     }
@@ -7207,7 +7200,7 @@ void TerrainRenderer::drawWater() {
     device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA);
     const auto stage = [&](D3DTEXTURESTAGESTATETYPE state, DWORD value) { device.checkResult(device.native_device->SetTextureStageState(0u, state, value), "SetTextureStageState"); };
     const auto directional = [&]() {  g_sfera_light_runtime.setDirectionalLight({-SphereRender::SceneRenderer::sun_direction.x, -SphereRender::SceneRenderer::sun_direction.y, -SphereRender::SceneRenderer::sun_direction.z}, {SphereRender::SceneRenderer::environment.sunColor.x, SphereRender::SceneRenderer::environment.sunColor.y, SphereRender::SceneRenderer::environment.sunColor.z}); };
-    const auto animation = [&](std::uint32_t animationId) { const int frame = rotationStep / 2; std::string name = "ww1_00"; name[2] = '0' + static_cast<std::uint8_t>(animationId); name[4] = '0' + frame / 10; name[5] = '0' + frame % 10; terrainSetTexture(0u, g_sfera_textures.resource(g_sfera_textures.find(name.c_str()))); g_sfera_textures.hasAlpha(g_sfera_textures.find(name.c_str())); };
+    const auto animation = [&](std::uint32_t animationId) { const int frame = rotationStep / 2; std::string name = "ww1_00"; name[2] = '0' + static_cast<std::uint8_t>(animationId); name[4] = '0' + frame / 10; name[5] = '0' + frame % 10; terrainSetTexture(0u, g_sfera_textures.resource(g_sfera_textures.find(name))); g_sfera_textures.hasAlpha(g_sfera_textures.find(name)); };
     for (const auto& range : ranges) {
         const auto& surface = waterSurfaces[range.first];
         if (surface.material == 0u || surface.material >= g_sfera_graphics_runtime.water_materials.size()) WorldDiagnostics::fail("Water material index outside 1..9");
@@ -7401,7 +7394,7 @@ void Motion::fall(std::uint32_t handle, float elapsed, bool controlled) {
         object->position.y = previous_y;
     }
     if (!(object->physical_velocity.y > 0.0f)) { object->physical_velocity.y = 0.0f; return; }
-    if (object->process_handle != nullptr && object->physical_velocity.y > (controlled ? 1.0f : 7.0f)) { char command[32]; std::snprintf(command, sizeof(command), "phDMG %5.1f", double(object->physical_velocity.y)); g_sfera_world_objects.appendCommand(handle, command); object = g_sfera_world_objects.extendedObject(handle); if (object == nullptr) return; }
+    if (object->process_handle != nullptr && object->physical_velocity.y > (controlled ? 1.0f : 7.0f)) { std::string command; command = std::format("phDMG {:5.1f}", double(object->physical_velocity.y)); g_sfera_world_objects.appendCommand(handle, command); object = g_sfera_world_objects.extendedObject(handle); if (object == nullptr) return; }
     object->airborne = false;
     const float speed = std::fabs(object->physical_velocity.y);
     const auto normal = motionSurfaceNormal();
@@ -7556,7 +7549,7 @@ std::uint32_t Motion::surfaceInteraction(std::uint32_t handle, std::uint32_t* ma
     const auto contact = g_sfera_contacts.test(handle, ContactQuery::Mode::Movement, false);
     object->position = position;
     if (contact == 0u) return 0u;
-    if (static_cast<int>(contact) > 1) { const auto* other = g_sfera_world_objects.object(contact); const auto* model = other == nullptr ? nullptr : motionModel(*other); return model != nullptr && _strnicmp(model->name.c_str(), "tree", 4u) == 0 ? 6u : 3u; }
+    if (static_cast<int>(contact) > 1) { const auto* other = g_sfera_world_objects.object(contact); const auto* model = other == nullptr ? nullptr : motionModel(*other); return model != nullptr && SferaText::compareInsensitive(std::string_view(model->name).substr(0, 4), "tree") == 0 ? 6u : 3u; }
     const float relative_x = double(position.x) - patch_x * 100;
     const float relative_z = double(position.z) - patch_z * 100;
     const int texture_x = std::trunc(double(relative_x) / 100.0 * 254.0 + 1.0);
@@ -7629,6 +7622,8 @@ void WorldObjects::destroy(std::uint32_t handle) {
     {
         if (!destroying_handles.insert(handle).second) return;
         WorldDestructionGuard guard{destroying_handles, handle};
+        // The script owns the binding. controlledObject() excludes this handle
+        // during callbacks without discarding a pending/recreated-object binding.
         auto* owned = object(handle);
         if (!owned) { WorldDiagnostics::warning("DeleteObject: wrong handle"); return; }
         WorldGuiControls::removeForObject(handle);
@@ -7696,10 +7691,10 @@ void WorldObjects::clear() {
     max_occupied_object_handle = controlled_object_handle = UINT32_MAX;
     clearing = false;
 }
-ExtendedWorldObject* WorldObjects::linkModel(std::uint32_t parentHandle, const char* name, std::uint32_t slot) { auto* parent = extendedObject(parentHandle); if (!parent || slot >= 5) { WorldDiagnostics::warning("Wrong handle: Link_object_to_object"); return nullptr; } if (parent->linked_objects[slot]) unlink(parentHandle, slot); const auto childHandle = create(name, 0, 0, true); if (childHandle == UINT32_MAX) return nullptr; auto* child = extendedObject(childHandle); parent = extendedObject(parentHandle); if (!parent || !child) { if (child) destroy(childHandle); return nullptr; } parent->linked_objects[slot] = childHandle; child->parent_object_handle = parentHandle; child->parent_link_slot = slot; return child; }
+ExtendedWorldObject* WorldObjects::linkModel(std::uint32_t parentHandle, std::string_view name, std::uint32_t slot) { auto* parent = extendedObject(parentHandle); if (!parent || slot >= 5) { WorldDiagnostics::warning("Wrong handle: Link_object_to_object"); return nullptr; } if (parent->linked_objects[slot]) unlink(parentHandle, slot); const auto childHandle = create(name, 0, 0, true); if (childHandle == UINT32_MAX) return nullptr; auto* child = extendedObject(childHandle); parent = extendedObject(parentHandle); if (!parent || !child) { if (child) destroy(childHandle); return nullptr; } parent->linked_objects[slot] = childHandle; child->parent_object_handle = parentHandle; child->parent_link_slot = slot; return child; }
 
 namespace SphereRender {
-namespace { void poseWarning(const char* message) { WorldDiagnostics::message[0] = 0; WorldDiagnostics::appendScriptContext(message); WorldDiagnostics::flushScriptContext(); } }
+namespace { void poseWarning(std::string_view message) { WorldDiagnostics::message.clear(); WorldDiagnostics::appendScriptContext(message); WorldDiagnostics::flushScriptContext(); } }
 ModelKeyframe ModelPose::keyframe(const Model& model, const BoneAnimation& animation, std::size_t frame) {
     if (!animation.animated) return model.keyframes[animation.pose_index];
     const auto& sample = model.animation_frames[animation.pose_index + frame];
@@ -7735,9 +7730,9 @@ void ModelPose::updateBone(const SferaMatrix4x4F& parent, std::size_t bone_index
     for (std::size_t child = 0u; child < bone.child_count; ++child) updateBone(transform, model->child_bones[bone.first_child + child]);
 }
 
-ExtendedWorldObject* ModelPose::queryObject(std::uint32_t handle, const char* operation) {
+ExtendedWorldObject* ModelPose::queryObject(std::uint32_t handle, std::string_view operation) {
     auto* object = g_sfera_world_objects.extendedObject(handle);
-    if (object == nullptr) poseWarning((std::string(operation) + ": wrong handle").c_str());
+    if (object == nullptr) poseWarning((std::string(operation) + ": wrong handle"));
     return object;
 }
 
@@ -7758,7 +7753,14 @@ int* ModelPose::secondaryFrame(std::uint32_t handle) { auto* object = queryObjec
 int* ModelPose::secondaryAnimation(std::uint32_t handle) { auto* object = queryObject(handle, "GetAnimation2"); return object == nullptr ? nullptr : &object->animation_secondary; }
 
 std::size_t ModelPose::frameOffset(const Model& model, int animation, int frame, bool secondary) {
-    if (model.animation_lengths.empty()) WorldDiagnostics::fail("CalcCharacterNeck: model has no animation");
+    if (model.animation_lengths.empty()) {
+        auto message = std::format("CalcCharacterNeck: model has no animation (model='{}', controlled={}, animation={}, frame={})",
+            model.name, g_sfera_world_objects.controlled_object_handle, animation, frame);
+        const auto& scriptError = g_sfera_mbc_runtime.first_execution_error;
+        if (!scriptError.empty()) message += "\nFirst script error in this session:\n" + scriptError;
+        g_sfera_log_runtime.write(message);
+        WorldDiagnostics::fail(message);
+    }
     if (animation < 0 || animation >= model.animation_lengths.size()) { poseWarning(secondary ? "CalcCharacterNeck: wrong animation 2" : "CalcCharacterNeck: wrong animation"); animation = 0; frame = 0; }
     std::size_t offset = 0u;
     for (int index = 0; index < animation; ++index) offset += model.animation_lengths[index];
@@ -7853,7 +7855,7 @@ std::uint32_t* CharacterModels::parameter(std::span<std::uint32_t> values, int i
     if (index < 0 || static_cast<std::size_t>(index) >= values.size()) WorldDiagnostics::fail("Character parameter index is out of bounds");
     return &values[static_cast<std::size_t>(index)];
 }
-ExtendedWorldObject* CharacterModels::checkedExtended(WorldObject* object) { if (object == nullptr) return nullptr; if (auto* extended = object->extended()) return extended; const auto* model = g_sfera_world_objects.model(*object); const auto message = std::string("Try to get extended from superstatic: ") + (model == nullptr ? "<none>" : model->name); WorldDiagnostics::fail(message.c_str()); }
+ExtendedWorldObject* CharacterModels::checkedExtended(WorldObject* object) { if (object == nullptr) return nullptr; if (auto* extended = object->extended()) return extended; const auto* model = g_sfera_world_objects.model(*object); const auto message = std::string("Try to get extended from superstatic: ") + (model == nullptr ? "<none>" : model->name); WorldDiagnostics::fail(message); }
 void CharacterModels::setAppearance(int handle, const CharacterAppearance& value) {
     if (handle < 0) { g_sfera_log_runtime.write("Wrong handle: set_char_param\n"); return; }
     auto* object = checkedExtended(g_sfera_world_objects.object(handle));
@@ -7862,14 +7864,32 @@ void CharacterModels::setAppearance(int handle, const CharacterAppearance& value
     if (object->render_cache_handle > 0) WorldDiagnostics::fail("Character model has a non-character render cache");
     if (object->render_cache_handle >= 0) { auto slot = std::find_if(std::begin(instances), std::end(instances), [](const auto& entry) { return entry.owner == nullptr; }); if (slot == std::end(instances)) WorldDiagnostics::fail("Character model instance limit reached"); slot->owner = object; object->render_cache_handle = -1 - static_cast<int>(slot - instances.begin()); }
     auto& current = instances[-1 - object->render_cache_handle].appearance;
-    if (value.parts[12] != 0u) { const char name[]{'m', 's', static_cast<char>(value.parts[12]), '\0'}; g_sfera_world_objects.linkModel(handle, name, 3u); } else if (current.parts[12] != 0u) g_sfera_world_objects.unlink(handle, 3u);
+    if (value.parts[12] != 0u) {
+        std::string name = "ms";
+        name.append(SferaText::fromBytes(std::span(value.parts).subspan(12u, 1u)));
+        g_sfera_world_objects.linkModel(handle, name, 3u);
+    } else if (current.parts[12] != 0u) g_sfera_world_objects.unlink(handle, 3u);
     current = value;
 }
 bool CharacterModels::getAppearance(int handle, CharacterAppearance& value) const { if (handle < 0) { g_sfera_log_runtime.write("Wrong handle: get_char_param\n"); return false; } const auto* object = checkedExtended(g_sfera_world_objects.object(handle)); if (object == nullptr || object->render_cache_handle >= 0) return false; value = appearance(*object); return true; }
 SferaVec3F CharacterModels::neckPosition(const ExtendedWorldObject& object) const { const auto world = SferaMatrix4x4F::fromEuler(object.position, object.rotation); const auto& skeleton = skeletons[appearance(object).sex]; std::vector<SferaMatrix4x4F> pose(skeleton.parents.size()); animate(skeleton, object.animation, object.frame, object.animation_secondary, object.frame_secondary, object.interpolation, pose.data(), true); const auto neck = skeleton.attachments[6]; const auto combined = (skeleton.initial_pose[neck]).multiplied((pose[neck])); return world.transformPoint({combined.m[3][0], combined.m[3][1], combined.m[3][2]}); }
 HRESULT CharacterModels::setMaterial(float opacity, float detail, const SferaVec3F& color) { const float intensity = double(detail) * 0.699999988079071 + 0.30000001192092896; D3DMATERIAL9 material{}; material.Diffuse = {intensity * color.x, intensity * color.y, intensity * color.z, opacity}; material.Ambient = {material.Diffuse.r, material.Diffuse.g, material.Diffuse.b, 0.0f}; auto& device = *g_sfera_graphics_runtime.d3d_runtime; return device.checkResult(device.native_device->SetMaterial(&material), "SetMaterial"); }
-int CharacterModels::textureVariants(bool female, char part) { std::string path = "models\\textures\\wf00.dds"; path[16] = female ? 'w' : 'm'; path[17] = part; g_sfera_files.setErrorReporting(false); int count = 0; for (;;) { path[18] = count <= 9 ? '0' + count : 'a' + count - 10; if (g_sfera_files.fileSize(path.c_str()) == -1) break; ++count; } g_sfera_files.setErrorReporting(true); return count; }
-void CharacterModels::loadSkeleton(const char* path, CharacterSkeleton& skeleton) {
+int CharacterModels::textureVariants(bool female, std::string_view part) {
+    if (part.size() != 1u) throw std::invalid_argument("Texture part must contain one code unit");
+    const std::string prefix = std::string("models\\textures\\") + (female ? "w" : "m") + std::string(part);
+    g_sfera_files.setErrorReporting(false);
+    int count = 0;
+    for (;;) {
+        // The legacy resource suffix is one encoded byte, including wraparound above 255.
+        const std::array<std::uint8_t, 1> suffix{{static_cast<std::uint8_t>(count <= 9 ? '0' + count : 'a' + count - 10)}};
+        const auto path = prefix + SferaText::fromBytes(suffix) + "0.dds";
+        if (g_sfera_files.fileSize(path) == -1) break;
+        ++count;
+    }
+    g_sfera_files.setErrorReporting(true);
+    return count;
+}
+void CharacterModels::loadSkeleton(const std::string& path, CharacterSkeleton& skeleton) {
     const auto bytes = g_sfera_files.readAll(path);
     const auto data = std::span<const std::uint8_t>(bytes);
     const auto encoded_bones = characterRead<int>(data, 0);
@@ -7909,7 +7929,7 @@ void CharacterModels::loadSkeleton(const char* path, CharacterSkeleton& skeleton
         }
     }
     // Acyclic parent chains are required before recursive pose evaluation.
-    std::vector<unsigned char> visited(bones, 0);
+    std::vector<std::uint8_t> visited(bones, 0);
     for (std::size_t bone = 0; bone < bones; ++bone) {
         std::optional<std::size_t> current = bone;
         while (current && visited[*current] == 0) { visited[*current] = 1; current = replacement.parents[*current]; }
@@ -7934,7 +7954,7 @@ void CharacterModels::loadSkeleton(const char* path, CharacterSkeleton& skeleton
 void CharacterModels::preload(CharacterAsset& asset, const CharacterSkeleton& skeleton) {
     if (asset.geometry != nullptr) return;
     const auto path = directories.at(asset.directory) + asset.name + ".chr";
-    const auto bytes = g_sfera_files.readAll(path.c_str());
+    const auto bytes = g_sfera_files.readAll(path);
     const auto data = std::span<const std::uint8_t>(bytes);
     if (data.size() < 4 || std::memcmp(data.data(), "sch0", 4) != 0) WorldDiagnostics::fail("preload_model: wrong file format");
     std::span<const std::uint8_t> vertexBytes, indexBytes, structureBytes, boneBytes;
@@ -7980,8 +8000,9 @@ void CharacterModels::preload(CharacterAsset& asset, const CharacterSkeleton& sk
         if (length <= 0) WorldDiagnostics::fail("Invalid character bone name length");
         const auto name = characterRange(boneBytes, offset, length);
         if (name.back() != 0) WorldDiagnostics::fail("Unterminated character bone name");
+        const auto boneName = SferaText::fromBytes(name).substr(0, std::find(name.begin(), name.end(), 0) - name.begin());
         std::size_t match = 0;
-        while (match < skeleton.parents.size() && ::_stricmp(reinterpret_cast<const char*>(name.data()), skeleton.names[match].c_str()) != 0) ++match;
+        while (match < skeleton.parents.size() && SferaText::compareInsensitive(boneName, skeleton.names[match]) != 0) ++match;
         if (match == skeleton.parents.size()) WorldDiagnostics::fail("Match for bone name not found");
         remap[bone] = match;
         offset += length;
@@ -8007,14 +8028,13 @@ void CharacterModels::clear() {
     directories.clear();
     for (auto& skeleton : skeletons) skeleton = {};
 }
-void CharacterModels::load(std::span<const char* const> folders) {
+void CharacterModels::load(std::span<const std::string_view> folders) {
     if (folders.size() >= 100) WorldDiagnostics::fail("Character model directory limit exceeded");
     auto replacement = std::make_unique<CharacterModels>();
     replacement->initializeBounds();
     replacement->loadSkeleton("xadd\\man.skl", replacement->skeletons[0]);
     replacement->loadSkeleton("xadd\\woman.skl", replacement->skeletons[1]);
-    for (const auto* folder : folders) {
-        const auto path = std::string_view(folder);
+    for (const auto path : folders) {
         if (path.size() >= 200) WorldDiagnostics::fail("Character model directory name too long");
         const auto directory = replacement->directories.size();
         replacement->directories.emplace_back(path);
@@ -8030,9 +8050,7 @@ void CharacterModels::load(std::span<const char* const> folders) {
             std::string name(entry.name);
             if (name.size() < 5u || name.size() >= 32u) WorldDiagnostics::fail("Invalid character model filename");
             name.resize(name.find_last_of('.'));
-            std::transform(name.begin(), name.end(), name.begin(), [](unsigned char value) {
-                return value >= 'A' && value <= 'Z' ? value + ('a' - 'A') : value;
-            });
+            SferaText::transformBytes(name, SferaText::asciiFold);
             replacement->assets.push_back({std::move(name), directory, {}});
         } while (::_findnext64i32(handle, &entry) == 0);
     }
@@ -8043,24 +8061,24 @@ void CharacterModels::load(std::span<const char* const> folders) {
     replacement->parts.resize(*countParts);
     for (std::size_t index = 0; index < *countParts; ++index) {
         const auto* record = configuration.objectAt("subobjs", index);
-        const char* code = record == nullptr ? nullptr : record->text("s");
-        const char* name = record == nullptr ? nullptr : record->text("m");
-        if (code == nullptr || name == nullptr) WorldDiagnostics::fail("wrong format of subobjs.dat");
-        const auto asset = std::find_if(replacement->assets.begin(), replacement->assets.end(), [&](const auto& value) { return value.name == name; });
-        if (asset == replacement->assets.end()) WorldDiagnostics::fail((std::string("char model not found. name=") + name).c_str());
+        const auto code = record == nullptr ? std::nullopt : record->text("s");
+        const auto name = record == nullptr ? std::nullopt : record->text("m");
+        if (!code || !name) WorldDiagnostics::fail("wrong format of subobjs.dat");
+        const auto asset = std::find_if(replacement->assets.begin(), replacement->assets.end(), [&](const auto& value) { return value.name == *name; });
+        if (asset == replacement->assets.end()) WorldDiagnostics::fail(std::format("char model not found. name={}", *name));
         auto& part = replacement->parts[index];
         part.asset = static_cast<std::size_t>(asset - replacement->assets.begin());
         part.textures.fill(-1);
         const auto textures = record->arraySize("t");
         if (!textures || *textures == 0u || *textures > part.textures.size()) WorldDiagnostics::fail("wrong format of subobjs.dat");
         for (std::size_t texture = 0; texture < *textures; ++texture) {
-            const auto* textureName = record->textAt("t", texture);
-            if (textureName == nullptr) WorldDiagnostics::fail("wrong format of subobjs.dat");
-            part.textures[texture] = g_sfera_textures.find(textureName);
-            if (part.textures[texture] == -1) WorldDiagnostics::fail((std::string("texture for char model not found. name=") + textureName).c_str());
+            const auto textureName = record->textAt("t", texture);
+            if (!textureName) WorldDiagnostics::fail("wrong format of subobjs.dat");
+            part.textures[texture] = g_sfera_textures.find(*textureName);
+            if (part.textures[texture] == -1) WorldDiagnostics::fail(std::format("texture for char model not found. name={}", *textureName));
         }
-        if (std::strlen(code) != 3u || (code[0] != 'm' && code[0] != 'w') || code[1] < 'a' || code[1] > 'z') WorldDiagnostics::fail("wrong format of subobjs.dat");
-        replacement->part_indices[code[0] == 'w'][code[1] - 'a'][static_cast<unsigned char>(code[2])] = index;
+        if (code->size() != 3u || ((*code)[0] != 'm' && (*code)[0] != 'w') || (*code)[1] < 'a' || (*code)[1] > 'z') WorldDiagnostics::fail("wrong format of subobjs.dat");
+        replacement->part_indices[(*code)[0] == 'w'][(*code)[1] - 'a'][static_cast<std::uint8_t>((*code)[2])] = index;
     }
     const auto helms = configuration.arraySize("womanhelmsmall");
     if (!helms || *helms == 0u || *helms > replacement->small_helm.size()) WorldDiagnostics::fail("wrong format of subobjs.dat");
@@ -8205,7 +8223,7 @@ void GameCamera::volume(const CameraRectangle* rectangle, const SferaFrustumF** 
 
 bool GameCamera::projectObjectTop(std::uint32_t handle, SferaVec3F& output, float height_factor) const {
     const auto* object = g_sfera_world_objects.object(handle);
-    if (object == nullptr) { WorldDiagnostics::message[0] = 0; WorldDiagnostics::appendScriptContext("Project_TopCharToScreen: wrong handle"); WorldDiagnostics::flushScriptContext(); return false; }
+    if (object == nullptr) { WorldDiagnostics::message.clear(); WorldDiagnostics::appendScriptContext("Project_TopCharToScreen: wrong handle"); WorldDiagnostics::flushScriptContext(); return false; }
     const auto* model = g_sfera_world_objects.model(*object);
     const auto* camera = g_sfera_world_objects.object(1u);
     if (model == nullptr || camera == nullptr) return false;
@@ -8299,7 +8317,7 @@ void GameCamera::setupViewport(std::uint32_t x, std::uint32_t y, std::uint32_t w
 GameCamera::Frame::Frame(std::uint32_t mode, bool reflection, float water_height) {
     auto* camera = g_sfera_world_objects.extendedObject(1u);
     if (camera == nullptr) WorldDiagnostics::fail("Camera object is missing");
-    auto* controlled = g_sfera_world_objects.object(g_sfera_world_objects.controlled_object_handle);
+    auto* controlled = g_sfera_world_objects.controlledObject();
     if (g_sfera_camera.controlled_observer_mode != 0u && controlled != nullptr) {
         SferaVec3F neck; ModelPose::neckPosition(neck);
         const float heading = controlled->rotation.x;
@@ -8365,7 +8383,7 @@ void SceneRenderer::modelFade(float distance, float power, float& fade, float& r
 std::uint32_t SceneRenderer::materialVariant(std::uint32_t first, std::uint32_t second, std::uint32_t third) { return 4u * first + 2u * second + third; }
 bool SceneRenderer::hasMaterialVariant(std::uint32_t object, int variant) {
     const auto* model = g_sfera_world_objects.model(*g_sfera_world_objects.object(object));
-    if (model != nullptr) for (const auto* material : model->materials) { if (material == nullptr) throw std::out_of_range("Model material reference"); if (!SferaText::asciiEqual(material->name.c_str(), "default")) return variant >= 0 && std::cmp_less(variant, material->textures.size()); }
+    if (model != nullptr) for (const auto* material : model->materials) { if (material == nullptr) throw std::out_of_range("Model material reference"); if (!SferaText::asciiEqual(material->name, "default")) return variant >= 0 && std::cmp_less(variant, material->textures.size()); }
     return false;
 }
 void SceneRenderer::setMaterialVariant(std::uint32_t object, int variant) { auto* instance = g_sfera_world_objects.extendedObject(object); if (instance != nullptr && instance->render_cache_handle >= 0) instance->render_cache_handle = variant; }
@@ -8450,19 +8468,19 @@ std::size_t SceneSky::buildLayerGeometry(const SceneSkyLayer& layer, float opaci
     return count;
 }
 void SceneSky::layerColor(const SceneSkyLayer& layer, SferaVec3F& output) { int first; int second; float amount; SceneSky::environment->interval(g_sfera_graphics_runtime.environment_factor, first, second, amount); output = {SferaMath::interpolate(layer.colors[first].x, layer.colors[second].x, amount), SferaMath::interpolate(layer.colors[first].y, layer.colors[second].y, amount), SferaMath::interpolate(layer.colors[first].z, layer.colors[second].z, amount)}; }
-void SceneSky::drawColorLayer(const char* texture, const SferaVec3F& color, std::size_t indices) {
-    if (*texture == '\0') return;
+void SceneSky::drawColorLayer(std::string_view texture, const SferaVec3F& color, std::size_t indices) {
+    if (texture.empty()) return;
     for (std::size_t index = 0; index < 120; ++index) { const float additional = SceneSky::glow_samples[index] * 255.0; auto& vertex = SceneSky::vertices[index]; vertex.diffuse = SferaColor::rgba(skyChannel(static_cast<float>(static_cast<double>(color.x) + additional)), skyChannel(static_cast<float>(static_cast<double>(color.y) + additional)), skyChannel(static_cast<float>(static_cast<double>(color.z) + additional)), SceneSky::layer_alpha[index]).argb(); vertex.specular = 0u; }
-    auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_ONE); if (std::strcmp(texture, "auto") != 0) SphereRender::SceneRenderer::bindTexture(g_sfera_textures.find(texture)); skySubmit(indices); device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_ONE); if (texture != "auto") SphereRender::SceneRenderer::bindTexture(g_sfera_textures.find(texture)); skySubmit(indices); device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
 }
-void SceneSky::drawMaskLayer(const char* texture, std::size_t indices) {
-    if (*texture == '\0') return;
+void SceneSky::drawMaskLayer(std::string_view texture, std::size_t indices) {
+    if (texture.empty()) return;
     for (std::size_t index = 0; index < 120; ++index) { const auto color = SceneSky::layer_alpha[index] & 255u; SceneSky::vertices[index].diffuse = D3DCOLOR_XRGB(color, color, color); SceneSky::vertices[index].specular = D3DCOLOR_ARGB(0, 255u - color, 255u - color, 255u - color); }
     auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.setAlphaBlending(D3DBLEND_ZERO, D3DBLEND_SRCCOLOR); device.checkResult(device.native_device->SetRenderState(D3DRS_SPECULARENABLE, TRUE), "SetRenderState"); SphereRender::SceneRenderer::bindTexture(g_sfera_textures.find(texture)); skySubmit(indices); device.checkResult(device.native_device->SetRenderState(D3DRS_SPECULARENABLE, FALSE), "SetRenderState"); device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
 }
 void SceneSky::drawLayers(const SceneSkyLayers& layers) {
     if (layers.primary.texture.empty() && layers.secondary.texture.empty()) return;
-    const auto& source = layers.primary.texture.empty() ? layers.secondary : layers.primary; const auto indices = buildLayerGeometry(source, layers.opacity); drawMaskLayer(layers.secondary.texture.c_str(), indices); if (!layers.primary.texture.empty()) { SferaVec3F color; layerColor(layers.primary, color); drawColorLayer(layers.primary.texture.c_str(), color, indices); }
+    const auto& source = layers.primary.texture.empty() ? layers.secondary : layers.primary; const auto indices = buildLayerGeometry(source, layers.opacity); drawMaskLayer(layers.secondary.texture, indices); if (!layers.primary.texture.empty()) { SferaVec3F color; layerColor(layers.primary, color); drawColorLayer(layers.primary.texture, color, indices); }
 }
 void SceneSky::orbit(float& x, float& y, std::uint32_t orbit) { const float angle = SceneSky::animation_phase * 3.1415929794311523 * 2.0 * static_cast<int>(orbit + 1u); x = static_cast<double>(x) + static_cast<float>(static_cast<float>(std::cos(static_cast<double>(angle))) * 0.019999999552965164); y = static_cast<double>(y) + static_cast<float>(static_cast<float>(std::sin(static_cast<double>(angle))) * 0.019999999552965164); }
 float SceneSky::horizonFog(float elevation, float amount) { const float position = elevation < 0.0f ? 0.0f : elevation > 0.4000000059604645 ? 1.0f : static_cast<float>(static_cast<double>(elevation) / 0.4000000059604645); return static_cast<double>(position) * amount; }
@@ -8530,7 +8548,16 @@ void SceneSky::drawSunMoon(float rotation) {
     auto& device = *g_sfera_graphics_runtime.d3d_runtime; device.setAlphaBlending(D3DBLEND_SRCALPHA, moon ? D3DBLEND_INVSRCALPHA : D3DBLEND_ONE); SphereRender::SceneRenderer::bindTexture(g_sfera_textures.find(moon ? "moon" : "sun")); if (!moon) SceneSky::flare_visible = 1u; device.checkResult(device.native_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1), "SetFVF"); device.drawVertices(D3DPT_TRIANGLEFAN, 14u, vertices, 4u, nullptr, 0u, sizeof(SferaScreenVertex)); device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
 }
 namespace SphereRender {
-SferaVec3F& SceneRenderer::observerPosition(SferaVec3F& output) { const auto handle = g_sfera_camera.controlled_observer_mode != 0u && g_sfera_world_objects.controlled_object_handle != UINT32_MAX ? g_sfera_world_objects.controlled_object_handle : 1u; output = g_sfera_world_objects.object(handle)->position; return output; }
+SferaVec3F& SceneRenderer::observerPosition(SferaVec3F& output) {
+    const auto* camera = g_sfera_world_objects.object(1u);
+    if (camera == nullptr) {
+        WorldDiagnostics::fail(std::format("Scene observer: camera object 1 is missing (controlled={}, mode={})",
+            g_sfera_world_objects.controlled_object_handle, g_sfera_camera.controlled_observer_mode));
+    }
+    const auto* controlled = g_sfera_camera.controlled_observer_mode != 0u ? g_sfera_world_objects.controlledObject() : nullptr;
+    output = (controlled != nullptr ? controlled : camera)->position;
+    return output;
+}
 void SceneRenderer::setupEnvironment(std::uint32_t mode, bool useDefault, float time) {
     environment = {};
     sun_direction = {};
@@ -8582,7 +8609,9 @@ std::size_t sceneAnimationFrame(Model& model, int animation, int frame) { if (an
 }
 void SceneRenderer::drawObjects(bool updateVegetation) {
     if (g_sfera_shadows && SphereRender::SceneRenderer::interior_scene == 0u) { const auto sun = SphereRender::SceneRenderer::sun_direction; auto& fade = g_sfera_graphics_runtime.view_scale; fade = 0.0f; if (sun.y < 0.4000000059604645f) fade = std::fabs(static_cast<float>(sun.y - 0.4000000059604645)) / 1.399999976158142; const float half = fade * 0.5; fade = 1.0 - half; g_sfera_shadows->setDirection(sun, fade); }
-    const SferaRestore grassMode(g_sfera_graphics_runtime.grass_depth); const auto controlled = g_sfera_world_objects.controlled_object_handle; if (controlled == UINT32_MAX || CharacterModels::checkedExtended(g_sfera_world_objects.object(controlled))->position.y > 1000.0f) g_sfera_graphics_runtime.grass_depth = 0u;
+    const SferaRestore grassMode(g_sfera_graphics_runtime.grass_depth);
+    const auto* controlled = g_sfera_world_objects.controlledObject();
+    if (controlled == nullptr || controlled->position.y > 1000.0f) g_sfera_graphics_runtime.grass_depth = 0u;
     auto* vegetation = g_sfera_vegetation.animation.get(); if (updateVegetation) g_sfera_vegetation.updateCells();
     const auto center = g_sfera_world_objects.object(1u)->position; g_sfera_world_spatial.gatherObjects(center, SphereRender::SceneRenderer::view_distance); const auto& candidates = g_sfera_world_spatial.objects();
     const auto count = candidates.size();
@@ -8607,7 +8636,7 @@ std::uint32_t sceneColor(const SferaVec3F& color) { return SferaColor::rgba(stat
 void sceneUnderwaterOverlay() {
     const auto handle = g_sfera_world_objects.controlled_object_handle; std::uint32_t materialIndex = 0u; if (handle == UINT32_MAX || g_sfera_motion.surfaceInteraction(handle, &materialIndex) != 5u) return; const auto width = g_sfera_graphics_runtime.display_width; const auto height = g_sfera_graphics_runtime.display_height; constexpr double textureScale = 0.20000000298023224; auto& x = SceneSky::horizontal_motion; auto& y = SceneSky::vertical_motion;
     if (x < 0.0f) x = x + width / textureScale; if (x > width / textureScale) x = x - width / textureScale; if (y < 0.0f) y = y + height / textureScale; if (y > height / textureScale) y = y - height / textureScale; const float u = -static_cast<double>(x) / static_cast<float>(width) * textureScale; const float v = -static_cast<double>(y) / static_cast<float>(height) * textureScale; const float right = u + textureScale; const float bottom = v + textureScale; const float uv[] = {u, v, right, v, right, bottom, u, bottom}; const auto& material = g_sfera_graphics_runtime.water_materials.at(materialIndex);
-    char texture[] = "ww1_00"; const auto animation = static_cast<int>(SphereRender::SceneRenderer::texture_animation_frame) / 2; texture[2] = static_cast<std::uint8_t>(material.primary_animation) + '0'; texture[4] = animation / 10 + '0'; texture[5] = animation % 10 + '0'; const auto heightFactor = std::fabs(SphereRender::SceneRenderer::sun_direction.y); const auto sun = SphereRender::SceneRenderer::environment.sunColor; const auto ambient = SphereRender::SceneRenderer::environment.ambientColor; const auto channel = [heightFactor](float light, float base) { return std::min(255, static_cast<int>(heightFactor * static_cast<double>(light) + base)); };
+    std::string texture = "ww1_00"; const auto animation = static_cast<int>(SphereRender::SceneRenderer::texture_animation_frame) / 2; texture[2] = static_cast<std::uint8_t>(material.primary_animation) + '0'; texture[4] = animation / 10 + '0'; texture[5] = animation % 10 + '0'; const auto heightFactor = std::fabs(SphereRender::SceneRenderer::sun_direction.y); const auto sun = SphereRender::SceneRenderer::environment.sunColor; const auto ambient = SphereRender::SceneRenderer::environment.ambientColor; const auto channel = [heightFactor](float light, float base) { return std::min(255, static_cast<int>(heightFactor * static_cast<double>(light) + base)); };
     GameInterface::tintTexture(0, 0, width, height, texture, channel(sun.x, ambient.x), channel(sun.y, ambient.y), channel(sun.z, ambient.z), static_cast<std::uint32_t>(static_cast<int>(material.primary_opacity * 255.0)), uv);
 }
 }
@@ -9228,24 +9257,24 @@ void ShadowMap::drawObject(ExtendedWorldObject& object, float width, float exten
 
 namespace {
 
-    void skyConfigurationError(const std::string& section) { CSphereError error; error.write(("Illegal format of Sky.txt, line: " + section).c_str()); }
+    void skyConfigurationError(const std::string& section) { CSphereError error; error.write(("Illegal format of Sky.txt, line: " + section)); }
 }
-void SkyEnvironment::load(const char* filename) {
+void SkyEnvironment::load(const std::string& filename) {
     SkyEnvironment replacement;
     SphereRender::ModelParameters parameters;
     parameters.load(filename);
-    auto integer = [&](const std::string& section, const char* key) { const auto value = parameters.intValue(section.c_str(), key); if (!value) skyConfigurationError(section); return value.value_or(0); };
-    auto scalar = [&](const std::string& section, const char* key) { const auto value = parameters.floatValue(section.c_str(), key); if (!value) skyConfigurationError(section); return value.value_or(0.0f); };
+    auto integer = [&](const std::string& section, std::string_view key) { const auto value = parameters.intValue(section, key); if (!value) skyConfigurationError(section); return value.value_or(0); };
+    auto scalar = [&](const std::string& section, std::string_view key) { const auto value = parameters.floatValue(section, key); if (!value) skyConfigurationError(section); return value.value_or(0.0f); };
     auto color = [&](const std::string& section) { return SferaVec4F{static_cast<float>(integer(section, "r")), static_cast<float>(integer(section, "g")), static_cast<float>(integer(section, "b")), static_cast<float>(integer(section, "a"))}; };
     for (std::size_t index = 0; index < 11; ++index) {
-        const char digit = index < 10 ? '0' + index : 'a' + index - 10;
-        const std::string suffix(1, digit);
-        if (!parameters.hasModel(("c" + suffix).c_str())) continue;
-        if (!parameters.contains(("c" + suffix).c_str(), "r")) skyConfigurationError("c" + suffix);
+        const std::string suffix(std::string_view("0123456789a").substr(index, 1u));
+        if (!parameters.hasModel("c" + suffix)) continue;
+        if (!parameters.contains("c" + suffix, "r")) skyConfigurationError("c" + suffix);
         auto& state = replacement.states[index];
-        auto samples = [&](const char* prefix, auto& keys) {
+        auto samples = [&](std::string_view prefix, auto& keys) {
             for (std::size_t sample = 0; sample < keys.size(); ++sample) {
-                const std::string section = std::string(prefix) + suffix + static_cast<char>('0' + sample);
+                std::string section = std::string(prefix) + suffix;
+                section += std::to_string(sample);
                 keys[sample] = {color(section), scalar(section, "p")};
             }
         };
@@ -9333,25 +9362,25 @@ void EnvironmentZones::calculate(bool useDefault, float x, float z, float time, 
     sample(influences.back().first, output);
     for (std::size_t index = influences.size() - 1; index > 0; --index) { EnvironmentLighting foreground{}; const auto [zone, amount] = influences[index - 1]; sample(zone, foreground); output.fogParameters = SferaMath::interpolate(output.fogParameters, foreground.fogParameters, amount); output.fogColor = SferaMath::interpolate(output.fogColor, foreground.fogColor, amount); output.ambientColor = SferaMath::interpolate(output.ambientColor, foreground.ambientColor, amount); output.sunColor = SferaMath::interpolate(output.sunColor, foreground.sunColor, amount); }
 }
-void EnvironmentZones::load(const char* filename) {
+void EnvironmentZones::load(const std::string& filename) {
     SphereRender::ConfigDocument::setStorageMode(SphereRender::ConfigDocument::StorageMode::Plain);
     const auto document = SphereRender::ConfigDocument::open(filename);
     const auto count = document.arraySize("zonesParams").value_or(0);
     std::vector<EnvironmentZone> replacement;
     replacement.reserve(count);
-    auto fail = [](std::size_t zone, const std::string& field) { CSphereError error; error.write(("Wrong format of \"Landscape\\zoning.cfg\" : zonesParams[" + std::to_string(zone) + "] : " + field).c_str()); };
+    auto fail = [](std::size_t zone, std::string_view field) { CSphereError error; error.write(std::format("Wrong format of \"Landscape\\zoning.cfg\" : zonesParams[{}] : {}", zone, field)); };
     for (std::size_t index = 0; index < count; ++index) {
         auto* configuration = document.objectAt("zonesParams", index);
         if (configuration == nullptr) { fail(index, "zoneParamsCfg is NULL"); continue; }
         EnvironmentZone zone{};
-        auto scalar = [&](const char* name) { const auto value = configuration->real(name); if (!value) fail(index, name); return value.value_or(0.0f); };
+        auto scalar = [&](std::string_view name) { const auto value = configuration->real(name); if (!value) fail(index, name); return value.value_or(0.0f); };
         zone.originX = scalar("xPatchMin"); zone.originZ = scalar("zPatchMin"); zone.minimumX = scalar("xMin"); zone.maximumX = scalar("xMax"); zone.minimumZ = scalar("zMin"); zone.maximumZ = scalar("zMax"); zone.borderFade = scalar("borderFadeDist");
         zone.fogParameters = {scalar("skyFogAlpha"), scalar("fogNear"), scalar("fogFar")};
         if (configuration->arraySize("dayColors").value_or(0) != 8) fail(index, "wrong size of dayColors");
         for (std::size_t day = 0; day < 8; ++day) {
             auto* colors = configuration->objectAt("dayColors", day);
             if (colors == nullptr) { fail(index, "dayColorCfg is NULL"); continue; }
-            auto color = [&](const char* name) { auto component = [&](std::size_t axis) { const auto value = colors->realAt(name, axis); if (!value) fail(index, std::string(name) + "[" + std::to_string(day) + "]"); return value.value_or(0.0f); }; return SferaVec3F{component(0), component(1), component(2)}; };
+            auto color = [&](std::string_view name) { auto component = [&](std::size_t axis) { const auto value = colors->realAt(name, axis); if (!value) fail(index, std::string(name) + "[" + std::to_string(day) + "]"); return value.value_or(0.0f); }; return SferaVec3F{component(0), component(1), component(2)}; };
             zone.fogColors[day] = color("fogColor"); zone.ambientColors[day] = color("ambientColor"); zone.sunColors[day] = color("sunColor");
         }
         replacement.push_back(zone);
@@ -9360,18 +9389,18 @@ void EnvironmentZones::load(const char* filename) {
 }
 
 namespace {
-    std::string weatherIndex(char prefix, std::size_t index, std::size_t digits = 2u) {
+    std::string weatherIndex(std::string_view prefix, std::size_t index, std::size_t digits = 2u) {
         const auto number = std::to_string(index);
-        return std::string(1u, prefix) + std::string(number.size() < digits ? digits - number.size() : 0u, '0') + number;
+        return std::string(prefix) + std::string(number.size() < digits ? digits - number.size() : 0u, '0') + number;
     }
-    [[noreturn]] void weatherFormatError(std::string_view model, std::string_view parameter) { WorldDiagnostics::fail((std::string("wrong format of weather.txt\n") + std::string(model) + ", " + std::string(parameter)).c_str()); }
+    [[noreturn]] void weatherFormatError(std::string_view model, std::string_view parameter) { WorldDiagnostics::fail((std::string("wrong format of weather.txt\n") + std::string(model) + ", " + std::string(parameter))); }
     std::string weatherName(std::string_view name) {
         if (name.size() >= 20) weatherFormatError(name, "texture name too long");
         return std::string(name);
     }
 }
 
-void WeatherScenarios::load(const char* filename) {
+void WeatherScenarios::load(const std::string& filename) {
     WeatherScenarios replacement;
     SphereRender::ModelParameters parameters;
     parameters.load(filename);
@@ -9379,7 +9408,7 @@ void WeatherScenarios::load(const char* filename) {
     const auto integer = [&](std::string_view model, std::string_view key) { const auto value = parameters.intValue(model, key); if (!value) weatherFormatError(model, key); return *value; };
     const auto text = [&](std::string_view model, std::string_view key) { const auto value = parameters.stringValue(model, key); if (!value) weatherFormatError(model, key); return *value; };
     const auto skyNames = [&](std::string_view model) {
-        const auto name = [&](const char* key) {
+        const auto name = [&](std::string_view key) {
             auto result = weatherName(text(model, key));
             if (SferaText::asciiEqual(result, "none")) result.clear();
             return result;
@@ -9388,7 +9417,7 @@ void WeatherScenarios::load(const char* filename) {
     };
     constexpr std::string_view durationJitter = "05185514038799035566164306887187530785282430311941";
     for (std::size_t index = 0; index < 100; ++index) {
-        const auto model = weatherIndex('s', index);
+        const auto model = weatherIndex("s", index);
         if (!parameters.hasModel(model)) break;
         WeatherScenario scenario;
         const auto duration = std::int64_t(integer(model, "stime")) + durationJitter[index % durationJitter.size()] - '0';
@@ -9410,7 +9439,7 @@ void WeatherScenarios::load(const char* filename) {
         replacement.scenarios.push_back(std::move(scenario));
     }
     for (std::size_t index = 0; index < 30; ++index) {
-        const auto model = weatherIndex('t', index);
+        const auto model = weatherIndex("t", index);
         if (!parameters.hasModel(model)) break;
         SceneSkyLayer texture;
         texture.texture = weatherName(text(model, "ntex"));
@@ -9420,12 +9449,12 @@ void WeatherScenarios::load(const char* filename) {
         texture.minimumTime = number(model, "time1");
         texture.maximumTime = number(model, "time2");
         for (std::size_t sample = 0; sample < texture.colors.size(); ++sample) {
-            texture.colors[sample] = {number(model + "c", weatherIndex('r', sample)), number(model + "c", weatherIndex('g', sample)), number(model + "c", weatherIndex('b', sample))};
+            texture.colors[sample] = {number(model + "c", weatherIndex("r", sample)), number(model + "c", weatherIndex("g", sample)), number(model + "c", weatherIndex("b", sample))};
         }
         replacement.textures.push_back(std::move(texture));
     }
     for (std::size_t item = 0; item < 200; ++item) {
-        const auto model = weatherIndex('q', item, 3);
+        const auto model = weatherIndex("q", item, 3);
         if (!parameters.hasModel(model)) break;
         const auto index = integer(model, "s");
         if (index < 0 || static_cast<std::size_t>(index) >= replacement.scenarios.size()) weatherFormatError(model, "s");
@@ -9436,7 +9465,7 @@ void WeatherScenarios::load(const char* filename) {
     }
     if (replacement.sequence.empty()) weatherFormatError(filename, "missing sequence");
     for (std::size_t index = 0; index < 30; ++index) {
-        const auto model = weatherIndex('c', index);
+        const auto model = weatherIndex("c", index);
         if (!parameters.hasModel(model)) break;
         replacement.pairs.push_back(skyNames(model));
     }
@@ -9511,7 +9540,7 @@ double WeatherScenarios::previousValue(std::size_t sequenceIndex, int time, Prop
 void WeatherScenarios::copyTexture(std::string_view name, SceneSkyLayer& output) const {
     if (name.empty()) { output = {}; return; }
     for (std::size_t index = 0u; index < textures.size(); ++index) if (SferaText::asciiEqual(textures[index].texture, name)) { output = textures[index]; return; }
-    WorldDiagnostics::warning((std::string("Sky texture name absent in params. ") + std::string(name)).c_str());
+    WorldDiagnostics::warning((std::string("Sky texture name absent in params. ") + std::string(name)));
 }
 
 WeatherSkyPair WeatherScenarios::selectSky(int time, float dayTime) const {
@@ -9531,7 +9560,7 @@ WeatherSkyPair WeatherScenarios::selectSky(int time, float dayTime) const {
             if (name.empty()) { available.push_back(&sky); continue; }
             const SceneSkyLayer* layer = nullptr;
             for (std::size_t texture = 0u; texture < textures.size(); ++texture) if (SferaText::asciiEqual(textures[texture].texture, name)) { layer = &textures[texture]; break; }
-            if (layer == nullptr) { WorldDiagnostics::warning((std::string("Sky texture name present in para, but absent in params. ") + std::string(name)).c_str()); continue; }
+            if (layer == nullptr) { WorldDiagnostics::warning((std::string("Sky texture name present in para, but absent in params. ") + std::string(name))); continue; }
             if (layer->minimumTime <= dayTime && layer->maximumTime >= dayTime) available.push_back(&sky);
         }
         if (!available.empty()) selected = available[static_cast<std::size_t>((start % static_cast<int>(available.size()) + static_cast<int>(available.size())) % static_cast<int>(available.size()))];
@@ -9599,10 +9628,10 @@ void WeatherScenarios::windDirection(bool refresh, int seed, float& x, float& z)
 }
 
 // Full writes and closure are shared by UI and VM configuration codecs.
-bool SferaFileManager::writeFile(const char* path, const void* data, std::size_t size) {
-    if (!path || (size && !data)) return false;
-    ::_chmod(path, _S_IREAD | _S_IWRITE);
-    std::unique_ptr<FILE, decltype(&std::fclose)> stream(::_fsopen(path, "wb", _SH_DENYNO), &std::fclose);
+bool SferaFileManager::writeFile(const std::string& path, const void* data, std::size_t size) {
+    if (path.empty() || (size && !data)) return false;
+    ::_chmod(path.c_str(), _S_IREAD | _S_IWRITE);
+    std::unique_ptr<FILE, decltype(&std::fclose)> stream(::_fsopen(path.c_str(), "wb", _SH_DENYNO), &std::fclose);
     if (!stream) return false;
     const auto written = transferFileBytes(::_fileno(stream.get()), static_cast<const std::byte*>(data), size, ::_write);
     const bool closed = std::fclose(stream.release()) == 0;

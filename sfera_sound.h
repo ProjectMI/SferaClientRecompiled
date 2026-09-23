@@ -1,7 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string_view>
 #include "semantic_types.h"
 
 
@@ -67,7 +70,7 @@ private:
     friend void SI_Close();
     friend class CSound;
     friend class CSoundStream;
-    friend CSoundStream* SI_StreamCreateFile(const char*, std::uint32_t);
+    friend CSoundStream* SI_StreamCreateFile(const std::string&, std::uint32_t);
     friend void SI_StreamFree(CSoundStream*);
     friend void SI_SetStreamVolume(int);
 };
@@ -81,7 +84,7 @@ public:
     CSound& operator=(const CSound&) = delete;
 
     int SetAllParameters(const SferaSound3DParameters* parameters, int deferred);
-    int LoadSound(const char* filename, std::uint32_t flags);
+    int LoadSound(const std::string& filename, std::uint32_t flags);
     int SetVolume(float gain);
     int Rewind();
     void Stop();
@@ -135,7 +138,7 @@ private:
     void applyVolume();
 
     friend class CSoundInterface;
-    friend CSoundStream* SI_StreamCreateFile(const char*, std::uint32_t);
+    friend CSoundStream* SI_StreamCreateFile(const std::string&, std::uint32_t);
     friend void SI_StreamFree(CSoundStream*);
     friend void SI_Close();
     friend void SI_SetStreamVolume(int);
@@ -147,7 +150,9 @@ int SI_GetStreamVolume();
 CSoundInterface* SI_CreateInterface(void* native_window, int device_index, std::uint32_t sample_rate, std::uint32_t flags);
 CSoundInterface* SI_GetInterface();
 void SI_Close();
-void SI_SetLogFile(const char* filename);
+// Use std::nullopt when no log file is requested.
+void SI_SetLogFile(std::optional<std::string_view> filename);
+void SI_SetLogFile(std::nullptr_t) = delete;
 void SI_SetStreamVolume(int percent);
-CSoundStream* SI_StreamCreateFile(const char* filename, std::uint32_t flags);
+CSoundStream* SI_StreamCreateFile(const std::string& filename, std::uint32_t flags);
 void SI_StreamFree(CSoundStream* stream);

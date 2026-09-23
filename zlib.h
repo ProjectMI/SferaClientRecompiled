@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <optional>
+#include <string_view>
 #include <vector>
 
 struct SferaDeflateState32;
@@ -27,7 +29,7 @@ struct SferaZStream32 {
     std::uint8_t* next_out = nullptr;
     std::uint32_t avail_out = 0;
     std::uint32_t total_out = 0;
-    const char* msg = nullptr;
+    std::optional<std::string_view> msg;
     SferaDeflateState32* state = nullptr;
     int data_type = 0;
     std::uint32_t adler = 1;

@@ -7,8 +7,12 @@
 #include <bit>
 #include <cmath>
 #include <cerrno>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <format>
+#include <functional>
+#include <istream>
 #include <optional>
 #include <cstddef>
 #include <cstdint>
@@ -64,26 +68,68 @@ namespace SferaAlgorithms {
 }
 
 namespace SferaBinary {
-    template<class T> requires (std::is_integral_v<T> && !std::is_same_v<T, bool>)
-    T readLittleEndian(const std::uint8_t* bytes) noexcept {
+    template<class T, std::size_t Extent>
+    std::span<T> range(std::span<T, Extent> bytes, std::size_t offset, std::size_t count) {
+        if (offset > bytes.size() || count > bytes.size() - offset)
+            throw std::out_of_range("Binary range exceeds its buffer");
+        return bytes.subspan(offset, count);
+    }
+    inline void copy(std::span<std::uint8_t> destination, std::span<const std::uint8_t> source) {
+        if (source.size() > destination.size()) throw std::out_of_range("Binary destination is too small");
+        if (!source.empty()) std::memmove(destination.data(), source.data(), source.size());
+    }
+    inline bool read(std::istream& stream, std::span<std::uint8_t> destination) {
+        if (!std::in_range<std::streamsize>(destination.size())) throw std::length_error("Binary read is too large");
+        if (destination.empty()) return true;
+        std::string input(destination.size(), '\0');
+        // Preserve untouched bytes even when the stream buffer writes a prefix and throws.
+        // gcount() alone cannot describe that partial write on every exception path.
+        std::memcpy(input.data(), destination.data(), destination.size());
+        const auto commit = [&] { std::memcpy(destination.data(), input.data(), input.size()); };
+        try {
+            stream.read(input.data(), static_cast<std::streamsize>(input.size()));
+        } catch (...) {
+            commit();
+            throw;
+        }
+        commit();
+        return bool(stream);
+    }
+    template<class T, class Byte> requires (std::is_integral_v<T> && !std::is_same_v<T, bool> &&
+        (std::is_same_v<Byte, std::uint8_t> || std::is_same_v<Byte, std::byte>))
+    T readLittleEndian(const Byte* bytes) noexcept {
         using Unsigned = std::make_unsigned_t<T>;
         Unsigned value = 0;
         for (std::size_t index = 0; index < sizeof(T); ++index) value |= static_cast<Unsigned>(static_cast<Unsigned>(bytes[index]) << (index * 8));
         return std::bit_cast<T>(value);
     }
-    template<class T> requires (std::is_integral_v<T> && !std::is_same_v<T, bool>)
-    void writeLittleEndian(std::uint8_t* bytes, T value) noexcept {
+    template<class T, class Byte> requires (std::is_integral_v<T> && !std::is_same_v<T, bool> &&
+        (std::is_same_v<Byte, std::uint8_t> || std::is_same_v<Byte, std::byte>))
+    void writeLittleEndian(Byte* bytes, T value) noexcept {
         const auto bits = std::bit_cast<std::make_unsigned_t<T>>(value);
-        for (std::size_t index = 0; index < sizeof(T); ++index) bytes[index] = static_cast<std::uint8_t>(bits >> (index * 8));
+        for (std::size_t index = 0; index < sizeof(T); ++index) bytes[index] = static_cast<Byte>(bits >> (index * 8));
     }
+    class ReadError : public std::runtime_error {
+    public:
+        using std::runtime_error::runtime_error;
+    };
     class Reader {
     public:
         explicit Reader(std::span<const std::uint8_t> bytes) : bytes_(bytes) {}
         std::span<const std::uint8_t> take(std::size_t size) {
-            if (size > bytes_.size()) throw std::runtime_error("Truncated binary record");
+            if (size > bytes_.size()) throw ReadError("Truncated binary record");
             const auto result = bytes_.first(size);
             bytes_ = bytes_.subspan(size);
             return result;
+        }
+        std::size_t remaining() const noexcept { return bytes_.size(); }
+        std::string readTerminated(std::size_t capacity) {
+            const auto field = bytes_.first(std::min(bytes_.size(), capacity));
+            const auto end = std::find(field.begin(), field.end(), std::uint8_t{});
+            if (end == field.end()) throw ReadError("Unterminated binary string");
+            const auto count = static_cast<std::size_t>(end - field.begin());
+            const auto value = take(count + 1);
+            return std::string(value.begin(), value.begin() + count);
         }
         template<class T> T read() {
             if constexpr (std::is_same_v<T, float>) return std::bit_cast<float>(read<std::uint32_t>());
@@ -302,6 +348,17 @@ private:
 };
 
 namespace SferaText {
+    template<class Mapping> void transformBytes(std::string& text, Mapping mapping) {
+        for (auto& byte : std::as_writable_bytes(std::span(text)))
+            byte = static_cast<std::byte>(mapping(std::to_integer<std::uint8_t>(byte)));
+    }
+    inline void lowercaseLocale(std::string& text) {
+        transformBytes(text, [](std::uint8_t value) { return std::tolower(value); });
+    }
+    struct Hash {
+        using is_transparent = void;
+        std::size_t operator()(std::string_view value) const noexcept { return std::hash<std::string_view>{}(value); }
+    };
     constexpr std::uint8_t asciiFold(std::uint8_t byte) noexcept {
         return byte >= 'A' && byte <= 'Z' ? static_cast<std::uint8_t>(byte + ('a' - 'A')) : byte;
     }
@@ -311,41 +368,119 @@ namespace SferaText {
             if (asciiFold(static_cast<std::uint8_t>(a[i])) != asciiFold(static_cast<std::uint8_t>(b[i]))) return false;
         return true;
     }
-    inline bool asciiEqual(const char* a, const char* b) noexcept {
-        return a && b && asciiEqual(std::string_view(a), std::string_view(b));
-    }
     const std::array<char32_t, 256>& unicodeCp1251();
     const std::array<std::uint8_t, 256>& lowercaseCp1251();
     std::string resourceKey(std::string_view name);
-    const char* findInsensitive(const char* text, const char* needle);
-    const char* fileName(const char* path);
-    void encodeUri(char* destination, const char* source, std::size_t capacity);
-    bool matchesWildcard(const char* text, const char* pattern);
-    // MBC compatibility operation: capacity<=0 means caller-validated complete destination.
-    std::uint32_t copyString(char* destination, const char* source, int capacity);
-    inline void copy(std::span<char> destination, const char* source) {
-        if (destination.empty()) return;
-        std::size_t length = 0;
-        if (source) while (length + 1 < destination.size() && source[length]) ++length;
-        if (length) std::memmove(destination.data(), source, length);
-        destination[length] = 0;
+    std::size_t findInsensitive(std::string_view text, std::string_view needle);
+    std::string_view fileName(std::string_view path);
+    std::string encodeUri(std::string_view source, std::size_t capacity = std::numeric_limits<std::size_t>::max());
+    bool matchesWildcard(std::string_view text, std::string_view pattern);
+    int compare(std::string_view first, std::string_view second);
+    int compareInsensitive(std::string_view first, std::string_view second);
+    // Byte-backed fields are decoded into owned text. No view aliases binary memory.
+    // This preserves every code unit of the client's single-byte encoding, including NUL.
+    inline std::string fromBytes(std::span<const std::byte> bytes) {
+        std::string text(bytes.size(), '\0');
+        if (!bytes.empty()) std::memcpy(text.data(), bytes.data(), bytes.size());
+        return text;
     }
+    inline std::string fromBytes(std::span<const std::uint8_t> bytes) {
+        return fromBytes(std::as_bytes(bytes));
+    }
+    inline std::size_t length(std::span<const std::uint8_t> bytes,
+                              std::size_t limit = std::numeric_limits<std::size_t>::max()) {
+        if (limit == 0) return 0;
+        const auto field = bytes.first(std::min(bytes.size(), limit));
+        const auto end = std::find(field.begin(), field.end(), std::uint8_t{});
+        if (end == field.end() && limit > bytes.size()) throw std::out_of_range("Unterminated text buffer");
+        return field.empty() ? 0u : static_cast<std::size_t>(end - field.begin());
+    }
+    inline std::string prefix(std::span<const std::uint8_t> bytes, std::size_t limit) {
+        return fromBytes(bytes.first(length(bytes, limit)));
+    }
+    inline std::string terminated(std::span<const std::uint8_t> bytes) {
+        return prefix(bytes, std::numeric_limits<std::size_t>::max());
+    }
+
+    // Mutable text exists only at a binary boundary. Every write reserves a terminator;
+    // no raw character pointer or unchecked element access escapes this interface.
+    class Buffer {
+    public:
+        explicit Buffer(std::span<std::uint8_t> bytes) noexcept : bytes_(bytes) {}
+        std::size_t size() const noexcept { return bytes_.size(); }
+        bool empty() const noexcept { return bytes_.empty(); }
+        Buffer limited(std::size_t capacity) const noexcept { return Buffer(bytes_.first(std::min(size(), capacity))); }
+        std::size_t length() const { return SferaText::length(bytes_); }
+        std::size_t write(std::string_view source) const {
+            if (empty()) return 0;
+            const auto count = std::min(source.size(), size() - 1);
+            if (count != 0) std::memmove(bytes_.data(), source.data(), count);
+            bytes_[count] = 0;
+            return count;
+        }
+        void assign(std::string_view source) const {
+            if (source.size() >= size()) throw std::out_of_range("Text destination is too small");
+            write(source);
+        }
+        void append(std::string_view source) const {
+            const auto count = length();
+            Buffer(bytes_.subspan(count)).assign(source);
+        }
+        // Bounded formatting leaves untouched padding except for the final sentinel.
+        std::size_t writeBounded(std::string_view source, std::size_t capacity) const {
+            if (capacity == 0) return 0;
+            if (capacity > size()) throw std::out_of_range("Bounded text destination is too small");
+            const auto copied = limited(capacity).write(source);
+            bytes_[capacity - 1] = 0;
+            return copied;
+        }
+        // MBC bounded copies write count bytes of payload/padding and one final NUL.
+        std::size_t writePadded(std::string_view source, std::size_t count) const {
+            if (count >= size()) throw std::out_of_range("Padded text destination is too small");
+            const auto copied = limited(count + 1).write(source);
+            std::fill(bytes_.begin() + copied, bytes_.begin() + count + 1, std::uint8_t{});
+            return copied;
+        }
+    private:
+        std::span<std::uint8_t> bytes_;
+    };
+    // The returned count includes the terminator, as required by the MBC instruction set.
+    std::uint32_t copyString(Buffer destination, std::string_view source, int capacity);
+
+    inline std::optional<std::string> readTerminated(std::istream& stream, std::size_t capacity) {
+        std::string value;
+        for (std::size_t index = 0; index < capacity; ++index) {
+            const auto input = stream.get();
+            if (std::istream::traits_type::eq_int_type(input, std::istream::traits_type::eof())) return std::nullopt;
+            const auto character = std::istream::traits_type::to_char_type(input);
+            if (character == '\0') return value;
+            value.push_back(character);
+        }
+        return std::nullopt;
+    }
+
     // Retain the existing CRT prefix, sign, locale and hexadecimal-float grammar.
     template<class Number> bool readNumber(std::string_view text, Number& output) {
         static_assert(std::is_same_v<Number, int> || std::is_same_v<Number, float>);
         const std::string input(text);
-        char* end = nullptr;
-        if constexpr (std::is_same_v<Number, float>) {
-            const float value = std::strtof(input.c_str(), &end);
-            if (end == input.c_str()) return false;
-            output = value;
-        } else {
-            errno = 0;
-            const auto value = std::strtol(input.c_str(), &end, 10);
-            if (end == input.c_str() || errno == ERANGE || value < std::numeric_limits<int>::min() || value > std::numeric_limits<int>::max()) return false;
-            output = static_cast<int>(value);
+        try {
+            if constexpr (std::is_same_v<Number, float>) output = std::stof(input);
+            else {
+                errno = 0;
+                output = std::stoi(input, nullptr, 10);
+            }
+            return true;
+        } catch (const std::invalid_argument&) {
+            return false;
+        } catch (const std::out_of_range&) {
+            if constexpr (std::is_same_v<Number, float>) {
+                // The legacy float parser accepts underflow/overflow. Keep its CRT
+                // result after stof has established that a numeric prefix exists.
+                output = std::strtof(input.c_str(), nullptr);
+                return true;
+            }
+            return false;
         }
-        return true;
     }
     inline std::size_t configValueOffset(std::string_view text, std::string_view key) {
         for (std::size_t line = 0; line < text.size();) {

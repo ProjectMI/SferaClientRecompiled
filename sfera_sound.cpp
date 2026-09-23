@@ -48,10 +48,10 @@ std::uint32_t readU32(const std::uint8_t* value) {
         (static_cast<std::uint32_t>(value[3]) << 24u);
 }
 
-bool readBinaryFile(const char* filename, std::vector<std::uint8_t>& bytes) {
-    if (filename == nullptr || *filename == '\0') return false;
+bool readBinaryFile(const std::string& filename, std::vector<std::uint8_t>& bytes) {
+    if (filename.empty()) return false;
     FILE* file = nullptr;
-    if (::fopen_s(&file, filename, "rb") != 0 || file == nullptr) return false;
+    if (::fopen_s(&file, filename.c_str(), "rb") != 0 || file == nullptr) return false;
     struct FileCloser {
         FILE* file;
         ~FileCloser() { if (file != nullptr) std::fclose(file); }
@@ -142,7 +142,7 @@ bool decodeVorbis(const std::vector<std::uint8_t>& bytes, DecodedAudio& output) 
     return true;
 }
 
-bool decodeAudioFile(const char* filename, DecodedAudio& output) {
+bool decodeAudioFile(const std::string& filename, DecodedAudio& output) {
     std::vector<std::uint8_t> bytes;
     if (!readBinaryFile(filename, bytes)) return false;
     if (decodePcmWave(bytes, output)) return true;
@@ -328,7 +328,7 @@ int CSoundInterface::UpdateSettings() {
 CSound::CSound() : impl_(std::make_unique<Impl>()) {}
 CSound::~CSound() { Stop(); }
 
-int CSound::LoadSound(const char* source_filename, std::uint32_t flags) {
+int CSound::LoadSound(const std::string& source_filename, std::uint32_t flags) {
     Stop();
     if (g_interface == nullptr || g_interface->impl_->device == nullptr) return 0;
 
@@ -339,8 +339,7 @@ int CSound::LoadSound(const char* source_filename, std::uint32_t flags) {
     ComPtr<IDirectSound3DBuffer8> spatial_buffer;
     if (!createBuffer(g_interface->impl_->device.Get(), audio, spatial, buffer, spatial_buffer)) return 0;
 
-    std::string copied_filename(source_filename);
-    filename = std::move(copied_filename);
+    filename = source_filename;
     impl_->audio = std::move(audio);
     impl_->buffer = std::move(buffer);
     impl_->spatial = std::move(spatial_buffer);
@@ -586,7 +585,7 @@ void SI_Close() {
     owner->impl_->streams.clear();
 }
 
-void SI_SetLogFile(const char*) {}
+void SI_SetLogFile(std::optional<std::string_view>) {}
 
 void SI_SetStreamVolume(int percent) {
     g_stream_volume = std::clamp(percent, 0, 100);
@@ -596,7 +595,7 @@ void SI_SetStreamVolume(int percent) {
     }
 }
 
-CSoundStream* SI_StreamCreateFile(const char* filename, std::uint32_t) {
+CSoundStream* SI_StreamCreateFile(const std::string& filename, std::uint32_t) {
     if (g_interface == nullptr || g_interface->impl_->device == nullptr) return nullptr;
     DecodedAudio audio;
     if (!decodeAudioFile(filename, audio)) return nullptr;

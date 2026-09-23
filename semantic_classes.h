@@ -62,17 +62,17 @@ extern SferaPolygon3F g_sfera_clipped_polygon;
 
 class SferaSimpleParser {
 public:
-    bool load(const char* filename);
+    bool load(const std::string& filename);
     void assign(std::string source);
-    bool findBlock(const char* name, SferaParserRange* output, const SferaParserRange* search, std::ptrdiff_t occurrence);
-    std::ptrdiff_t countBlocks(const char* name, const SferaParserRange* search);
-    bool findValue(const char* name, const SferaParserRange* search);
+    bool findBlock(std::string_view name, SferaParserRange* output, const SferaParserRange* search, std::ptrdiff_t occurrence);
+    std::ptrdiff_t countBlocks(std::string_view name, const SferaParserRange* search);
+    bool findValue(std::string_view name, const SferaParserRange* search);
     void setScanRange(const SferaParserRange* range);
     void clearScanRange() { scan_ = {}; }
-    bool nextValue(const char* name);
+    bool nextValue(std::string_view name);
     void setBlockRange(const SferaParserRange* range);
     void clearBlockRange() { block_ = {}; }
-    bool nextBlock(const char* name, SferaParserRange* output);
+    bool nextBlock(std::string_view name, SferaParserRange* output);
     void getBlockRange(SferaParserRange* output) const { *output = block_; }
     void getScanRange(SferaParserRange* output) const { *output = scan_; }
     std::string_view lineAt(std::ptrdiff_t index) const;
@@ -101,7 +101,7 @@ private:
     static std::string_view firstToken(std::string_view line);
     std::ptrdiff_t findClosingBrace(std::ptrdiff_t begin, std::ptrdiff_t end) const;
     std::ptrdiff_t parseBlockAt(std::string_view first, std::ptrdiff_t line, std::ptrdiff_t end, SferaParserRange* output);
-    bool findValueFrom(const char* name, std::ptrdiff_t& line, std::ptrdiff_t end);
+    bool findValueFrom(std::string_view name, std::ptrdiff_t& line, std::ptrdiff_t end);
     std::size_t tokenStart(std::size_t index) const;
 };
 
@@ -158,7 +158,7 @@ struct SferaEffectMeshDefinition {
     bool additive = false;
     bool custom_uv = false;
 
-    bool loadDefinition(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range);
+    bool loadDefinition(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range);
     std::size_t renderSlotCount() const;
 };
 
@@ -243,7 +243,7 @@ struct SferaParticleSystemDefinition {
     float texture_animation_speed{};
     std::vector<SferaParticleSystemLink> links;
 
-    bool loadDefinition(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range);
+    bool loadDefinition(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range);
 };
 
 struct SferaParticleSystemInstance {
@@ -421,7 +421,7 @@ public:
 
     IEffect() = default;
     void initializeBaseState(Kind kind);
-    void assignScriptName(const char* name);
+    void assignScriptName(std::string_view name);
     virtual void initializeEffect(const SferaEffectInitializeContext& context);
     virtual void updateEffect(const SferaEffectUpdateContext& context);
     virtual void queryEffectState(const SferaEffectQueryContext& context);
@@ -457,7 +457,7 @@ public:
     std::uint32_t phase_ticks_remaining{};
 
     void initializeScriptedState();
-    bool loadScript(const char* filename);
+    bool loadScript(const std::string& filename);
     void resetRuntimeState();
     void initializeEffect(const SferaEffectInitializeContext& context) override;
     void updateEffect(const SferaEffectUpdateContext& context) override;
@@ -570,20 +570,20 @@ public:
 class IOutputDevice {
 public:
     virtual ~IOutputDevice() = default;
-    virtual void write(const char* text) = 0;
+    virtual void write(std::string_view text) = 0;
 };
 
 class COutputLogDevice : public IOutputDevice {
 public:
     std::string filename;
-    void setFilename(const char* path);
-    void write(const char* text) override;
+    void setFilename(const std::string& path);
+    void write(std::string_view text) override;
 };
 
 class CSphereError : public IOutputDevice {
 public:
     CSphereError() = default;
-    void write(const char* text) override;
+    void write(std::string_view text) override;
 };
 
 class GrassMapMngr {
@@ -683,9 +683,10 @@ public:
     std::uint8_t kind = 255u;
     SferaInterfaceCursor() = default;
     bool loadTextures();
-    void setImage(std::size_t layer, const char* texture, int x, int y);
+    void setImage(std::size_t layer, std::optional<std::string_view> texture, int x, int y);
+    void setImage(std::size_t, std::nullptr_t, int, int) = delete;
     void setImageSize(std::size_t layer, int width, int height);
-    void setText(std::size_t layer, const char* text, int x, int y, int font, std::uint32_t color);
+    void setText(std::size_t layer, std::string_view text, int x, int y, int font, std::uint32_t color);
     void setKind(std::uint32_t cursor_kind);
     void draw(float x, float y) const;
 private:
@@ -914,7 +915,7 @@ public:
     ~CD3D9Device();
     CD3D9Device(const CD3D9Device&) = delete;
     CD3D9Device& operator=(const CD3D9Device&) = delete;
-    HRESULT checkResult(HRESULT result, const char* operation);
+    HRESULT checkResult(HRESULT result, std::string_view operation);
     void initialize(HWND window, std::uint32_t width, std::uint32_t height, std::uint32_t depth_bits, bool windowed);
     void enumerateDisplayModes(bool windowed);
     bool supportsDisplayMode(std::uint32_t width, std::uint32_t height, std::uint32_t depth_bits) const;
@@ -984,20 +985,20 @@ public:
     SferaFileManager(const SferaFileManager&) = delete;
     SferaFileManager& operator=(const SferaFileManager&) = delete;
     bool setErrorReporting(bool enabled);
-    int open(const char* filename, int flags);
-    int create(const char* filename);
-    int transformEnvelope(const char* destination, const char* source, bool compress);
+    int open(const std::string& filename, int flags);
+    int create(const std::string& filename);
+    int transformEnvelope(const std::string& destination, const std::string& source, bool compress);
     std::ptrdiff_t read(int descriptor, void* destination, std::size_t size);
     std::ptrdiff_t write(int descriptor, const void* source, std::size_t size);
     std::int64_t seek(int descriptor, std::int64_t offset, int origin);
     int close(int descriptor);
-    std::int64_t fileSize(const char* filename);
-    std::vector<std::uint8_t> readAll(const char* filename);
-    static bool writeFile(const char* path, const void* data, std::size_t size);
-    static std::optional<std::vector<std::uint8_t>> readBounded(const char* filename, std::size_t capacity);
-    void keepTail(const char* filename, std::size_t size);
-    void addSearchPath(const char* directory);
-    std::vector<std::string> candidatePaths(const char* filename, bool search_nested_paths = false) const;
+    std::int64_t fileSize(const std::string& filename);
+    std::vector<std::uint8_t> readAll(const std::string& filename);
+    static bool writeFile(const std::string& path, const void* data, std::size_t size);
+    static std::optional<std::vector<std::uint8_t>> readBounded(const std::string& filename, std::size_t capacity);
+    void keepTail(const std::string& filename, std::size_t size);
+    void addSearchPath(std::string_view directory);
+    std::vector<std::string> candidatePaths(const std::string& filename, bool search_nested_paths = false) const;
     class ScopedFile {
     public:
         ScopedFile(SferaFileManager& owner, int descriptor) noexcept : owner_(owner), descriptor_(descriptor) {}
@@ -1013,12 +1014,12 @@ public:
 private:
     static constexpr std::size_t maximum_open_files = 100u;
     static constexpr std::size_t maximum_search_paths = 100u;
-    void reportError(const char* description, const char* filename) const;
+    void reportError(std::string_view description, const std::string& filename) const;
     bool error_reporting_enabled = false;
     std::vector<std::string> search_paths;
     std::unordered_map<int, std::string> open_files;
     int registerDescriptor(int descriptor, const std::string& filename);
-    const std::string* filenameFor(int descriptor, const char* invalid_handle_message) const;
+    const std::string* filenameFor(int descriptor, std::string_view invalid_handle_message) const;
 };
 
 extern SferaFileManager g_sfera_files;
@@ -1031,9 +1032,9 @@ struct QuickFileEntry {
 class QuickFile {
 public:
     static constexpr std::size_t file_capacity = 400;
-    QuickFile* initialize(const char* directory);
+    QuickFile* initialize(const std::string& directory);
     void release();
-    int load(const char* filename, std::size_t size);
+    int load(const std::string& filename, std::size_t size);
     const QuickFileEntry* find(std::string_view filename) const;
 private:
     static constexpr std::size_t maximum_filename_length = 32;
@@ -1043,11 +1044,11 @@ private:
 
 class SferaFileMap {
 public:
-    explicit SferaFileMap(const char* path);
+    explicit SferaFileMap(const std::string& path);
     SferaFileMap(const SferaFileMap&) = delete;
     SferaFileMap& operator=(const SferaFileMap&) = delete;
     ~SferaFileMap() noexcept;
-    bool open(const char* path);
+    bool open(const std::string& path);
     void close() noexcept;
     bool isOpen() const noexcept;
 
@@ -1056,7 +1057,7 @@ private:
     const std::byte* mapped_view = nullptr;
     std::size_t file_size = 0u;
     std::string filename;
-    void reportError(const char* format) const noexcept;
+    void reportError(std::string_view operation) const noexcept;
 };
 
 namespace SphereUI {
@@ -1105,17 +1106,19 @@ namespace SphereUI {
         float u1 = 0.0f;
         float v1 = 0.0f;
         static constexpr std::size_t encodedSize = 28;
-        static FontGlyph decode(const std::uint8_t* bytes) {
+        static FontGlyph decode(std::span<const std::uint8_t> bytes) {
+            SferaBinary::Reader reader(bytes);
             FontGlyph glyph;
-            glyph.width = SferaBinary::readLittleEndian<std::uint16_t>(bytes);
-            glyph.height = SferaBinary::readLittleEndian<std::uint16_t>(bytes + 2);
-            glyph.bearing_x = SferaBinary::readLittleEndian<std::int16_t>(bytes + 4);
-            glyph.bearing_y = SferaBinary::readLittleEndian<std::int16_t>(bytes + 6);
-            glyph.advance = SferaBinary::readLittleEndian<std::int16_t>(bytes + 8);
-            glyph.u0 = std::bit_cast<float>(SferaBinary::readLittleEndian<std::uint32_t>(bytes + 12));
-            glyph.v0 = std::bit_cast<float>(SferaBinary::readLittleEndian<std::uint32_t>(bytes + 16));
-            glyph.u1 = std::bit_cast<float>(SferaBinary::readLittleEndian<std::uint32_t>(bytes + 20));
-            glyph.v1 = std::bit_cast<float>(SferaBinary::readLittleEndian<std::uint32_t>(bytes + 24));
+            glyph.width = reader.read<std::uint16_t>();
+            glyph.height = reader.read<std::uint16_t>();
+            glyph.bearing_x = reader.read<std::int16_t>();
+            glyph.bearing_y = reader.read<std::int16_t>();
+            glyph.advance = reader.read<std::int16_t>();
+            reader.take(2u); // Reserved bytes in the SFNT record.
+            glyph.u0 = reader.read<float>();
+            glyph.v0 = reader.read<float>();
+            glyph.u1 = reader.read<float>();
+            glyph.v1 = reader.read<float>();
             return glyph;
         }
     };
@@ -1127,7 +1130,8 @@ namespace SphereUI {
         std::string name;
         int line_height = 0;
         int baseline = 0;
-        bool load(const char* display_name, const char* filename, const char* texture_name);
+        bool load(std::optional<std::string_view> display_name, const std::string& filename, std::string_view texture_name);
+        bool load(std::nullptr_t, const std::string&, std::string_view) = delete;
     };
 
     class InterfaceRenderer {
@@ -1137,17 +1141,17 @@ namespace SphereUI {
     static SferaScreenVertex glyph_vertices[1200];
     static uint16_t quad_indices[1800];
 
-        static TextExtent measureText(const char* text, int font, bool initialized);
+        static TextExtent measureText(std::string_view text, int font, bool initialized);
         static std::uint32_t tracking(int font) noexcept;
-        static void drawText(const char* text, int x, int y, std::uint32_t color, int font, bool initialized, const UiRect& clip, bool opaque);
-        static void reportError(const char* message);
+        static void drawText(std::string_view text, int x, int y, std::uint32_t color, int font, bool initialized, const UiRect& clip, bool opaque);
+        static void reportError(std::string_view message);
         static void drawTexture(IDirect3DBaseTexture9* texture, float left, float top, float right, float bottom, std::uint32_t color, float u = 1.0f, float v = 1.0f, bool textured = true);
         static void setSpriteRenderMode(std::uint32_t mode);
         static UiViewport viewport();
         static void setViewport(const UiViewport& viewport);
 
     private:
-        static void drawFaceText(const char* text, int x, int y, std::uint32_t color, int font, const UiRect& clip);
+        static void drawFaceText(std::string_view text, int x, int y, std::uint32_t color, int font, const UiRect& clip);
     };
 
     class InterfaceConfiguration {
@@ -1155,9 +1159,9 @@ namespace SphereUI {
         static std::optional<std::string_view> value(std::string_view key);
         static bool empty() noexcept { return text_.empty(); }
         static void close() noexcept { text_.clear(); filename_.clear(); }
-        static void open(const char* filename);
-        static int readInteger(const char* key, int fallback);
-        static void writeInteger(const char* key, int value);
+        static void open(const std::string& filename);
+        static int readInteger(std::string_view key, int fallback);
+        static void writeInteger(std::string_view key, int value);
         static void save();
     private:
         static std::string text_;
@@ -1172,8 +1176,8 @@ namespace SphereUI {
         FontFactory& operator=(const FontFactory&) = delete;
         void initialize();
         void clear();
-        bool load(const char* filename, const char* texture_name);
-        void loadNamedFont(const char* name);
+        bool load(const std::string& filename, std::string_view texture_name);
+        void loadNamedFont(std::string_view name);
         void loadConfiguration();
         std::size_t count() const noexcept;
         const FontFace& face(int font) const;
@@ -1234,8 +1238,8 @@ namespace SphereUI {
         std::uint32_t hover_color = D3DCOLOR_ARGB(255, 255, 255, 0);
         HyperTextDocument() = default;
         HyperTextDocument(std::string_view text, int width, std::uint32_t format, int font);
-        void setName(const char* value);
-        bool load(const char* filename);
+        void setName(std::string_view value);
+        bool load(const std::string& filename);
         void load(const SferaSimpleParser& parser, const SferaParserRange& range);
         void parse(std::string_view input);
         std::unique_ptr<HyperTextDocument> clone(int width, std::uint32_t format, int font) const;
@@ -1288,11 +1292,11 @@ struct OptionsSession {
     float saved_lod_distance{};
     float saved_fog_distance{};
     uint32_t saved_music_volume{};
-    char labels[7][512]{};
+    std::array<std::string, 7> labels{};
     uint32_t saved_graphics[7]{};
-    char unknown_graphics_label[28]{};
+    std::string unknown_graphics_label;
     uint32_t saved_sound_volume{};
-    char binding_key_name[128]{};
+    std::string binding_key_name;
     uint32_t comparison_graphics_value{};
     bool binding_dialog_open{};
     std::vector<std::uint32_t> saved_chat_fonts{};
@@ -1303,7 +1307,7 @@ class ChatFilter;
 
 class InterfaceManager {
 public:
-    char default_cursor_name[8]{};
+    std::string default_cursor_name;
     uint32_t overlay_alpha{};
     uint32_t cursor_kind{};
     bool ui_enabled = true;
@@ -1324,24 +1328,23 @@ public:
     std::vector<std::shared_ptr<const UiSprite>> sprites;
     std::vector<LocalizedTextEntry> localized_strings;
     std::list<SavedWindowPosition> saved_positions;
-    std::string resolved_ui_path;
-    const char* localizedPath(const char* filename);
-    std::shared_ptr<const UiSprite> sharedSprite(const char* name);
-    std::shared_ptr<const UiSprite> acquireSprite(const char* name);
-    void loadSprites(const char* filename);
+    std::string localizedPath(std::string_view filename);
+    std::shared_ptr<const UiSprite> sharedSprite(std::string_view name);
+    std::shared_ptr<const UiSprite> acquireSprite(std::string_view name);
+    void loadSprites(const std::string& filename);
     void clearSprites();
-    bool loadWindowTemplates(const char* filename);
-    Window* templateWindow(const char* name) const;
+    bool loadWindowTemplates(const std::string& filename);
+    Window* templateWindow(std::string_view name) const;
     void clearWindowTemplates();
     void loadHyperTexts();
-    HyperTextDocument* findHyperText(const char* name) const;
+    HyperTextDocument* findHyperText(std::string_view name) const;
     void clearHyperTexts();
     bool loadLocalizedStrings();
-    std::string_view localizedValue(const char* key) const;
-    const char* localizedText(const char* key) const;
+    std::string_view localizedValue(std::string_view key) const;
+    std::string_view localizedText(std::string_view key) const;
     void clearLocalizedStrings();
-    SavedWindowPosition* savedPosition(const char* name, bool create);
-    bool findSavedPosition(const char* name, SferaCursorPosition& position);
+    SavedWindowPosition* savedPosition(std::string_view name, bool create);
+    bool findSavedPosition(std::string_view name, SferaCursorPosition& position);
     void saveWindowPosition(Window& window);
     std::size_t savedPositionsSize() const;
     void writeSavedPositions(std::span<std::byte> destination) const;
@@ -1374,19 +1377,22 @@ public:
     void clearWindows();
     void queueEvent(const WindowEvent& event);
     bool pollEvent(WindowEvent& event);
-    Window* findWindow(const char* name, bool exact = false) const;
+    Window* findWindow(std::string_view name, bool exact = false) const;
     Window* windowUnderCursor() const;
     bool hasEscapeWindow() const;
     Window* addTopLevelWindow(std::unique_ptr<Window> window);
     void raiseWindow(Window& window);
     void lowerWindow(Window& window);
     void collectCoveredWindows(Window& window);
-    Window* openWindow(const char* name, int x = 0, int y = 0, std::uint32_t flags = 0u);
+    Window* openWindow(std::string_view name, int x = 0, int y = 0, std::uint32_t flags = 0u);
     void closeWindow(Window* window, bool animated = true);
-    void showHelpPage(const char* name);
-    void setTooltipText(const char* text);
+    void showHelpPage(std::optional<std::string_view> name);
+    void showHelpPage(std::nullptr_t) = delete;
+    void setTooltipText(std::optional<std::string_view> text);
+    void setTooltipText(std::nullptr_t) = delete;
     void setCursorKind(std::uint32_t kind, int x, int y);
-    void setCursorImage(const char* texture, int x, int y);
+    void setCursorImage(std::optional<std::string_view> texture, int x, int y);
+    void setCursorImage(std::nullptr_t, int, int) = delete;
     void update(std::uint8_t key = 0u, std::uint8_t character = 0u, std::uint32_t mouse_buttons = 0u, int wheel_delta = 0);
     void draw();
     std::uint32_t sendMessage(Window* window, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second);
@@ -1408,7 +1414,7 @@ extern SphereUI::InterfaceManager g_sfera_interface;
 
 namespace SphereUI {
     struct ImageDescriptionParameters {
-        char texture_name[64];
+        std::string texture_name;
         int width;
         int height;
         UiRect rectangle;
@@ -1416,7 +1422,7 @@ namespace SphereUI {
     };
 
     struct ImageDescription {
-        char name[64];
+        std::string name;
         ImageDescriptionParameters image;
     };
 }
@@ -1433,16 +1439,16 @@ public:
         std::variant<int, float, std::string, std::vector<std::uint8_t>, std::vector<int>, std::vector<float>, std::vector<std::string>, std::vector<ConfigDocument>> data;
     };
     static ConfigDocument parse(std::string_view source);
-    static ConfigDocument open(const char* path);
+    static ConfigDocument open(const std::string& path);
     static void setStorageMode(StorageMode mode);
     const Value* find(std::string_view name) const;
     std::optional<int> integer(std::string_view name) const;
     std::optional<float> real(std::string_view name) const;
-    const char* text(std::string_view name) const;
+    std::optional<std::string_view> text(std::string_view name) const;
     std::optional<std::size_t> arraySize(std::string_view name) const;
     std::optional<int> integerAt(std::string_view name, std::size_t index) const;
     std::optional<float> realAt(std::string_view name, std::size_t index) const;
-    const char* textAt(std::string_view name, std::size_t index) const;
+    std::optional<std::string_view> textAt(std::string_view name, std::size_t index) const;
     const ConfigDocument* object(std::string_view name) const;
     const ConfigDocument* objectAt(std::string_view name, std::size_t index) const;
     std::span<const std::uint8_t> binary(std::string_view name) const;
@@ -1456,7 +1462,7 @@ private:
 
 class ModelParameters {
 public:
-    void load(const char* path);
+    void load(const std::string& path);
     void parse(std::string_view source);
     void clear();
     bool contains(std::string_view model, std::string_view parameter) const;
@@ -1484,7 +1490,7 @@ struct Material {
 
 class MaterialLibrary {
 public:
-    void load(const char* binary_path, const char* configuration_path = "Models\\Materials.cfg");
+    void load(const std::string& binary_path, const std::string& configuration_path = "Models\\Materials.cfg");
     void clear();
     const Material* find(std::string_view name) const;
     const Material* at(std::size_t index) const;
@@ -1663,7 +1669,7 @@ public:
     Model() = default;
     Model(const Model&) = delete;
     Model& operator=(const Model&) = delete;
-    static std::unique_ptr<Model> load(const char* model_name, const char* directory, const ModelParameters& parameters, const MaterialLibrary& materials);
+    static std::unique_ptr<Model> load(std::string_view model_name, std::string_view directory, const ModelParameters& parameters, const MaterialLibrary& materials);
     static std::unique_ptr<Model> decode(std::string_view model_name, std::span<const std::uint8_t> bytes, const ModelParameters& parameters, const MaterialLibrary& materials);
     void prepareGrass(bool synchronized, float ground_y);
     void prepareTree(float dead_radius, float phase_multiplier);
@@ -1694,10 +1700,10 @@ struct SceneSortEntry;
             bool has_alpha = false;
         };
         void initialize();
-        void addFolder(const char* directory);
+        void addFolder(const std::string& directory);
         void finishRegistration();
         void clear();
-        int find(const char* name) const;
+        int find(std::string_view name) const;
         IDirect3DBaseTexture9* resource(int index);
         SphereUI::TextExtent size(int index);
         bool hasAlpha(int index);
@@ -1721,9 +1727,9 @@ struct SceneSortEntry;
             std::chrono::steady_clock::time_point last_used;
         };
         void initialize();
-        void addFolder(const char* directory);
+        void addFolder(const std::string& directory);
         void finishRegistration();
-        int find(const char* name) const;
+        int find(std::string_view name) const;
         std::shared_ptr<Model> model(int index);
         void releaseModels();
         void evictUnused(std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now());
@@ -1760,14 +1766,14 @@ public:
     std::string pixel_directory;
     std::array<float, 512> wave_samples;
     std::array<float, 64> downsample_offsets;
-    CShaderMgr(CD3D9Device& device, const char* vertex_directory, const char* pixel_directory);
+    CShaderMgr(CD3D9Device& device, std::string vertex_directory, std::string pixel_directory);
     CShaderMgr(const CShaderMgr&) = delete;
     CShaderMgr& operator=(const CShaderMgr&) = delete;
     static std::pair<bool, std::array<std::uint8_t, 8>> instanceCode(std::string_view filename, bool pixel);
     static std::array<float, 512> makeWaveSamples();
     static std::array<float, 64> makeDownsampleOffsets(float width, float height);
     static WaterParameters waterParameters(float environment, float height);
-    void loadFolder(const char* directory, bool pixel);
+    void loadFolder(const std::string& directory, bool pixel);
     void setPixelShader(std::uint32_t group);
 private:
     CD3D9Device& device;
@@ -1840,31 +1846,30 @@ struct SferaLogRuntime {
     std::string path;
     std::uint32_t size_limit = 0;
     void initialize();
-    void write(const char* text);
+    void write(std::string_view text);
     void write(int number);
-    void writeFormatted(const char* format, std::va_list arguments);
-    void writeTimestamp(const char* prefix);
+    void writeTimestamp(std::string_view prefix);
 };
 
 struct SferaConfigTextRuntime {
     enum class Operation : int { Write = 13, Read = 14, Load = 15, Save = 16, Clear = 17, UseText = 30, ReadCommands = 54, SaveCompressed = 55, CopyText = 56, Length = 57, SetFilename = 62 };
     static constexpr std::size_t text_capacity = 2458176u;
     static constexpr std::size_t filename_capacity = 1024u;
-    bool load(const char* filename);
+    bool load(const std::string& filename);
     bool save(bool compressed = false) const;
     bool writeValue(std::string_view key, std::string_view value, bool quoted);
     static std::string encodeBinary(std::span<const std::uint8_t> input);
     std::string filename;
-    std::string_view text() const;
+    std::string text() const;
     std::size_t copyText(std::string_view source);
     void useText(std::uint32_t address, std::size_t capacity, SferaMbcProcessRecord* process);
     void clear(std::string path = {}) { storage_.emplace<std::string>(); filename = std::move(path); }
-    std::optional<std::string_view> find(std::string_view key) const;
+    std::optional<std::string> find(std::string_view key) const;
     bool readInteger(std::string_view key, int& value) const;
     bool readFloat(std::string_view key, float& value) const;
-    bool readString(std::string_view key, char* destination, std::size_t capacity) const;
-    bool readBinary(std::string_view key, std::uint8_t* destination, std::size_t capacity) const;
-    std::size_t copyTo(char* destination, std::size_t capacity) const;
+    std::optional<std::string> readString(std::string_view key) const;
+    bool readBinary(std::string_view key, std::span<std::uint8_t> destination) const;
+    std::size_t copyTo(std::span<std::uint8_t> destination) const;
 private:
     struct BorrowedText {
         std::uint32_t address;
@@ -1874,7 +1879,7 @@ private:
         std::uint64_t mapping_lifetime;
     };
     std::variant<std::string, BorrowedText> storage_;
-    std::span<char> borrowedBytes(const BorrowedText& view) const;
+    std::span<std::uint8_t> borrowedBytes(const BorrowedText& view) const;
 };
 
 struct SferaErrorLogRuntime {
@@ -1882,25 +1887,25 @@ struct SferaErrorLogRuntime {
     std::unique_ptr<CSphereError> owned_error;
     std::unique_ptr<COutputLogDevice> owned_log;
     bool enabled = false;
-    char user_name[128]{};
+    std::string user_name;
     void initialize(IOutputDevice* error = nullptr, IOutputDevice* log = nullptr);
     void clear();
 };
 
 class WorldDiagnostics {
 public:
-    static char message[2048];
+    static std::string message;
 
     static constexpr std::uint32_t codeBaseMismatch = 1u << 7u;
-    static void appendScriptContext(const char* text);
+    static void appendScriptContext(std::string_view text);
     static void flushScriptContext();
     static std::uint32_t inspectInstruction(std::uint16_t& module, std::uint32_t& offset, std::uint8_t* bytes, std::uint32_t& count);
     static void describeScript(bool includeTime);
-    static void appendCallStack(char* output);
-    static const char* scriptContext();
-    static void report(const char* message);
-    static void warning(const char* message);
-    [[noreturn]] static void fail(const char* message);
+    static void appendCallStack(std::string& output);
+    static std::optional<std::string_view> scriptContext();
+    static void report(std::string_view message);
+    static void warning(std::string_view message);
+    [[noreturn]] static void fail(std::string_view message);
 };
 class WorldClock {
 public:
@@ -2019,10 +2024,12 @@ public:
     void detachEffect(std::uint32_t handle, SferaActiveEffect& item);
     SferaActiveEffect* firstEffect(std::uint32_t handle) const;
     SferaEffectFrames buildEffectFrames(std::uint32_t handle) const;
-    WorldObject* object(std::uint32_t handle, const char* operation = nullptr) const;
+    WorldObject* object(std::uint32_t handle, std::optional<std::string_view> operation = std::nullopt) const;
+    WorldObject* object(std::uint32_t, std::nullptr_t) const = delete;
     ExtendedWorldObject* extendedObject(std::uint32_t handle) const;
+    WorldObject* controlledObject() const;
     SphereRender::Model* model(const WorldObject& object) const;
-    std::uint32_t create(const char* name, SferaMbcProcessRecord* process, std::uint32_t kind, bool dynamic);
+    std::uint32_t create(std::string_view name, SferaMbcProcessRecord* process, std::uint32_t kind, bool dynamic);
     void destroy(std::uint32_t handle);
     void destroyAll();
     void clear();
@@ -2035,13 +2042,13 @@ public:
     void alignReferenceOrientation();
     void reflectReferenceOrientation();
     void recalculateBasis(std::uint32_t handle);
-    void appendCommand(std::uint32_t handle, const char* command);
+    void appendCommand(std::uint32_t handle, std::string_view command);
     bool actorActive(std::uint32_t handle) const;
     void activateTrap(const WorldObject& obstacle);
     void addExtended(std::uint32_t handle);
     void removeExtended(std::uint32_t handle);
     void unlink(std::uint32_t parent, std::uint32_t slot);
-    ExtendedWorldObject* linkModel(std::uint32_t parent, const char* name, std::uint32_t slot);
+    ExtendedWorldObject* linkModel(std::uint32_t parent, std::string_view name, std::uint32_t slot);
 };
 
 // Runtime terrain storage is independent of the encoded landscape headers.
@@ -2156,7 +2163,7 @@ public:
     void loadBytes(std::span<const std::uint8_t> bytes);
     void typeRange(int first, int last, int& start, int& count) const;
     bool sameEdge(int first_contour, int first_edge, int second_contour, int second_edge) const;
-    void setServerMap(const int* types, const int* servers, int count);
+    void setServerMap(std::span<const int> types, std::span<const int> servers);
     int serverByType(int type) const;
     void buildServerMask(int server);
     int typeAt(float x, float z, int first_type, int last_type) const;
@@ -2322,7 +2329,7 @@ class VegetationPatterns {
 public:
     struct GrassPattern { std::uint32_t id; std::array<std::string, 10> variants; };
     void initializeGrass();
-    void addGrass(std::uint32_t id, const std::array<const char*, 10>& variants);
+    void addGrass(std::uint32_t id, const std::array<std::string_view, 10>& variants);
     const GrassPattern& grass(std::uint32_t id) const;
 private:
     std::vector<GrassPattern> grass_patterns_;
@@ -2478,8 +2485,8 @@ public:
     static uint32_t text_width;
 
     static std::vector<std::unique_ptr<GameUiElement>> elements;
-    static std::uint32_t createText(int x, int y, const char* text, std::uint32_t window);
-    static std::uint32_t createSprite(int x, int y, int width, int height, const char* texture, std::uint32_t window, std::uint32_t alpha);
+    static std::uint32_t createText(int x, int y, std::string_view text, std::uint32_t window);
+    static std::uint32_t createSprite(int x, int y, int width, int height, std::string_view texture, std::uint32_t window, std::uint32_t alpha);
     static void setAppearance(std::uint32_t handle, std::uint32_t alpha, std::optional<std::uint32_t> color = std::nullopt);
     static void destroyAllText();
     static GameUiElement* control(std::uint32_t handle);
@@ -2516,7 +2523,7 @@ public:
     static SferaVec3F* neckPosition(SferaVec3F& output);
 private:
     static ModelKeyframe keyframe(const Model& model, const BoneAnimation& animation, std::size_t frame);
-    static ExtendedWorldObject* queryObject(std::uint32_t handle, const char* operation);
+    static ExtendedWorldObject* queryObject(std::uint32_t handle, std::string_view operation);
     static std::size_t frameOffset(const Model& model, int animation, int frame, bool secondary);
 };
 }
@@ -2560,7 +2567,7 @@ public:
     float lod_start = 0.0f;
     float lod_end = 0.0f;
 
-    void load(std::span<const char* const> folders);
+    void load(std::span<const std::string_view> folders);
     void clear();
     void initializeBounds();
     int classify(const SferaMatrix4x4F& world) const;
@@ -2571,7 +2578,7 @@ public:
     bool getAppearance(int handle, CharacterAppearance& appearance) const;
     int partAnimationLength(const ExtendedWorldObject& object, int animation) const;
     int usesSmallHelm(int sex, int code) const;
-    void loadSkeleton(const char* path, CharacterSkeleton& skeleton);
+    void loadSkeleton(const std::string& path, CharacterSkeleton& skeleton);
     void preload(CharacterAsset& asset, const CharacterSkeleton& skeleton);
     void animate(const CharacterSkeleton& skeleton, int animation, int frame, int secondaryAnimation, int secondaryFrame, float interpolation, SferaMatrix4x4F* output, bool attachmentsOnly) const;
     SferaVec3F neckPosition(const ExtendedWorldObject& object) const;
@@ -2579,7 +2586,7 @@ public:
     void drawLowDetail(std::uint32_t handle);
     void draw(std::uint32_t handle, std::uint32_t color);
     static HRESULT setMaterial(float opacity, float detail, const SferaVec3F& color);
-    static int textureVariants(bool female, char part);
+    static int textureVariants(bool female, std::string_view part);
     static std::uint32_t* parameter(std::span<std::uint32_t> values, int index);
     static ExtendedWorldObject* checkedExtended(WorldObject* object);
 private:
@@ -2748,8 +2755,8 @@ public:
     static void rotateUv(float x, float y, float angle, float& u, float& v);
     static std::size_t buildLayerGeometry(const SceneSkyLayer& layer, float opacity);
     static void layerColor(const SceneSkyLayer& layer, SferaVec3F& output);
-    static void drawColorLayer(const char* texture, const SferaVec3F& color, std::size_t indices);
-    static void drawMaskLayer(const char* texture, std::size_t indices);
+    static void drawColorLayer(std::string_view texture, const SferaVec3F& color, std::size_t indices);
+    static void drawMaskLayer(std::string_view texture, std::size_t indices);
     static void drawLayers(const SceneSkyLayers& layers);
     static void orbit(float& x, float& y, std::uint32_t orbit);
     static float horizonFog(float elevation, float amount);
@@ -2840,7 +2847,7 @@ public:
     std::array<SkyState, 11> states{};
     int sunsetState = 0;
     int sunriseState = 0;
-    void load(const char* filename);
+    void load(const std::string& filename);
     void interval(float time, int& first, int& second, float& fraction) const;
     void sample(float time, SkyState& output) const;
     void sunDirection(float time, SferaVec3F& output) const;
@@ -2860,7 +2867,7 @@ struct EnvironmentZone {
 class EnvironmentZones {
 public:
     static void interval(float time, int& first, int& second, float& fraction);
-    void load(const char* filename);
+    void load(const std::string& filename);
     void calculate(bool useDefault, float x, float z, float time, const SkyEnvironment& sky, EnvironmentLighting& output);
     std::vector<EnvironmentZone> zones;
 };
@@ -2888,7 +2895,7 @@ public:
     std::vector<std::uint16_t> sequence;
     int totalDuration = 0;
     int lastUpdate = 0;
-    void load(const char* filename);
+    void load(const std::string& filename);
     void update(int time, float dayTime, WeatherState& output, bool alternateClouds);
     void locate(int time, std::size_t& sequenceIndex, int& startTime, int& localTime) const;
     int advance(std::size_t& sequenceIndex, std::size_t& keyframe) const;
@@ -2974,7 +2981,7 @@ struct GameUiElement {
     float height_factor = 1.0f;
     std::uint32_t color = 0, alpha = 255;
     bool isText() const noexcept { return std::holds_alternative<Text>(content); }
-    void layoutText(const char* text, const GameUiWindow& window, int x, int y);
+    void layoutText(std::string_view text, const GameUiWindow& window, int x, int y);
 };
 
 class GameInterface {
@@ -2986,10 +2993,10 @@ public:
     static uint32_t loading_guard;
 
     static std::vector<std::unique_ptr<GameUiWindow>> windows;
-    inline static constexpr const char* nativeWindowClassName = "SphereWclName";
+    inline static constexpr std::string_view nativeWindowClassName = "SphereWclName";
     static void registerNativeWindowClass();
     static void createNativeWindow();
-    static GameUiWindow* window(std::uint32_t handle, const char* operation = nullptr);
+    static GameUiWindow* window(std::uint32_t handle, std::string_view operation = {});
     static std::uint32_t createWindow(int left, int top, int right, int bottom, std::uint32_t layer, std::uint32_t opacity);
     static void destroyWindow(std::uint32_t handle);
     static GameUiHit hitTest(SferaCursorPosition point);
@@ -2998,11 +3005,11 @@ public:
     static std::uint32_t glyphWidth(std::uint32_t character, int font);
     static std::uint32_t textHeight(int font, std::uint32_t scale, std::uint32_t lines);
     static std::uint32_t lineOffset(int font, std::uint32_t scale, std::uint32_t line);
-    static void drawAtlasText(const char* text, int x, int y, std::uint32_t color, int scale, int font, float depth);
+    static void drawAtlasText(std::string_view text, int x, int y, std::uint32_t color, int scale, int font, float depth);
     static HRESULT drawSpriteQuad(std::uint32_t color, const float* uv, float left, float top, float right, float bottom);
     static HRESULT drawSpriteTexture(std::uint32_t color, int texture, float left, float top, float right, float bottom, const float* uv, bool reserved = false);
-    static void drawTexture(int left, int top, int width, int height, const char* name, std::uint32_t alpha, float depth, const float* uv);
-    static void tintTexture(int left, int top, int width, int height, const char* name, std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint32_t alpha, const float* uv);
+    static void drawTexture(int left, int top, int width, int height, std::string_view name, std::uint32_t alpha, float depth, const float* uv);
+    static void tintTexture(int left, int top, int width, int height, std::string_view name, std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint32_t alpha, const float* uv);
     static void drawFullscreenOverlay();
     static void setRenderState();
     static void restoreRenderState();
@@ -3034,7 +3041,7 @@ public:
             return page < pages.size() ? pages[page].Get() : nullptr;
         }
     };
-    char language_suffix[8]{};
+    std::string language_suffix;
     // The existing character map is shared by all faces; its reload policy is unchanged.
     SferaFontGlyphRuntime glyphs[256]{};
     std::array<Face, 5> faces;
@@ -3042,7 +3049,7 @@ public:
     GameFontAtlas(const GameFontAtlas&) = delete;
     GameFontAtlas& operator=(const GameFontAtlas&) = delete;
     void clear() noexcept;
-    void load(int font, const char* filename, int outline, std::uint32_t spacing, std::uint32_t emptyWidth);
+    void load(int font, const std::string& filename, int outline, std::uint32_t spacing, std::uint32_t emptyWidth);
 };
 
 extern GameFontAtlas g_sfera_font_runtime;

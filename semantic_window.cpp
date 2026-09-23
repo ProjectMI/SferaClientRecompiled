@@ -45,7 +45,7 @@
 
 namespace {
     template<class T> struct NamedValue {
-        const char* name;
+        std::string_view name;
         T value;
     };
 
@@ -115,13 +115,11 @@ namespace SphereUI::detail {
         events.push_back(event);
     }
 
-    // Copy at most capacity - 1 characters; even a truncated result is NUL-terminated.
-
     void serializeHyperTextElements(std::span<const HyperTextRun> elements, std::string& hyper_text, std::string& plain);
     std::string escapeHyperText(std::string_view source);
-    SphereUI::UiControlKind controlKind(const char* name);
-    SphereUI::WindowAnimation::Kind animationKind(const char* name);
-    std::uint32_t alignmentFlag(const char* name);
+    SphereUI::UiControlKind controlKind(std::string_view name);
+    SphereUI::WindowAnimation::Kind animationKind(std::string_view name);
+    std::uint32_t alignmentFlag(std::string_view name);
     int addCoordinate(int left, int right) {
         return static_cast<std::uint32_t>(left) + static_cast<std::uint32_t>(right);
     }
@@ -145,7 +143,7 @@ namespace SphereUI::detail {
 namespace SphereUI::Runtime {
     void clipboardText(std::string& result);
     static void playWindowSound(bool opening);
-    static void openExternalLink(const char* target, bool mail);
+    static void openExternalLink(std::string_view target, bool mail);
     static void playLinkSound();
     static std::uint32_t milliseconds();
     static bool keyDown(std::uint32_t key);
@@ -157,10 +155,10 @@ namespace SphereUI::Runtime {
     static TextExtent screenSize();
 
     std::unique_ptr<Window> makeControl(SphereUI::UiControlKind kind);
-    static std::uint32_t keyCode(const char* name);
+    static std::uint32_t keyCode(std::string_view name);
 
     void broadcastMessage(Window* root, int group, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second, SphereUI::UiControlKind kind);
-    static int findImage(const char* name);
+    static int findImage(std::string_view name);
     static void playClickSound();
     static void playScrollSound(bool page);
     static std::uint64_t clockTicks();
@@ -173,27 +171,27 @@ namespace SphereUI::Runtime {
 namespace SphereUI::detail {
     namespace {
 
-        template<class T, std::size_t Size> T lookup(const char* name, const NamedValue<T> (&values)[Size], T fallback) {
+        template<class T, std::size_t Size> T lookup(std::string_view name, const NamedValue<T> (&values)[Size], T fallback) {
             for (const auto& entry : values) if (SferaText::asciiEqual(name, entry.name)) return entry.value;
             return fallback;
         }
     }
 
-    SphereUI::UiControlKind controlKind(const char* name) {
+    SphereUI::UiControlKind controlKind(std::string_view name) {
         constexpr NamedValue<UiControlKind> values[] = { {
             "BUTTON", UiControlKind::button
         }, {"TEXT", UiControlKind::text}, {"IMAGE", UiControlKind::image}, {"PROGRESS_BAR", UiControlKind::progressBar}, {"SCROLL_BAR", UiControlKind::scrollBar}, {"HYPER_TEXT", UiControlKind::hyperText}, {"CHECKBOX", UiControlKind::checkBox}, {"RADIOBUTTON", UiControlKind::radioButton}, {"TEXTLIST", UiControlKind::textList}, {"SLIDER", UiControlKind::slider}, {"LISTITEM", UiControlKind::listItem}, {"EDIT", UiControlKind::edit}, {"SLOT", UiControlKind::slot}, {"SPINBUTTON", UiControlKind::spinButton}, {"RICHEDIT", UiControlKind::richEdit}, {"FILTERLISTCTRL", UiControlKind::filteredList}, {"MINIMAP", UiControlKind::minimap}, {"MENULISTCTRL", UiControlKind::menu}, {"HTCHATLISTCTRL", UiControlKind::hyperTextChat}, {"HTEDIT", UiControlKind::hyperTextEdit}, {"FONTPICKER", UiControlKind::fontPicker}, {"COLORPICKER", UiControlKind::colorPicker}};
         return lookup(name, values, anyControlKind);
     }
 
-    SphereUI::WindowAnimation::Kind animationKind(const char* name) {
+    SphereUI::WindowAnimation::Kind animationKind(std::string_view name) {
         constexpr NamedValue<SphereUI::WindowAnimation::Kind> values[] = { {
             "ALPHA_IN", WindowAnimation::Kind::FadeIn
         }, {"ALPHA_OUT", WindowAnimation::Kind::FadeOut}, {"MOVE_LEFT", WindowAnimation::Kind::MoveLeft}, {"MOVE_RIGHT", WindowAnimation::Kind::MoveRight}, {"MOVE_TOP", WindowAnimation::Kind::MoveUp}, {"MOVE_BOTTOM", WindowAnimation::Kind::MoveDown}};
         return lookup(name, values, WindowAnimation::Kind::None);
     }
 
-    std::uint32_t alignmentFlag(const char* name) {
+    std::uint32_t alignmentFlag(std::string_view name) {
         constexpr NamedValue<std::uint32_t> values[] = { {
             "LEFT_X", SphereUI::alignLeft
         }, {"CENTER_X", SphereUI::alignCenterX}, {"RIGHT_X", SphereUI::alignRight}, {"LEFT_Y", SphereUI::alignTop}, {"CENTER_Y", SphereUI::alignCenterY}, {"RIGHT_Y", SphereUI::alignBottom}};
@@ -293,15 +291,15 @@ void SphereUI::Window::appendResource(std::shared_ptr<const UiSprite> resource) 
     if (resource) resources.push_back(std::move(resource));
 }
 
-std::shared_ptr<const SphereUI::UiSprite> SphereUI::Window::findResource(const char* name_to_find) const {
+std::shared_ptr<const SphereUI::UiSprite> SphereUI::Window::findResource(std::string_view name_to_find) const {
     if (resource_parent != nullptr) if (auto resource = resource_parent->findResource(name_to_find)) return resource;
     const auto found = std::find_if(resources.begin(), resources.end(), [name_to_find](const auto& resource) {
-        return SferaText::asciiEqual(resource->name.c_str(), name_to_find);
+        return SferaText::asciiEqual(resource->name, name_to_find);
     });
     return found == resources.end() ? nullptr : *found;
 }
 
-std::shared_ptr<const SphereUI::UiSprite> SphereUI::Window::getResource(const char* name_to_find) {
+std::shared_ptr<const SphereUI::UiSprite> SphereUI::Window::getResource(std::string_view name_to_find) {
     if (auto existing = findResource(name_to_find)) return existing;
     if (Runtime::findImage(name_to_find) == -1) return {};
     auto sprite = std::make_shared<UiSprite>();
@@ -331,17 +329,17 @@ const HyperTextGeometry* HyperTextRun::geometry() const {
     return nullptr;
 }
 
-const char* HyperTextRun::Link::linkValue() const {
+std::string_view HyperTextRun::Link::linkValue() const {
     const auto separator = target.find("://");
     if (separator == std::string::npos) return "";
     auto offset = separator + 3u;
     if (offset < target.size() && target[offset] == '/') ++offset;
-    return target.c_str() + offset;
+    return std::string_view(target).substr(offset);
 }
 
-void SphereUI::HyperTextChatListItem::initialize(const char* text, std::uint32_t channel_id, std::uint32_t text_color) {
+void SphereUI::HyperTextChatListItem::initialize(std::string_view text, std::uint32_t channel_id, std::uint32_t text_color) {
     HyperTextChatListItem replacement;
-    replacement.hyper_text = text == nullptr ? "" : text;
+    replacement.hyper_text = text;
     replacement.channel = channel_id;
     replacement.color = text_color;
     HyperTextParser::parseElements(replacement.hyper_text, replacement.elements, replacement.plain_text);
@@ -350,7 +348,7 @@ void SphereUI::HyperTextChatListItem::initialize(const char* text, std::uint32_t
 
 std::string SphereUI::detail::escapeHyperText(std::string_view text) {
         std::string output;
-        for (char character : text) {
+        for (const auto character : text) {
             if (character == '<') output += "\\[";
             else if (character == '>') output += "\\]";
             else {
@@ -390,7 +388,7 @@ void SphereUI::Runtime::broadcastMessage(Window* root, int group, SphereUI::UiMe
 
 namespace {
     struct UiKeyBinding {
-        const char* name;
+        std::string_view name;
         std::uint32_t code;
         std::uint32_t scan;
     };
@@ -406,16 +404,17 @@ namespace {
 
 
 
-    void playUiSound(const char* filename) {
+    void playUiSound(const std::string& filename) {
         g_sfera_sound_runtime.playUiSound(filename);
     }
 }
 
 std::uint64_t SphereUI::Runtime::clockTicks() { return WorldClock::nowTicks(); }
 
-std::uint32_t SphereUI::Runtime::keyCode(const char* name) {
-    if (name == nullptr) return 0u;
-    for (std::size_t code = 0u; code <= 255u; ++code) if (const auto* candidate = SphereUI::Runtime::keyName(code); candidate != nullptr && SferaText::asciiEqual(name, candidate)) return code;
+std::uint32_t SphereUI::Runtime::keyCode(std::string_view name) {
+    if (name.empty()) return 0u;
+    for (std::uint32_t code = 0u; code <= 255u; ++code)
+        if (const auto candidate = keyName(code); !candidate.empty() && SferaText::asciiEqual(name, candidate)) return code;
     return 0u;
 }
 
@@ -464,26 +463,33 @@ bool SphereUI::Runtime::playerHeading(float& heading) {
     return true;
 }
 
-void SphereUI::Runtime::openExternalLink(const char* target, bool mail) {
-    if (target == nullptr) return;
-    ::ShellExecuteA(nullptr, "open", mail ? target : "explorer", mail ? nullptr : target, nullptr, SW_SHOWNORMAL);
+void SphereUI::Runtime::openExternalLink(std::string_view target, bool mail) {
+    if (target.empty()) return;
+    // ShellExecuteA is a native NUL-terminated API; materialize only at this boundary.
+    const std::string native_target(target);
+    ::ShellExecuteA(nullptr, "open", mail ? native_target.c_str() : "explorer", mail ? nullptr : native_target.c_str(), nullptr, SW_SHOWNORMAL);
     ::ShowWindow(SferaClientApplication::main_window, SW_MINIMIZE);
 }
 
 void SphereUI::Runtime::clipboardText(std::string& result) {
-    result.assign("");
+    result.clear();
     if (!::IsClipboardFormatAvailable(CF_TEXT) || !::OpenClipboard(nullptr)) return;
+    struct ClipboardGuard {
+        ~ClipboardGuard() { ::CloseClipboard(); }
+    } clipboard;
     const auto handle = ::GetClipboardData(CF_TEXT);
-    const auto* text = handle == nullptr ? nullptr : static_cast<const char*>(::GlobalLock(handle));
-    try {
-        if (text != nullptr) result.assign(text);
-    } catch (...) {
-        if (text != nullptr) ::GlobalUnlock(handle);
-        ::CloseClipboard();
-        throw;
-    }
-    if (text != nullptr) ::GlobalUnlock(handle);
-    ::CloseClipboard();
+    if (handle == nullptr) return;
+    const auto size = ::GlobalSize(handle);
+    if (size == 0) return;
+    const auto* data = static_cast<const std::uint8_t*>(::GlobalLock(handle));
+    if (data == nullptr) return;
+    struct LockGuard {
+        HGLOBAL handle;
+        ~LockGuard() { ::GlobalUnlock(handle); }
+    } lock{handle};
+    const std::span<const std::uint8_t> bytes(data, size);
+    const auto end = std::find(bytes.begin(), bytes.end(), std::uint8_t{});
+    if (end != bytes.end()) result.assign(SferaText::fromBytes(bytes.first(static_cast<std::size_t>(end - bytes.begin()))));
 }
 
 namespace {
@@ -492,7 +498,7 @@ namespace {
 
 }
 
-int SphereUI::Runtime::findImage(const char* name) {
+int SphereUI::Runtime::findImage(std::string_view name) {
     return g_sfera_textures.find(name);
 }
 
@@ -525,8 +531,8 @@ namespace {
         return true;
     }
 
-    bool readHexColor(const char* text, std::uint32_t& color) {
-        std::string_view input(text == nullptr ? "" : text);
+    bool readHexColor(std::string_view text, std::uint32_t& color) {
+        auto input = text;
         return readInteger(input, color, 16);
     }
     class ViewportScope {
@@ -572,7 +578,6 @@ namespace {
         SferaSimpleParser& parser;
         const SferaParserRange& range;
         SferaParserRange saved_block{};
-        std::string buffer;
     public:
         UiReader(SferaSimpleParser& source, const SferaParserRange& scope) : parser(source), range(scope) {
             parser.getBlockRange(&saved_block);
@@ -585,37 +590,43 @@ namespace {
             parser.setBlockRange(&saved_block);
         }
 
-        bool block(const char* key, SferaParserRange& result) {
+        bool block(std::string_view key, SferaParserRange& result) {
             return parser.findBlock(key, &result, &range, 1);
         }
 
-        bool has(const char* key) {
+        bool has(std::string_view key) {
             return parser.findValue(key, &range);
         }
 
-        const char* token(std::size_t index = 0u, bool quoted = false) {
-            const bool present = quoted ? parser.readQuotedString(index, buffer) : parser.readString(index, buffer);
-            return present ? buffer.c_str() : nullptr;
+        std::string token(std::size_t index = 0u, bool quoted = false) {
+            std::string result;
+            if (quoted) parser.readQuotedString(index, result);
+            else parser.readString(index, result);
+            return result;
         }
 
-        const char* string(const char* key, bool quoted = false) {
-            return has(key) ? token(0u, quoted) : nullptr;
+        std::optional<std::string> string(std::string_view key, bool quoted = false) {
+            if (!has(key)) return std::nullopt;
+            std::string result;
+            const bool present = quoted ? parser.readQuotedString(0u, result) : parser.readString(0u, result);
+            if (!present) return std::nullopt;
+            return result;
         }
 
-        template<class T> void integer(const char* key, T& value) {
+        template<class T> void integer(std::string_view key, T& value) {
             if (has(key)) value = static_cast<T>(parser.readInt(0u));
         }
 
-        void count(const char* key, std::size_t& value) {
+        void count(std::string_view key, std::size_t& value) {
             int parsed = 0;
             if (has(key) && parser.tryReadInt(0u, parsed) && parsed >= 0) value = parsed;
         }
 
-        template<class T> void boolean(const char* key, T& value) {
+        template<class T> void boolean(std::string_view key, T& value) {
             if (has(key)) value = static_cast<T>(parser.readBool(0u));
         }
 
-        bool pair(const char* key, int& first, int& second) {
+        bool pair(std::string_view key, int& first, int& second) {
             if (!has(key)) return false;
             int values[2]{};
             if (!parser.readIntSequence(0u, values)) return false;
@@ -624,7 +635,7 @@ namespace {
             return true;
         }
 
-        bool rectangle(const char* key, int& left, int& top, int& right, int& bottom) {
+        bool rectangle(std::string_view key, int& left, int& top, int& right, int& bottom) {
             if (!has(key)) return false;
             int values[4]{};
             if (!parser.readIntSequence(0u, values)) return false;
@@ -635,50 +646,49 @@ namespace {
             return true;
         }
 
-        void color(const char* key, std::uint32_t& color) {
+        void color(std::string_view key, std::uint32_t& color) {
             if (!has(key)) return;
             int values[3]{};
             if (!parser.readIntSequence(0u, values)) return;
             color = SferaColor::rgba(values[0], values[1], values[2]).argb();
         }
 
-        void rgba(const char* key, std::uint32_t& color) {
+        void rgba(std::string_view key, std::uint32_t& color) {
             if (!has(key)) return;
             int values[4]{};
             if (!parser.readIntSequence(0u, values)) return;
             color = SferaColor::rgba(values[0], values[1], values[2], values[3]).argb();
         }
 
-        template<std::size_t Size> void flags(const char* key, std::uint32_t& value, const NamedValue<std::uint32_t> (&names)[Size], bool reset = false) {
+        template<std::size_t Size> void flags(std::string_view key, std::uint32_t& value, const NamedValue<std::uint32_t> (&names)[Size], bool reset = false) {
             if (!has(key)) return;
             if (reset) value = 0u;
             for (std::size_t index = 0u; index < parser.tokenCount(); index += 2u) {
-                const char* name = token(index);
+                const auto name = token(index);
                 for (const auto& flag : names) if (SferaText::asciiEqual(name, flag.name)) value |= flag.value;
             }
         }
 
-        void sprite(const char* key, SphereUI::Window& window, std::shared_ptr<const SphereUI::UiSprite>& destination) {
-            const char* name = string(key, true);
-            if (name == nullptr) return;
+        void sprite(std::string_view key, SphereUI::Window& window, std::shared_ptr<const SphereUI::UiSprite>& destination) {
+            const auto name = string(key, true);
+            if (!name) return;
             auto* owner = window.parent;
-            destination = (owner == nullptr ? window : *owner).getResource(name);
+            destination = (owner == nullptr ? window : *owner).getResource(*name);
         }
 
-        void status(const char* key, std::uint32_t& mode) {
-            const char* value = string(key);
-            if (value != nullptr) mode = SferaText::asciiEqual(value, "PERCENT") ? 1u : SferaText::asciiEqual(value, "STYLE1") ? 2u : 0u;
+        void status(std::string_view key, std::uint32_t& mode) {
+            const auto value = string(key);
+            if (value) mode = SferaText::asciiEqual(*value, "PERCENT") ? 1u : SferaText::asciiEqual(*value, "STYLE1") ? 2u : 0u;
         }
 
         void drawMethod(SphereUI::Window& window, bool own_resources = false) {
-            const char* method = string("drawMethod");
-            if (SferaText::asciiEqual(method, "NONE")) window.behavior_flags |= WindowStyle::skipDrawing;
-            else if (SferaText::asciiEqual(method, "SPRITE")) {
-                const char* name = token(1u, true);
-                if (name != nullptr) {
-                    auto* owner = own_resources ? &window : window.parent;
-                    window.resource_reference = (owner == nullptr ? window : *owner).getResource(name);
-                }
+            const auto method = string("drawMethod");
+            if (!method) return;
+            if (SferaText::asciiEqual(*method, "NONE")) window.behavior_flags |= WindowStyle::skipDrawing;
+            else if (SferaText::asciiEqual(*method, "SPRITE")) {
+                const auto name = token(1u, true);
+                auto* owner = own_resources ? &window : window.parent;
+                window.resource_reference = (owner == nullptr ? window : *owner).getResource(name);
             }
         }
     };
@@ -691,8 +701,8 @@ namespace {
         return result;
     }
 
-    void renderLabel(const SphereUI::Window& window, const char* text, int x, int y, std::uint32_t color, const SphereUI::UiRect& clip, int font = inheritFont) {
-        if (text == nullptr || *text == '\0') return;
+    void renderLabel(const SphereUI::Window& window, std::string_view text, int x, int y, std::uint32_t color, const SphereUI::UiRect& clip, int font = inheritFont) {
+        if (text.empty()) return;
         SphereUI::InterfaceRenderer::drawText(text, x, y, color, font == inheritFont ? window.font : font, window.font_initialized, clip, window.alpha == 255u);
     }
 
@@ -724,10 +734,10 @@ namespace {
         return SferaColor::fromArgb(color).scaledAlpha(alpha).argb();
     }
 
-    template<class Emit> void wrapTextLine(const SphereUI::Window& window, const char* text, bool wrap, Emit emit) {
-        std::string remaining = text == nullptr ? " " : text;
-        const auto measuredWidth = [&](const std::string& value) {
-            return SphereUI::InterfaceRenderer::measureText(value.c_str(), window.font, true).width - (window.font < 2u ? 2 : 0);
+    template<class Emit> void wrapTextLine(const SphereUI::Window& window, std::string_view text, bool wrap, Emit emit) {
+        auto remaining = text;
+        const auto measuredWidth = [&](std::string_view value) {
+            return SphereUI::InterfaceRenderer::measureText(value, window.font, true).width - (window.font < 2u ? 2 : 0);
         };
         while (wrap && remaining.size() > 1u && measuredWidth(remaining) > window.width) {
             std::size_t fit = 0u, boundary = 0u;
@@ -737,10 +747,10 @@ namespace {
                 if (remaining[index - 1u] == ' ' || remaining[index - 1u] == ':' || remaining[index - 1u] == ';') boundary = index;
             }
             const auto count = boundary != 0u ? boundary : std::max(fit, std::size_t{1u});
-            emit(remaining.substr(0u, count).c_str());
-            remaining.erase(0u, count);
+            emit(remaining.substr(0u, count));
+            remaining.remove_prefix(count);
         }
-        emit(remaining.c_str());
+        emit(remaining);
     }
 
     void drawChild(SphereUI::Window* address, std::uint32_t alpha);
@@ -766,7 +776,7 @@ namespace {
         destination = std::move(copy);
     }
 
-    template<class T> bool loadPart(SphereUI::Window& owner, std::unique_ptr<T>& destination, UiReader& reader, const char* key, const char* filename, SferaSimpleParser& parser, UiControlKind kind, std::uint32_t id) {
+    template<class T> bool loadPart(SphereUI::Window& owner, std::unique_ptr<T>& destination, UiReader& reader, std::string_view key, const std::string& filename, SferaSimpleParser& parser, UiControlKind kind, std::uint32_t id) {
         SferaParserRange part{};
         if (!reader.block(key, part)) return false;
         std::unique_ptr<T> control(static_cast<T*>(owner.createControl(filename, parser, part, kind, id).release()));
@@ -775,10 +785,10 @@ namespace {
         return destination != nullptr;
     }
 
-    void readAnimation(UiReader& reader, SferaSimpleParser& parser, const char* key, SphereUI::WindowAnimation& animation) {
-        const char* name = reader.string(key);
-        if (name == nullptr) return;
-        animation.kind = SphereUI::detail::animationKind(name);
+    void readAnimation(UiReader& reader, SferaSimpleParser& parser, std::string_view key, SphereUI::WindowAnimation& animation) {
+        const auto name = reader.string(key);
+        if (!name) return;
+        animation.kind = SphereUI::detail::animationKind(*name);
         animation.duration = parser.readFloat(1u);
         animation.distance = parser.readFloat(2u);
         animation.offset = parser.readFloat(3u);
@@ -789,8 +799,8 @@ namespace {
         return x >= bounds.left && x < bounds.right && y >= bounds.top && y < bounds.bottom;
     }
 
-    template<class T> void loadNavigationButtons(T& owner, UiReader& reader, const char* filename, SferaSimpleParser& parser, bool defaults, float interval = 0.0f) {
-        const char* names[] = {"leftbutton", "rightbutton"};
+    template<class T> void loadNavigationButtons(T& owner, UiReader& reader, const std::string& filename, SferaSimpleParser& parser, bool defaults, float interval = 0.0f) {
+        constexpr std::string_view names[] = {"leftbutton", "rightbutton"};
         std::unique_ptr<SphereUI::ButtonCtrl>* destinations[] = {&owner.decrease_button, &owner.increase_button};
         for (std::size_t index = 0u; index < 2u; ++index) if (loadPart(owner, *destinations[index], reader, names[index], filename, parser, UiControlKind::button, index + 1u) && defaults) {
             auto* button = destinations[index]->get();
@@ -846,10 +856,10 @@ namespace {
 
 }
 
-bool SphereUI::Window::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::Window::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     reader.boolean("hitTransparent", hit_transparent);
-    if (const char* value = reader.string("windowName", true)) setResourceName(value);
+    if (const auto value = reader.string("windowName", true)) setResourceName(*value);
     SferaParserRange sprites{};
     if (reader.block("spritesDef", sprites)) {
         parser.setBlockRange(&sprites);
@@ -869,8 +879,8 @@ bool SphereUI::Window::loadUi(const char* filename, SferaSimpleParser& parser, c
         initial_y = y;
     }
     reader.pair("size", width, height);
-    if (const char* value = reader.string("windowText")) setText(g_sfera_interface.localizedText(value));
-    if (const char* value = reader.string("windowHelp", true)) setHelp(value);
+    if (const auto value = reader.string("windowText")) setText(g_sfera_interface.localizedText(*value));
+    if (const auto value = reader.string("windowHelp", true)) setHelp(*value);
     reader.boolean("canDragDrop", can_drag_drop);
     reader.boolean("canGoTop", can_go_top);
     if (reader.has("canNotCross") && parser.readBool(0u)) behavior_flags |= WindowStyle::preventOverlap;
@@ -891,8 +901,8 @@ bool SphereUI::Window::loadUi(const char* filename, SferaSimpleParser& parser, c
     std::uint32_t ordinal = 1u;
     while (parser.nextBlock("control", &entry)) {
         UiReader child_reader(parser, entry);
-        const char* name = child_reader.string("classID");
-        if (name != nullptr) if (auto child = createControl(filename, parser, entry, detail::controlKind(name), ordinal)) {
+        const auto name = child_reader.string("classID");
+        if (name) if (auto child = createControl(filename, parser, entry, detail::controlKind(*name), ordinal)) {
             child->control_id = next_id++;
             appendChild(std::move(child));
         }
@@ -1063,7 +1073,7 @@ int SphereUI::Window::getFont() const {
     return font;
 }
 
-bool SphereUI::ButtonCtrl::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::ButtonCtrl::loadUi(const std::string&, SferaSimpleParser& parser, const SferaParserRange& range) {
 
     UiReader reader(parser, range);
     reader.sprite("checkedImage", *this, pressed_image);
@@ -1071,11 +1081,11 @@ bool SphereUI::ButtonCtrl::loadUi(const char* , SferaSimpleParser& parser, const
     reader.sprite("disabledImage", *this, disabled_image);
     reader.sprite("uncheckedImage", *this, idle_image);
     reader.flags("buttonStyle", button_flags, buttonStyles);
-    const char* method = reader.string("drawMethod");
-    if (SferaText::asciiEqual(method, "SPRITE")) button_flags |= ButtonStyle::stateImages;
-    if (SferaText::asciiEqual(method, "NONE")) behavior_flags |= WindowStyle::skipDrawing;
-    if (const char* name = reader.string("hotKey", true)) {
-        hotkey = Runtime::keyCode(name);
+    const auto method = reader.string("drawMethod");
+    if (method && SferaText::asciiEqual(*method, "SPRITE")) button_flags |= ButtonStyle::stateImages;
+    if (method && SferaText::asciiEqual(*method, "NONE")) behavior_flags |= WindowStyle::skipDrawing;
+    if (const auto name = reader.string("hotKey", true)) {
+        hotkey = Runtime::keyCode(*name);
         std::string_view arguments(parser.valueText());
         const auto first = arguments.find_first_not_of(numericWhitespace);
         const auto end = first == std::string_view::npos ? first : arguments.find_first_of(numericWhitespace, first);
@@ -1156,7 +1166,7 @@ void SphereUI::ButtonCtrl::handleInput(const WindowInput& input) {
     }
 }
 
-bool SphereUI::CheckBox::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::CheckBox::loadUi(const std::string&, SferaSimpleParser& parser, const SferaParserRange& range) {
 
     UiReader reader(parser, range);
     hover_color = text_color;
@@ -1289,10 +1299,10 @@ SphereUI::EditCtrl::EditCtrl() {
 }
 
 void SphereUI::EditCtrl::updatePassword() {
-    if (password && password_text.size() != text.size()) password_text.assign(std::string(text.size(), '*').c_str());
+    if (password && password_text.size() != text.size()) password_text.assign(text.size(), '*');
 }
 
-bool SphereUI::EditCtrl::loadUi(const char*, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::EditCtrl::loadUi(const std::string&, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     reader.count("maxsymbols", maximum_symbols);
     reader.boolean("numeric", numeric);
@@ -1351,7 +1361,7 @@ void SphereUI::EditCtrl::handleInput(const WindowInput& input) {
         std::string value(getText());
         caret_position = std::clamp(caret_position, 0, static_cast<int>(value.size()));
         if (input.character >= 32u && value.size() < maximum_symbols && (!numeric || (input.character >= '0' && input.character <= '9'))) {
-            value.insert(caret_position, 1u, static_cast<char>(input.character));
+            value.insert(caret_position, input.text());
             ++caret_position;
         }
         switch (input.key_code) {
@@ -1378,7 +1388,7 @@ void SphereUI::EditCtrl::handleInput(const WindowInput& input) {
             default:
                 break;
         }
-        if (value != getText()) setText(value.c_str());
+        if (value != getText()) setText(value);
         observed_length = text.size();
         updatePassword();
         if (input.key_code == VK_TAB) notifyParent(*this, UiMessage::editTab);
@@ -1400,10 +1410,10 @@ void SphereUI::EditCtrl::draw() {
     if (observed_length != text.size()) caret_position = text.size();
     caret_position = std::clamp(caret_position, 0, static_cast<int>(text.size()));
     updatePassword();
-    const char* display = password ? password_text.data() : getText();
+    const std::string_view display = password ? password_text : getText();
     const auto extent = InterfaceRenderer::measureText(display, font, font_initialized);
-    const auto prefix = std::string(display, caret_position);
-    const auto caret_x = InterfaceRenderer::measureText(prefix.c_str(), font, font_initialized).width;
+    const auto prefix = display.substr(0u, static_cast<std::size_t>(caret_position));
+    const auto caret_x = InterfaceRenderer::measureText(prefix, font, font_initialized).width;
     const auto full_width = detail::addCoordinate(extent.width, cursor_width);
     int dx = 0, dy = extent.height < height ? (height - extent.height) / 2 : 0;
     if (full_width > width) {
@@ -1430,7 +1440,7 @@ SphereUI::EditCtrl::~EditCtrl() {
     Runtime::setTextInputActive(false);
 }
 
-bool SphereUI::ListCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::ListCtrl::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     line_height = InterfaceRenderer::measureText(" ", font, true).height;
     loadPart(*this, scrollbar, reader, "scrollbar", filename, parser, UiControlKind::scrollBar, 1u);
@@ -1451,7 +1461,7 @@ bool SphereUI::ListCtrl::loadUi(const char* filename, SferaSimpleParser& parser,
         parser.readString(0u, key);
         parser.readString(1u, color_text);
         std::uint32_t color = 0u;
-        if (!key.empty() && readHexColor(color_text.c_str(), color)) addText(g_sfera_interface.localizedText(key.c_str()), color);
+        if (!key.empty() && readHexColor(color_text, color)) addText(g_sfera_interface.localizedText(key), color);
     }
     parser.clearScanRange();
     updateLayout();
@@ -1516,9 +1526,9 @@ void SphereUI::ListCtrl::draw() {
                 auto clip = bounds;
                 const auto row_color = SferaColor::fromArgb(row.color).withAlpha(alpha).argb();
                 const auto row_x = detail::addCoordinate(bounds.left, row.offset);
-                const bool truncated = continue_mark && InterfaceRenderer::measureText(row.text.data(), font, font_initialized).width > width;
+                const bool truncated = continue_mark && InterfaceRenderer::measureText(row.text, font, font_initialized).width > width;
                 if (truncated) clip.right = detail::subtractCoordinate(clip.right, mark_width);
-                InterfaceRenderer::drawText(row.text.data(), row_x, row_y, row_color, font, true, clip, alpha == 255u);
+                InterfaceRenderer::drawText(row.text, row_x, row_y, row_color, font, true, clip, alpha == 255u);
                 if (truncated) InterfaceRenderer::drawText("  ...", detail::addCoordinate(bounds.left, detail::addCoordinate(row.offset, detail::subtractCoordinate(width, mark_width))), row_y, row_color, font, true, bounds, alpha == 255u);
                 row_y = detail::addCoordinate(row_y, line_height);
             }
@@ -1581,7 +1591,7 @@ std::uint32_t SphereUI::FilterListCtrl::handleMessage(SphereUI::UiMessage messag
     }
 }
 
-bool SphereUI::FontPicker::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::FontPicker::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     loadPart(*this, preview, reader, "text", filename, parser, UiControlKind::text, 2u);
     loadPart(*this, selector, reader, "spinButton", filename, parser, UiControlKind::spinButton, 1u);
@@ -1641,7 +1651,7 @@ int SphereUI::FontPicker::getFont() const {
     return Window::getFont();
 }
 
-bool SphereUI::ImageCtrl::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::ImageCtrl::loadUi(const std::string&, SferaSimpleParser& parser, const SferaParserRange& range) {
 
     UiReader reader(parser, range);
     resource_reference = nullptr;
@@ -1702,7 +1712,7 @@ void SphereUI::ImageCtrl::setOpacity(float new_opacity) {
     opacity = new_opacity;
 }
 
-bool SphereUI::ListItemCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::ListItemCtrl::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     loadPart(*this, vertical_scroll, reader, "vscrollbar", filename, parser, UiControlKind::scrollBar, 1u);
     if (loadPart(*this, horizontal_scroll, reader, "hscrollbar", filename, parser, UiControlKind::scrollBar, 1u)) horizontal_scroll->orientation_flags |= 1u;
@@ -1846,7 +1856,7 @@ void SphereUI::ListItemCtrl::dispatchMessage(int target_group, SphereUI::UiMessa
     for (std::size_t index = 0u; index < items.size(); ++index) if (auto* child = itemAt(index)) child->dispatchMessage(target_group, message, first, second, target_kind);
 }
 
-bool SphereUI::ToolTipCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::ToolTipCtrl::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     reader.integer("font", font);
     reader.color("textColor", text_color);
@@ -1855,8 +1865,8 @@ bool SphereUI::ToolTipCtrl::loadUi(const char* filename, SferaSimpleParser& pars
     parser.setScanRange(&range);
     try {
         while (parser.nextValue("toolstr")) {
-            const char* key = reader.token();
-            if (key != nullptr) appendLine(g_sfera_interface.localizedText(key));
+            const auto key = reader.token();
+            appendLine(g_sfera_interface.localizedText(key));
         }
     } catch (...) {
         parser.clearScanRange();
@@ -1909,7 +1919,7 @@ void SphereUI::ToolTipCtrl::draw() {
     auto text_y = detail::addCoordinate(screen_y, margin_top);
     const UiRect clip{text_x, text_y, detail::addCoordinate(text_x, tooltip_width), detail::addCoordinate(text_y, tooltip_height)};
     for (std::size_t index = 0u; index < lines.size(); ++index) {
-        InterfaceRenderer::drawText(lines.at(index).data(), text_x, text_y, text_color, font, true, clip, opacity == 255u);
+        InterfaceRenderer::drawText(lines.at(index), text_x, text_y, text_color, font, true, clip, opacity == 255u);
         text_y = detail::addCoordinate(text_y, line_height);
     }
 }
@@ -2000,7 +2010,7 @@ void SphereUI::ProgressBar::refreshProgressDisplay() {
     updateStatusText(status_text, display_mode, progress_ratio * 100.0f, current, range);
 }
 
-bool SphereUI::ProgressBar::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::ProgressBar::loadUi(const std::string&, SferaSimpleParser& parser, const SferaParserRange& range) {
 
     UiReader reader(parser, range);
     reader.drawMethod(*this);
@@ -2046,7 +2056,7 @@ void SphereUI::ProgressBar::draw() {
     if (display_mode != 0u) {
         const auto left = detail::addCoordinate(bounds.left, status_x);
         const auto top = detail::addCoordinate(bounds.top, status_y);
-        renderLabel(*this, status_text.c_str(), left, top, text_color, {left, top, detail::addCoordinate(left, 100), detail::addCoordinate(top, 100)});
+        renderLabel(*this, status_text, left, top, text_color, {left, top, detail::addCoordinate(left, 100), detail::addCoordinate(top, 100)});
     }
 }
 
@@ -2066,14 +2076,14 @@ void SphereUI::RadioButtonCtrl::playClickSound() {
     CheckBox::playClickSound();
 }
 
-bool SphereUI::ScrollBar::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::ScrollBar::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     if (reader.has("horizontal") && parser.readBool(0u)) orientation_flags = 1u;
     reader.rectangle("bounds", track_left, track_top, track_right, track_bottom);
     reader.boolean("postMessage", notify_changes);
     reader.drawMethod(*this);
     if (reader.has("scrollSpr")) {
-        const char* name = reader.token(0u, true);
+        const auto name = reader.token(0u, true);
         auto* owner = parent;
         scroll_resource = (owner == nullptr ? *this : *owner).getResource(name);
         thumb_width = parser.readInt(1u);
@@ -2215,7 +2225,7 @@ void SphereUI::ScrollBar::loadControlParameters() {
     if (notify_changes) owner->queueEvent({this, control_id, message, static_cast<std::uint32_t>(current), 0u});
 }
 
-bool SphereUI::SliderCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::SliderCtrl::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     reader.pair("range", minimum, maximum);
     reader.integer("defaultPos", current);
@@ -2243,7 +2253,7 @@ void SphereUI::SliderCtrl::draw() {
         const auto bounds = windowBounds(*this);
         const auto left = detail::addCoordinate(bounds.left, status_x);
         const auto top = detail::addCoordinate(bounds.top, status_y);
-        renderLabel(*this, value_text.c_str(), left, top, text_color, {left, top, detail::addCoordinate(left, 100), detail::addCoordinate(top, 100)});
+        renderLabel(*this, value_text, left, top, text_color, {left, top, detail::addCoordinate(left, 100), detail::addCoordinate(top, 100)});
     }
 }
 
@@ -2283,7 +2293,7 @@ int SphereUI::SpinButton::currentValue() const {
     return current;
 }
 
-bool SphereUI::SpinButton::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::SpinButton::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     bool defaults = true;
     reader.boolean("defButtonStyle", defaults);
@@ -2362,8 +2372,7 @@ void SphereUI::SpinButton::updateStatus() {
     if (current > maximum) current = maximum;
     if (current != previous) {
         if (auto* window = body) {
-            char value[32];
-            std::snprintf(value, sizeof(value), "%d", current);
+            auto value = std::format("{}", current);
             window->setText(value);
         }
         if (notify_changes && update_enabled) owner->queueEvent({this, control_id, UiMessage::spinValueChanged, static_cast<std::uint32_t>(current), 0u});
@@ -2373,7 +2382,7 @@ void SphereUI::SpinButton::updateStatus() {
     update_enabled = true;
 }
 
-bool SphereUI::TextCtrl::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::TextCtrl::loadUi(const std::string&, SferaSimpleParser& parser, const SferaParserRange& range) {
 
     UiReader reader(parser, range);
     if ((width == 0 || height == 0) && text.size() != 0u) {
@@ -2466,36 +2475,36 @@ namespace {
 
 }
 
-const char* SphereUI::Window::getText() const {
-    return text.c_str();
+const std::string& SphereUI::Window::getText() const {
+    return text;
 }
 
-const char* SphereUI::Window::getHelp() const {
-    return help.c_str();
+const std::string& SphereUI::Window::getHelp() const {
+    return help;
 }
 
-void SphereUI::Window::setText(const char* value) {
-    text.assign(value == nullptr ? "" : value);
+void SphereUI::Window::setText(std::string_view value) {
+    text.assign(value);
 }
 
-void SphereUI::Window::setHelp(const char* value) {
-    help.assign(value == nullptr ? "" : value);
+void SphereUI::Window::setHelp(std::string_view value) {
+    help.assign(value);
 }
 
-const char* SphereUI::Window::getName() const {
-    return name.c_str();
+const std::string& SphereUI::Window::getName() const {
+    return name;
 }
 
-const char* SphereUI::Window::getResourceName() const {
-    return resource_name.c_str();
+const std::string& SphereUI::Window::getResourceName() const {
+    return resource_name;
 }
 
-void SphereUI::Window::setName(const char* value) {
-    name.assign(value == nullptr ? "" : value);
+void SphereUI::Window::setName(std::string_view value) {
+    name.assign(value);
 }
 
-void SphereUI::Window::setResourceName(const char* value) {
-    resource_name.assign(value == nullptr ? "" : value);
+void SphereUI::Window::setResourceName(std::string_view value) {
+    resource_name.assign(value);
 }
 
 void SphereUI::ButtonCtrl::click() {
@@ -2512,9 +2521,7 @@ void SphereUI::ButtonCtrl::click() {
 
 void SphereUI::ImageCtrl::setImageName(std::string_view name) {
     ImageDescription description{};
-    const auto length = std::min(name.size(), sizeof(description.name) - 1u);
-    std::memcpy(description.name, name.data(), length);
-    description.name[length] = '\0';
+    description.name.assign(name);
     setImage(&description);
 }
 
@@ -2525,7 +2532,7 @@ void SphereUI::ImageCtrl::setRotationDegrees(float degrees) {
 
 void SphereUI::ImageCtrl::setImage(const ImageDescription* description) {
     if (description == nullptr) { resource_reference.reset(); return; }
-    if (resource_reference && SferaText::asciiEqual(resource_reference->name.c_str(), description->name)) return;
+    if (resource_reference && SferaText::asciiEqual(resource_reference->name, description->name)) return;
     auto replacement = parent ? parent->findResource(description->name) : nullptr;
     if (!replacement) replacement = g_sfera_interface.sharedSprite(description->name);
     if (!replacement) {
@@ -2537,7 +2544,7 @@ void SphereUI::ImageCtrl::setImage(const ImageDescription* description) {
     resource_reference = std::move(replacement);
 }
 
-std::unique_ptr<SphereUI::Window> SphereUI::Window::createControl(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range, SphereUI::UiControlKind kind, std::uint32_t id) {
+std::unique_ptr<SphereUI::Window> SphereUI::Window::createControl(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range, SphereUI::UiControlKind kind, std::uint32_t id) {
     if (kind == anyControlKind) return nullptr;
     auto control = Runtime::makeControl(kind);
     if (control == nullptr) return nullptr;
@@ -2563,9 +2570,9 @@ std::unique_ptr<SphereUI::Window> SphereUI::Window::createControl(const char* fi
     }
     reader.flags("textFormat", control->text_alignment, textAlignments, true);
     reader.color("textColor", control->text_color);
-    if (const char* value = reader.string("windowText")) control->setText(g_sfera_interface.localizedText(value));
-    if (const char* value = reader.string("windowHelp", true)) control->setHelp(value);
-    if (const char* value = reader.string("setWindowText", true)) control->setText(value);
+    if (const auto value = reader.string("windowText")) control->setText(g_sfera_interface.localizedText(*value));
+    if (const auto value = reader.string("windowHelp", true)) control->setHelp(*value);
+    if (const auto value = reader.string("setWindowText", true)) control->setText(*value);
     reader.boolean("canDragDrop", control->can_drag_drop);
     control->parent = parent == nullptr ? this : parent;
     if (!control->loadUi(filename, parser, range)) return nullptr;
@@ -2659,7 +2666,7 @@ void SphereUI::ToolTipCtrl::updateLayout() {
     int widest = 0, total = 0;
     line_height = 0;
     for (std::size_t index = 0u; index < lines.size(); ++index) {
-        const auto extent = InterfaceRenderer::measureText(lines.at(index).data(), font, true);
+        const auto extent = InterfaceRenderer::measureText(lines.at(index), font, true);
         widest = std::max(widest, extent.width);
         total = detail::addCoordinate(total, extent.height);
         line_height = extent.height;
@@ -2668,20 +2675,19 @@ void SphereUI::ToolTipCtrl::updateLayout() {
     tooltip_height = detail::addCoordinate(total, detail::addCoordinate(margin_top, margin_bottom));
 }
 
-void SphereUI::ToolTipCtrl::appendLine(const char* text) {
-    if (text == nullptr) return;
-    lines.emplace_back(text == nullptr ? "" : text);
+void SphereUI::ToolTipCtrl::appendLine(std::string_view text) {
+    lines.emplace_back(text);
     updateLayout();
 }
 
-void SphereUI::ToolTipCtrl::setLine(std::uint32_t index, const char* text) {
+void SphereUI::ToolTipCtrl::setLine(std::uint32_t index, std::optional<std::string_view> text) {
     if (index >= lines.size()) {
-        appendLine(text);
+        if (text) appendLine(*text);
         return;
     }
-    if (text == nullptr) text = "";
-    if (std::strcmp(lines.at(index).data(), text) == 0) return;
-    lines.at(index).assign(text == nullptr ? "" : text);
+    const auto value = text.value_or(std::string_view{});
+    if (lines.at(index) == value) return;
+    lines.at(index).assign(value);
     updateLayout();
 }
 
@@ -2699,11 +2705,11 @@ SphereUI::CDescriptionWindow::CDescriptionWindow() {
     Window::initializeCopy(*original, context);
     context.finish();
     displayed_source = pending_source = nullptr; show_deadline = hide_deadline = 0u;
-    const char* names[] = {"window_caption", "window_bottom", "window_left", "window_right"};
+    constexpr std::string_view names[] = {"window_caption", "window_bottom", "window_left", "window_right"};
     std::shared_ptr<const UiSprite>* sprites[] = {&caption_sprite, &bottom_sprite, &left_sprite, &right_sprite};
     for (std::size_t index = 0u; index < 4u; ++index) {
         *sprites[index] = findResource(names[index]);
-        if (*sprites[index] == 0u) throw std::runtime_error(std::string("description sprite is missing: ") + names[index]);
+        if (*sprites[index] == 0u) throw std::runtime_error(std::string("description sprite is missing: ") + std::string(names[index]));
     }
     Window* content = nullptr;
     detail::forEachChild(*this, [&](Window& child) {
@@ -2773,15 +2779,14 @@ SferaCursorPosition* SphereUI::CDescriptionWindow::calculatePosition(SferaCursor
     return output;
 }
 
-void SphereUI::CDescriptionWindow::showDescription(const char* text, const Window* source, std::uint32_t duration, bool pin) {
-    if (text == nullptr) text = "";
+void SphereUI::CDescriptionWindow::showDescription(std::string_view text, const Window* source, std::uint32_t duration, bool pin) {
     Window* content = nullptr;
     detail::forEachChild(*this, [&](Window& child) {
         if (content == nullptr) content = &child;
     });
     if (content == nullptr) throw std::runtime_error("description content control is missing");
     if (auto* hypertext = dynamic_cast<HyperTextCtrl*>(content)) {
-        hypertext->queueBuffer(std::string_view(text, std::strlen(text)));
+        hypertext->queueBuffer(text);
         hypertext->handleMessage(UiMessage::resizeToHyperText, 0u, 0u);
     }
     height = detail::addCoordinate(frame_height, content->height);
@@ -2795,8 +2800,8 @@ void SphereUI::CDescriptionWindow::showDescription(const char* text, const Windo
     input_enabled = true;
 }
 
-void SphereUI::CDescriptionWindow::requestDescription(const char* text, bool force, const Window* source) {
-    if (text == nullptr || text[0] == '\0') return;
+void SphereUI::CDescriptionWindow::requestDescription(std::string_view text, bool force, const Window* source) {
+    if (text.empty()) return;
     if (force) {
         showDescription(text, source, 250u, false);
         return;
@@ -2948,45 +2953,41 @@ void SphereUI::ListCtrl::updateLayout() {
     updateVisibleRange();
 }
 
-void SphereUI::ListCtrl::appendLine(const char* text, std::uint32_t color) {
+void SphereUI::ListCtrl::appendLine(std::string_view text, std::uint32_t color) {
     if (parent != nullptr && selected_index != -1) {
         selected_index = -1;
         notifyParent(*this, UiMessage::listSelectionChanged, invalidIndex);
     }
     int offset = 0;
-    if (text_alignment != 0u && text != nullptr) {
+    if (text_alignment != 0u) {
         const auto extent = InterfaceRenderer::measureText(text, font, font_initialized);
         const auto remainder = detail::subtractCoordinate(width, extent.width);
         if ((text_alignment & TextAlignment::right) != 0u) offset = remainder;
         if ((text_alignment & TextAlignment::horizontalCenter) != 0u) offset = std::abs(static_cast<std::int64_t>(remainder)) / 2;
     }
-    appendCircular(rows, maximum_items, write_index, UiTextRow{text == nullptr ? " " : text, color, offset});
+    appendCircular(rows, maximum_items, write_index, UiTextRow{std::string(text), color, offset});
     updateLayout();
 }
 
-void SphereUI::ListCtrl::appendFormattedLine(const char* text, std::uint32_t color) {
-    wrapTextLine(*this, text, format_strings, [&](const char* line) {
+void SphereUI::ListCtrl::appendFormattedLine(std::string_view text, std::uint32_t color) {
+    wrapTextLine(*this, text, format_strings, [&](std::string_view line) {
         appendLine(line, color);
     });
 }
 
-void SphereUI::ListCtrl::addText(const char* text, std::uint32_t color) {
-    if (text == nullptr) return;
-    std::string value(text);
+void SphereUI::ListCtrl::addText(std::string_view text, std::uint32_t color) {
     std::size_t begin = 0u;
     for (;;) {
-        const auto end = value.find('\n', begin);
-        const auto line = value.substr(begin, end == std::string::npos ? end : end - begin);
-        appendFormattedLine(line.c_str(), color);
-        if (end == std::string::npos) break;
+        const auto end = text.find('\n', begin);
+        appendFormattedLine(text.substr(begin, end == std::string_view::npos ? end : end - begin), color);
+        if (end == std::string_view::npos) break;
         begin = end + 1u;
     }
 }
 
 void SphereUI::ListCtrl::appendMessageText(std::string_view text, std::uint32_t color) {
     const bool at_bottom = detail::addCoordinate(vertical_offset, 5) >= maximum_scroll;
-    const std::string value(text);
-    addText(value.c_str(), color);
+    addText(text, color);
     if (chatlike && at_bottom) {
         vertical_offset = maximum_scroll;
         if (auto* bar = scrollbar.get()) bar->setParameters({0u, ScrollField::position, 0, 0, 0, vertical_offset, 0});
@@ -3032,7 +3033,7 @@ void SphereUI::ListCtrl::alignRow(std::size_t index, std::uint32_t flags) {
     auto& row = rows.at(index);
     if (flags == 0u) row.offset = 0;
     else {
-        const auto extent = InterfaceRenderer::measureText(row.text.data(), font, font_initialized);
+        const auto extent = InterfaceRenderer::measureText(row.text, font, font_initialized);
         const auto remainder = detail::subtractCoordinate(width, extent.width);
         if ((flags & 4u) != 0u) row.offset = static_cast<std::uint32_t>(remainder) / 2u;
         if ((flags & 1u) != 0u) row.offset = remainder;
@@ -3063,8 +3064,8 @@ void SphereUI::FilterListCtrl::clearHistory() {
     history_write = 0u;
 }
 
-void SphereUI::FilterListCtrl::appendHistory(const char* text, std::uint32_t color, std::uint32_t mask) {
-    appendCircular(history, maximum_items, history_write, HistoryEntry{text == nullptr ? " " : text, color, mask});
+void SphereUI::FilterListCtrl::appendHistory(std::string_view text, std::uint32_t color, std::uint32_t mask) {
+    appendCircular(history, maximum_items, history_write, HistoryEntry{std::string(text), color, mask});
 }
 
 void SphereUI::FilterListCtrl::appendFilteredText(std::string_view text, std::uint32_t packed_color) {
@@ -3072,7 +3073,7 @@ void SphereUI::FilterListCtrl::appendFilteredText(std::string_view text, std::ui
     const auto mask = components.alpha();
     const auto color = components.withAlpha(0u).argb();
     const std::string value(text);
-    appendHistory(value.c_str(), color, mask);
+    appendHistory(value, color, mask);
     if ((filter_mask & mask) != 0u) appendMessageText(text, color);
 }
 
@@ -3083,12 +3084,12 @@ void SphereUI::FilterListCtrl::applyFilter(std::uint32_t mask) {
     clearRows();
     for (std::size_t index = 0u; index < history.size(); ++index) {
         const auto& row = history.at(index);
-        if ((row.filter & mask) != 0u) addText(row.text.data(), row.color);
+        if ((row.filter & mask) != 0u) addText(row.text, row.color);
     }
 }
 
 namespace {
-    void menuLabel(const SphereUI::Window& window, const char* text, const SphereUI::UiRect& margins, const SphereUI::TextExtent& size, std::uint32_t format, std::uint32_t color, int left, int top, const SphereUI::UiRect& clip) {
+    void menuLabel(const SphereUI::Window& window, std::string_view text, const SphereUI::UiRect& margins, const SphereUI::TextExtent& size, std::uint32_t format, std::uint32_t color, int left, int top, const SphereUI::UiRect& clip) {
         const auto extent = SphereUI::InterfaceRenderer::measureText(text, window.font, true);
         const auto room_x = size.width - margins.left - margins.right - extent.width, room_y = size.height - margins.top - margins.bottom - extent.height;
         const auto dx = (format & 4u) != 0u ? room_x / 2 : (format & 1u) != 0u ? room_x : 0;
@@ -3102,7 +3103,7 @@ SphereUI::CMenuListControl::CMenuListControl() {
     control_kind = UiControlKind::menu;
 }
 
-bool SphereUI::CMenuListControl::loadUi(const char*, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::CMenuListControl::loadUi(const std::string&, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     reader.sprite("topSprite", *this, top_sprite);
     reader.sprite("middleSprite", *this, middle_sprite);
@@ -3175,9 +3176,9 @@ void SphereUI::CMenuListControl::keepOnScreen() {
     }
 }
 
-void SphereUI::CMenuListControl::addItem(const char* text, bool enabled) {
+void SphereUI::CMenuListControl::addItem(std::string_view text, bool enabled) {
     if (items.size() >= maximum_items) return;
-    items.push_back({text == nullptr ? "" : text, enabled});
+    items.push_back({std::string(text), enabled});
     height += item_size.height;
     updateParentPosition();
     if (auto* owner = parent) owner->handleMessage(UiMessage::setSize, static_cast<std::uint32_t>(parent_width), static_cast<std::uint32_t>(parent_height + item_size.height));
@@ -3281,37 +3282,37 @@ SphereUI::SlotCtrl::SlotCtrl() {
     text_color = UiColor::white;
 }
 
-void SphereUI::SlotCtrl::setOverlay(std::shared_ptr<const UiSprite>& destination, const char* image) {
-    if (image == nullptr) { destination.reset(); return; }
+void SphereUI::SlotCtrl::setOverlay(std::shared_ptr<const UiSprite>& destination, std::optional<std::string_view> image) {
+    if (!image) { destination.reset(); return; }
     auto replacement = std::make_shared<UiSprite>();
-    replacement->setImage(image);
+    replacement->setImage(*image);
     destination = std::move(replacement);
 }
 
-void SphereUI::SlotCtrl::setItem(const char* image) {
-    if (image == nullptr) {
+void SphereUI::SlotCtrl::setItem(std::optional<std::string_view> image) {
+    if (!image) {
         show_full_background = true;
         has_item = false;
         setText("");
         description.assign("");
         item_count = 0u;
-        setOverlay(top_left_overlay, nullptr);
-        setOverlay(bottom_right_overlay, nullptr);
-        setOverlay(bottom_left_overlay, nullptr);
+        setOverlay(top_left_overlay, std::nullopt);
+        setOverlay(bottom_right_overlay, std::nullopt);
+        setOverlay(bottom_left_overlay, std::nullopt);
         return;
     }
-    if (item_image.name != image) item_image.setImage(image);
+    if (item_image.name != *image) item_image.setImage(*image);
     show_full_background = false;
     has_item = true;
 }
 
 void SphereUI::SlotCtrl::setItemCount(std::uint32_t count) {
     if (count == item_count) return;
-    setText(count == 0u ? "" : std::to_string(static_cast<int>(count)).c_str());
+    setText(count == 0u ? "" : std::to_string(static_cast<int>(count)));
     item_count = count;
 }
 
-bool SphereUI::SlotCtrl::loadUi(const char*, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::SlotCtrl::loadUi(const std::string&, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     if (parent == nullptr) return false;
     const bool background = reader.has("slotpic") || reader.has("slotFull");
@@ -3326,8 +3327,8 @@ bool SphereUI::SlotCtrl::loadUi(const char*, SferaSimpleParser& parser, const Sf
     reader.pair("textofs", count_offset_x, count_offset_y);
     int number = 0;
     reader.integer("slotnumber", number);
-    if (number != 0) setText(std::to_string(number).c_str());
-    if (const char* image = reader.string("slotItem", true)) setItem(image);
+    if (number != 0) setText(std::to_string(number));
+    if (const auto image = reader.string("slotItem", true)) setItem(*image);
     return true;
 }
 
@@ -3499,75 +3500,73 @@ void SphereUI::RichEditCtrl::moveCaret(std::uint32_t key) {
     ensureCaretVisible();
 }
 
-void SphereUI::RichEditCtrl::setContent(const char* text) {
-    const std::string source = text == nullptr ? "" : text;
+void SphereUI::RichEditCtrl::setContent(std::string_view text) {
+    const auto source = text;
     std::vector<std::string> replacement{};
     std::string line;
     int used_width = 0;
-    for (unsigned char character : source) {
-        const char glyph[] = {static_cast<char>(character), 0};
+    for (std::size_t index = 0; index < source.size(); ++index) {
+        const auto glyph = source.substr(index, 1u);
         const auto extent = InterfaceRenderer::measureText(glyph, font, font_initialized);
-        if (character == '\n' || used_width + extent.width + cursor_width > width) {
-            replacement.push_back(line.c_str());
+        if (glyph == "\n" || used_width + extent.width + cursor_width > width) {
+            replacement.push_back(line);
             line.clear();
             used_width = 0;
         } else {
-            line.push_back(static_cast<char>(character));
+            line.append(glyph);
             used_width += extent.width;
         }
     }
-    if (!line.empty() || replacement.size() == 0u) replacement.push_back(line.c_str());
+    if (!line.empty() || replacement.size() == 0u) replacement.push_back(line);
     lines = std::move(replacement);
     caret_row = static_cast<int>(lines.size()) - 1;
     caret_column = lines.at(caret_row).size();
     ensureCaretVisible();
 }
 
-void SphereUI::RichEditCtrl::copyContent(std::span<char> destination) const {
-    if (destination.empty()) return;
-    std::size_t copied = 0u;
-    for (std::size_t index = 0u; index < lines.size() && copied + 1u < destination.size(); ++index) {
-        const auto& line = lines.at(index);
-        const auto count = std::min<std::size_t>(line.size(), destination.size() - copied - 1u);
-        std::memcpy(destination.data() + copied, line.data(), count);
-        copied += count;
+std::string SphereUI::RichEditCtrl::content(std::size_t limit) const {
+    std::string result;
+    for (const auto& line : lines) {
+        if (result.size() == limit) break;
+        const auto count = std::min(line.size(), limit - result.size());
+        result.append(line, 0, count);
         if (count < line.size()) break;
-        if (copied + 1u < destination.size()) destination[copied++] = '\n';
+        if (result.size() < limit) result.push_back('\n');
     }
-    destination[copied] = 0;
+    return result;
 }
 
-void SphereUI::RichEditCtrl::insertAt(std::uint32_t column, std::uint8_t character, std::uint32_t row) {
+void SphereUI::RichEditCtrl::insertAt(std::uint32_t column, std::string glyph, std::uint32_t row) {
+    if (glyph.size() != 1u) throw std::invalid_argument("Rich edit insertion requires one code unit");
     for (;;) {
         if (row >= lines.size()) {
-            const char glyph[] = {static_cast<char>(character), 0};
-            lines.push_back(glyph);
+            lines.push_back(std::move(glyph));
             return;
         }
-        std::string text = lines.at(row).data();
-        text.insert(std::min<std::size_t>(column, text.size()), 1u, static_cast<char>(character));
-        if (text.size() < 2u || InterfaceRenderer::measureText(text.c_str(), font, font_initialized).width + cursor_width <= width) {
-            lines.at(row).assign(text.c_str());
+        std::string text = lines.at(row);
+        text.insert(std::min<std::size_t>(column, text.size()), glyph);
+        if (text.size() < 2u || InterfaceRenderer::measureText(text, font, font_initialized).width + cursor_width <= width) {
+            lines.at(row).assign(text);
             return;
         }
-        character = text.back();
+        glyph.assign(text, text.size() - 1u, 1u);
         text.pop_back();
-        lines.at(row).assign(text.c_str());
+        lines.at(row).assign(text);
         ++row;
         column = 0u;
     }
 }
 
-void SphereUI::RichEditCtrl::insertCharacter(std::uint8_t character) {
+void SphereUI::RichEditCtrl::insertCharacter(std::string_view glyph) {
+    if (glyph.size() != 1u) throw std::invalid_argument("Rich edit insertion requires one code unit");
     ensureCaretVisible();
     const auto& row = lines.at(caret_row);
-    const char glyph[] = {static_cast<char>(character), 0};
-    const auto prospective = InterfaceRenderer::measureText(row.data(), font, font_initialized).width + InterfaceRenderer::measureText(glyph, font, font_initialized).width + cursor_width;
+    const auto prospective = InterfaceRenderer::measureText(row, font, font_initialized).width + InterfaceRenderer::measureText(glyph, font, font_initialized).width + cursor_width;
     if (caret_column == static_cast<int>(row.size()) && prospective >= width) {
-        insertAt(0u, character, ++caret_row);
+        insertAt(0u, std::string(glyph), ++caret_row);
         caret_column = 1;
     } else {
-        insertAt(static_cast<std::uint32_t>(caret_column), character, static_cast<std::uint32_t>(caret_row));
+        insertAt(static_cast<std::uint32_t>(caret_column), std::string(glyph), static_cast<std::uint32_t>(caret_row));
         ++caret_column;
     }
     ensureCaretVisible();
@@ -3578,28 +3577,28 @@ std::uint32_t SphereUI::RichEditCtrl::mergeRows(std::uint32_t destination, std::
     std::string text = lines.at(destination).data();
     const std::string following = lines.at(source).data();
     std::uint32_t count = 0u;
-    for (char character : following) {
+    for (const auto character : following) {
         text.push_back(character);
-        if (InterfaceRenderer::measureText(text.c_str(), font, font_initialized).width + cursor_width > width) {
+        if (InterfaceRenderer::measureText(text, font, font_initialized).width + cursor_width > width) {
             text.pop_back();
             break;
         }
         ++count;
     }
-    lines.at(destination).assign(text.c_str());
+    lines.at(destination).assign(text);
     return count;
 }
 
 void SphereUI::RichEditCtrl::eraseCharacter(bool backward) {
     ensureCaretVisible();
     std::uint32_t row = caret_row;
-    std::string text = lines.at(row).data();
+    std::string text = lines.at(row);
     if (backward && caret_column > 0) {
         text.erase(--caret_column, 1u);
-        lines.at(row).assign(text.c_str());
+        lines.at(row).assign(text);
     } else if (!backward && caret_column < static_cast<int>(text.size())) {
         text.erase(caret_column, 1u);
-        lines.at(row).assign(text.c_str());
+        lines.at(row).assign(text);
     } else {
         if (backward) {
             if (row == 0u) return;
@@ -3612,7 +3611,7 @@ void SphereUI::RichEditCtrl::eraseCharacter(bool backward) {
         std::string remainder = lines.at(row + 1u).data();
         remainder.erase(0u, transferred);
         if (remainder.empty()) lines.erase(lines.begin() + row + 1u);
-        else lines.at(row + 1u).assign(remainder.c_str());
+        else lines.at(row + 1u).assign(remainder);
     }
     ensureCaretVisible();
 }
@@ -3623,7 +3622,7 @@ void SphereUI::RichEditCtrl::splitLine() {
     const auto following = text.substr(caret_column);
     text.resize(caret_column);
     lines.insert(lines.begin() + caret_row + 1, following);
-    lines.at(caret_row).assign(text.c_str());
+    lines.at(caret_row).assign(text);
     ++caret_row;
     caret_column = 0;
     ensureCaretVisible();
@@ -3636,11 +3635,11 @@ void SphereUI::RichEditCtrl::drawCaret(float left, float top) {
     if (elapsed > 4000u) cursor_visible = static_cast<std::uint8_t>(((elapsed - 4000u) / 4000u) & 1u);
     if (!input_enabled || !cursor_visible || caret_row < 0 || caret_row >= static_cast<int>(lines.size())) return;
     const std::string prefix(lines.at(caret_row).data(), std::clamp(caret_column, 0, static_cast<int>(lines.at(caret_row).size())));
-    const auto extent = InterfaceRenderer::measureText(prefix.c_str(), font, font_initialized);
+    const auto extent = InterfaceRenderer::measureText(prefix, font, font_initialized);
     InterfaceRenderer::drawText("_", static_cast<int>(left) + extent.width, static_cast<int>(top), text_color, font, font_initialized, windowBounds(*this), false);
 }
 
-bool SphereUI::RichEditCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::RichEditCtrl::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     loadPart(*this, scrollbar, reader, "scrollbar", filename, parser, UiControlKind::scrollBar, 1u);
     updateMetrics(font);
@@ -3682,7 +3681,7 @@ void SphereUI::RichEditCtrl::draw() {
         if (viewport) {
             const auto start = std::clamp(first_row, 0, static_cast<int>(lines.size()));
             const auto finish = std::min(static_cast<int>(lines.size()), start + std::max(0, page_rows) + 1);
-            for (auto row = start; row < finish; ++row) InterfaceRenderer::drawText(lines.at(row).data(), bounds.left, bounds.top + (row - start) * line_height, text_color, font, font_initialized, bounds, false);
+            for (auto row = start; row < finish; ++row) InterfaceRenderer::drawText(lines.at(row), bounds.left, bounds.top + (row - start) * line_height, text_color, font, font_initialized, bounds, false);
             if (caret_row >= start && caret_row < finish) drawCaret(static_cast<float>(bounds.left), static_cast<float>(bounds.top + (caret_row - start) * line_height));
         }
     }
@@ -3693,7 +3692,7 @@ void SphereUI::RichEditCtrl::handleInput(const WindowInput& input) {
     if (input_enabled) Runtime::setTextInputActive(true);
     if (hidden) return;
     if (input_enabled) {
-        if (input.character >= 32u) insertCharacter(input.character);
+        if (input.character >= 32u) insertCharacter(input.text());
         const auto key = input.key_code;
         if (key == VK_BACK || key == VK_DELETE) eraseCharacter(key == VK_BACK);
         else if (key == VK_RETURN) splitLine();
@@ -3741,7 +3740,7 @@ void SphereUI::HyperTextCtrl::copyHyperTextState(const HyperTextCtrl& source, Cl
     discard_old_text = source.discard_old_text;
 }
 
-std::uint32_t SphereUI::HyperTextCtrl::parseTextFormat(const char* name) {
+std::uint32_t SphereUI::HyperTextCtrl::parseTextFormat(std::string_view name) {
     if (SferaText::asciiEqual(name, "RIGHT")) return 1u;
     if (SferaText::asciiEqual(name, "CENTER")) return 2u;
     if (SferaText::asciiEqual(name, "PARAGRAPH")) return 3u;
@@ -3779,7 +3778,7 @@ void SphereUI::HyperTextCtrl::updateDocument(bool resize_to_content) {
         replacement = std::make_unique<HyperTextDocument>(*bytes, page_width, text_format, font);
     } else if (const auto* request = std::get_if<PageRequest>(&pending_page)) {
         remember = request->remember;
-        if (auto* source = g_sfera_interface.findHyperText(request->name.c_str())) replacement = source->clone(page_width, text_format, font);
+        if (auto* source = g_sfera_interface.findHyperText(request->name)) replacement = source->clone(page_width, text_format, font);
     }
     if (replacement != nullptr) {
         auto* current = document.get();
@@ -3812,30 +3811,30 @@ void SphereUI::HyperTextCtrl::updateDocument(bool resize_to_content) {
     pending_page = std::monostate{};
 }
 
-void SphereUI::HyperTextCtrl::openLink(const char* target) {
-    if (target == nullptr) return;
-    const std::string value(target);
+void SphereUI::HyperTextCtrl::openLink(std::string_view target) {
+    if (target.empty()) return;
+    const auto value = target;
     const auto separator = value.find(':');
     const auto scheme = value.substr(0u, separator);
-    if (SferaText::asciiEqual(scheme.c_str(), "HTS")) {
+    if (SferaText::asciiEqual(scheme, "HTS")) {
         if (separator == std::string::npos) return;
         const auto first = value.find_first_not_of('\\', separator + 1u);
-        if (first != std::string::npos) queuePage(value.c_str() + first, true);
-    } else Runtime::openExternalLink(value.c_str(), SferaText::asciiEqual(scheme.c_str(), "mailto"));
+        if (first != std::string::npos) queuePage(value.substr(first), true);
+    } else Runtime::openExternalLink(value, SferaText::asciiEqual(scheme, "mailto"));
 }
 
-bool SphereUI::HyperTextCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::HyperTextCtrl::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
-    if (const char* value = reader.string("textFormat")) text_format = parseTextFormat(value);
-    if (const char* value = reader.string("hyperText", true)) queuePage(value, false);
+    if (const auto value = reader.string("textFormat")) text_format = parseTextFormat(*value);
+    if (const auto value = reader.string("hyperText", true)) queuePage(*value, false);
     loadPart(*this, scrollbar, reader, "scrollbar", filename, parser, UiControlKind::scrollBar, 1u);
     if (reader.has("linkcolor")) {
-        const char* first = reader.token(0u);
-        if (first != nullptr) readHexColor(first, link_color);
-        const char* second = reader.token(1u);
-        if (second != nullptr) readHexColor(second, hover_color);
+        const auto first = reader.token(0u);
+        readHexColor(first, link_color);
+        const auto second = reader.token(1u);
+        readHexColor(second, hover_color);
     }
-    if (const char* value = reader.string("flags")) if (SferaText::asciiEqual(value, "DISCARD_OLD_TEXT")) discard_old_text = true;
+    if (const auto value = reader.string("flags")) if (SferaText::asciiEqual(*value, "DISCARD_OLD_TEXT")) discard_old_text = true;
     return true;
 }
 
@@ -3860,7 +3859,7 @@ std::uint32_t SphereUI::HyperTextCtrl::handleMessage(SphereUI::UiMessage message
                 if (message == UiMessage::firstHyperTextPage) while (history.size() > 1u) history.pop_back();
                 const std::string name = history.at(history.size() - 1u).data();
                 history.pop_back();
-                queuePage(name.c_str(), false);
+                queuePage(name, false);
             }
             return 1u;
         case UiMessage::clearHyperTextHistory:
@@ -3913,7 +3912,7 @@ void SphereUI::HyperTextCtrl::handleInput(const WindowInput& input) {
         if (auto* tip = tooltip.get()) {
             tip->reset();
             if (hovered >= 0) {
-                tip->setLine(0u, page->tooltips.at(hovered).target.c_str());
+                tip->setLine(0u, page->tooltips.at(hovered).target);
                 tip->showAt(input.mouse_x, input.mouse_y);
             }
         }
@@ -3923,7 +3922,7 @@ void SphereUI::HyperTextCtrl::handleInput(const WindowInput& input) {
         auto& link = page->links.at(index);
         link.hovered = link.contains(input.mouse_x, input.mouse_y) ? 1u : 0u;
         if (link.hovered && (input.mouse_flags & MouseInput::leftPress) != 0u) {
-            openLink(link.target.c_str());
+            openLink(link.target);
             Runtime::playLinkSound();
         }
     }
@@ -3952,7 +3951,7 @@ std::unique_ptr<SphereUI::Window> SphereUI::HyperTextChatListControl::cloneInto(
     });
 }
 
-bool SphereUI::HyperTextChatListControl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::HyperTextChatListControl::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     if (!reader.has("linkColor")) return false;
     reader.color("linkColor", link_color);
@@ -3988,13 +3987,13 @@ void SphereUI::HyperTextChatListControl::rebuildVisible() {
     if (visible_messages.size() == 0u) bottom_message = bottom_row = scroll_offset = 0u;
 }
 
-const char* SphereUI::HyperTextChatListControl::messageText(std::size_t index, bool plain) const {
+std::string_view SphereUI::HyperTextChatListControl::messageText(std::size_t index, bool plain) const {
     if (index >= visible_messages.size()) return "";
     const auto& item = messages.at(visible_messages.at(index));
-    return plain ? item.plain_text.data() : item.hyper_text.data();
+    return plain ? std::string_view(item.plain_text) : std::string_view(item.hyper_text);
 }
 
-void SphereUI::HyperTextChatListControl::addMessage(const char* text, std::uint32_t channel, std::uint32_t color) {
+void SphereUI::HyperTextChatListControl::addMessage(std::string_view text, std::uint32_t channel, std::uint32_t color) {
     HyperTextChatListItem item{};
     item.initialize(text, channel, color);
     item.layout(width, font);
@@ -4034,7 +4033,7 @@ void SphereUI::HyperTextChatListControl::setFont(int font_id) {
     Window::setFont(font_id);
     for (auto& item : messages) {
         HyperTextChatListItem replacement;
-        replacement.initialize(item.hyper_text.c_str(), item.channel, item.color);
+        replacement.initialize(item.hyper_text, item.channel, item.color);
         replacement.layout(width, font);
         item = std::move(replacement);
     }
@@ -4099,7 +4098,7 @@ void SphereUI::HyperTextChatListControl::drawElement(HyperTextRun& element, int 
         else color = link_color;
     }
     const UiRect clip{left, top, detail::addCoordinate(left, std::max(geometry->width, 1) - 1), detail::addCoordinate(top, std::max(geometry->height, 1) - 1)};
-    InterfaceRenderer::drawText(element.text.data(), left, top, SferaColor::fromArgb(color).withAlpha(alpha).argb(), font, true, clip, false);
+    InterfaceRenderer::drawText(element.text, left, top, SferaColor::fromArgb(color).withAlpha(alpha).argb(), font, true, clip, false);
 }
 
 void SphereUI::HyperTextChatListControl::draw() {
@@ -4224,10 +4223,10 @@ SphereUI::HyperTextEditControl::HyperTextEditControl() {
     edit_modes.set(PlainText);
 }
 
-void SphereUI::HyperTextEditControl::setContent(const char* text, std::uint32_t mode) {
-    if (text == nullptr || mode > 1u) return;
-    const std::string source(text);
-    if (mode == 0u && source == hyper_text.data()) return;
+void SphereUI::HyperTextEditControl::setContent(std::string_view text, std::uint32_t mode) {
+    if (mode > 1u) return;
+    const auto source = text;
+    if (mode == 0u && source == hyper_text) return;
     if (source.size() + (mode == 1u ? hyper_text.size() : 0u) > maximum_hyper_length) return;
     std::string plain;
     std::vector<HyperTextRun> parsed, replacement;
@@ -4240,7 +4239,7 @@ void SphereUI::HyperTextEditControl::setContent(const char* text, std::uint32_t 
             const auto length = element.text.size();
             if (used >= maximum_visible_length) break;
             if (length > maximum_visible_length - used) {
-                appendPlainRun(replacement, std::string_view(element.text.data(), maximum_visible_length - used));
+                appendPlainRun(replacement, std::string_view(element.text).substr(0u, maximum_visible_length - used));
                 used = maximum_visible_length;
             } else {
                 appendEditorElement(replacement, element);
@@ -4254,9 +4253,9 @@ void SphereUI::HyperTextEditControl::setContent(const char* text, std::uint32_t 
     moveCaret(35u);
 }
 
-void SphereUI::HyperTextEditControl::insertPlainText(const char* text) {
-    if (text == nullptr || visible_text.size() >= maximum_visible_length) return;
-    const std::string insertion(text, std::min<std::size_t>(std::strlen(text), maximum_visible_length - visible_text.size()));
+void SphereUI::HyperTextEditControl::insertPlainText(std::string_view text) {
+    if (visible_text.size() >= maximum_visible_length) return;
+    const auto insertion = text.substr(0u, maximum_visible_length - visible_text.size());
     if (insertion.empty()) return;
     caret_position = std::min(caret_position, visible_text.size());
     std::vector<HyperTextRun> replacement;
@@ -4273,7 +4272,7 @@ void SphereUI::HyperTextEditControl::insertPlainText(const char* text) {
                 replacement.push_back(element);
                 appendPlainRun(replacement, insertion);
             } else {
-                std::string value(element.text.data(), length);
+                std::string value(element.text, length);
                 value.insert(offset, insertion);
                 appendPlainRun(replacement, value);
             }
@@ -4290,10 +4289,11 @@ void SphereUI::HyperTextEditControl::insertPlainText(const char* text) {
     updateVisibleEnd();
 }
 
-void SphereUI::HyperTextEditControl::insertCharacter(std::uint8_t character) {
-    if (!edit_modes.test(PlainText) || character < 32u || (edit_modes.test(Numeric) && (character < '0' || character > '9'))) return;
-    const char text[] = {static_cast<char>(character), 0};
-    insertPlainText(text);
+void SphereUI::HyperTextEditControl::insertCharacter(std::string_view glyph) {
+    if (glyph.size() != 1u) throw std::invalid_argument("Hypertext insertion requires one code unit");
+    if (!edit_modes.test(PlainText) || std::as_bytes(std::span(glyph)).front() < std::byte{32} ||
+        (edit_modes.test(Numeric) && (glyph < "0" || glyph > "9"))) return;
+    insertPlainText(glyph);
 }
 
 void SphereUI::HyperTextEditControl::eraseCharacter(bool backspace) {
@@ -4305,7 +4305,7 @@ void SphereUI::HyperTextEditControl::eraseCharacter(bool backspace) {
     for (const auto& element : elements) {
         const auto length = element.text.size();
         if (target >= position && target < position + length) {
-            std::string value(element.text.data(), length);
+            std::string value(element.text, length);
             value.erase(target - position, 1u);
             appendPlainRun(replacement, value);
         } else appendEditorElement(replacement, element);
@@ -4317,14 +4317,13 @@ void SphereUI::HyperTextEditControl::eraseCharacter(bool backspace) {
     updateVisibleEnd();
 }
 
-std::size_t SphereUI::HyperTextEditControl::fitText(const char* text, int font, int pixels, bool reverse) {
-    const std::string_view value(text == nullptr ? "" : text);
+std::size_t SphereUI::HyperTextEditControl::fitText(std::string_view text, int font, int pixels, bool reverse) {
+    const auto value = text;
     if (pixels <= 0 || value.empty()) return 0u;
     std::int64_t used = 0;
     for (std::size_t count = 0u; count < value.size(); ++count) {
         const auto index = reverse ? value.size() - count - 1u : count;
-        const char glyph[] = {value[index], 0};
-        used += InterfaceRenderer::measureText(glyph, font, true).width;
+        used += InterfaceRenderer::measureText(value.substr(index, 1u), font, true).width;
         if (used > pixels) return index;
     }
     return reverse ? 0u : value.size();
@@ -4348,7 +4347,7 @@ void SphereUI::HyperTextEditControl::updateVisibleStart() {
     }
     visible_last = std::min(visible_last, visible_text.size() - 1u);
     const std::string prefix(visible_text.data(), visible_last + 1u);
-    const auto first = fitText(prefix.c_str(), font, std::max(0, width - text_margins.left - text_margins.right), true);
+    const auto first = fitText(prefix, font, std::max(0, width - text_margins.left - text_margins.right), true);
     visible_first = first == 0u ? 0u : first + 1u;
 }
 
@@ -4379,15 +4378,19 @@ void SphereUI::HyperTextEditControl::drawElement(const TextExtent& point, HyperT
     if (!element.isPlain() && element.link() == nullptr) return;
     const auto first = std::min(range.first, element.text.size());
     const auto length = range.last == invalidIndex ? element.text.size() - first : std::min(element.text.size() - first, range.last >= first ? range.last - first + 1u : 0u);
-    std::string display(element.text.data() + first, length);
-    if (element.isPlain() && edit_modes.test(Password)) display.assign(length, '*');
+    std::string password;
+    std::string_view display = std::string_view(element.text).substr(first, length);
+    if (element.isPlain() && edit_modes.test(Password)) {
+        password.assign(length, '*');
+        display = password;
+    }
     if (element.link() != nullptr) {
         const auto kind = element.link()->link_kind;
         color = kind == 1u ? item_link_color : kind == 2u ? player_link_color : link_color;
     }
-    const auto extent = InterfaceRenderer::measureText(display.c_str(), font, true);
+    const auto extent = InterfaceRenderer::measureText(display, font, true);
     if (auto* geometry = element.geometry()) *geometry = {point.width, point.height, extent.width, extent.height};
-    InterfaceRenderer::drawText(display.c_str(), point.width, point.height, SferaColor::fromArgb(color).withAlpha(alpha).argb(), font, true, windowBounds(*this), false);
+    InterfaceRenderer::drawText(display, point.width, point.height, SferaColor::fromArgb(color).withAlpha(alpha).argb(), font, true, windowBounds(*this), false);
 }
 
 void SphereUI::HyperTextEditControl::drawCaret() {
@@ -4395,7 +4398,7 @@ void SphereUI::HyperTextEditControl::drawCaret() {
     const auto bounds = windowBounds(*this);
     const auto start = std::min(visible_first, visible_text.size()), caret = std::clamp(caret_position, start, visible_text.size());
     std::string prefix(visible_text.data() + start, caret - start);
-    const auto left = bounds.left + text_margins.left + InterfaceRenderer::measureText(prefix.c_str(), font, true).width;
+    const auto left = bounds.left + text_margins.left + InterfaceRenderer::measureText(prefix, font, true).width;
     const auto top = bounds.top + text_margins.top;
     const auto color = SferaColor::fromArgb(cursor_color).withAlpha(alpha).argb();
     if (cursor_type == 2u) InterfaceRenderer::drawText("_", left, top, color, font, true, bounds, false);
@@ -4446,10 +4449,10 @@ void SphereUI::HyperTextEditControl::submitText() {
     if (edit_modes.test(Password) || hyper_text.size() == 0u || maximum_history == 0u) return;
     std::deque<std::string> replacement;
     for (const auto& entry : history) {
-        if (std::strcmp(entry.c_str(), hyper_text.c_str()) != 0) replacement.emplace_back(entry.c_str());
+        if (entry != hyper_text) replacement.emplace_back(entry);
     }
     while (replacement.size() >= maximum_history) replacement.pop_front();
-    replacement.emplace_back(hyper_text.c_str());
+    replacement.emplace_back(hyper_text);
     history = std::move(replacement);
     history_position = history.size();
 }
@@ -4457,8 +4460,8 @@ void SphereUI::HyperTextEditControl::submitText() {
 void SphereUI::HyperTextEditControl::pasteClipboard() {
     std::string value;
     Runtime::clipboardText(value);
-    for (char& character : value) if (character == '\n' || character == '\r') character = ' ';
-    insertPlainText(value.c_str());
+    for (auto& character : value) if (character == '\n' || character == '\r') character = ' ';
+    insertPlainText(value);
 }
 
 void SphereUI::HyperTextEditControl::historyProfile(std::string& result) {
@@ -4471,18 +4474,20 @@ void SphereUI::HyperTextEditControl::historyProfile(std::string& result) {
         const auto end = line.find('"', dot + 1u);
         if (end != std::string::npos) value += line.substr(dot + 1u, end - dot - 1u);
     }
-    result.assign(value.c_str());
+    result.assign(value);
 }
 
 void SphereUI::HyperTextEditControl::transformHistory(std::string& result, const std::string& source, bool decode) {
     constexpr std::int8_t primary[] = {1, 2, 3, -2, 1, -1, -2, -3, 2, -1, 0, -2, 2};
     constexpr std::int8_t secondary[] = {0, -1, -2, 2, -1, 0, 1};
-    std::string value(source.data(), source.size());
-    for (std::size_t index = 0u; index < value.size(); ++index) {
-        const auto shift = primary[index % 13u] + secondary[index % 7u];
-        value[index] = static_cast<unsigned char>(value[index]) + (decode ? shift : -shift);
-    }
-    result.assign(value);
+    std::string value(source);
+    std::size_t index = 0;
+    SferaText::transformBytes(value, [&](std::uint8_t byte) {
+        const auto shift = primary[index % std::size(primary)] + secondary[index % std::size(secondary)];
+        ++index;
+        return byte + (decode ? shift : -shift);
+    });
+    result = std::move(value);
 }
 
 void SphereUI::HyperTextEditControl::loadHistory() {
@@ -4529,7 +4534,7 @@ std::unique_ptr<SphereUI::Window> SphereUI::HyperTextEditControl::cloneInto(Clon
     });
 }
 
-bool SphereUI::HyperTextEditControl::loadUi(const char*, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::HyperTextEditControl::loadUi(const std::string&, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     if (font < 2u || !reader.has("linkColor")) return false;
     plain_color = cursor_color = UiColor::white;
@@ -4545,10 +4550,10 @@ bool SphereUI::HyperTextEditControl::loadUi(const char*, SferaSimpleParser& pars
     reader.count("maxHyperTextLength", maximum_hyper_length);
     reader.count("maxHistoryLength", maximum_history);
     cursor_type = 1u;
-    if (const char* value = reader.string("cursorType")) cursor_type = SferaText::asciiEqual(value, "none") ? 0u : SferaText::asciiEqual(value, "uline") ? 2u : 1u;
+    if (const auto value = reader.string("cursorType")) cursor_type = SferaText::asciiEqual(*value, "none") ? 0u : SferaText::asciiEqual(*value, "uline") ? 2u : 1u;
     edit_modes.reset();
     if (reader.has("editMode")) for (std::size_t index = 0u; index < parser.tokenCount(); ++index) {
-        const char* value = reader.token(index);
+        const auto value = reader.token(index);
         if (SferaText::asciiEqual(value, "enterPlainText")) edit_modes.set(PlainText);
         else if (SferaText::asciiEqual(value, "numbersOnly")) {
             edit_modes.set(PlainText);
@@ -4582,7 +4587,7 @@ std::uint32_t SphereUI::HyperTextEditControl::handleMessage(SphereUI::UiMessage 
 void SphereUI::HyperTextEditControl::handleInput(const WindowInput& input) {
     if (hidden) return;
     if (input_enabled) {
-        if (input.character >= 32u) insertCharacter(input.character);
+        if (input.character >= 32u) insertCharacter(input.text());
         else if (input.character == 0u) {
             const auto key = input.key_code;
             if (key == VK_BACK || key == VK_DELETE) eraseCharacter(key == VK_BACK);
@@ -4591,7 +4596,7 @@ void SphereUI::HyperTextEditControl::handleInput(const WindowInput& input) {
             else if (key == VK_DOWN) historyDown();
             else if (key == VK_RETURN) submitText();
             else if (key == VK_INSERT && (input.key_modifiers & 3u) != 0u) pasteClipboard();
-            else if (key == VK_OEM_PLUS) insertCharacter('=');
+            else if (key == VK_OEM_PLUS) insertCharacter("=");
         }
         input.key_code = input.character = 0u;
         Runtime::setTextInputActive(true);
@@ -4608,7 +4613,7 @@ void SphereUI::HyperTextEditControl::handleInput(const WindowInput& input) {
     const auto start = std::min(visible_first, visible_text.size());
     const auto end = std::min(visible_last + 1u, visible_text.size());
     const std::string visible(visible_text.data() + start, end > start ? end - start : 0u);
-    caret_position = std::min(visible_text.size(), start + fitText(visible.c_str(), font, cursor.x - bounds.left - text_margins.left, false));
+    caret_position = std::min(visible_text.size(), start + fitText(visible, font, cursor.x - bounds.left - text_margins.left, false));
     if ((input.key_modifiers & 1u) == 0u) return;
     std::size_t position = 0u;
     for (const auto& element : elements) {
@@ -4829,7 +4834,7 @@ namespace {
         WorldGuiControls::elements.at(handle).reset();
     }
 
-    template<class Build> std::uint32_t createGuiControl(std::uint32_t windowHandle, const char* operation, Build&& build) {
+    template<class Build> std::uint32_t createGuiControl(std::uint32_t windowHandle, std::string_view operation, Build&& build) {
         auto* window = GameInterface::window(windowHandle, operation);
         if (!window) { windowHandle = 0; window = GameInterface::window(windowHandle); }
         if (!window) WorldDiagnostics::fail("create_control: root window is unavailable");
@@ -4882,36 +4887,38 @@ namespace {
 
 }
 
-bool SphereUI::FontFace::load(const char* display_name, const char* filename, const char* texture_name) {
-    if (filename == nullptr || texture_name == nullptr) return false;
+bool SphereUI::FontFace::load(std::optional<std::string_view> display_name, const std::string& filename, std::string_view texture_name) {
+    if (filename.empty()) return false;
     std::ifstream stream(filename, std::ios::binary);
     if (!stream) {
         const std::string message = std::string("Can't open font '") + filename + "'";
-        if (auto* log = g_sfera_error_log_runtime.outputs[1u]; log != nullptr) log->write(message.c_str());
+        if (auto* log = g_sfera_error_log_runtime.outputs[1u]; log != nullptr) log->write(message);
         return false;
     }
-    std::array<char, 4> signature{};
-    if (!stream.read(signature.data(), signature.size()) || std::string_view(signature.data(), signature.size()) != "SFNT") return false;
+    std::array<std::uint8_t, 4> signature{};
+    if (!SferaBinary::read(stream, signature) || SferaText::fromBytes(signature) != "SFNT") return false;
     FontFace replacement;
-    std::string stored_name, stored_texture;
-    if (!std::getline(stream, stored_name, '\0') || stored_name.size() >= 256u || !std::getline(stream, stored_texture, '\0') || stored_texture.size() >= 256u) return false;
-    replacement.name = display_name == nullptr ? stored_name : display_name;
+    const auto stored_name = SferaText::readTerminated(stream, 256u);
+    if (!stored_name) return false;
+    const auto stored_texture = SferaText::readTerminated(stream, 256u);
+    if (!stored_texture) return false;
+    replacement.name = display_name ? *display_name : std::string_view(*stored_name);
     const auto texture_id = g_sfera_textures.find(texture_name);
     if (texture_id == -1) {
-        const std::string message = std::string("Can't load texture '") + texture_name + "' for font '" + replacement.name + "'";
-        InterfaceRenderer::reportError(message.c_str());
+        const std::string message = std::string("Can't load texture '") + std::string(texture_name) + "' for font '" + replacement.name + "'";
+        InterfaceRenderer::reportError(message);
         return false;
     }
     replacement.texture = static_cast<std::uint32_t>(texture_id);
     std::array<std::uint8_t, 8> metrics{};
-    if (!stream.read(reinterpret_cast<char*>(metrics.data()), metrics.size())) return false;
+    if (!SferaBinary::read(stream, metrics)) return false;
     replacement.line_height = SferaBinary::readLittleEndian<int>(metrics.data());
     replacement.baseline = SferaBinary::readLittleEndian<int>(metrics.data() + 4);
     // SFNT stores 224 little-endian records, including a legacy two-byte gap after advance.
     std::array<std::uint8_t, FontGlyph::encodedSize> record{};
     for (auto& glyph : std::span(replacement.glyphs).subspan(32u)) {
-        if (!stream.read(reinterpret_cast<char*>(record.data()), record.size())) return false;
-        glyph = FontGlyph::decode(record.data());
+        if (!SferaBinary::read(stream, record)) return false;
+        glyph = FontGlyph::decode(record);
         glyph.bearing_y = static_cast<std::uint16_t>(glyph.bearing_y) - static_cast<std::uint16_t>(replacement.baseline);
     }
     *this = std::move(replacement);
@@ -4935,22 +4942,22 @@ void SphereUI::FontFactory::clear() {
     vertex_count = 0u;
 }
 
-bool SphereUI::FontFactory::load(const char* filename, const char* texture_name) {
+bool SphereUI::FontFactory::load(const std::string& filename, std::string_view texture_name) {
     auto loaded = std::make_unique<FontFace>();
-    if (!loaded->load(nullptr, filename, texture_name)) return false;
+    if (!loaded->load(std::nullopt, filename, texture_name)) return false;
     faces.push_back(std::move(loaded));
     return true;
 }
 
-void SphereUI::FontFactory::loadNamedFont(const char* name) {
-    if (name == nullptr) return;
+void SphereUI::FontFactory::loadNamedFont(std::string_view name) {
+    if (name.empty()) return;
     std::string localized_name(name);
-    const char* suffix = g_sfera_font_runtime.language_suffix;
-    if (*suffix != '\0' && !SferaText::asciiEqual(suffix, "_e")) localized_name += suffix;
+    const auto& suffix = g_sfera_font_runtime.language_suffix;
+    if (!suffix.empty() && !SferaText::asciiEqual(suffix, "_e")) localized_name += suffix;
     const std::string filename = "Effects\\" + localized_name + ".sfn";
-    if (!load(filename.c_str(), localized_name.c_str())) {
+    if (!load(filename, localized_name)) {
         const std::string message = "Can't load font '" + localized_name + "'";
-        InterfaceRenderer::reportError(message.c_str());
+        InterfaceRenderer::reportError(message);
     }
 }
 
@@ -4969,13 +4976,13 @@ void SphereUI::FontFactory::loadConfiguration() {
         const auto end = value.find('"', 1u);
         if (value.empty() || value.front() != '"' || end == std::string_view::npos) {
             const std::string message = "Missing quoted font name for '" + key + "' in fonts.cfg.";
-            InterfaceRenderer::reportError(message.c_str());
+            InterfaceRenderer::reportError(message);
             continue;
         }
         std::string name(value.substr(1u, end - 1u));
         std::replace(name.begin(), name.end(), '\r', ' ');
         std::erase(name, '\n');
-        loadNamedFont(name.c_str());
+        loadNamedFont(name);
     }
 }
 
@@ -4994,9 +5001,9 @@ std::uint32_t SphereUI::InterfaceRenderer::tracking(int font) noexcept {
 
 bool SferaInterfaceCursor::loadTextures() {
     for (std::size_t index = 0u; index < textures.size(); ++index) {
-        const char* name = sfera_cursor_texture_name(static_cast<std::uint32_t>(index));
+        const auto name = sfera_cursor_texture_name(static_cast<std::uint32_t>(index));
         textures[index] = g_sfera_textures.find(name);
-        if (textures[index] == -1) SphereUI::InterfaceRenderer::reportError((std::string("Cursor texture '") + name + "' not found").c_str());
+        if (textures[index] == -1) SphereUI::InterfaceRenderer::reportError((std::string("Cursor texture '") + std::string(name) + "' not found"));
     }
     kind = 0u;
     images = {};
@@ -5004,12 +5011,12 @@ bool SferaInterfaceCursor::loadTextures() {
     return true;
 }
 
-void SferaInterfaceCursor::setImage(std::size_t layer, const char* texture, int x, int y) {
+void SferaInterfaceCursor::setImage(std::size_t layer, std::optional<std::string_view> texture, int x, int y) {
     if (layer >= images.size()) return;
     auto& image = images[layer];
     image.x = x;
     image.y = y;
-    image.texture = texture == nullptr ? -1 : g_sfera_textures.find(texture);
+    image.texture = texture ? g_sfera_textures.find(*texture) : -1;
     const auto extent = image.texture == -1 ? SphereUI::TextExtent{32, 32} : g_sfera_textures.size(image.texture);
     image.width = extent.width;
     image.height = extent.height;
@@ -5021,14 +5028,14 @@ void SferaInterfaceCursor::setImageSize(std::size_t layer, int width, int height
     images[layer].height = height;
 }
 
-void SferaInterfaceCursor::setText(std::size_t layer, const char* text, int x, int y, int font, std::uint32_t color) {
+void SferaInterfaceCursor::setText(std::size_t layer, std::string_view text, int x, int y, int font, std::uint32_t color) {
     if (layer >= labels.size()) return;
     auto& label = labels[layer];
     label.x = x;
     label.y = y;
     label.font = font;
     label.color = color;
-    label.text = text == nullptr ? std::string{} : std::string(text, std::min(std::strlen(text), std::size_t{63u}));
+    label.text = text;
 }
 
 void SferaInterfaceCursor::setKind(std::uint32_t cursor_kind) {
@@ -5054,7 +5061,7 @@ void SferaInterfaceCursor::draw(float x, float y) const {
     }
     device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
     const SphereUI::UiRect clip{SphereUI::InterfaceRenderer::clip_rectangle.left, SphereUI::InterfaceRenderer::clip_rectangle.top, SphereUI::InterfaceRenderer::clip_rectangle.right, SphereUI::InterfaceRenderer::clip_rectangle.bottom};
-    for (const auto& label : labels) if (!label.text.empty()) SphereUI::InterfaceRenderer::drawText(label.text.c_str(), static_cast<int>(static_cast<double>(x) + label.x), static_cast<int>(static_cast<double>(y) + label.y), label.color, label.font, true, clip, SferaColor::fromArgb(label.color).alpha() == 255u);
+    for (const auto& label : labels) if (!label.text.empty()) SphereUI::InterfaceRenderer::drawText(label.text, static_cast<int>(static_cast<double>(x) + label.x), static_cast<int>(static_cast<double>(y) + label.y), label.color, label.font, true, clip, SferaColor::fromArgb(label.color).alpha() == 255u);
 }
 
 CCursorManager* CCursorManager::initialized = nullptr;
@@ -5121,8 +5128,8 @@ SphereUI::CursorGeometry CCursorManager::geometry() const {
     active->getPosition(&position);
     const auto dimensions = active == &software ? SphereUI::TextExtent{static_cast<int>(software.texture_width), static_cast<int>(software.texture_height)} : SphereUI::TextExtent{static_cast<int>(hardware.texture_width), static_cast<int>(hardware.texture_height)};
     const auto kind = active->cursorKind();
-    const auto* name = kind < 4u ? sfera_cursor_texture_name(kind) : nullptr;
-    return {position.x, position.y, dimensions.width, dimensions.height, name != nullptr && name[0] != '_'};
+    const auto name = sfera_cursor_texture_name(kind);
+    return {position.x, position.y, dimensions.width, dimensions.height, !name.empty() && name.front() != '_'};
 }
 
 void SphereUI::InterfaceRenderer::drawTexture(IDirect3DBaseTexture9* texture, float left, float top, float right, float bottom, std::uint32_t color, float u, float v, bool textured) {
@@ -5147,7 +5154,7 @@ void SphereUI::InterfaceRenderer::drawTexture(IDirect3DBaseTexture9* texture, fl
     (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, 2u, vertices.data(), sizeof(SferaScreenVertex)));
 }
 
-void SphereUI::InterfaceRenderer::reportError(const char* message) {
+void SphereUI::InterfaceRenderer::reportError(std::string_view message) {
     for (std::uint32_t index : {1u, 0u}) if (auto* output = g_sfera_error_log_runtime.outputs[index]) {
         if (index == 1u) output->write("*** ERROR ****************************************************:");
         output->write(message);
@@ -5167,12 +5174,12 @@ void SphereUI::UiSprite::resetParts(std::size_t count) {
     if (parts.size() != count) parts = std::vector<SpritePart>(count);
 }
 
-void SphereUI::SpritePart::setTexture(const char* image_name, const UiRect* texture_rectangle, const UiRect* sprite_rectangle) {
-    texture_name = image_name == nullptr ? "" : image_name;
+void SphereUI::SpritePart::setTexture(std::string_view image_name, const UiRect* texture_rectangle, const UiRect* sprite_rectangle) {
+    texture_name = image_name;
     texture = g_sfera_textures.find(image_name);
     if (texture < 0) {
-        const auto message = std::string("Sprite::Texture not found '") + (image_name == nullptr ? "" : image_name) + "'";
-        SphereUI::InterfaceRenderer::reportError(message.c_str());
+        const auto message = std::string("Sprite::Texture not found '") + std::string(image_name) + "'";
+        SphereUI::InterfaceRenderer::reportError(message);
     }
     const auto extent = g_sfera_textures.size(texture);
     const auto coordinate = [](int value, int maximum) { return maximum == 0 ? 0.0f : static_cast<float>(static_cast<double>(value) / maximum); };
@@ -5186,15 +5193,14 @@ void SphereUI::SpritePart::setTexture(const char* image_name, const UiRect* text
 }
 
 namespace {
-    void uiSpriteLoadDiagnostic(const char* filename, const SferaParserRange& range, const char* message) {
-        char buffer[1024]{};
-        std::snprintf(buffer, sizeof(buffer), "Sprite::Load(%s,%td,%td) -> %s", filename == nullptr ? "" : filename, range.begin, range.end, message);
-        SphereUI::InterfaceRenderer::reportError(buffer);
+    void uiSpriteLoadDiagnostic(const std::string& filename, const SferaParserRange& range, std::string_view message) {
+        const auto diagnostic = "Sprite::Load(" + filename + "," + std::to_string(range.begin) + "," + std::to_string(range.end) + ") -> " + std::string(message);
+        SphereUI::InterfaceRenderer::reportError(diagnostic);
     }
 }
 
-void SphereUI::UiSprite::setImage(const char* name) {
-    this->name = name == nullptr ? "" : name;
+void SphereUI::UiSprite::setImage(std::string_view name) {
+    this->name = name;
     resetParts(1u);
     auto& part = parts.front();
     part.setTexture(name, nullptr, nullptr);
@@ -5202,7 +5208,7 @@ void SphereUI::UiSprite::setImage(const char* name) {
     height = part.rectangle.bottom;
 }
 
-bool SphereUI::UiSprite::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+bool SphereUI::UiSprite::loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     std::string text;
     if (parser.findValue("name", &range) && parser.readQuotedString(0u, text)) name = text;
     else uiSpriteLoadDiagnostic(filename, range, "Name not specified.");
@@ -5230,7 +5236,7 @@ bool SphereUI::UiSprite::loadUi(const char* filename, SferaSimpleParser& parser,
         if (!parser.readIntSequence(1u, rectangles)) uiSpriteLoadDiagnostic(filename, range, "Incorrect number of args in 'texture'.");
         const UiRect source{rectangles[0], rectangles[1], rectangles[2], rectangles[3]};
         const UiRect destination{rectangles[4], rectangles[5], rectangles[6], rectangles[7]};
-        parts[index++].setTexture(text.c_str(), &source, &destination);
+        parts[index++].setTexture(text, &source, &destination);
     }
     parser.setScanRange(&range);
     while (parser.nextValue("tcoords")) {
@@ -5330,24 +5336,26 @@ void SphereUI::UiSprite::drawNatural(float left, float top, std::uint32_t color)
     drawParts(left, top, left + width, top + height, color, true);
 }
 
-const char* SphereUI::InterfaceManager::localizedPath(const char* filename) {
-    if (filename == nullptr || g_sfera_font_runtime.language_suffix[0] == '\0') return filename;
-    resolved_ui_path = filename;
-    const auto extension = resolved_ui_path.rfind('.');
-    resolved_ui_path.insert(extension == std::string::npos ? resolved_ui_path.size() : extension, g_sfera_font_runtime.language_suffix);
-    return resolved_ui_path.c_str();
+std::string SphereUI::InterfaceManager::localizedPath(std::string_view filename) {
+    std::string resolved(filename);
+    const auto& suffix = g_sfera_font_runtime.language_suffix;
+    if (!resolved.empty() && !suffix.empty()) {
+        const auto extension = resolved.rfind('.');
+        resolved.insert(extension == std::string::npos ? resolved.size() : extension, suffix);
+    }
+    return resolved;
 }
 
-std::shared_ptr<const SphereUI::UiSprite> SphereUI::InterfaceManager::sharedSprite(const char* name) {
-    if (name == nullptr) return {};
+std::shared_ptr<const SphereUI::UiSprite> SphereUI::InterfaceManager::sharedSprite(std::string_view name) {
+    if (name.empty()) return {};
     const auto found = std::find_if(sprites.begin(), sprites.end(), [name](const auto& sprite) {
-        return SferaText::asciiEqual(sprite->name.c_str(), name);
+        return SferaText::asciiEqual(sprite->name, name);
     });
     return found == sprites.end() ? nullptr : *found;
 }
 
-std::shared_ptr<const SphereUI::UiSprite> SphereUI::InterfaceManager::acquireSprite(const char* name) {
-    if (name == nullptr) return {};
+std::shared_ptr<const SphereUI::UiSprite> SphereUI::InterfaceManager::acquireSprite(std::string_view name) {
+    if (name.empty()) return {};
     if (auto sprite = sharedSprite(name)) return sprite;
     if (g_sfera_textures.find(name) == -1) return {};
     auto sprite = std::make_shared<UiSprite>();
@@ -5355,7 +5363,7 @@ std::shared_ptr<const SphereUI::UiSprite> SphereUI::InterfaceManager::acquireSpr
     return sprite;
 }
 
-void SphereUI::InterfaceManager::loadSprites(const char* filename) {
+void SphereUI::InterfaceManager::loadSprites(const std::string& filename) {
     SferaSimpleParser parser{};
     parser.load(filename);
     parser.setBlockRange(nullptr);
@@ -5373,7 +5381,7 @@ void SphereUI::InterfaceManager::clearSprites() {
     sprites.clear();
 }
 
-bool SphereUI::InterfaceManager::loadWindowTemplates(const char* filename) {
+bool SphereUI::InterfaceManager::loadWindowTemplates(const std::string& filename) {
     SferaSimpleParser parser{};
     parser.load(filename);
     parser.setBlockRange(nullptr);
@@ -5382,10 +5390,10 @@ bool SphereUI::InterfaceManager::loadWindowTemplates(const char* filename) {
         auto window = Runtime::makeControl(SphereUI::UiControlKind::window);
         if (window == nullptr) throw std::bad_alloc();
         if (!window->loadUi(filename, parser, range)) continue;
-        if (window->getResourceName()[0] == '\0') {
-            const auto message = std::string("Window name is missing in ") + (filename == nullptr ? "" : filename) + " at lines " + std::to_string(range.begin) + "-" + std::to_string(range.end);
+        if (window->getResourceName().empty()) {
+            const auto message = std::string("Window name is missing in ") + filename + " at lines " + std::to_string(range.begin) + "-" + std::to_string(range.end);
             CSphereError error;
-            error.write(message.c_str());
+            error.write(message);
         }
         window_templates.push_back(std::move(window));
 
@@ -5393,8 +5401,8 @@ bool SphereUI::InterfaceManager::loadWindowTemplates(const char* filename) {
     return true;
 }
 
-SphereUI::Window* SphereUI::InterfaceManager::templateWindow(const char* name) const {
-    if (name == nullptr) return nullptr;
+SphereUI::Window* SphereUI::InterfaceManager::templateWindow(std::string_view name) const {
+    if (name.empty()) return nullptr;
     const auto found = std::find_if(window_templates.begin(), window_templates.end(), [name](const auto& window) { return window != nullptr && SferaText::asciiEqual(window->getResourceName(), name); });
     return found == window_templates.end() ? nullptr : found->get();
 }
@@ -5409,19 +5417,19 @@ void SphereUI::InterfaceManager::loadHyperTexts() {
     for (std::filesystem::directory_iterator entry("Language", error), end; !error && entry != end; entry.increment(error)) {
         if (entry->is_directory(error)) continue;
         const auto basename = entry->path().filename().string();
-        if (basename.size() < suffix.size() || !SferaText::asciiEqual(basename.c_str() + basename.size() - suffix.size(), suffix.c_str())) continue;
+        if (basename.size() < suffix.size() || !SferaText::asciiEqual(std::string_view(basename).substr(basename.size() - suffix.size()), suffix)) continue;
         auto document = std::make_unique<HyperTextDocument>();
-        if (!document->load(entry->path().string().c_str())) continue;
+        if (!document->load(entry->path().string())) continue;
         auto name = entry->path().string();
-        if (g_sfera_font_runtime.language_suffix[0] != '\0') if (const auto language = name.rfind('_'); language != std::string::npos) name.replace(language, std::string::npos, ".hts");
-        document->setName(name.c_str());
+        if (!g_sfera_font_runtime.language_suffix.empty()) if (const auto language = name.rfind('_'); language != std::string::npos) name.replace(language, std::string::npos, ".hts");
+        document->setName(name);
         hypertext_documents.push_back(std::move(document));
     }
 }
 
-SphereUI::HyperTextDocument* SphereUI::InterfaceManager::findHyperText(const char* name) const {
-    if (name == nullptr) return nullptr;
-    const auto found = std::find_if(hypertext_documents.begin(), hypertext_documents.end(), [name](const auto& document) { return document != nullptr && SferaText::asciiEqual(document->name.c_str(), name); });
+SphereUI::HyperTextDocument* SphereUI::InterfaceManager::findHyperText(std::string_view name) const {
+    if (name.empty()) return nullptr;
+    const auto found = std::find_if(hypertext_documents.begin(), hypertext_documents.end(), [name](const auto& document) { return document != nullptr && SferaText::asciiEqual(document->name, name); });
     return found == hypertext_documents.end() ? nullptr : found->get();
 }
 
@@ -5443,29 +5451,29 @@ bool SphereUI::InterfaceManager::loadLocalizedStrings() {
     return true;
 }
 
-std::string_view SphereUI::InterfaceManager::localizedValue(const char* key) const {
-    const auto found = std::find_if(localized_strings.begin(), localized_strings.end(), [key](const LocalizedTextEntry& entry) { return key != nullptr && SferaText::asciiEqual(entry.key.c_str(), key); });
+std::string_view SphereUI::InterfaceManager::localizedValue(std::string_view key) const {
+    const auto found = std::find_if(localized_strings.begin(), localized_strings.end(), [key](const LocalizedTextEntry& entry) { return SferaText::asciiEqual(entry.key, key); });
     if (found != localized_strings.end()) return found->value;
     if (!localized_strings.empty()) return localized_strings.front().value;
     return {};
 }
 
-const char* SphereUI::InterfaceManager::localizedText(const char* key) const {
-    return localized_strings.empty() ? (key == nullptr ? "" : key) : localizedValue(key).data();
+std::string_view SphereUI::InterfaceManager::localizedText(std::string_view key) const {
+    return localized_strings.empty() ? key : localizedValue(key);
 }
 
 void SphereUI::InterfaceManager::clearLocalizedStrings() {
     localized_strings.clear();
 }
 
-SphereUI::SavedWindowPosition* SphereUI::InterfaceManager::savedPosition(const char* name, bool create) {
-    if (name == nullptr) return nullptr;
+SphereUI::SavedWindowPosition* SphereUI::InterfaceManager::savedPosition(std::string_view name, bool create) {
+    if (name.empty()) return nullptr;
     const auto found = std::find_if(saved_positions.begin(), saved_positions.end(), [name](const SavedWindowPosition& position) { return position.name == name; });
     if (found != saved_positions.end()) return &*found;
-    return create ? &saved_positions.emplace_back(SavedWindowPosition{name}) : nullptr;
+    return create ? &saved_positions.emplace_back(SavedWindowPosition{std::string(name)}) : nullptr;
 }
 
-bool SphereUI::InterfaceManager::findSavedPosition(const char* name, SferaCursorPosition& position) {
+bool SphereUI::InterfaceManager::findSavedPosition(std::string_view name, SferaCursorPosition& position) {
     const auto* saved = savedPosition(name, false);
     if (saved == nullptr) return false;
     position = {saved->x, saved->y};
@@ -5510,7 +5518,7 @@ void SphereUI::InterfaceManager::readSavedPositions(std::span<const std::byte> s
         if (end == source.end()) return;
         const std::size_t name_size = end - source.begin();
         if (source.size() - name_size - 1u < sizeof(float) * 2u) return;
-        SavedWindowPosition position{std::string(reinterpret_cast<const char*>(source.data()), name_size)};
+        SavedWindowPosition position{std::string(SferaText::fromBytes(source.first(name_size)))};
         source = source.subspan(name_size + 1u);
         float coordinates[2]{};
         std::memcpy(coordinates, source.data(), sizeof(coordinates));
@@ -5547,15 +5555,15 @@ namespace {
         return text.substr(first, last - first + 1u);
     }
 
-    bool hyperEquals(std::string_view text, const char* expected) {
-        return SferaText::asciiEqual(std::string(text).c_str(), expected);
+    bool hyperEquals(std::string_view text, std::string_view expected) {
+        return SferaText::asciiEqual(text, expected);
     }
 
     std::string hyperUnescape(std::string_view text) {
         std::string result;
         result.reserve(text.size());
         for (std::size_t index = 0u; index < text.size(); ++index) {
-            char character = text[index];
+            auto character = text[index];
             if (character == '\\') {
                 if (++index == text.size()) break;
                 character = text[index];
@@ -5588,14 +5596,14 @@ namespace {
     }
 
     SphereUI::TextExtent hyperTextExtent(std::string_view text, int font) {
-        auto result = SphereUI::InterfaceRenderer::measureText(std::string(text).c_str(), font, true);
+        auto result = SphereUI::InterfaceRenderer::measureText(text, font, true);
         if (text.empty()) result.width = 0;
         else if (font < 2u) result.width = std::max(0, result.width - 2);
         return result;
     }
 
     std::size_t hyperWordEnd(std::string_view text, std::size_t first, bool controls = false) {
-        const auto separator = [controls](char character) {
+        const auto separator = [controls](auto character) {
             return character == ' ' || (controls && (character == '\t' || character == '\r' || character == '\n'));
         };
         auto end = first;
@@ -5622,7 +5630,7 @@ SphereUI::HyperTextCommand SphereUI::HyperTextParser::command(std::string_view n
 bool SphereUI::HyperTextParser::parseCommand(std::string_view tag, HyperDocumentNode& node, std::string& argument) {
     const auto equals = tag.find('=');
     std::string name;
-    for (char character : hyperTrim(tag.substr(0, equals))) if (character != ' ') name += character;
+    for (const auto character : hyperTrim(tag.substr(0, equals))) if (character != ' ') name += character;
     node.command = command(name);
     if (node.command == HyperTextCommand::unknown) return false;
     auto value = equals == std::string_view::npos ? std::string_view{} : hyperTrim(tag.substr(equals + 1));
@@ -5646,7 +5654,7 @@ void SphereUI::HyperTextParser::parseImage(std::string_view argument, HyperDocum
         argument.remove_prefix(comma + 1);
     }
     if (fields.empty()) return;
-    node.sprite = g_sfera_interface.acquireSprite(fields.front().c_str());
+    node.sprite = g_sfera_interface.acquireSprite(fields.front());
     if (node.sprite == nullptr) return;
     if (fields.size() > 1 && hyperEquals(fields[1], "BOT")) node.image_alignment = HyperTextImageAlignment::bottom;
     else if (fields.size() > 1 && hyperEquals(fields[1], "MID")) node.image_alignment = HyperTextImageAlignment::middle;
@@ -5671,11 +5679,11 @@ SphereUI::HyperTextDocument::HyperTextDocument(std::string_view text, int width,
     }
 }
 
-void SphereUI::HyperTextDocument::setName(const char* value) {
-    name = value == nullptr ? "" : value;
+void SphereUI::HyperTextDocument::setName(std::string_view value) {
+    name = value;
 }
 
-bool SphereUI::HyperTextDocument::load(const char* filename) {
+bool SphereUI::HyperTextDocument::load(const std::string& filename) {
     SferaSimpleParser parser;
     parser.load(filename);
     SferaParserRange range{};
@@ -5719,8 +5727,8 @@ void SphereUI::HyperTextDocument::parse(std::string_view input) {
         }
         if (node.command == HyperTextCommand::linkStart || node.command == HyperTextCommand::tooltipStart) {
             HyperTextRegion region;
-            const auto* target = node.command == HyperTextCommand::tooltipStart && !argument.empty() && argument.front() == '#' ? g_sfera_interface.localizedText(argument.c_str() + 1) : argument.c_str();
-            region.target = target == nullptr ? "" : target;
+            const auto target = node.command == HyperTextCommand::tooltipStart && !argument.empty() && argument.front() == '#' ? g_sfera_interface.localizedText(std::string_view(argument).substr(1)) : std::string_view(argument);
+            region.target.assign(target);
             auto& regions = node.command == HyperTextCommand::linkStart ? parsed_links : parsed_tooltips;
             node.region_index = regions.size();
             regions.push_back(std::move(region));
@@ -5968,7 +5976,7 @@ void SphereUI::HyperTextDocument::draw(int left, int top, int clip_offset, int c
             }
             if (!node.text.empty() && y + line.height > clip.top && y < clip.bottom) {
                 const auto text_color = link == nullptr ? color : link->hovered ? hover_color : link_color;
-                SphereUI::InterfaceRenderer::drawText(node.text.c_str(), x, y + baseline, SferaColor::fromArgb(text_color).withAlpha(opacity).argb(), font, true, clip, alpha == 255u);
+                SphereUI::InterfaceRenderer::drawText(node.text, x, y + baseline, SferaColor::fromArgb(text_color).withAlpha(opacity).argb(), font, true, clip, alpha == 255u);
             }
             x += node.width;
         }
@@ -6044,7 +6052,7 @@ void SphereUI::HyperTextChatListItem::layout(int width, int font) {
     };
     const auto append = [&](HyperTextRun element) {
         if (auto* geometry = element.geometry()) {
-            const auto extent = hyperTextExtent(std::string_view(element.text.data(), element.text.size()), font);
+            const auto extent = hyperTextExtent(std::string_view(element.text), font);
             *geometry = {x, 0, extent.width, extent.height};
             x += extent.width;
         }
@@ -6052,17 +6060,17 @@ void SphereUI::HyperTextChatListItem::layout(int width, int font) {
     };
     for (const auto& element : elements) {
         if (element.isWrap()) {
-            if (element.text.size() != 0u) wrap(std::string_view(element.text.data(), element.text.size()));
+            if (element.text.size() != 0u) wrap(std::string_view(element.text));
             continue;
         }
         if (element.link() != nullptr) {
-            const auto extent = hyperTextExtent(std::string_view(element.text.data(), element.text.size()), font);
+            const auto extent = hyperTextExtent(std::string_view(element.text), font);
             if (x != 0 && x + extent.width > width) wrap({});
             append(element);
             continue;
         }
         if (!element.isPlain()) continue;
-        const std::string_view text(element.text.data(), element.text.size());
+        const std::string_view text(element.text);
         std::string pending;
         const auto flush = [&]() {
             if (!pending.empty()) {
@@ -6109,7 +6117,7 @@ bool SphereUI::InterfaceManager::prepareResources() {
     g_sfera_fonts.loadConfiguration();
     cursor->setKind(255u);
     setCursorKind(255u, 0, 0);
-    setCursorImage(nullptr, 0, 0);
+    setCursorImage(std::nullopt, 0, 0);
     loadLocalizedStrings();
     loadWindowTemplates("Effects\\loadscreen.ui");
     loadSprites("Effects\\sprites.ui");
@@ -6158,9 +6166,9 @@ bool SphereUI::InterfaceManager::pollEvent(WindowEvent& event) {
     return true;
 }
 
-SphereUI::Window* SphereUI::InterfaceManager::findWindow(const char* name, bool exact) const {
-    if (name == nullptr) return nullptr;
-    const auto found = std::find_if(windows.begin(), windows.end(), [name, exact](const auto& window) { return window != nullptr && (exact ? std::strcmp(window->getResourceName(), name) == 0 : SferaText::asciiEqual(window->getResourceName(), name)); });
+SphereUI::Window* SphereUI::InterfaceManager::findWindow(std::string_view name, bool exact) const {
+    if (name.empty()) return nullptr;
+    const auto found = std::find_if(windows.begin(), windows.end(), [name, exact](const auto& window) { return window != nullptr && (exact ? window->getResourceName() == name : SferaText::asciiEqual(window->getResourceName(), name)); });
     return found == windows.end() ? nullptr : found->get();
 }
 
@@ -6224,11 +6232,11 @@ void SphereUI::InterfaceManager::collectCoveredWindows(Window& window) {
     }
 }
 
-SphereUI::Window* SphereUI::InterfaceManager::openWindow(const char* name, int x, int y, std::uint32_t flags) {
-    if (name == nullptr) return nullptr;
+SphereUI::Window* SphereUI::InterfaceManager::openWindow(std::string_view name, int x, int y, std::uint32_t flags) {
+    if (name.empty()) return nullptr;
     std::string template_name(name);
     if (const auto separator = template_name.rfind(':'); separator != std::string::npos) template_name.resize(separator);
-    Window* original = templateWindow(template_name.c_str());
+    Window* original = templateWindow(template_name);
     if (original == nullptr) return nullptr;
     auto window = original->clone();
     if (window == nullptr) { InterfaceRenderer::reportError("Cannot clone the requested window template."); return nullptr; }
@@ -6257,9 +6265,9 @@ void SphereUI::InterfaceManager::closeWindow(Window* window, bool animated) {
     window->beginClose(animated);
 }
 
-void SphereUI::InterfaceManager::showHelpPage(const char* name) {
-    if (name == nullptr) { closeWindow(help_window); help_window = nullptr; return; }
-    if (findHyperText(name) == nullptr) return;
+void SphereUI::InterfaceManager::showHelpPage(std::optional<std::string_view> name) {
+    if (!name) { closeWindow(help_window); help_window = nullptr; return; }
+    if (findHyperText(*name) == nullptr) return;
     if (help_window == nullptr) {
         help_window = openWindow("help");
         bindEventHandler(help_window, WindowEventHandler::help);
@@ -6267,16 +6275,16 @@ void SphereUI::InterfaceManager::showHelpPage(const char* name) {
     if (help_window == nullptr) return;
     auto* control = dynamic_cast<HyperTextCtrl*>(help_window->controlAt(3u));
     if (control == nullptr) return;
-    if (control->document != nullptr && SferaText::asciiEqual(control->document->name.c_str(), name)) return;
+    if (control->document != nullptr && SferaText::asciiEqual(control->document->name, *name)) return;
     sendMessage(help_window->controlAt(2u), UiMessage::setEnabled, control->history.size() != 0u ? 1u : 0u, 0u);
-    control->queuePage(name, true);
+    control->queuePage(*name, true);
 }
 
-void SphereUI::InterfaceManager::setTooltipText(const char* text) {
-    if (text == nullptr) { if (tooltip != nullptr && !tooltip_disabled) tooltip->reset(); return; }
+void SphereUI::InterfaceManager::setTooltipText(std::optional<std::string_view> text) {
+    if (!text) { if (tooltip != nullptr && !tooltip_disabled) tooltip->reset(); return; }
     if (!tooltip) tooltip = std::make_unique<ToolTipCtrl>();
     if (tooltip == nullptr) return;
-    tooltip->setLine(0u, text);
+    tooltip->setLine(0u, *text);
     SferaCursorPosition position{};
     CCursorManager::instance().activeCursor()->getPosition(&position);
     tooltip->showAt(position.x, position.y);
@@ -6284,7 +6292,7 @@ void SphereUI::InterfaceManager::setTooltipText(const char* text) {
 
 void SphereUI::InterfaceManager::setCursorKind(std::uint32_t kind, int x, int y) {
     if (!cursor) return;
-    const char* texture = nullptr;
+    std::optional<std::string_view> texture;
     if (kind == 64u || kind == 65u) { texture = "curseye"; kind = 64u; }
     else if (kind == 66u || kind == 67u) texture = "cursman";
     else if (kind != 255u) return;
@@ -6293,11 +6301,11 @@ void SphereUI::InterfaceManager::setCursorKind(std::uint32_t kind, int x, int y)
     g_sfera_interface.cursor_kind = kind;
 }
 
-void SphereUI::InterfaceManager::setCursorImage(const char* texture, int x, int y) {
+void SphereUI::InterfaceManager::setCursorImage(std::optional<std::string_view> texture, int x, int y) {
     if (!cursor) return;
-    if (texture == nullptr) { x = 0; y = 0; }
+    if (!texture) { x = 0; y = 0; }
     cursor->setImage(1u, texture, x, y);
-    cursor_name = texture == nullptr ? "" : texture;
+    cursor_name = texture.value_or(std::string_view{});
 }
 
 std::uint32_t SphereUI::InterfaceManager::sendMessage(Window* window, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
@@ -6347,7 +6355,7 @@ void SphereUI::InterfaceManager::showLoadingScreen(bool visible, int width, int 
     sendMessage(load_screen->controlAt(2u), UiMessage::setSize, image_width, image_height);
     sendMessage(load_screen->controlAt(1u), UiMessage::setPosition, 0u, 0u);
     sendMessage(load_screen->controlAt(1u), UiMessage::setSize, width, height);
-    if (auto* image = dynamic_cast<ImageCtrl*>(load_screen->controlAt(2u))) { ImageDescription description{}; ::strcpy_s(description.name, sizeof(description.name), english ? "english_sphere1" : "russian_sphere1"); image->setImage(&description); }
+    if (auto* image = dynamic_cast<ImageCtrl*>(load_screen->controlAt(2u))) { ImageDescription description{}; description.name = english ? "english_sphere1" : "russian_sphere1"; image->setImage(&description); }
     const int progress_left = left + static_cast<int>(image_width * 0.3701171875);
     const int progress_top = top + static_cast<int>(image_height * 0.83203125);
     const int progress_width = image_width * 0.2490234375;
@@ -6516,7 +6524,7 @@ void SphereUI::UiSprite::setDescription(const ImageDescription& description) {
     resetParts(1u);
     const auto flags = description.image.flags;
     const auto* rectangle = (flags & 2u) != 0u ? &description.image.rectangle : nullptr;
-    const char* texture_name = (flags & 4u) != 0u ? description.image.texture_name : description.name;
+    const std::string_view texture_name = (flags & 4u) != 0u ? description.image.texture_name : description.name;
     auto& part = parts.front();
     part.setTexture(texture_name, rectangle, rectangle);
     width = (flags & 1u) != 0u ? description.image.width : part.rectangle.right;
@@ -6535,35 +6543,35 @@ std::optional<std::string_view> SphereUI::InterfaceConfiguration::value(std::str
     return std::string_view(text_).substr(offset);
 }
 
-void SphereUI::InterfaceConfiguration::open(const char* filename) {
+void SphereUI::InterfaceConfiguration::open(const std::string& filename) {
     close();
-    if (!filename) return;
-    filename_.assign(filename, std::min(std::strlen(filename), SferaConfigTextRuntime::filename_capacity - 1));
-    auto bytes = SferaFileManager::readBounded(filename_.c_str(), SferaConfigTextRuntime::text_capacity);
+    if (filename.empty()) return;
+    filename_ = filename;
+    auto bytes = SferaFileManager::readBounded(filename_, SferaConfigTextRuntime::text_capacity);
     if (!bytes || bytes->empty()) return;
     try {
         if (bytes->size() >= 14 && std::memcmp(bytes->data(), "SPHR", 4) == 0) {
             const auto key = (*bytes)[8];
             for (const auto offset : {9u, 17u, 20u}) if (offset < bytes->size()) (*bytes)[offset] ^= key;
             auto decoded = SferaZStream32::decompressUiConfig(std::span<const std::uint8_t>(*bytes).subspan(8), SferaConfigTextRuntime::text_capacity - 1);
-            text_.assign(reinterpret_cast<const char*>(decoded.data()), decoded.size());
-        } else text_.assign(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+            text_.assign(SferaText::fromBytes(decoded));
+        } else text_.assign(SferaText::fromBytes(*bytes));
     } catch (const std::exception&) { close(); }
 }
 
-int SphereUI::InterfaceConfiguration::readInteger(const char* key, int fallback) {
-    const auto text = value(key ? std::string_view(key) : std::string_view{});
+int SphereUI::InterfaceConfiguration::readInteger(std::string_view key, int fallback) {
+    const auto text = value(key);
     int result = fallback;
     return text && SferaText::readNumber(*text, result) ? result : fallback;
 }
 
-void SphereUI::InterfaceConfiguration::writeInteger(const char* key, int value) {
-    if (key && !SferaText::replaceConfigValue(text_, key, std::to_string(value), false, SferaConfigTextRuntime::text_capacity))
+void SphereUI::InterfaceConfiguration::writeInteger(std::string_view key, int value) {
+    if (!SferaText::replaceConfigValue(text_, key, std::to_string(value), false, SferaConfigTextRuntime::text_capacity))
         throw std::length_error("UI configuration too large");
 }
 
 void SphereUI::InterfaceConfiguration::save() {
-    if (!filename_.empty()) SferaFileManager::writeFile(filename_.c_str(), text_.data(), text_.size());
+    if (!filename_.empty()) SferaFileManager::writeFile(filename_, text_.data(), text_.size());
 }
 
 namespace {
@@ -6593,7 +6601,7 @@ namespace {
         if (auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get())) (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0u, vertex_count, index_count / 3u, indices, D3DFMT_INDEX16, vertices, sizeof(SferaScreenVertex)));
     }
 
-    void uiDrawAtlasText(const char* text, int x, int top, std::uint32_t color, int font, int scale, const SphereUI::UiRect& clip, float depth, bool configureAlpha) {
+    void uiDrawAtlasText(std::string_view text, int x, int top, std::uint32_t color, int font, int scale, const SphereUI::UiRect& clip, float depth, bool configureAlpha) {
         auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get());
         if (device == nullptr) return;
         const int size = static_cast<std::uint32_t>(scale) * 30u;
@@ -6614,8 +6622,9 @@ namespace {
             vertex_count = 0u;
             index_count = 0u;
         };
-        for (const auto* cursor = reinterpret_cast<const unsigned char*>(text); *cursor != 0u && *cursor != '\n'; ++cursor) {
-            const auto character = uiAtlasGlyph(*cursor);
+        for (const std::uint8_t byte : text) {
+            if (byte == '\n') break;
+            const auto character = uiAtlasGlyph(byte);
             if (x <= clip.right && SphereUI::detail::addCoordinate(x, size) > clip.left) {
                 const auto& glyph = g_sfera_font_runtime.glyphs[character];
                 const auto next_texture = g_sfera_font_runtime.faces[font].texture(glyph.texture_index);
@@ -6638,7 +6647,7 @@ namespace {
     }
 }
 
-void SphereUI::InterfaceRenderer::drawFaceText(const char* text, int x, int y, std::uint32_t color, int font, const SphereUI::UiRect& clip) {
+void SphereUI::InterfaceRenderer::drawFaceText(std::string_view text, int x, int y, std::uint32_t color, int font, const SphereUI::UiRect& clip) {
     const auto& face = g_sfera_fonts.face(font);
     if (y > clip.bottom || SphereUI::detail::addCoordinate(y, face.line_height) <= clip.top || (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get()) == nullptr) return;
     auto* texture = g_sfera_textures.resource(face.texture);
@@ -6657,8 +6666,7 @@ void SphereUI::InterfaceRenderer::drawFaceText(const char* text, int x, int y, s
         index_count = 0u;
         batch_first = factory.vertex_count;
     };
-    for (const auto* cursor = reinterpret_cast<const unsigned char*>(text); *cursor != 0u; ++cursor) {
-        const auto character = *cursor;
+    for (const std::uint8_t character : text) {
         if (character == '\n') {
             left = origin;
             top += face.line_height;
@@ -6687,20 +6695,19 @@ void SphereUI::InterfaceRenderer::drawFaceText(const char* text, int x, int y, s
     flush();
 }
 
-SphereUI::TextExtent SphereUI::InterfaceRenderer::measureText(const char* text, int font, bool initialized) {
-    const auto* cursor = reinterpret_cast<const unsigned char*>(text == nullptr ? "" : text);
+SphereUI::TextExtent SphereUI::InterfaceRenderer::measureText(std::string_view text, int font, bool initialized) {
     std::uint32_t width = 0u, line_width = 0u, extra_height = 0u;
     if (font >= 2u) {
         const auto& face = g_sfera_fonts.face(font);
         const auto* glyphs = face.glyphs.data();
-        for (; *cursor != 0u; ++cursor) {
-            if (*cursor == '\n') {
+        for (const std::uint8_t byte : text) {
+            if (byte == '\n') {
                 width = std::max(width, line_width);
                 line_width = 0u;
                 extra_height += static_cast<std::uint32_t>(face.line_height);
             } else {
                 constexpr std::uint8_t lowercase_yo = 184u, lowercase_e = 229u, uppercase_yo = 168u, uppercase_e = 197u;
-                const auto character = *cursor == lowercase_yo ? lowercase_e : *cursor == uppercase_yo ? uppercase_e : *cursor;
+                const auto character = byte == lowercase_yo ? lowercase_e : byte == uppercase_yo ? uppercase_e : byte;
                 line_width += static_cast<std::uint32_t>(glyphs[character].advance);
             }
         }
@@ -6708,15 +6715,15 @@ SphereUI::TextExtent SphereUI::InterfaceRenderer::measureText(const char* text, 
     }
     std::uint32_t lines = 1u;
     const auto& face = g_sfera_font_runtime.faces[font];
-    for (; *cursor != 0u; ++cursor) {
-        if (*cursor == '\n') {
+    for (const std::uint8_t byte : text) {
+        if (byte == '\n') {
             const auto completed_width = initialized ? line_width : 0u;
             if (static_cast<int>(completed_width) > static_cast<int>(width)) width = completed_width;
             if (++lines == 300u) throw std::length_error("too many lines in font measurement");
             line_width = 0u;
         } else {
             if (static_cast<int>(line_width) > 0) line_width += face.code_base;
-            line_width += g_sfera_font_runtime.faces[font].widths[uiAtlasGlyph(*cursor)];
+            line_width += g_sfera_font_runtime.faces[font].widths[uiAtlasGlyph(byte)];
         }
     }
     if (static_cast<int>(line_width) > static_cast<int>(width)) width = line_width;
@@ -6724,15 +6731,15 @@ SphereUI::TextExtent SphereUI::InterfaceRenderer::measureText(const char* text, 
     return {static_cast<int>(width + 2u), static_cast<int>(height + (font == 1u ? 2u : 0u))};
 }
 
-void SphereUI::InterfaceRenderer::drawText(const char* text, int x, int y, std::uint32_t color, int font, bool initialized, const UiRect& clip, bool opaque) {
+void SphereUI::InterfaceRenderer::drawText(std::string_view text, int x, int y, std::uint32_t color, int font, bool initialized, const UiRect& clip, bool opaque) {
     SphereUI::InterfaceRenderer::clip_rectangle.left = clip.left;
     SphereUI::InterfaceRenderer::clip_rectangle.top = clip.top;
     SphereUI::InterfaceRenderer::clip_rectangle.right = clip.right;
     SphereUI::InterfaceRenderer::clip_rectangle.bottom = clip.bottom;
     const bool disable_blending = opaque && font < 2u;
     if (disable_blending) SphereUI::InterfaceRenderer::setSpriteRenderMode(0u);
-    if (font < 2u) uiDrawAtlasText(text == nullptr ? "" : text, x, SphereUI::detail::subtractCoordinate(SphereUI::detail::subtractCoordinate(y, 2), static_cast<int>(g_sfera_font_runtime.faces[font].origin)), color, font, initialized ? 1 : 0, clip, 0.0f, false);
-    else drawFaceText(text == nullptr ? "" : text, x, y, color, font, clip);
+    if (font < 2u) uiDrawAtlasText(text, x, SphereUI::detail::subtractCoordinate(SphereUI::detail::subtractCoordinate(y, 2), static_cast<int>(g_sfera_font_runtime.faces[font].origin)), color, font, initialized ? 1 : 0, clip, 0.0f, false);
+    else drawFaceText(text, x, y, color, font, clip);
     if (disable_blending) SphereUI::InterfaceRenderer::setSpriteRenderMode(1u);
 }
 
@@ -6784,22 +6791,22 @@ SphereUI::ChatFilter::ChatFilter() {
     SphereRender::ConfigDocument::setStorageMode(SphereRender::ConfigDocument::StorageMode::Encoded);
     const std::string filename = std::string("xadd\\matbase") + g_sfera_font_runtime.language_suffix + ".dat";
     g_sfera_files.setErrorReporting(false);
-    const auto size = g_sfera_files.fileSize(filename.c_str());
+    const auto size = g_sfera_files.fileSize(filename);
     g_sfera_files.setErrorReporting(true);
     if (size == -1) return;
-    auto configuration = SphereRender::ConfigDocument::open(filename.c_str());
+    auto configuration = SphereRender::ConfigDocument::open(filename);
     const auto count = configuration.arraySize("words");
     if (!count) { WorldDiagnostics::fail("CMatFilter::CMatFilter: array words absent in matbase.dat"); return; }
     rules.reserve(*count);
     for (std::size_t index = 0u; index < *count; ++index) {
         const auto* item = configuration.objectAt("words", index);
-        const char* word = item != nullptr ? item->text("w") : nullptr;
-        if (word == nullptr) { WorldDiagnostics::fail("CMatFilter::CMatFilter: field 'w' absent in one of array's elements"); continue; }
+        const auto word = item != nullptr ? item->text("w") : std::nullopt;
+        if (!word) { WorldDiagnostics::fail("CMatFilter::CMatFilter: field 'w' absent in one of array's elements"); continue; }
         const auto kind = item->integer("t");
         if (!kind) { WorldDiagnostics::fail("CMatFilter::CMatFilter: field 't' absent in one of array's elements"); continue; }
-        Rule rule{word, static_cast<std::uint32_t>(*kind)};
+        Rule rule{std::string(*word), static_cast<std::uint32_t>(*kind)};
         for (std::size_t exception = 0u; exception < item->arraySize("e").value_or(0u); ++exception) {
-            if (const auto* value = item->textAt("e", exception)) rule.exceptions.emplace_back(value);
+            if (const auto value = item->textAt("e", exception)) rule.exceptions.emplace_back(*value);
             else WorldDiagnostics::fail("CMatFilter::CMatFilter: error reading exceptions");
         }
         rules.push_back(std::move(rule));
@@ -6870,7 +6877,7 @@ bool SphereUI::ChatFilter::rejects(std::string_view message) const {
     std::string visible(message);
     bool tag = false;
     for (auto& character : visible) {
-        const char value = character;
+        const auto value = character;
         if (value == '<') tag = true;
         if (tag) character = ' ';
         if (value == '>') tag = false;
@@ -6956,12 +6963,12 @@ bool SphereUI::HyperTextParser::eraseRange(std::string_view input, std::size_t f
 void SphereUI::InterfaceManager::loadAllWindowTemplates() {
     std::vector<std::filesystem::path> files;
     std::error_code error;
-    for (std::filesystem::directory_iterator entry("Effects", error), end; !error && entry != end; entry.increment(error)) if (!entry->is_directory(error) && SferaText::asciiEqual(entry->path().extension().string().c_str(), ".ui")) files.push_back(entry->path());
+    for (std::filesystem::directory_iterator entry("Effects", error), end; !error && entry != end; entry.increment(error)) if (!entry->is_directory(error) && SferaText::asciiEqual(entry->path().extension().string(), ".ui")) files.push_back(entry->path());
     float completed = 0.0f;
     const float fraction = files.empty() ? 0.0f : static_cast<float>(1.0 / static_cast<double>(files.size()));
     for (const auto& file : files) {
-        if (SferaText::asciiEqual(file.filename().string().c_str(), "loadscreen.ui")) continue;
-        loadWindowTemplates(file.string().c_str());
+        if (SferaText::asciiEqual(file.filename().string(), "loadscreen.ui")) continue;
+        loadWindowTemplates(file.string());
         completed += fraction;
         GameInterface::updateLoadingProgress(static_cast<std::uint32_t>(static_cast<int>(static_cast<double>(completed) * 30.0 + 30.0)));
     }
@@ -7003,7 +7010,7 @@ namespace {
         }
     }
 
-    void interfaceNamedQuad(int left, int top, int width, int height, const char* name, std::uint32_t color, std::uint32_t alpha, float depth, const float* uv, bool worldSpace) {
+    void interfaceNamedQuad(int left, int top, int width, int height, std::string_view name, std::uint32_t color, std::uint32_t alpha, float depth, const float* uv, bool worldSpace) {
         if (width == 0 || height == 0) return;
         auto& device = *g_sfera_graphics_runtime.d3d_runtime;
         const auto texture = g_sfera_textures.find(name);
@@ -7036,11 +7043,11 @@ HRESULT GameInterface::drawSpriteTexture(std::uint32_t color, int texture, float
     return drawSpriteQuad(color, uv, left, top, right, bottom);
 }
 
-void GameInterface::drawTexture(int left, int top, int width, int height, const char* name, std::uint32_t alpha, float depth, const float* uv) {
+void GameInterface::drawTexture(int left, int top, int width, int height, std::string_view name, std::uint32_t alpha, float depth, const float* uv) {
     interfaceNamedQuad(left, top, width, height, name, SferaColor::rgba(255u, 255u, 255u, alpha).argb(), alpha, depth, uv, true);
 }
 
-void GameInterface::tintTexture(int left, int top, int width, int height, const char* name, std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint32_t alpha, const float* uv) {
+void GameInterface::tintTexture(int left, int top, int width, int height, std::string_view name, std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint32_t alpha, const float* uv) {
     interfaceNamedQuad(left, top, width, height, name, SferaColor::rgba(red, green, blue, alpha).argb(), alpha, 0.0f, uv, false);
 }
 
@@ -7123,7 +7130,7 @@ void GameInterface::updateLoadingProgress(std::uint32_t increment) {
     device.present();
 }
 
-void GameInterface::drawAtlasText(const char* text, int x, int y, std::uint32_t color, int scale, int font, float depth) {
+void GameInterface::drawAtlasText(std::string_view text, int x, int y, std::uint32_t color, int scale, int font, float depth) {
 
     uiDrawAtlasText(text, x, y, color, font, scale, {SphereUI::InterfaceRenderer::clip_rectangle.left, SphereUI::InterfaceRenderer::clip_rectangle.top, SphereUI::InterfaceRenderer::clip_rectangle.right, SphereUI::InterfaceRenderer::clip_rectangle.bottom}, depth, true);
 }
@@ -7174,12 +7181,12 @@ namespace {
         }
         if (const auto* sprite = std::get_if<GameUiElement::Sprite>(&element.content)) {
             const auto opacity = static_cast<int>(element.alpha * alpha) / 255;
-            GameInterface::drawTexture(sprite->left - scrollX + x, sprite->top - scrollY + y, sprite->width, sprite->height, sprite->texture.c_str(), opacity, depth, nullptr);
+            GameInterface::drawTexture(sprite->left - scrollX + x, sprite->top - scrollY + y, sprite->width, sprite->height, sprite->texture, opacity, depth, nullptr);
         } else {
             const auto& text = std::get<GameUiElement::Text>(element.content);
             const auto opacity = static_cast<int>(SferaColor::fromArgb(element.color).alpha() * alpha) / 255;
             const auto color = SferaColor::fromArgb(element.color).withAlpha(static_cast<std::uint32_t>(opacity)).argb();
-            for (const auto& line : text.lines) GameInterface::drawAtlasText(text.bytes.c_str() + line.offset, line.x - scrollX + x, line.y - scrollY + y, color, text.font_scale, text.font, depth);
+            for (const auto& line : text.lines) GameInterface::drawAtlasText(std::string_view(text.bytes).substr(line.offset), line.x - scrollX + x, line.y - scrollY + y, color, text.font_scale, text.font, depth);
         }
     }
 }
@@ -7187,7 +7194,7 @@ namespace {
 void GameInterface::drawWindow(int handle) {
     auto* window = GameInterface::window(handle);
     if (!window) {
-        WorldDiagnostics::message[0] = 0;
+        WorldDiagnostics::message.clear();
         WorldDiagnostics::appendScriptContext("draw_window: wrong handle");
         WorldDiagnostics::flushScriptContext();
         return;
@@ -7225,11 +7232,11 @@ void GameInterface::drawAll() {
     for (int handle : orderedWindows(WindowOrder::Draw)) drawWindow(handle);
 }
 
-GameUiWindow* GameInterface::window(std::uint32_t handle, const char* operation) {
+GameUiWindow* GameInterface::window(std::uint32_t handle, std::string_view operation) {
     const auto& windows = GameInterface::windows;
     auto* result = handle < windows.size() ? windows[handle].get() : nullptr;
-    if (!result && operation) {
-        WorldDiagnostics::message[0] = '\0';
+    if (!result && !operation.empty()) {
+        WorldDiagnostics::message.clear();
         WorldDiagnostics::appendScriptContext(operation);
         WorldDiagnostics::appendScriptContext(": wrong handle");
         WorldDiagnostics::flushScriptContext();
@@ -7329,8 +7336,8 @@ void GameUiWindow::scrollBy(float dx, float dy, SferaCursorPosition& cursor) {
     clampAxis(scrollY, height - (contentBottom - contentTop + 1), cursor.y);
 }
 
-void GameUiElement::layoutText(const char* text, const GameUiWindow& window, int x, int y) {
-    if (!text || window.font >= g_sfera_font_runtime.faces.size()) WorldDiagnostics::fail("Invalid text or font");
+void GameUiElement::layoutText(std::string_view text, const GameUiWindow& window, int x, int y) {
+    if (text.empty() || window.font >= g_sfera_font_runtime.faces.size()) WorldDiagnostics::fail("Invalid text or font");
     Text layout;
     layout.bytes = text;
     layout.bytes.push_back('\n');
@@ -7349,7 +7356,7 @@ void GameUiElement::layoutText(const char* text, const GameUiWindow& window, int
             begin = offset + 1;
         } else {
             if (width > 0) width += g_sfera_font_runtime.faces[layout.font].code_base;
-            const auto character = static_cast<unsigned char>(layout.bytes[offset]);
+            const auto character = static_cast<std::uint8_t>(layout.bytes[offset]);
             width += g_sfera_font_runtime.faces[layout.font].widths[g_sfera_font_runtime.glyphs[character].defined ? character : 124u];
         }
     }
@@ -7381,16 +7388,16 @@ void GameUiElement::layoutText(const char* text, const GameUiWindow& window, int
     content = std::move(layout);
 }
 
-std::uint32_t WorldGuiControls::createText(int x, int y, const char* text, std::uint32_t windowHandle) {
+std::uint32_t WorldGuiControls::createText(int x, int y, std::string_view text, std::uint32_t windowHandle) {
     return createGuiControl(windowHandle, "create_text: wrong window", [&](GameUiElement& item, const GameUiWindow& window) {
         item.layoutText(text, window, x, y);
         return (window.textStyle & GameUiWindow::measureOnly) == 0;
     });
 }
 
-std::uint32_t WorldGuiControls::createSprite(int x, int y, int width, int height, const char* texture, std::uint32_t windowHandle, std::uint32_t alpha) {
+std::uint32_t WorldGuiControls::createSprite(int x, int y, int width, int height, std::string_view texture, std::uint32_t windowHandle, std::uint32_t alpha) {
     return createGuiControl(windowHandle, "create_sprite: wrong window", [&](GameUiElement& item, const GameUiWindow& window) {
-        if (texture == nullptr) WorldDiagnostics::fail("Sprite texture name is null");
+        if (texture.empty()) WorldDiagnostics::fail("Sprite texture name is empty");
         const std::string_view name(texture);
         if (name.size() >= 40) WorldDiagnostics::fail("Sprite texture name is too long");
         item.content = GameUiElement::Sprite{std::string(name), window.contentLeft + x, window.contentTop + y, width, height};
@@ -7474,7 +7481,7 @@ void GameFontAtlas::clear() noexcept {
     for (auto& face : faces) face.pages.clear();
 }
 
-void GameFontAtlas::load(int font, const char* filename, int outline, std::uint32_t spacing, std::uint32_t emptyWidth) {
+void GameFontAtlas::load(int font, const std::string& filename, int outline, std::uint32_t spacing, std::uint32_t emptyWidth) {
     if (font < 0 || static_cast<std::size_t>(font) >= faces.size() || outline < 0 || outline > 3) WorldDiagnostics::fail("Invalid bitmap font parameters");
     const auto image = g_sfera_files.readAll(filename);
     constexpr std::size_t sourceWidth = 280;
@@ -7506,8 +7513,8 @@ void GameFontAtlas::load(int font, const char* filename, int outline, std::uint3
     }
     const auto language = SferaClientApplication::language;
     const auto mappingPath = language == 0 || language == 1 ? std::string("fonts\\font.txt") : std::string("fonts\\font") + language_suffix + ".txt";
-    const auto mappingBytes = g_sfera_files.readAll(mappingPath.c_str());
-    const std::string_view mapping(reinterpret_cast<const char*>(mappingBytes.data()), mappingBytes.size());
+    const auto mappingBytes = g_sfera_files.readAll(mappingPath);
+    const auto mapping = SferaText::fromBytes(mappingBytes);
     std::array<SferaFontGlyphRuntime, 256> placements{};
     std::array<std::uint32_t, 256> widths{};
     std::array<std::uint16_t, atlasWidth * atlasWidth> pixels{};
@@ -7576,17 +7583,19 @@ void GameFontAtlas::load(int font, const char* filename, int outline, std::uint3
     std::copy(placements.begin(), placements.end(), std::begin(glyphs));
 }
 
-const char* SphereUI::Runtime::keyName(std::uint32_t code) {
-        static const auto names = [] {
-            std::array<std::array<char, 12>, 256> result{};
-            for (const auto& binding : uiKeyBindings) SferaText::copy(result[binding.code], binding.name);
-            for (std::size_t value = '0'; value <= 'Z'; ++value) if (value <= '9' || value >= 'A') result[value][0] = value;
-            for (std::size_t index = 0u; index != 12u; ++index) std::snprintf(result[VK_F1 + index].data(), result[VK_F1 + index].size(), "F%zu", index + 1u);
-            for (std::size_t index = 0u; index != 10u; ++index) std::snprintf(result[VK_NUMPAD0 + index].data(), result[VK_NUMPAD0 + index].size(), "NUMPAD%zu", index);
-            return result;
-        }();
-        return code < names.size() && names[code][0] != '\0' ? names[code].data() : nullptr;
-    }
+std::string_view SphereUI::Runtime::keyName(std::uint32_t code) {
+    static const auto names = [] {
+        std::array<std::string, 256> result{};
+        for (const auto& binding : uiKeyBindings) result[binding.code] = binding.name;
+        constexpr std::string_view printable = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (std::size_t index = 0; index < printable.size(); ++index)
+            result[printable[index]].assign(printable.substr(index, 1u));
+        for (std::size_t index = 0u; index != 12u; ++index) result[VK_F1 + index] = "F" + std::to_string(index + 1u);
+        for (std::size_t index = 0u; index != 10u; ++index) result[VK_NUMPAD0 + index] = "NUMPAD" + std::to_string(index);
+        return result;
+    }();
+    return code < names.size() ? std::string_view(names[code]) : std::string_view{};
+}
 std::uint32_t SphereUI::Runtime::scanCode(std::uint32_t key) {
         if (key >= VK_F1 && key <= VK_F10) return 59u + key - VK_F1;
         if (key == VK_F11 || key == VK_F12) return 87u + key - VK_F11;
@@ -7598,14 +7607,17 @@ std::uint32_t SphereUI::Runtime::scanCode(std::uint32_t key) {
             return 83u - 4u * ((digit + 2u) / 3u) + ((digit - 1u) % 3u);
         }
         struct Row {
-            const char* keys;
+            std::string_view keys;
             std::uint32_t first_scan;
         };
 
         static constexpr Row rows[] = { {
             "QWERTYUIOP", 16u
         }, {"ASDFGHJKL", 30u}, {"ZXCVBNM", 44u}};
-        for (const auto& row : rows) if (const auto* position = std::strchr(row.keys, static_cast<int>(key))) return row.first_scan + static_cast<std::uint32_t>(position - row.keys);
+        for (const auto& row : rows) {
+            const auto position = std::find(row.keys.begin(), row.keys.end(), key);
+            if (position != row.keys.end()) return row.first_scan + static_cast<std::uint32_t>(position - row.keys.begin());
+        }
         for (const auto& binding : uiKeyBindings) if (binding.code == key) return binding.scan;
         return 0u;
     }
@@ -7615,7 +7627,7 @@ std::uint32_t SphereUI::Runtime::virtualKey(std::uint32_t scan) {
     }
 void SphereUI::Runtime::setSystemCursorVisible(bool visible) { if (visible) { while (::ShowCursor(TRUE) < 0) {} } else { while (::ShowCursor(FALSE) >= 0) {} } }
 namespace {
-bool cursor_uses_center_clip(std::uint32_t kind) { const char* name = kind < 4u ? sfera_cursor_texture_name(kind) : nullptr; return name != nullptr && name[0] != '_'; }
+bool cursor_uses_center_clip(std::uint32_t kind) { const auto name = sfera_cursor_texture_name(kind); return !name.empty() && name.front() != '_'; }
 }
 CHardwareCursor::CHardwareCursor() { SphereUI::Runtime::setSystemCursorVisible(false); }
 CHardwareCursor::~CHardwareCursor() {
@@ -7650,8 +7662,8 @@ bool CHardwareCursor::isSystemCursorVisible() const {
 void CHardwareCursor::setSystemCursorVisible(bool visible) { SphereUI::Runtime::setSystemCursorVisible(visible); }
 std::uint32_t CHardwareCursor::cursorKind() const { return kind; }
 void CHardwareCursor::setCursorKind(std::uint32_t new_kind) {
-    const char* name = new_kind < 4u ? sfera_cursor_texture_name(new_kind) : nullptr;
-    if (name == nullptr) {
+    const auto name = sfera_cursor_texture_name(new_kind);
+    if (name.empty()) {
         ::SetCursor(nullptr);
         cursor_handle.reset();
         kind = new_kind; texture_width = texture_height = 0u;
@@ -7660,9 +7672,9 @@ void CHardwareCursor::setCursorKind(std::uint32_t new_kind) {
     }
     struct BitmapDeleter { void operator()(HBITMAP bitmap) const noexcept { if (bitmap) ::DeleteObject(bitmap); } };
     using BitmapOwner = std::unique_ptr<std::remove_pointer_t<HBITMAP>, BitmapDeleter>;
-    const std::string relative_path = std::string("textures\\cursors\\") + name + ".bmp";
+    const std::string relative_path = std::string("textures\\cursors\\") + std::string(name) + ".bmp";
     BitmapOwner color;
-    for (const auto& path : g_sfera_files.candidatePaths(relative_path.c_str(), true)) {
+    for (const auto& path : g_sfera_files.candidatePaths(relative_path, true)) {
         color.reset(static_cast<HBITMAP>(::LoadImageA(nullptr, path.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION)));
         if (color) break;
     }
@@ -7713,8 +7725,8 @@ void CSoftwareCursor::setCursorKind(std::uint32_t new_kind) {
     if (state != nullptr) state->setKind(new_kind);
     texture_width = 0u;
     texture_height = 0u;
-    const char* name = new_kind < 4u ? sfera_cursor_texture_name(new_kind) : nullptr;
-    if (name == nullptr) return;
+    const auto name = sfera_cursor_texture_name(new_kind);
+    if (name.empty()) return;
     const int index = g_sfera_textures.find(name);
     if (index < 0) return;
     const auto extent = g_sfera_textures.size(index);
