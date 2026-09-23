@@ -448,7 +448,7 @@ public:
         std::uint32_t work_time_min = UINT32_MAX, work_time_max{}, sleep_time_min = UINT32_MAX, sleep_time_max{};
     };
     std::shared_ptr<const Definition> definition;
-    std::vector<std::unique_ptr<IEffect>> pooled_instances;
+    std::vector<std::unique_ptr<CScriptedEffect>> pooled_instances;
     std::vector<SferaEffectMeshInstance> meshes;
     std::vector<SferaLightInstance> lights;
     std::vector<std::unique_ptr<SferaParticleSystemInstance>> particle_systems;
@@ -896,7 +896,7 @@ public:
     D3DPRESENT_PARAMETERS presentation{};
     D3DCAPS9 capabilities{};
     HRESULT last_hresult = S_OK;
-    D3DMATRIX world_transform{};
+    SferaMatrix4x4F world_transform{};
     Microsoft::WRL::ComPtr<IDirect3DQuery9> sync_query;
     bool supports_post_effects = false;
     std::vector<SphereUI::DisplayMode> display_modes;
@@ -923,7 +923,7 @@ public:
     D3DFORMAT selectDepthFormat(D3DFORMAT adapter_format, D3DFORMAT back_buffer_format) const;
     void initializeRenderState();
     void applyFiltering();
-    void setTransform(D3DTRANSFORMSTATETYPE kind, const D3DMATRIX& matrix);
+    void setTransform(D3DTRANSFORMSTATETYPE kind, const SferaMatrix4x4F& matrix);
     void setAlphaBlending(D3DBLEND source, D3DBLEND destination);
     void setColorOperation(std::uint32_t stage, D3DTEXTUREOP operation, std::uint32_t first, std::uint32_t second);
     void setAlphaOperation(std::uint32_t stage, D3DTEXTUREOP operation, std::uint32_t first, std::uint32_t second);
@@ -971,7 +971,7 @@ public:
     ~RenderStateScope() noexcept;
 private:
     CD3D9Device& device_;
-    D3DMATRIX world_transform_;
+    SferaMatrix4x4F world_transform_;
     std::array<bool, 31> active_lights_;
     std::size_t active_light_count_;
     std::uint32_t sprite_render_mode_;
@@ -988,13 +988,13 @@ public:
     int open(const std::string& filename, int flags);
     int create(const std::string& filename);
     int transformEnvelope(const std::string& destination, const std::string& source, bool compress);
-    std::ptrdiff_t read(int descriptor, void* destination, std::size_t size);
-    std::ptrdiff_t write(int descriptor, const void* source, std::size_t size);
+    std::ptrdiff_t read(int descriptor, std::span<std::byte> destination);
+    std::ptrdiff_t write(int descriptor, std::span<const std::byte> source);
     std::int64_t seek(int descriptor, std::int64_t offset, int origin);
     int close(int descriptor);
     std::int64_t fileSize(const std::string& filename);
     std::vector<std::uint8_t> readAll(const std::string& filename);
-    static bool writeFile(const std::string& path, const void* data, std::size_t size);
+    static bool writeFile(const std::string& path, std::span<const std::byte> source);
     static std::optional<std::vector<std::uint8_t>> readBounded(const std::string& filename, std::size_t capacity);
     void keepTail(const std::string& filename, std::size_t size);
     void addSearchPath(std::string_view directory);
@@ -1052,9 +1052,9 @@ public:
     void close() noexcept;
     bool isOpen() const noexcept;
 
-    std::span<const std::byte> bytes() const noexcept { return {mapped_view, file_size}; }
+    std::span<const std::uint8_t> bytes() const noexcept { return {mapped_view, file_size}; }
 private:
-    const std::byte* mapped_view = nullptr;
+    const std::uint8_t* mapped_view = nullptr;
     std::size_t file_size = 0u;
     std::string filename;
     void reportError(std::string_view operation) const noexcept;
@@ -1356,7 +1356,11 @@ public:
     bool tooltip_disabled = false;
     std::list<std::unique_ptr<Window>> windows;
     std::deque<WindowEvent> events;
-    std::unordered_set<Window*> registered_windows;
+    struct WindowPointerHash {
+        using is_transparent = void;
+        std::size_t operator()(const Window* window) const noexcept { return std::hash<const Window*>{}(window); }
+    };
+    std::unordered_set<Window*, WindowPointerHash, std::equal_to<>> registered_windows;
     std::uint64_t next_registration_id = 1u;
     std::unordered_map<const Window*, WindowEventHandler> event_handlers;
     std::unique_ptr<SferaInterfaceCursor> cursor;
@@ -1406,7 +1410,7 @@ public:
     void copyEventHandler(Window* destination, const Window* source);
     bool hasEventHandler(const Window* window) const;
     void dispatchEvent(Window* window, const WindowEvent& event);
-    void unbindEventHandler(const void* window);
+    void unbindEventHandler(const Window* window);
 
 };
 }
@@ -2161,8 +2165,8 @@ public:
     void clear();
     void load();
     void loadBytes(std::span<const std::uint8_t> bytes);
-    void typeRange(int first, int last, int& start, int& count) const;
-    bool sameEdge(int first_contour, int first_edge, int second_contour, int second_edge) const;
+    std::span<const Contour> typeRange(int first, int last) const;
+    bool sameEdge(std::size_t first_contour, std::size_t first_edge, std::size_t second_contour, std::size_t second_edge) const;
     void setServerMap(std::span<const int> types, std::span<const int> servers);
     int serverByType(int type) const;
     void buildServerMask(int server);
@@ -2206,7 +2210,7 @@ public:
     void generateEffects(const WorldObject& observer, float field_of_view, const SferaFrustumF& frustum);
     void updateEffectRendering();
     static bool intersectPlane(const SferaPlaneF& plane, const SferaVec3F& start, const SferaVec3F& end, SferaVec3F& output);
-    static std::uint32_t classifyVisibility(const SferaFrustumF& frustum, const SferaVec3F* points, int count);
+    static std::uint32_t classifyVisibility(const SferaFrustumF& frustum, std::span<const SferaVec3F> points);
     static int intersectXZ(const SferaVec3F& first, const SferaVec3F& second, const SferaVec3F& other_first, const SferaVec3F& other_second, SferaVec3F& output);
 };
 

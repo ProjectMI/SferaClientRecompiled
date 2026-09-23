@@ -263,7 +263,8 @@ namespace SphereUI {
         const std::string& getHelp() const;
         void setHelp(std::string_view value);
         void setName(std::string_view value);
-        Window* controlAt(std::size_t index) const;
+        Window* controlAt(std::size_t index);
+        const Window* controlAt(std::size_t index) const;
         void addModalReference(Window& window);
         void beginModal(Window* owner);
         const std::string& getName() const;

@@ -44,9 +44,10 @@ struct SferaZStream32 {
 struct SferaDeflateConfig { std::uint16_t good_length; std::uint16_t max_lazy; std::uint16_t nice_length; std::uint16_t max_chain; };
 struct SferaCtData32 { std::uint16_t code; std::uint16_t length; };
 enum class SferaZlibTreeKind { Literal, Distance, BitLength };
-struct SferaTreeDesc32 { SferaCtData32* dynamic_tree; int max_code; SferaZlibTreeKind kind; };
+struct SferaTreeDesc32 { SferaCtData32* dynamic_tree; std::uint32_t symbol_count; SferaZlibTreeKind kind; };
 struct SferaDeflateState32 {
     enum class Phase { Header, Blocks, Complete };
+    enum class BlockState { NeedOutput, BlockDone, FinalNeedOutput, Complete };
     static constexpr std::uint32_t fixed_literal_start = 48;
     static constexpr std::uint32_t fixed_high_start = 400;
     static constexpr std::uint32_t fixed_tail_start = 192;
@@ -56,7 +57,7 @@ struct SferaDeflateState32 {
     std::vector<std::uint8_t> pending_buf;
     std::uint32_t pending_buf_size = 0;
     std::uint32_t pending_offset = 0;
-    int pending = 0;
+    std::uint32_t pending = 0;
     int noheader = 0;
     std::uint8_t data_type = 0;
     std::uint8_t method = 8;
@@ -73,7 +74,8 @@ struct SferaDeflateState32 {
     std::uint32_t hash_bits = 15;
     std::uint32_t hash_mask = 32767;
     std::uint32_t hash_shift = 5;
-    int block_start = 0;
+    // Sliding the window can move the block origin before index zero.
+    std::int64_t block_start = 0;
     std::uint32_t match_length = 0;
     std::uint32_t prev_match = 0;
     int match_available = 0;
@@ -86,7 +88,7 @@ struct SferaDeflateState32 {
     int level = 1;
     int strategy = 0;
     std::uint32_t good_match = 0;
-    int nice_match = 0;
+    std::uint32_t nice_match = 0;
     SferaCtData32 dynamic_literal_tree[573]{};
     SferaCtData32 dynamic_distance_tree[61]{};
     SferaCtData32 bit_length_tree[39]{};
@@ -95,8 +97,8 @@ struct SferaDeflateState32 {
     SferaTreeDesc32 bit_length_descriptor{};
     std::uint16_t bit_length_counts[16]{};
     std::uint32_t heap[573]{};
-    int heap_length = 0;
-    int heap_max = 0;
+    std::uint32_t heap_length = 0;
+    std::uint32_t heap_max = 0;
     std::uint8_t depth[573]{};
     std::vector<std::uint8_t> literal_buffer;
     std::uint32_t literal_buffer_size = 16384;
@@ -110,9 +112,9 @@ struct SferaDeflateState32 {
     std::uint32_t valid_bits = 0;
     static SferaDeflateConfig deflateConfig(int32_t level);
     static uint16_t reverseBits(uint32_t value, uint32_t bit_count);
-    static uint32_t fixedLiteralLength(uint32_t symbol);
-    static uint32_t fixedLiteralCode(uint32_t symbol);
-    static uint32_t fixedDistanceCode(uint32_t symbol);
+    static uint8_t fixedLiteralLength(uint32_t symbol);
+    static uint16_t fixedLiteralCode(uint32_t symbol);
+    static uint16_t fixedDistanceCode(uint32_t symbol);
     static SferaCtData32 treeEntry(SferaCtData32* tree, uint32_t symbol, bool distance_tree);
     void putShortLe(uint16_t value);
     void sendBits(uint32_t value, uint32_t length);
@@ -129,23 +131,23 @@ struct SferaDeflateState32 {
     static uint32_t staticSymbolLength(SferaZlibTreeKind kind, uint32_t symbol);
     bool heapLess(const SferaCtData32* tree, uint32_t left, uint32_t right);
     void pqDownHeap(SferaCtData32* tree, uint32_t heap_index);
-    static void generateCodes(SferaCtData32* tree, int32_t max_code, const uint16_t* bit_counts);
+    static void generateCodes(SferaCtData32* tree, uint32_t symbol_count, const uint16_t* bit_counts);
     void generateBitLengths(SferaTreeDesc32* descriptor);
     void initBlock();
     void treeInit();
     void buildTree(SferaTreeDesc32* descriptor);
-    void scanTree(SferaCtData32* tree, int32_t max_code);
-    void sendTree(SferaCtData32* tree, int32_t max_code);
-    int32_t buildBitLengthTree();
+    void scanTree(SferaCtData32* tree, uint32_t symbol_count);
+    void sendTree(SferaCtData32* tree, uint32_t symbol_count);
+    uint32_t buildBitLengthTree();
     void sendAllTrees(uint32_t literal_codes, uint32_t distance_codes, uint32_t bit_length_codes);
     void flushBlock(const uint8_t* buffer, uint32_t stored_length, uint32_t end_of_file);
     void compressBlock(SferaCtData32* literal_tree, SferaCtData32* distance_tree);
     bool tally(uint32_t distance, uint32_t literal_or_length);
     uint32_t insertString(uint8_t* window, uint16_t* previous, uint16_t* heads);
-    int32_t flushCurrentBlock(bool end_of_file);
-    uint32_t deflateStored(int32_t flush);
-    uint32_t deflateFast(int32_t flush);
-    uint32_t deflateSlow(int32_t flush);
+    std::optional<BlockState> flushCurrentBlock(bool end_of_file);
+    BlockState deflateStored(int32_t flush);
+    BlockState deflateFast(int32_t flush);
+    BlockState deflateSlow(int32_t flush);
     void deflatePutShortMsb(uint32_t value);
     void deflateLmInit();
     uint32_t deflateLongestMatch(uint32_t current_match);

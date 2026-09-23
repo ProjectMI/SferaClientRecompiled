@@ -27,19 +27,24 @@
 
 struct SferaColor {
     std::array<std::uint8_t, 4> channels;
-    static constexpr SferaColor rgba(std::uint32_t red, std::uint32_t green, std::uint32_t blue, std::uint32_t alpha = 255u) { return {{static_cast<std::uint8_t>(red), static_cast<std::uint8_t>(green), static_cast<std::uint8_t>(blue), static_cast<std::uint8_t>(alpha)}}; }
+    static constexpr SferaColor rgba(std::uint32_t red, std::uint32_t green, std::uint32_t blue, std::uint32_t alpha = 255u) {
+        const std::array components{red, green, blue, alpha};
+        SferaColor result{};
+        for (std::size_t index = 0; index < components.size(); ++index) result.channels[index] = components[index] & 255u;
+        return result;
+    }
     static constexpr SferaColor fromArgb(std::uint32_t value) { return rgba(value >> 16u, value >> 8u, value, value >> 24u); }
-    constexpr std::uint8_t red() const { return channels[0]; }
-    constexpr std::uint8_t green() const { return channels[1]; }
-    constexpr std::uint8_t blue() const { return channels[2]; }
-    constexpr std::uint8_t alpha() const { return channels[3]; }
-    constexpr std::uint32_t argb() const { return (std::uint32_t(alpha()) << 24u) | (std::uint32_t(red()) << 16u) | (std::uint32_t(green()) << 8u) | blue(); }
+    constexpr std::uint32_t red() const { return channels[0]; }
+    constexpr std::uint32_t green() const { return channels[1]; }
+    constexpr std::uint32_t blue() const { return channels[2]; }
+    constexpr std::uint32_t alpha() const { return channels[3]; }
+    constexpr std::uint32_t argb() const { return (alpha() << 24u) | (red() << 16u) | (green() << 8u) | blue(); }
     constexpr SferaColor withAlpha(std::uint32_t value) const { return rgba(red(), green(), blue(), value); }
-    constexpr SferaColor scaledAlpha(std::uint32_t factor, std::uint32_t divisor = 255u) const { return withAlpha(std::uint32_t(alpha()) * factor / divisor); }
-    constexpr SferaColor scaledRgb(std::uint32_t factor, std::uint32_t divisor) const { return rgba(std::uint32_t(red()) * factor / divisor, std::uint32_t(green()) * factor / divisor, std::uint32_t(blue()) * factor / divisor, alpha()); }
-    constexpr std::uint16_t rgb565() const { return static_cast<std::uint16_t>(((red() >> 3u) << 11u) | ((green() >> 2u) << 5u) | (blue() >> 3u)); }
+    constexpr SferaColor scaledAlpha(std::uint32_t factor, std::uint32_t divisor = 255u) const { return withAlpha(alpha() * factor / divisor); }
+    constexpr SferaColor scaledRgb(std::uint32_t factor, std::uint32_t divisor) const { return rgba(red() * factor / divisor, green() * factor / divisor, blue() * factor / divisor, alpha()); }
+    constexpr std::uint16_t rgb565() const { return ((red() >> 3u) << 11u) | ((green() >> 2u) << 5u) | (blue() >> 3u); }
     static constexpr SferaColor fromArgb4444(std::uint16_t value) { return rgba(((value >> 8u) & 15u) * 17u, ((value >> 4u) & 15u) * 17u, (value & 15u) * 17u, (value >> 12u) * 17u); }
-    constexpr std::uint16_t argb4444() const { return static_cast<std::uint16_t>(((alpha() >> 4u) << 12u) | ((red() >> 4u) << 8u) | ((green() >> 4u) << 4u) | (blue() >> 4u)); }
+    constexpr std::uint16_t argb4444() const { return ((alpha() >> 4u) << 12u) | ((red() >> 4u) << 8u) | ((green() >> 4u) << 4u) | (blue() >> 4u); }
 };
 
 struct SferaScreenVertex {
@@ -93,21 +98,36 @@ namespace SferaBinary {
             throw;
         }
         commit();
-        return bool(stream);
+        return !stream.fail();
     }
     template<class T, class Byte> requires (std::is_integral_v<T> && !std::is_same_v<T, bool> &&
         (std::is_same_v<Byte, std::uint8_t> || std::is_same_v<Byte, std::byte>))
     T readLittleEndian(const Byte* bytes) noexcept {
         using Unsigned = std::make_unsigned_t<T>;
         Unsigned value = 0;
-        for (std::size_t index = 0; index < sizeof(T); ++index) value |= static_cast<Unsigned>(static_cast<Unsigned>(bytes[index]) << (index * 8));
-        return std::bit_cast<T>(value);
+        for (std::size_t index = sizeof(T); index != 0; --index) {
+            if constexpr (sizeof(T) > 1) value <<= 8;
+            if constexpr (std::is_same_v<Byte, std::byte>) value |= std::to_integer<unsigned int>(bytes[index - 1]);
+            else value |= bytes[index - 1];
+        }
+        if constexpr (std::is_signed_v<T>) {
+            if (value > std::numeric_limits<T>::max()) {
+                const T complement = std::numeric_limits<Unsigned>::max() - value;
+                return -1 - complement;
+            }
+        }
+        return value;
     }
     template<class T, class Byte> requires (std::is_integral_v<T> && !std::is_same_v<T, bool> &&
         (std::is_same_v<Byte, std::uint8_t> || std::is_same_v<Byte, std::byte>))
     void writeLittleEndian(Byte* bytes, T value) noexcept {
-        const auto bits = std::bit_cast<std::make_unsigned_t<T>>(value);
-        for (std::size_t index = 0; index < sizeof(T); ++index) bytes[index] = static_cast<Byte>(bits >> (index * 8));
+        // Unsigned arithmetic preserves the complete two's-complement representation.
+        std::make_unsigned_t<T> bits = value;
+        for (std::size_t index = 0; index < sizeof(T); ++index) {
+            if constexpr (std::is_same_v<Byte, std::byte>) bytes[index] = static_cast<std::byte>(bits & 255u);
+            else bytes[index] = bits & 255u;
+            if constexpr (sizeof(T) > 1) bits >>= 8;
+        }
     }
     class ReadError : public std::runtime_error {
     public:
@@ -127,7 +147,7 @@ namespace SferaBinary {
             const auto field = bytes_.first(std::min(bytes_.size(), capacity));
             const auto end = std::find(field.begin(), field.end(), std::uint8_t{});
             if (end == field.end()) throw ReadError("Unterminated binary string");
-            const auto count = static_cast<std::size_t>(end - field.begin());
+            const std::size_t count = end - field.begin();
             const auto value = take(count + 1);
             return std::string(value.begin(), value.begin() + count);
         }
@@ -149,15 +169,17 @@ struct SferaVec3F {
     SferaVec3F operator+(const SferaVec3F& other) const;
     SferaVec3F operator-(const SferaVec3F& other) const;
     SferaVec3F operator*(float factor) const;
-    template<class Accumulator = double> Accumulator dot(const SferaVec3F& other) const {
-        return Accumulator(x) * other.x + Accumulator(y) * other.y + Accumulator(z) * other.z;
+    SferaVec3F subtractScaled(const SferaVec3F& direction, float factor) const;
+    template<class Accumulator = double, bool YFirst = false> Accumulator dot(const SferaVec3F& other) const {
+        const std::array<Accumulator, 3> components{x, y, z};
+        if constexpr (YFirst) return components[1] * other.y + components[0] * other.x + components[2] * other.z;
+        else return components[0] * other.x + components[1] * other.y + components[2] * other.z;
     }
     template<class Accumulator = double, class Root = double, bool YFirst = false>
     float length() const {
-        const float squared = YFirst
-            ? (Accumulator(y) * y + Accumulator(x) * x) + Accumulator(z) * z
-            : dot<Accumulator>(*this);
-        return static_cast<float>(std::sqrt(Root(squared)));
+        const float squared = dot<Accumulator, YFirst>(*this);
+        const Root radicand = squared;
+        return std::sqrt(radicand);
     }
     // A zero threshold, precision and divide-vs-reciprocal are observable in old effects.
     template<class Accumulator = double, class Root = double, bool Divide = false, bool PropagateNaN = false>
@@ -170,9 +192,12 @@ struct SferaVec3F {
     SferaVec3F normalized(int diagnosticCode = 0) const;
     void normalize();
     template<class Accumulator = double> SferaVec3F cross(const SferaVec3F& other) const {
-        return {static_cast<float>(Accumulator(y) * other.z - Accumulator(z) * other.y),
-                static_cast<float>(Accumulator(z) * other.x - Accumulator(x) * other.z),
-                static_cast<float>(Accumulator(x) * other.y - Accumulator(y) * other.x)};
+        const std::array<Accumulator, 3> components{x, y, z};
+        SferaVec3F result;
+        result.x = components[1] * other.z - components[2] * other.y;
+        result.y = components[2] * other.x - components[0] * other.z;
+        result.z = components[0] * other.y - components[1] * other.x;
+        return result;
     }
     float component(std::size_t axis) const;
     void setComponent(std::size_t axis, float value);
@@ -212,8 +237,17 @@ struct SferaVec4F {
 };
 
 namespace SferaMath {
-    inline float interpolate(float first, float second, float fraction) {
-        return static_cast<float>((double(second) - first) * fraction + first);
+    inline float interpolate(float first, double second, float fraction) {
+        return (second - first) * fraction + first;
+    }
+    struct RotationTerms {
+        double sine;
+        double cosine;
+    };
+    inline RotationTerms rotationTerms(double angle) {
+        // Rotation formulas historically use single-rounded trigonometric values.
+        const float sine = std::sin(angle), cosine = std::cos(angle);
+        return {sine, cosine};
     }
     inline SferaVec3F interpolate(const SferaVec3F& a, const SferaVec3F& b, float fraction) {
         return {interpolate(a.x, b.x, fraction), interpolate(a.y, b.y, fraction), interpolate(a.z, b.z, fraction)};
@@ -243,24 +277,25 @@ struct SferaMatrix4x4F {
 
     static SferaMatrix4x4F identity();
     template<class Trigonometry = double> static SferaMatrix4x4F fromAxisRotation(Axis axis, float angle) {
-    SferaMatrix4x4F result = identity();
-    const std::size_t first = axis == Axis::x ? 1u : axis == Axis::y ? 2u : 0u;
-    const std::size_t second = (first + 1u) % 3u;
-    const float sine = std::sin(Trigonometry(angle));
-    const float cosine = std::cos(Trigonometry(angle));
-    result.m[first][first] = result.m[second][second] = cosine;
-    result.m[first][second] = -sine;
-    result.m[second][first] = sine;
-    return result;
-}
+        SferaMatrix4x4F result = identity();
+        const std::size_t first = axis == Axis::x ? 1u : axis == Axis::y ? 2u : 0u;
+        const std::size_t second = (first + 1u) % 3u;
+        const Trigonometry radians = angle;
+        const float sine = std::sin(radians), cosine = std::cos(radians);
+        result.m[first][first] = result.m[second][second] = cosine;
+        result.m[first][second] = -sine;
+        result.m[second][first] = sine;
+        return result;
+    }
     static SferaMatrix4x4F fromRollPitchYaw(float roll, float pitch, float yaw);
     static SferaMatrix4x4F fromEuler(const SferaVec3F& translation, const SferaVec3F& angles);
     static SferaMatrix4x4F fromQuaternion(const SferaQuaternionF& rotation, const SferaVec3F& translation = {});
     template<class Accumulator = double> SferaVec3F transformPoint(const SferaVec3F& point) const {
         SferaVec3F result{};
-        for (std::size_t row = 0; row < 3; ++row)
-            result.setComponent(row, static_cast<float>(Accumulator(m[row][0]) * point.x +
-                Accumulator(m[row][1]) * point.y + Accumulator(m[row][2]) * point.z + m[row][3]));
+        for (std::size_t row = 0; row < 3; ++row) {
+            const std::array<Accumulator, 3> basis{m[row][0], m[row][1], m[row][2]};
+            result.setComponent(row, basis[0] * point.x + basis[1] * point.y + basis[2] * point.z + m[row][3]);
+        }
         return result;
     }
     SferaVec3F inverseTransformPoint(const SferaVec3F& point) const;
@@ -268,8 +303,11 @@ struct SferaMatrix4x4F {
         SferaMatrix4x4F result{};
         for (std::size_t row = 0; row < 4; ++row) for (std::size_t column = 0; column < 4; ++column) {
             Accumulator value = 0;
-            for (std::size_t axis = 0; axis < 4; ++axis) value += Accumulator(m[row][axis]) * other.m[axis][column];
-            result.m[row][column] = static_cast<float>(value);
+            for (std::size_t axis = 0; axis < 4; ++axis) {
+                const Accumulator element = m[row][axis];
+                value += element * other.m[axis][column];
+            }
+            result.m[row][column] = value;
         }
         return result;
     }

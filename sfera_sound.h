@@ -26,6 +26,7 @@ struct SferaVorbisPcm {
 bool sferaDecodeVorbis(const std::uint8_t* data, std::size_t size, SferaVorbisPcm& output) noexcept;
 
 
+struct HWND__;
 class CSoundInterface;
 class CSoundStream;
 using SferaSoundStreamCallback = std::uint32_t (*)(CSoundStream* stream, void* state) noexcept;
@@ -49,7 +50,7 @@ private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
     friend class CSoundInterface;
-    friend CSoundInterface* SI_CreateInterface(void*, int, std::uint32_t, std::uint32_t);
+    friend CSoundInterface* SI_CreateInterface(HWND__*, int, std::uint32_t, std::uint32_t);
 };
 
 class CSoundInterface {
@@ -66,7 +67,7 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
-    friend CSoundInterface* SI_CreateInterface(void*, int, std::uint32_t, std::uint32_t);
+    friend CSoundInterface* SI_CreateInterface(HWND__*, int, std::uint32_t, std::uint32_t);
     friend void SI_Close();
     friend class CSound;
     friend class CSoundStream;
@@ -147,7 +148,7 @@ private:
 void SI_SetHardwareMixing(bool enabled);
 bool SI_GetHardwareMixing();
 int SI_GetStreamVolume();
-CSoundInterface* SI_CreateInterface(void* native_window, int device_index, std::uint32_t sample_rate, std::uint32_t flags);
+CSoundInterface* SI_CreateInterface(HWND__* native_window, int device_index, std::uint32_t sample_rate, std::uint32_t flags);
 CSoundInterface* SI_GetInterface();
 void SI_Close();
 // Use std::nullopt when no log file is requested.

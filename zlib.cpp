@@ -8,6 +8,8 @@
 #include <stdexcept>
 
 namespace {
+    constexpr std::array<std::uint8_t, 19> codeLengthOrder{16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+
     struct UiDeflateBits {
         std::span<const std::uint8_t> input;
         std::size_t position = 0u;
@@ -81,27 +83,26 @@ std::vector<std::uint8_t> SferaZStream32::decompressUiConfig(std::span<const std
             bits.align();
             const auto length = bits.read(16u), complement = bits.read(16u);
             if ((length ^ complement) != 65535u) throw std::runtime_error("Invalid UI stored block length");
-            for (unsigned index = 0u; index < length; ++index) append(static_cast<std::uint8_t>(bits.read(8u)));
+            for (unsigned index = 0u; index < length; ++index) append(bits.read(8u));
             continue;
         }
         if (kind == 3u) throw std::runtime_error("Invalid UI deflate block");
         std::array<std::uint8_t, 288> literal_lengths{};
         std::array<std::uint8_t, 32> distance_lengths{};
         if (kind == 1u) {
-            for (unsigned index = 0u; index < literal_lengths.size(); ++index) literal_lengths[index] = static_cast<std::uint8_t>(index < 144u ? 8u : index < 256u ? 9u : index < 280u ? 7u : 8u);
+            for (unsigned index = 0u; index < literal_lengths.size(); ++index) literal_lengths[index] = SferaDeflateState32::fixedLiteralLength(index);
             distance_lengths.fill(5u);
         } else {
             const auto literals = bits.read(5u) + 257u, distances = bits.read(5u) + 1u, codes = bits.read(4u) + 4u;
             if (literals > 286u) throw std::runtime_error("Invalid UI literal alphabet");
-            constexpr unsigned order[] = {16u, 17u, 18u, 0u, 8u, 7u, 9u, 6u, 10u, 5u, 11u, 4u, 12u, 3u, 13u, 2u, 14u, 1u, 15u};
             std::array<std::uint8_t, 19> code_lengths{};
-            for (unsigned index = 0u; index < codes; ++index) code_lengths[order[index]] = static_cast<std::uint8_t>(bits.read(3u));
+            for (unsigned index = 0u; index < codes; ++index) code_lengths[codeLengthOrder[index]] = bits.read(3u);
             UiDeflateAlphabet alphabet{code_lengths, true};
             std::vector<std::uint8_t> lengths;
             lengths.reserve(literals + distances);
             while (lengths.size() < literals + distances) {
                 const auto code = alphabet.decode(bits);
-                if (code < 16u) lengths.push_back(static_cast<std::uint8_t>(code));
+                if (code < 16u) lengths.push_back(code);
                 else {
                     if (code == 16u && lengths.empty()) throw std::runtime_error("UI Huffman repeat without predecessor");
                     const auto count = code == 16u ? bits.read(2u) + 3u : code == 17u ? bits.read(3u) + 3u : bits.read(7u) + 11u;
@@ -120,7 +121,7 @@ std::vector<std::uint8_t> SferaZStream32::decompressUiConfig(std::span<const std
             const auto symbol = literals.decode(bits);
             if (symbol == 256u) break;
             if (symbol < 256u) {
-                append(static_cast<std::uint8_t>(symbol));
+                append(symbol);
                 continue;
             }
             if (symbol > 285u) throw std::runtime_error("Invalid UI length symbol");
@@ -163,17 +164,17 @@ SferaDeflateConfig SferaDeflateState32::deflateConfig(int32_t level) {
 uint16_t SferaDeflateState32::reverseBits(uint32_t value, uint32_t bit_count) {
     uint32_t result = 0u;
     for (uint32_t bit = 0u; bit != bit_count; ++bit) { result = (result << 1u) | ((value >> bit) & 1u); }
-    return static_cast<uint16_t>(result);
+    return result & 65535u;
 }
 
-uint32_t SferaDeflateState32::fixedLiteralLength(uint32_t symbol) {
+uint8_t SferaDeflateState32::fixedLiteralLength(uint32_t symbol) {
     if (symbol <= 143u) { return 8u; }
     if (symbol <= 255u) { return 9u; }
     if (symbol <= 279u) { return 7u; }
     return symbol <= 287u ? 8u : 0u;
 }
 
-uint32_t SferaDeflateState32::fixedLiteralCode(uint32_t symbol) {
+uint16_t SferaDeflateState32::fixedLiteralCode(uint32_t symbol) {
     if (symbol <= 143u) { return reverseBits(symbol + fixed_literal_start, 8u); }
     if (symbol <= 255u) { return reverseBits(symbol - 144u + fixed_high_start, 9u); }
     if (symbol <= 279u) { return reverseBits(symbol - 256u, 7u); }
@@ -181,35 +182,32 @@ uint32_t SferaDeflateState32::fixedLiteralCode(uint32_t symbol) {
     return 0u;
 }
 
-uint32_t SferaDeflateState32::fixedDistanceCode(uint32_t symbol) {
+uint16_t SferaDeflateState32::fixedDistanceCode(uint32_t symbol) {
     return symbol < 30u ? reverseBits(symbol, 5u) : 0u;
 }
 
 SferaCtData32 SferaDeflateState32::treeEntry(SferaCtData32* tree, uint32_t symbol, bool distance_tree) {
     if (tree != nullptr) { return tree[symbol]; }
     SferaCtData32 entry = {};
-    entry.code = static_cast<uint16_t>(distance_tree ? fixedDistanceCode(symbol) : fixedLiteralCode(symbol));
-    entry.length = static_cast<uint16_t>(distance_tree ? 5u : fixedLiteralLength(symbol));
+    entry.code = distance_tree ? fixedDistanceCode(symbol) : fixedLiteralCode(symbol);
+    entry.length = distance_tree ? 5u : fixedLiteralLength(symbol);
     return entry;
 }
 
 void SferaDeflateState32::putShortLe(uint16_t value) {
     uint8_t* pending_bytes = this->pending_buf.data();
-    pending_bytes[this->pending++] = static_cast<uint8_t>(value);
-    pending_bytes[this->pending++] = static_cast<uint8_t>(value >> 8u);
+    pending_bytes[this->pending++] = value & 255u;
+    pending_bytes[this->pending++] = (value >> 8u) & 255u;
 }
 
 void SferaDeflateState32::sendBits(uint32_t value, uint32_t length) {
-
-    if (length == 0u) { return; }
+    if (length == 0u) return;
+    bit_buffer |= (value << valid_bits) & 65535u;
     if (valid_bits > 16u - length) {
-        bit_buffer = static_cast<uint16_t>(bit_buffer | static_cast<uint16_t>(value << valid_bits));
         putShortLe(bit_buffer);
-        bit_buffer = static_cast<uint16_t>(value >> (16u - valid_bits));
+        bit_buffer = (value >> (16u - valid_bits)) & 65535u;
         valid_bits += length - 16u;
-    }
-    else {
-        bit_buffer = static_cast<uint16_t>(bit_buffer | static_cast<uint16_t>(value << valid_bits));
+    } else {
         valid_bits += length;
     }
 }
@@ -220,34 +218,36 @@ void SferaDeflateState32::sendTreeCode(SferaCtData32* tree, uint32_t symbol, boo
 }
 
 void SferaDeflateState32::bitFlush() {
-
-    uint8_t* pending_bytes = this->pending_buf.data();
-    if (valid_bits == 16u) { pending_bytes[this->pending++] = static_cast<uint8_t>(bit_buffer); pending_bytes[this->pending++] = static_cast<uint8_t>(bit_buffer >> 8u); bit_buffer = 0u; valid_bits = 0u; }
-    else if (valid_bits >= 8u) { pending_bytes[this->pending++] = static_cast<uint8_t>(bit_buffer); bit_buffer = static_cast<uint16_t>(bit_buffer >> 8u); valid_bits -= 8u; }
+    if (valid_bits == 16u) {
+        putShortLe(bit_buffer);
+        bit_buffer = 0u;
+        valid_bits = 0u;
+    } else if (valid_bits >= 8u) {
+        pending_buf[pending++] = bit_buffer & 255u;
+        bit_buffer >>= 8u;
+        valid_bits -= 8u;
+    }
 }
 
 void SferaDeflateState32::bitWindup() {
-
-    uint8_t* pending_bytes = this->pending_buf.data();
-    if (valid_bits > 8u) { pending_bytes[this->pending++] = static_cast<uint8_t>(bit_buffer); pending_bytes[this->pending++] = static_cast<uint8_t>(bit_buffer >> 8u); }
-    else if (valid_bits != 0u) { pending_bytes[this->pending++] = static_cast<uint8_t>(bit_buffer); }
+    if (valid_bits > 8u) putShortLe(bit_buffer);
+    else if (valid_bits != 0u) pending_buf[pending++] = bit_buffer & 255u;
     bit_buffer = 0u;
     valid_bits = 0u;
 }
 
 void SferaDeflateState32::copyStoredBlock(const uint8_t* buffer, uint32_t length, uint32_t write_header) {
     bitWindup();
-    this->last_eob_length = 8u;
-    uint8_t* pending_bytes = this->pending_buf.data();
+    last_eob_length = 8u;
     if (write_header != 0u) {
-        const uint16_t block_length = static_cast<uint16_t>(length);
-        const uint16_t complement = static_cast<uint16_t>(~block_length);
-        pending_bytes[this->pending++] = static_cast<uint8_t>(block_length);
-        pending_bytes[this->pending++] = static_cast<uint8_t>(block_length >> 8u);
-        pending_bytes[this->pending++] = static_cast<uint8_t>(complement);
-        pending_bytes[this->pending++] = static_cast<uint8_t>(complement >> 8u);
+        const uint16_t block_length = length & 65535u;
+        putShortLe(block_length);
+        putShortLe(65535u - block_length);
     }
-    if (length != 0u) { std::memcpy(pending_bytes + this->pending, buffer, length); this->pending += static_cast<int32_t>(length); }
+    if (length != 0u) {
+        std::memcpy(pending_buf.data() + pending, buffer, length);
+        pending += length;
+    }
 }
 
 void SferaDeflateState32::writeStoredBlock(const uint8_t* buffer, uint32_t length, uint32_t end_of_file) {
@@ -274,7 +274,7 @@ void SferaDeflateState32::setDataType() {
     while (symbol < 7u) { binary_frequency += this->dynamic_literal_tree[symbol++].code; }
     while (symbol < 128u) { ascii_frequency += this->dynamic_literal_tree[symbol++].code; }
     while (symbol < 256u) { binary_frequency += this->dynamic_literal_tree[symbol++].code; }
-    this->data_type = static_cast<uint8_t>(binary_frequency > (ascii_frequency >> 2u) ? 0u : 1u);
+    this->data_type = binary_frequency > (ascii_frequency >> 2u) ? 0u : 1u;
 }
 
 uint32_t SferaDeflateState32::treeElementCount(SferaZlibTreeKind kind) {
@@ -303,8 +303,8 @@ bool SferaDeflateState32::heapLess(const SferaCtData32* tree, uint32_t left, uin
 void SferaDeflateState32::pqDownHeap(SferaCtData32* tree, uint32_t heap_index) {
     const uint32_t value = this->heap[heap_index];
     uint32_t child = heap_index << 1u;
-    while (child <= static_cast<uint32_t>(this->heap_length)) {
-        if (child < static_cast<uint32_t>(this->heap_length) && heapLess(tree, this->heap[child + 1u], this->heap[child])) { ++child; }
+    while (child <= this->heap_length) {
+        if (child < this->heap_length && heapLess(tree, this->heap[child + 1u], this->heap[child])) { ++child; }
         if (heapLess(tree, value, this->heap[child])) { break; }
         this->heap[heap_index] = this->heap[child];
         heap_index = child;
@@ -313,11 +313,11 @@ void SferaDeflateState32::pqDownHeap(SferaCtData32* tree, uint32_t heap_index) {
     this->heap[heap_index] = value;
 }
 
-void SferaDeflateState32::generateCodes(SferaCtData32* tree, int32_t max_code, const uint16_t* bit_counts) {
+void SferaDeflateState32::generateCodes(SferaCtData32* tree, uint32_t symbol_count, const uint16_t* bit_counts) {
     uint16_t next_code[16] = {};
     uint32_t code = 0u;
-    for (uint32_t bits = 1u; bits <= 15u; ++bits) { code = (code + bit_counts[bits - 1u]) << 1u; next_code[bits] = static_cast<uint16_t>(code); }
-    for (int32_t symbol = 0; symbol <= max_code; ++symbol) { const uint32_t length = tree[symbol].length; if (length != 0u) { tree[symbol].code = reverseBits(next_code[length]++, length); } }
+    for (uint32_t bits = 1u; bits <= 15u; ++bits) { code = (code + bit_counts[bits - 1u]) << 1u; next_code[bits] = code & 65535u; }
+    for (uint32_t symbol = 0; symbol < symbol_count; ++symbol) { const uint32_t length = tree[symbol].length; if (length != 0u) { tree[symbol].code = reverseBits(next_code[length]++, length); } }
 }
 
 void SferaDeflateState32::generateBitLengths(SferaTreeDesc32* descriptor) {
@@ -327,12 +327,12 @@ void SferaDeflateState32::generateBitLengths(SferaTreeDesc32* descriptor) {
     for (uint32_t bits = 0u; bits <= 15u; ++bits) { this->bit_length_counts[bits] = 0u; }
     tree[this->heap[this->heap_max]].length = 0u;
     int32_t overflow = 0;
-    for (int32_t heap_index = this->heap_max + 1; heap_index < 573; ++heap_index) {
+    for (uint32_t heap_index = this->heap_max + 1u; heap_index < 573u; ++heap_index) {
         const uint32_t symbol = this->heap[heap_index];
-        uint32_t bits = static_cast<uint32_t>(tree[tree[symbol].length].length) + 1u;
+        uint32_t bits = tree[tree[symbol].length].length + 1u;
         if (bits > max_length) { bits = max_length; ++overflow; }
-        tree[symbol].length = static_cast<uint16_t>(bits);
-        if (symbol > static_cast<uint32_t>(descriptor->max_code)) { continue; }
+        tree[symbol].length = bits;
+        if (symbol >= descriptor->symbol_count) { continue; }
         ++this->bit_length_counts[bits];
         const uint32_t extra = treeExtraBits(kind, symbol);
         const uint32_t frequency = tree[symbol].code;
@@ -341,20 +341,20 @@ void SferaDeflateState32::generateBitLengths(SferaTreeDesc32* descriptor) {
         if (fixed_length != 0u) { this->static_length += frequency * (fixed_length + extra); }
     }
     while (overflow > 0) {
-        int32_t bits = static_cast<int32_t>(max_length) - 1;
+        uint32_t bits = max_length - 1u;
         while (bits > 0 && this->bit_length_counts[bits] == 0u) { --bits; }
         --this->bit_length_counts[bits];
-        this->bit_length_counts[bits + 1] = static_cast<uint16_t>(this->bit_length_counts[bits + 1] + 2u);
+        this->bit_length_counts[bits + 1] += 2u;
         --this->bit_length_counts[max_length];
         overflow -= 2;
     }
-    int32_t heap_index = 573;
-    for (int32_t bits = static_cast<int32_t>(max_length); bits != 0; --bits) {
+    uint32_t heap_index = 573u;
+    for (uint32_t bits = max_length; bits != 0; --bits) {
         uint32_t remaining = this->bit_length_counts[bits];
         while (remaining != 0u) {
             const uint32_t symbol = this->heap[--heap_index];
-            if (symbol > static_cast<uint32_t>(descriptor->max_code)) { continue; }
-            if (tree[symbol].length != static_cast<uint32_t>(bits)) { this->optimal_length += static_cast<uint32_t>((static_cast<int32_t>(bits) - static_cast<int32_t>(tree[symbol].length)) * static_cast<int32_t>(tree[symbol].code)); tree[symbol].length = static_cast<uint16_t>(bits); }
+            if (symbol >= descriptor->symbol_count) { continue; }
+            if (tree[symbol].length != bits) { this->optimal_length += (bits - tree[symbol].length) * tree[symbol].code; tree[symbol].length = bits; }
             --remaining;
         }
     }
@@ -373,13 +373,13 @@ void SferaDeflateState32::initBlock() {
 
 void SferaDeflateState32::treeInit() {
     this->literal_descriptor.dynamic_tree = this->dynamic_literal_tree;
-    this->literal_descriptor.max_code = -1;
+    this->literal_descriptor.symbol_count = 0u;
     this->literal_descriptor.kind = SferaZlibTreeKind::Literal;
     this->distance_descriptor.dynamic_tree = this->dynamic_distance_tree;
-    this->distance_descriptor.max_code = -1;
+    this->distance_descriptor.symbol_count = 0u;
     this->distance_descriptor.kind = SferaZlibTreeKind::Distance;
     this->bit_length_descriptor.dynamic_tree = this->bit_length_tree;
-    this->bit_length_descriptor.max_code = -1;
+    this->bit_length_descriptor.symbol_count = 0u;
     this->bit_length_descriptor.kind = SferaZlibTreeKind::BitLength;
     this->bit_buffer = 0u;
     this->valid_bits = 0;
@@ -391,15 +391,15 @@ void SferaDeflateState32::buildTree(SferaTreeDesc32* descriptor) {
     const SferaZlibTreeKind kind = descriptor->kind;
     const uint32_t element_count = treeElementCount(kind);
     SferaCtData32* tree = descriptor->dynamic_tree;
-    int32_t max_code = -1;
+    uint32_t symbol_count = 0u;
     this->heap_length = 0;
     this->heap_max = 573;
     for (uint32_t symbol = 0u; symbol != element_count; ++symbol) {
-        if (tree[symbol].code != 0u) { this->heap[++this->heap_length] = symbol; max_code = static_cast<int32_t>(symbol); this->depth[symbol] = 0u; }
+        if (tree[symbol].code != 0u) { this->heap[++this->heap_length] = symbol; symbol_count = symbol + 1u; this->depth[symbol] = 0u; }
         else { tree[symbol].length = 0u; }
     }
     while (this->heap_length < 2) {
-        const uint32_t symbol = max_code < 2 ? static_cast<uint32_t>(++max_code) : 0u;
+        const uint32_t symbol = symbol_count < 3u ? symbol_count++ : 0u;
         this->heap[++this->heap_length] = symbol;
         tree[symbol].code = 1u;
         this->depth[symbol] = 0u;
@@ -407,8 +407,8 @@ void SferaDeflateState32::buildTree(SferaTreeDesc32* descriptor) {
         const uint32_t fixed_length = staticSymbolLength(kind, symbol);
         if (fixed_length != 0u) { this->static_length -= fixed_length; }
     }
-    descriptor->max_code = max_code;
-    for (int32_t heap_index = this->heap_length / 2; heap_index >= 1; --heap_index) { pqDownHeap(tree, static_cast<uint32_t>(heap_index)); }
+    descriptor->symbol_count = symbol_count;
+    for (uint32_t heap_index = this->heap_length / 2; heap_index >= 1; --heap_index) { pqDownHeap(tree, heap_index); }
     uint32_t node = element_count;
     do {
         const uint32_t first = this->heap[1];
@@ -417,32 +417,32 @@ void SferaDeflateState32::buildTree(SferaTreeDesc32* descriptor) {
         const uint32_t second = this->heap[1];
         this->heap[--this->heap_max] = first;
         this->heap[--this->heap_max] = second;
-        tree[node].code = static_cast<uint16_t>(tree[first].code + tree[second].code);
-        this->depth[node] = static_cast<uint8_t>((this->depth[first] > this->depth[second] ? this->depth[first] : this->depth[second]) + 1u);
-        tree[first].length = static_cast<uint16_t>(node);
-        tree[second].length = static_cast<uint16_t>(node);
+        tree[node].code = (tree[first].code + tree[second].code) & 65535u;
+        this->depth[node] = (std::max(this->depth[first], this->depth[second]) + 1u) & 255u;
+        tree[first].length = node;
+        tree[second].length = node;
         this->heap[1] = node++;
         pqDownHeap(tree, 1u);
     } while (this->heap_length >= 2);
     this->heap[--this->heap_max] = this->heap[1];
     generateBitLengths(descriptor);
-    generateCodes(tree, max_code, this->bit_length_counts);
+    generateCodes(tree, symbol_count, this->bit_length_counts);
 }
 
-void SferaDeflateState32::scanTree(SferaCtData32* tree, int32_t max_code) {
+void SferaDeflateState32::scanTree(SferaCtData32* tree, uint32_t symbol_count) {
     
     int32_t previous_length = -1;
     int32_t next_length = tree[0].length;
     uint32_t count = 0u;
     uint32_t maximum_count = next_length == 0 ? 138u : 7u;
     uint32_t minimum_count = next_length == 0 ? 3u : 4u;
-    tree[max_code + 1].length = std::numeric_limits<uint16_t>::max();
-    for (int32_t symbol = 0; symbol <= max_code; ++symbol) {
+    tree[symbol_count].length = std::numeric_limits<uint16_t>::max();
+    for (uint32_t symbol = 0; symbol < symbol_count; ++symbol) {
         const int32_t current_length = next_length;
         next_length = tree[symbol + 1].length;
         ++count;
         if (count < maximum_count && current_length == next_length) { continue; }
-        if (count < minimum_count) { this->bit_length_tree[current_length].code = static_cast<uint16_t>(this->bit_length_tree[current_length].code + count); }
+        if (count < minimum_count) { this->bit_length_tree[current_length].code += count; }
         else if (current_length != 0) { if (current_length != previous_length) { ++this->bit_length_tree[current_length].code; } ++this->bit_length_tree[16].code; }
         else if (count <= 10u) { ++this->bit_length_tree[17].code; }
         else { ++this->bit_length_tree[18].code; }
@@ -454,7 +454,7 @@ void SferaDeflateState32::scanTree(SferaCtData32* tree, int32_t max_code) {
     }
 }
 
-void SferaDeflateState32::sendTree(SferaCtData32* tree, int32_t max_code) {
+void SferaDeflateState32::sendTree(SferaCtData32* tree, uint32_t symbol_count) {
     
     SferaCtData32* bit_tree = this->bit_length_tree;
     int32_t previous_length = -1;
@@ -462,14 +462,14 @@ void SferaDeflateState32::sendTree(SferaCtData32* tree, int32_t max_code) {
     uint32_t count = 0u;
     uint32_t maximum_count = next_length == 0 ? 138u : 7u;
     uint32_t minimum_count = next_length == 0 ? 3u : 4u;
-    for (int32_t symbol = 0; symbol <= max_code; ++symbol) {
+    for (uint32_t symbol = 0; symbol < symbol_count; ++symbol) {
         const int32_t current_length = next_length;
         next_length = tree[symbol + 1].length;
         ++count;
         if (count < maximum_count && current_length == next_length) { continue; }
-        if (count < minimum_count) { while (count-- != 0u) { sendTreeCode(bit_tree, static_cast<uint32_t>(current_length), false); } }
+        if (count < minimum_count) { while (count-- != 0u) { sendTreeCode(bit_tree, current_length, false); } }
         else if (current_length != 0) {
-            if (current_length != previous_length) { sendTreeCode(bit_tree, static_cast<uint32_t>(current_length), false); --count; }
+            if (current_length != previous_length) { sendTreeCode(bit_tree, current_length, false); --count; }
             sendTreeCode(bit_tree, 16u, false);
             sendBits(count - 3u, 2u);
         }
@@ -483,13 +483,13 @@ void SferaDeflateState32::sendTree(SferaCtData32* tree, int32_t max_code) {
     }
 }
 
-int32_t SferaDeflateState32::buildBitLengthTree() {
-    scanTree(this->literal_descriptor.dynamic_tree, this->literal_descriptor.max_code);
-    scanTree(this->distance_descriptor.dynamic_tree, this->distance_descriptor.max_code);
-    buildTree(&this->bit_length_descriptor);
-    int32_t last_rank = 18;
-    while (last_rank >= 3) { const uint32_t rank = static_cast<uint32_t>(last_rank); const uint32_t order = rank == 3u ? 0u : (rank < 3u ? 16u + rank : 8u + ((rank - 4u) & 1u ? -static_cast<int32_t>((rank - 3u) >> 1u) : static_cast<int32_t>((rank - 4u) >> 1u))); if (this->bit_length_tree[order].length != 0u) { break; } --last_rank; }
-    this->optimal_length += static_cast<uint32_t>(3 * (last_rank + 1) + 14);
+uint32_t SferaDeflateState32::buildBitLengthTree() {
+    scanTree(literal_descriptor.dynamic_tree, literal_descriptor.symbol_count);
+    scanTree(distance_descriptor.dynamic_tree, distance_descriptor.symbol_count);
+    buildTree(&bit_length_descriptor);
+    uint32_t last_rank = 18u;
+    while (last_rank >= 3u && bit_length_tree[codeLengthOrder[last_rank]].length == 0u) --last_rank;
+    optimal_length += 3u * (last_rank + 1u) + 14u;
     return last_rank;
 }
 
@@ -497,15 +497,15 @@ void SferaDeflateState32::sendAllTrees(uint32_t literal_codes, uint32_t distance
     sendBits(literal_codes - 257u, 5u);
     sendBits(distance_codes - 1u, 5u);
     sendBits(bit_length_codes - 4u, 4u);
-    for (uint32_t rank = 0u; rank != bit_length_codes; ++rank) { const uint32_t order = rank < 3u ? 16u + rank : (rank == 3u ? 0u : 8u + ((rank - 4u) & 1u ? -static_cast<int32_t>((rank - 3u) >> 1u) : static_cast<int32_t>((rank - 4u) >> 1u))); sendBits(this->bit_length_tree[order].length, 3u); }
-    sendTree(this->literal_descriptor.dynamic_tree, static_cast<int32_t>(literal_codes - 1u));
-    sendTree(this->distance_descriptor.dynamic_tree, static_cast<int32_t>(distance_codes - 1u));
+    for (uint32_t rank = 0u; rank < bit_length_codes; ++rank) sendBits(bit_length_tree[codeLengthOrder[rank]].length, 3u);
+    sendTree(literal_descriptor.dynamic_tree, literal_codes);
+    sendTree(distance_descriptor.dynamic_tree, distance_codes);
 }
 
 void SferaDeflateState32::flushBlock(const uint8_t* buffer, uint32_t stored_length, uint32_t end_of_file) {
     uint32_t optimal_bytes = 0u;
     uint32_t static_bytes = 0u;
-    int32_t last_bit_length_rank = 0;
+    uint32_t last_bit_length_rank = 0u;
     if (this->level > 0) {
         if (this->data_type == 2u) { setDataType(); }
         buildTree(&this->literal_descriptor);
@@ -520,7 +520,7 @@ void SferaDeflateState32::flushBlock(const uint8_t* buffer, uint32_t stored_leng
     else if (static_bytes == optimal_bytes) { sendBits(2u + (end_of_file & 1u), 3u); compressBlock(nullptr, nullptr); }
     else {
         sendBits(4u + (end_of_file & 1u), 3u);
-        sendAllTrees(static_cast<uint32_t>(this->literal_descriptor.max_code + 1), static_cast<uint32_t>(this->distance_descriptor.max_code + 1), static_cast<uint32_t>(last_bit_length_rank + 1));
+        sendAllTrees(literal_descriptor.symbol_count, distance_descriptor.symbol_count, last_bit_length_rank + 1u);
         compressBlock(this->literal_descriptor.dynamic_tree, this->distance_descriptor.dynamic_tree);
     }
     initBlock();
@@ -557,8 +557,8 @@ bool SferaDeflateState32::tally(uint32_t distance, uint32_t literal_or_length) {
     uint8_t* literals = this->literal_buffer.data();
     uint16_t* distances = this->distance_buffer.data();
     const uint32_t index = this->last_literal++;
-    distances[index] = static_cast<uint16_t>(distance);
-    literals[index] = static_cast<uint8_t>(literal_or_length);
+    distances[index] = distance & 65535u;
+    literals[index] = literal_or_length & 255u;
     if (distance == 0u) { ++this->dynamic_literal_tree[literal_or_length].code; }
     else {
         ++this->matches;
@@ -575,20 +575,20 @@ bool SferaDeflateState32::tally(uint32_t distance, uint32_t literal_or_length) {
 
 uint32_t SferaDeflateState32::insertString(uint8_t* window, uint16_t* previous, uint16_t* heads) {
     this->ins_h = ((this->ins_h << this->hash_shift) ^ window[this->strstart + 2u]) & this->hash_mask;
-    const uint32_t hash_head = heads[this->ins_h];
-    previous[this->strstart & this->w_mask] = static_cast<uint16_t>(hash_head);
-    heads[this->ins_h] = static_cast<uint16_t>(this->strstart);
+    const uint16_t hash_head = heads[this->ins_h];
+    previous[this->strstart & this->w_mask] = hash_head;
+    heads[this->ins_h] = this->strstart & 65535u;
     return hash_head;
 }
 
-int32_t SferaDeflateState32::flushCurrentBlock(bool end_of_file) {
-    const uint8_t* buffer = this->block_start >= 0 ? this->window.data() + this->block_start : nullptr;
-    const uint32_t stored_length = static_cast<uint32_t>(static_cast<int64_t>(this->strstart) - static_cast<int64_t>(this->block_start));
+std::optional<SferaDeflateState32::BlockState> SferaDeflateState32::flushCurrentBlock(bool end_of_file) {
+    const uint8_t* buffer = block_start >= 0 ? window.data() + block_start : nullptr;
+    const uint32_t stored_length = strstart - block_start;
     flushBlock(buffer, stored_length, end_of_file ? 1u : 0u);
-    this->block_start = static_cast<int32_t>(this->strstart);
+    block_start = strstart;
     strm->deflateFlushPending();
-    if (this->strm->avail_out == 0u) { return end_of_file ? 2 : 0; }
-    return -1;
+    if (strm->avail_out == 0u) return end_of_file ? BlockState::FinalNeedOutput : BlockState::NeedOutput;
+    return std::nullopt;
 }
 
 int SferaZStream32::deflateReset() {
@@ -618,9 +618,9 @@ int SferaZStream32::deflate(int32_t flush) {
     const int32_t previous_flush = state->last_flush;
     state->last_flush = flush;
     if (state->phase == SferaDeflateState32::Phase::Header) {
-        uint32_t header = (static_cast<uint32_t>(state->method) + ((state->w_bits - 8u) << 4u)) << 8u;
-        uint32_t level_flags = static_cast<uint32_t>((state->level - 1) >> 1);
-        if (level_flags > 3u) { level_flags = 3u; }
+        uint32_t header = (state->method + ((state->w_bits - 8u) << 4u)) << 8u;
+        const int level_hint = (state->level - 1) >> 1;
+        const uint32_t level_flags = level_hint < 0 ? 3 : std::min(level_hint, 3);
         header |= level_flags << 6u;
         if (state->strstart != 0u) { header |= preset_dictionary_flag; }
         header += 31u - header % 31u;
@@ -636,13 +636,14 @@ int SferaZStream32::deflate(int32_t flush) {
     else if (this->avail_in == 0u && flush <= previous_flush && flush != 4) { this->msg = "buffer error"; return -5; }
     if (state->phase == SferaDeflateState32::Phase::Complete && this->avail_in != 0u) { this->msg = "buffer error"; return -5; }
     if (this->avail_in != 0u || state->lookahead != 0u || (flush != 0 && state->phase != SferaDeflateState32::Phase::Complete)) {
-        uint32_t block_state = 0u;
+        using BlockState = SferaDeflateState32::BlockState;
+        BlockState block_state;
         if (state->level == 0) { block_state = state->deflateStored(flush); }
         else if (state->level <= 3) { block_state = state->deflateFast(flush); }
         else { block_state = state->deflateSlow(flush); }
-        if (block_state == 2u || block_state == 3u) { state->phase = SferaDeflateState32::Phase::Complete; }
-        if (block_state == 0u || block_state == 2u) { if (this->avail_out == 0u) { state->last_flush = -1; } return 0u; }
-        if (block_state == 1u) {
+        if (block_state == BlockState::FinalNeedOutput || block_state == BlockState::Complete) { state->phase = SferaDeflateState32::Phase::Complete; }
+        if (block_state == BlockState::NeedOutput || block_state == BlockState::FinalNeedOutput) { if (this->avail_out == 0u) { state->last_flush = -1; } return 0u; }
+        if (block_state == BlockState::BlockDone) {
             if (flush == 1) { state->alignStaticBlock(); }
             else {
                 state->writeStoredBlock(nullptr, 0u, 0u);
@@ -661,42 +662,41 @@ int SferaZStream32::deflate(int32_t flush) {
     return state->pending != 0 ? 0u : 1u;
 }
 
-uint32_t SferaDeflateState32::deflateStored(int32_t flush) {
+SferaDeflateState32::BlockState SferaDeflateState32::deflateStored(int32_t flush) {
     uint32_t max_block_size = std::numeric_limits<uint16_t>::max();
     if (max_block_size > this->pending_buf_size - 5u) { max_block_size = this->pending_buf_size - 5u; }
     for (;;) {
         if (this->lookahead <= 1u) {
             deflateFillWindow();
-            if (this->lookahead == 0u && flush == 0) { return 0u; }
+            if (this->lookahead == 0u && flush == 0) { return BlockState::NeedOutput; }
             if (this->lookahead == 0u) { break; }
         }
         this->strstart += this->lookahead;
         this->lookahead = 0u;
-        const uint32_t max_start = static_cast<uint32_t>(this->block_start) + max_block_size;
+        const uint32_t max_start = this->block_start + max_block_size;
         if (this->strstart == 0u || this->strstart >= max_start) {
             this->lookahead = this->strstart - max_start;
             this->strstart = max_start;
-            const int32_t result = flushCurrentBlock(false);
-            if (result >= 0) { return static_cast<uint32_t>(result); }
+            const auto result = flushCurrentBlock(false);
+            if (result) return *result;
         }
-        if (this->strstart - static_cast<uint32_t>(this->block_start) >= this->w_size - 262u) {
-            const int32_t result = flushCurrentBlock(false);
-            if (result >= 0) { return static_cast<uint32_t>(result); }
+        if (this->strstart - this->block_start >= this->w_size - 262u) {
+            const auto result = flushCurrentBlock(false);
+            if (result) return *result;
         }
     }
     const bool finishing = flush == 4;
-    const int32_t result = flushCurrentBlock(finishing);
-    return result >= 0 ? static_cast<uint32_t>(result) : (finishing ? 3u : 1u);
+    return flushCurrentBlock(finishing).value_or(finishing ? BlockState::Complete : BlockState::BlockDone);
 }
 
-uint32_t SferaDeflateState32::deflateFast(int32_t flush) {
+SferaDeflateState32::BlockState SferaDeflateState32::deflateFast(int32_t flush) {
     uint8_t* window = this->window.data();
     uint16_t* previous = this->prev.data();
     uint16_t* heads = this->head.data();
     for (;;) {
         if (this->lookahead < 262u) {
             deflateFillWindow();
-            if (this->lookahead < 262u && flush == 0) { return 0u; }
+            if (this->lookahead < 262u && flush == 0) { return BlockState::NeedOutput; }
             if (this->lookahead == 0u) { break; }
         }
         uint32_t hash_head = 0u;
@@ -723,21 +723,20 @@ uint32_t SferaDeflateState32::deflateFast(int32_t flush) {
             --this->lookahead;
             ++this->strstart;
         }
-        if (flush_block) { const int32_t result = flushCurrentBlock(false); if (result >= 0) { return static_cast<uint32_t>(result); } }
+        if (flush_block) { const auto result = flushCurrentBlock(false); if (result) return *result; }
     }
     const bool finishing = flush == 4;
-    const int32_t result = flushCurrentBlock(finishing);
-    return result >= 0 ? static_cast<uint32_t>(result) : (finishing ? 3u : 1u);
+    return flushCurrentBlock(finishing).value_or(finishing ? BlockState::Complete : BlockState::BlockDone);
 }
 
-uint32_t SferaDeflateState32::deflateSlow(int32_t flush) {
+SferaDeflateState32::BlockState SferaDeflateState32::deflateSlow(int32_t flush) {
     uint8_t* window = this->window.data();
     uint16_t* previous = this->prev.data();
     uint16_t* heads = this->head.data();
     for (;;) {
         if (this->lookahead < 262u) {
             deflateFillWindow();
-            if (this->lookahead < 262u && flush == 0) { return 0u; }
+            if (this->lookahead < 262u && flush == 0) { return BlockState::NeedOutput; }
             if (this->lookahead == 0u) { break; }
         }
         uint32_t hash_head = 0u;
@@ -758,21 +757,20 @@ uint32_t SferaDeflateState32::deflateSlow(int32_t flush) {
             this->match_available = 0;
             this->match_length = 2u;
             ++this->strstart;
-            if (flush_block) { const int32_t result = flushCurrentBlock(false); if (result >= 0) { return static_cast<uint32_t>(result); } }
+            if (flush_block) { const auto result = flushCurrentBlock(false); if (result) return *result; }
         }
         else if (this->match_available != 0) {
             const bool flush_block = tally(0u, window[this->strstart - 1u]);
             if (flush_block) { flushCurrentBlock(false); }
             ++this->strstart;
             --this->lookahead;
-            if (this->strm->avail_out == 0u) { return 0u; }
+            if (this->strm->avail_out == 0u) { return BlockState::NeedOutput; }
         }
         else { this->match_available = 1; ++this->strstart; --this->lookahead; }
     }
     if (this->match_available != 0) { tally(0u, window[this->strstart - 1u]); this->match_available = 0; }
     const bool finishing = flush == 4;
-    const int32_t result = flushCurrentBlock(finishing);
-    return result >= 0 ? static_cast<uint32_t>(result) : (finishing ? 3u : 1u);
+    return flushCurrentBlock(finishing).value_or(finishing ? BlockState::Complete : BlockState::BlockDone);
 }
 
 uint32_t SferaZStream32::adler32(uint32_t adler, const uint8_t* buffer, uint32_t length) {
@@ -794,12 +792,12 @@ uint32_t SferaZStream32::adler32(uint32_t adler, const uint8_t* buffer, uint32_t
 
 void SferaDeflateState32::deflatePutShortMsb(uint32_t value) {
     uint8_t* pending_bytes = this->pending_buf.data();
-    pending_bytes[this->pending++] = static_cast<uint8_t>(value >> 8u);
-    pending_bytes[this->pending++] = static_cast<uint8_t>(value);
+    pending_bytes[this->pending++] = (value >> 8u) & 255u;
+    pending_bytes[this->pending++] = value & 255u;
 }
 
 void SferaZStream32::deflateFlushPending() {
-    uint32_t length = static_cast<uint32_t>(state->pending);
+    uint32_t length = state->pending;
     if (length > this->avail_out) { length = this->avail_out; }
     if (length == 0u) { return; }
     std::memcpy(this->next_out, state->pending_buf.data() + state->pending_offset, length);
@@ -807,7 +805,7 @@ void SferaZStream32::deflateFlushPending() {
     state->pending_offset += length;
     this->total_out += length;
     this->avail_out -= length;
-    state->pending -= static_cast<int32_t>(length);
+    state->pending -= length;
     if (state->pending == 0) { state->pending_offset = 0u; }
 }
 
@@ -845,7 +843,7 @@ uint32_t SferaDeflateState32::deflateLongestMatch(uint32_t current_match) {
     uint16_t* previous = this->prev.data();
     uint32_t chain_left = this->max_chain_length;
     uint32_t best_length = this->prev_length;
-    uint32_t nice_length = this->nice_match > 0 ? static_cast<uint32_t>(this->nice_match) : 0u;
+    uint32_t nice_length = this->nice_match;
     if (nice_length > this->lookahead) { nice_length = this->lookahead; }
     if (this->prev_length >= this->good_match) { chain_left >>= 2u; }
     const uint32_t max_distance = this->w_size - 262u;
@@ -884,9 +882,9 @@ void SferaDeflateState32::deflateFillWindow() {
             std::memcpy(window, window + window_size, window_size);
             this->match_start -= window_size;
             this->strstart -= window_size;
-            this->block_start -= static_cast<int32_t>(window_size);
-            for (uint32_t index = 0u; index != this->hash_size; ++index) { const uint32_t value = heads[index]; heads[index] = static_cast<uint16_t>(value >= window_size ? value - window_size : 0u); }
-            for (uint32_t index = 0u; index != window_size; ++index) { const uint32_t value = previous[index]; previous[index] = static_cast<uint16_t>(value >= window_size ? value - window_size : 0u); }
+            this->block_start -= window_size;
+            for (uint32_t index = 0u; index != this->hash_size; ++index) { const uint32_t value = heads[index]; heads[index] = value >= window_size ? value - window_size : 0u; }
+            for (uint32_t index = 0u; index != window_size; ++index) { const uint32_t value = previous[index]; previous[index] = value >= window_size ? value - window_size : 0u; }
             more += window_size;
         }
         if (this->strm->avail_in == 0u) { return; }
@@ -918,7 +916,7 @@ int SferaZStream32::compress(std::uint8_t* output, std::uint32_t& outputSize, st
     try {
         SferaZStream32 stream;
         stream.next_in = input.data();
-        stream.avail_in = static_cast<std::uint32_t>(input.size());
+        stream.avail_in = input.size();
         stream.next_out = output;
         stream.avail_out = outputSize;
         SferaDeflateState32 state(stream, level);
@@ -931,7 +929,8 @@ int SferaZStream32::compress(std::uint8_t* output, std::uint32_t& outputSize, st
 bool SferaZStream32::readBits(std::uint32_t count, std::uint32_t& value) {
     while (input_bit_count < count) {
         if (avail_in == 0) return false;
-        input_bits |= static_cast<std::uint32_t>(*next_in++) << input_bit_count;
+        const std::uint32_t byte = *next_in++;
+        input_bits |= byte << input_bit_count;
         input_bit_count += 8;
         --avail_in;
         ++total_in;
@@ -961,7 +960,7 @@ bool SferaInflateHuft32::build(std::span<const std::uint8_t> lengths, bool codeL
     std::array<std::uint16_t, 16> offsets{};
     for (std::size_t bits = 1; bits + 1 < offsets.size(); ++bits) offsets[bits + 1] = offsets[bits] + counts[bits];
     for (std::size_t symbol = 0; symbol < lengths.size(); ++symbol) {
-        if (lengths[symbol] != 0) symbols[offsets[lengths[symbol]]++] = static_cast<std::uint16_t>(symbol);
+        if (lengths[symbol] != 0) symbols[offsets[lengths[symbol]]++] = symbol;
     }
     return true;
 }
@@ -980,7 +979,6 @@ int SferaInflateHuft32::decode(SferaZStream32& stream) const {
     return -3;
 }
 int SferaZStream32::inflate() {
-    static constexpr std::array<std::uint8_t, 19> codeLengthOrder{16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
     std::uint32_t methodByte, flags;
     if (!readBits(8, methodByte) || !readBits(8, flags)) return -5;
     const auto method = methodByte & 15u;
@@ -1006,7 +1004,7 @@ int SferaZStream32::inflate() {
             for (std::uint32_t i = 0; i < length; ++i) {
                 std::uint32_t value;
                 if (avail_out == 0 || !readBits(8, value)) return -5;
-                *next_out++ = static_cast<std::uint8_t>(value);
+                *next_out++ = value;
                 --avail_out;
                 ++total_out;
             }
@@ -1018,7 +1016,7 @@ int SferaZStream32::inflate() {
         std::uint32_t distanceCount = 32;
         SferaInflateHuft32 literalTree, distanceTree;
         if (blockType == 1) {
-            for (std::uint32_t symbol = 0; symbol < literalCount; ++symbol) lengths[symbol] = static_cast<std::uint8_t>(SferaDeflateState32::fixedLiteralLength(symbol));
+            for (std::uint32_t symbol = 0; symbol < literalCount; ++symbol) lengths[symbol] = SferaDeflateState32::fixedLiteralLength(symbol);
             std::fill(lengths.begin() + literalCount, lengths.end(), 5);
         } else {
             std::uint32_t codeCount;
@@ -1031,7 +1029,7 @@ int SferaZStream32::inflate() {
             for (std::uint32_t i = 0; i < codeCount; ++i) {
                 std::uint32_t length;
                 if (!readBits(3, length)) return -5;
-                codeLengths[codeLengthOrder[i]] = static_cast<std::uint8_t>(length);
+                codeLengths[codeLengthOrder[i]] = length;
             }
             SferaInflateHuft32 codeTree;
             if (!codeTree.build(codeLengths, true)) return -3;
@@ -1040,7 +1038,7 @@ int SferaZStream32::inflate() {
             while (index < count) {
                 const int symbol = codeTree.decode(*this);
                 if (symbol < 0) return symbol;
-                if (symbol < 16) { lengths[index++] = static_cast<std::uint8_t>(symbol); continue; }
+                if (symbol < 16) { lengths[index++] = symbol; continue; }
                 if (symbol > 18 || (symbol == 16 && index == 0)) return -3;
                 const auto extraBits = SferaDeflateState32::treeExtraBits(SferaZlibTreeKind::BitLength, symbol);
                 std::uint32_t repetitions;
@@ -1059,13 +1057,13 @@ int SferaZStream32::inflate() {
             if (symbol == 256) break;
             if (symbol < 256) {
                 if (avail_out == 0) return -5;
-                *next_out++ = static_cast<std::uint8_t>(symbol);
+                *next_out++ = symbol;
                 --avail_out;
                 ++total_out;
                 continue;
             }
             if (symbol > 285) return -3;
-            const auto lengthCode = static_cast<std::uint32_t>(symbol - 257);
+            const std::uint32_t lengthCode = symbol - 257;
             const auto lengthBits = SferaDeflateState32::treeExtraBits(SferaZlibTreeKind::Literal, symbol);
             std::uint32_t lengthExtra;
             if (!readBits(lengthBits, lengthExtra)) return -5;
@@ -1102,7 +1100,7 @@ int SferaZStream32::decompress(std::uint8_t* output, std::uint32_t& outputSize, 
     if (output == nullptr || input.size() > std::numeric_limits<std::uint32_t>::max()) return -2;
     SferaZStream32 stream;
     stream.next_in = input.data();
-    stream.avail_in = static_cast<std::uint32_t>(input.size());
+    stream.avail_in = input.size();
     stream.next_out = output;
     stream.avail_out = outputSize;
     const auto status = stream.inflate();
@@ -1116,24 +1114,27 @@ bool SferaZStream32::hasEnvelope(std::span<const std::uint8_t> input) {
 }
 int SferaZStream32::compressEnvelope(std::uint8_t* output, std::uint32_t& outputSize, std::span<const std::uint8_t> input) {
     if (output == nullptr || outputSize < envelope_header_size || input.size() > std::numeric_limits<std::uint32_t>::max()) return -1;
-    auto payloadSize = outputSize - static_cast<std::uint32_t>(envelope_header_size);
+    std::uint32_t payloadSize = outputSize - envelope_header_size;
     auto* payload = output + envelope_header_size;
     if (compress(payload, payloadSize, input, 1) != 0) return -1;
     if (payloadSize <= envelope_length_mask_index) return -1;
     for (const auto index : envelope_encoded_positions) {
         if (index < payloadSize) payload[index] ^= payload[0];
     }
-    const auto originalSize = static_cast<std::uint32_t>(input.size());
-    for (std::size_t i = 0; i < sizeof(originalSize); ++i) output[4 + i] = static_cast<std::uint8_t>(originalSize >> (8u * i)) ^ payload[envelope_length_mask_index];
+    const std::uint32_t originalSize = input.size();
+    for (std::size_t i = 0; i < sizeof(originalSize); ++i) output[4 + i] = ((originalSize >> (8u * i)) & 255u) ^ payload[envelope_length_mask_index];
     std::copy_n("SPHR", 4, output);
-    outputSize = payloadSize + static_cast<std::uint32_t>(envelope_header_size);
+    outputSize = payloadSize + envelope_header_size;
     return 0;
 }
 int SferaZStream32::decompressEnvelope(std::uint8_t* output, std::uint32_t& outputSize, std::span<std::uint8_t> input) {
     if (!hasEnvelope(input) || input.size() <= envelope_header_size + envelope_length_mask_index) return -2;
     auto payload = input.subspan(envelope_header_size);
     if (outputSize == 0) {
-        for (std::size_t i = 0; i < sizeof(outputSize); ++i) outputSize |= static_cast<std::uint32_t>(input[4 + i] ^ payload[envelope_length_mask_index]) << (8u * i);
+        for (std::size_t i = 0; i < sizeof(outputSize); ++i) {
+            const std::uint32_t byte = input[4 + i] ^ payload[envelope_length_mask_index];
+            outputSize |= byte << (8u * i);
+        }
         return 0;
     }
     for (const auto index : envelope_encoded_positions) {

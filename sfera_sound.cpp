@@ -37,15 +37,11 @@ bool g_hardware_mixing = false;
 int g_stream_volume = 100;
 
 std::uint16_t readU16(const std::uint8_t* value) {
-    return static_cast<std::uint16_t>(value[0]) |
-        static_cast<std::uint16_t>(static_cast<std::uint16_t>(value[1]) << 8u);
+    return SferaBinary::readLittleEndian<std::uint16_t>(value);
 }
 
 std::uint32_t readU32(const std::uint8_t* value) {
-    return static_cast<std::uint32_t>(value[0]) |
-        (static_cast<std::uint32_t>(value[1]) << 8u) |
-        (static_cast<std::uint32_t>(value[2]) << 16u) |
-        (static_cast<std::uint32_t>(value[3]) << 24u);
+    return SferaBinary::readLittleEndian<std::uint32_t>(value);
 }
 
 bool readBinaryFile(const std::string& filename, std::vector<std::uint8_t>& bytes) {
@@ -163,7 +159,7 @@ LONG directSoundVolume(float gain) {
     gain = normalizedGain(gain);
     if (gain <= 0.00001f) return DSBVOLUME_MIN;
     const double units = 2000.0 * std::log10(static_cast<double>(gain));
-    return static_cast<LONG>(std::clamp<long>(static_cast<long>(std::lround(units)), DSBVOLUME_MIN, DSBVOLUME_MAX));
+    return static_cast<LONG>(std::clamp<long>(std::lround(units), DSBVOLUME_MIN, DSBVOLUME_MAX));
 }
 
 class SoundBufferMapping {
@@ -212,8 +208,9 @@ bool createBuffer(IDirectSound8* device, const DecodedAudio& audio, bool spatial
     if (device == nullptr || audio.pcm.empty()) return false;
     DSBUFFERDESC description{};
     description.dwSize = sizeof(description);
-    description.dwBufferBytes = static_cast<DWORD>(audio.pcm.size());
-    description.lpwfxFormat = const_cast<WAVEFORMATEX*>(&audio.format);
+    description.dwBufferBytes = audio.pcm.size();
+    auto format = audio.format;
+    description.lpwfxFormat = &format;
     description.dwFlags = DSBCAPS_CTRLVOLUME | DSBCAPS_GETCURRENTPOSITION2 | DSBCAPS_GLOBALFOCUS;
     if (spatial && audio.format.nChannels == 1u) {
         description.dwFlags |= DSBCAPS_CTRL3D | DSBCAPS_MUTE3DATMAXDISTANCE;
@@ -248,7 +245,7 @@ std::uint32_t secondsToBytes(const WAVEFORMATEX& format, float seconds, std::siz
     const double raw = static_cast<double>(seconds) * format.nAvgBytesPerSec;
     std::size_t value = static_cast<std::size_t>(std::min<double>(raw, static_cast<double>(last_block)));
     value -= value % block_align;
-    return static_cast<std::uint32_t>(std::min<std::size_t>(value, std::numeric_limits<std::uint32_t>::max()));
+    return std::min<std::size_t>(value, std::numeric_limits<std::uint32_t>::max());
 }
 
 
@@ -395,7 +392,7 @@ float CSound::GetPlayTimepos() const {
     DWORD play = 0u;
     DWORD write = 0u;
     if (FAILED(impl_->buffer->GetCurrentPosition(&play, &write))) return impl_->requested_position;
-    return static_cast<float>(static_cast<double>(play) / impl_->audio.format.nAvgBytesPerSec);
+    return (static_cast<double>(play) / impl_->audio.format.nAvgBytesPerSec);
 }
 
 int CSound::IsSoundPlaying() const {
@@ -532,8 +529,8 @@ int SI_GetStreamVolume() {
     return g_stream_volume;
 }
 
-CSoundInterface* SI_CreateInterface(void* native_window, int, std::uint32_t sample_rate, std::uint32_t) {
-    const HWND window = static_cast<HWND>(native_window);
+CSoundInterface* SI_CreateInterface(HWND__* native_window, int, std::uint32_t sample_rate, std::uint32_t) {
+    const HWND window = native_window;
     if (g_interface != nullptr) return g_interface.get();
 
     auto sound_interface = std::make_unique<CSoundInterface>();

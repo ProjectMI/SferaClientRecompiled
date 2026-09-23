@@ -183,7 +183,7 @@ struct SferaMbcProcessRecord {
     std::vector<ScriptProgramDiagnostic> programs;
     std::vector<SferaMbcFunctionRecord> functions;
     const std::uint8_t* codeData() const noexcept { return bytecode ? bytecode->data() : nullptr; }
-    std::uint32_t codeSize() const noexcept { return bytecode ? static_cast<std::uint32_t>(bytecode->size()) : 0; }
+    std::uint32_t codeSize() const noexcept { return bytecode ? bytecode->size() : 0; }
     int32_t chain_prev_index = -1;
     int32_t chain_next_index = -1;
     uint16_t program_map_a[4];
@@ -266,7 +266,7 @@ struct SferaMbcRuntime {
         else if (value == -1) return UINT32_MAX;
         const NativeResource resource{value};
         if (const auto existing = native_resource_ids.find(resource); existing != native_resource_ids.end()) return existing->second;
-        if (next_native_handle >= static_cast<std::uint32_t>(INT32_MAX)) throw std::length_error("Script resource handles exhausted");
+        if (next_native_handle >= INT32_MAX) throw std::length_error("Script resource handles exhausted");
         const auto handle = next_native_handle++;
         native_resources.emplace(handle, resource);
         try { native_resource_ids.emplace(resource, handle); } catch (...) { native_resources.erase(handle); throw; }

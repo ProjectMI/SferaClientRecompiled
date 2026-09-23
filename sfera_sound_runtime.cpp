@@ -91,7 +91,7 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
 }
 
     float sound_elapsed(std::uint64_t start) {
-        return static_cast<float>(static_cast<std::int64_t>(WorldClock::nowTicks() - start)) * 0.0001f;
+        return static_cast<std::int64_t>(WorldClock::nowTicks() - start) * 0.0001f;
     }
     std::uint32_t sound_flag(std::string_view token) {
         if (SferaText::asciiEqual(token, "SF_TYPE_ENVIRONMENT")) return 1u << 0u;
@@ -200,7 +200,7 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
             const auto& group = groups[selected];
             if ((effect.definition->flags & ((1u << 2u) | (1u << 3u))) != 0u && group.source_end >= group.source_begin && group.source_end - group.source_begin + 1u > 1u) {
                 std::size_t value = group.source_begin;
-                do value = group.source_begin + static_cast<std::size_t>(std::rand()) % (group.source_end - group.source_begin + 1u);
+                do value = group.source_begin + std::rand() % (group.source_end - group.source_begin + 1u);
                 while (effect.last_source_index == value);
                 return value;
             }
@@ -208,7 +208,7 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
         }
         if ((effect.definition->flags & ((1u << 2u) | (1u << 3u))) != 0u && effect.definition->sources.size() > 1u) {
             std::size_t value = 0u;
-            do value = static_cast<std::size_t>(std::rand()) % effect.definition->sources.size();
+            do value = std::rand() % effect.definition->sources.size();
             while (effect.last_source_index == value);
             return value;
         }
@@ -395,7 +395,7 @@ void CSoundEffect::start(const SferaVec3F* frame, bool after_start_time) {
     if (manager == nullptr || filename.empty()) return;
     if ((definition->flags & (1u << 5u)) != 0u) {
         auto random_component = [](float radius) {
-            return static_cast<float>(std::rand() - std::rand()) * 3.0518509447574615e-05f * radius;
+            return (std::rand() - std::rand()) * 3.0518509447574615e-05f * radius;
         };
         region_offset = {random_component(definition->region_radius.x), random_component(definition->region_radius.y), random_component(definition->region_radius.z)};
     }
@@ -578,7 +578,7 @@ SoundEventRecord SferaSoundPlaybackState::nextEvent() noexcept {
         current_list = &playlists[event.argument - 1u];
         if (current_list->groups.empty()) return {};
         current_list->item_index = 0u;
-        current_list->group_index = static_cast<std::size_t>(std::rand()) % current_list->groups.size();
+        current_list->group_index = std::rand() % current_list->groups.size();
     }
 }
 
@@ -652,7 +652,7 @@ float SferaSoundPlaybackState::parseTime(std::string_view text) {
 
     const auto minutes = std::atoi(std::string(token.substr(0u, prefix_size)).c_str());
     const auto seconds = std::atof(std::string(token.substr(prefix_size + 1u)).c_str());
-    return static_cast<float>(minutes * 60.0 + seconds);
+    return (minutes * 60.0 + seconds);
 }
 
 bool SferaSoundPlaybackState::load(const std::string& filename) {
@@ -724,7 +724,7 @@ bool SferaSoundPlaybackState::load(const std::string& filename) {
 
     const int starting_pattern = parser.findValue("start_pattern", &block) ? parser.readInt(0u) : 1;
     if (starting_pattern <= 0 || std::cmp_greater(starting_pattern, playlists.size())) return false;
-    playlist_index = static_cast<std::size_t>(starting_pattern - 1);
+    playlist_index = (starting_pattern - 1);
     return true;
 }
 
@@ -743,14 +743,14 @@ bool SferaSoundPlaybackState::start() {
     stream->decode_state = this;
     stream->play_callback = &sfera_sound_play_callback;
     stream->play_state = this;
-    stream->stream_gain = static_cast<float>(volume_scale);
+    stream->stream_gain = volume_scale;
 
     playing = false;
     finished = false;
     force_stop = false;
     current_list = &playlists[playlist_index];
     current_list->item_index = 0u;
-    current_list->group_index = static_cast<std::size_t>(std::rand()) % current_list->groups.size();
+    current_list->group_index = std::rand() % current_list->groups.size();
     event_queue.clear();
     stopped = false;
     return true;
@@ -904,7 +904,7 @@ void SferaSoundRuntime::requestTrack(std::optional<std::string_view> filename) {
 }
 
 void CSoundManager::setVolume(int percent) {
-    volume = static_cast<float>(std::clamp(percent, 0, 100)) * 0.01f;
+    volume = std::clamp(percent, 0, 100) * 0.01f;
     for (const auto& sound : sounds) {
         sound->SetVolume(volume);
     }
