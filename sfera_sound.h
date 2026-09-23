@@ -2,21 +2,26 @@
 
 #include <cstdint>
 #include <memory>
+#include "semantic_types.h"
 
-struct SferaSoundVec3 {
-    float x = 0.0f;
-    float y = 0.0f;
-    float z = 0.0f;
-};
 
 struct SferaSound3DParameters {
-    SferaSoundVec3 position{};
-    SferaSoundVec3 cone_orientation{0.0f, 0.0f, -1.0f};
+    SferaVec3F position{};
+    SferaVec3F cone_orientation{0.0f, 0.0f, -1.0f};
     std::uint32_t inside_cone_angle = 360u;
     std::uint32_t outside_cone_angle = 360u;
     float min_distance = 1.0f;
     float max_distance = 1000000000.0f;
 };
+
+struct SferaVorbisPcm {
+    std::uint16_t channels = 0u;
+    std::uint32_t sample_rate = 0u;
+    std::vector<std::int16_t> samples;
+};
+
+bool sferaDecodeVorbis(const std::uint8_t* data, std::size_t size, SferaVorbisPcm& output) noexcept;
+
 
 class CSoundInterface;
 class CSoundStream;
@@ -30,12 +35,12 @@ public:
     CSoundListener(const CSoundListener&) = delete;
     CSoundListener& operator=(const CSoundListener&) = delete;
 
-    void GetOrientation(SferaSoundVec3* forward, SferaSoundVec3* up) const;
+    void GetOrientation(SferaVec3F* forward, SferaVec3F* up) const;
     int SetPosition(float x, float y, float z, int deferred);
     int SetVelocity(float x, float y, float z, int deferred);
-    int SetOrientation(const SferaSoundVec3& forward, const SferaSoundVec3& up, int deferred);
+    int SetOrientation(const SferaVec3F& forward, const SferaVec3F& up, int deferred);
 
-    SferaSoundVec3 position{};
+    SferaVec3F position{};
 
 private:
     struct Impl;
@@ -87,7 +92,7 @@ public:
     int Play(int looped);
     int SetVelocity(float x, float y, float z, int deferred);
 
-    char* filename = nullptr;
+    std::string filename;
     float duration_seconds = 0.0f;
     int cache_lifetime_seconds = 0;
     std::uint64_t cache_idle_since = UINT64_MAX;
@@ -132,6 +137,7 @@ private:
     friend class CSoundInterface;
     friend CSoundStream* SI_StreamCreateFile(const char*, std::uint32_t);
     friend void SI_StreamFree(CSoundStream*);
+    friend void SI_Close();
     friend void SI_SetStreamVolume(int);
 };
 

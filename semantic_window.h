@@ -13,33 +13,7 @@
 #include <string_view>
 #include <optional>
 
-struct SferaColor {
-    std::array<std::uint8_t, 4> channels;
-    static constexpr SferaColor rgba(std::uint32_t red, std::uint32_t green, std::uint32_t blue, std::uint32_t alpha = 255u) { return {{static_cast<std::uint8_t>(red), static_cast<std::uint8_t>(green), static_cast<std::uint8_t>(blue), static_cast<std::uint8_t>(alpha)}}; }
-    static constexpr SferaColor fromArgb(std::uint32_t value) { return rgba(value >> 16u, value >> 8u, value, value >> 24u); }
-    constexpr std::uint8_t red() const { return channels[0]; }
-    constexpr std::uint8_t green() const { return channels[1]; }
-    constexpr std::uint8_t blue() const { return channels[2]; }
-    constexpr std::uint8_t alpha() const { return channels[3]; }
-    constexpr std::uint32_t argb() const { return (std::uint32_t(alpha()) << 24u) | (std::uint32_t(red()) << 16u) | (std::uint32_t(green()) << 8u) | blue(); }
-    constexpr SferaColor withAlpha(std::uint32_t value) const { return rgba(red(), green(), blue(), value); }
-    constexpr SferaColor scaledAlpha(std::uint32_t factor, std::uint32_t divisor = 255u) const { return withAlpha(std::uint32_t(alpha()) * factor / divisor); }
-    constexpr SferaColor scaledRgb(std::uint32_t factor, std::uint32_t divisor) const { return rgba(std::uint32_t(red()) * factor / divisor, std::uint32_t(green()) * factor / divisor, std::uint32_t(blue()) * factor / divisor, alpha()); }
-    constexpr std::uint16_t rgb565() const { return static_cast<std::uint16_t>(((red() >> 3u) << 11u) | ((green() >> 2u) << 5u) | (blue() >> 3u)); }
-    static constexpr SferaColor fromArgb4444(std::uint16_t value) { return rgba(((value >> 8u) & 15u) * 17u, ((value >> 4u) & 15u) * 17u, (value & 15u) * 17u, (value >> 12u) * 17u); }
-    constexpr std::uint16_t argb4444() const { return static_cast<std::uint16_t>(((alpha() >> 4u) << 12u) | ((red() >> 4u) << 8u) | ((green() >> 4u) << 4u) | (blue() >> 4u)); }
-};
-
-struct SferaScreenVertex {
-    float x;
-    float y;
-    float z;
-    float rhw;
-    std::uint32_t diffuse;
-    std::uint32_t specular;
-    float u;
-    float v;
-};
+#include "semantic_types.h"
 
 class SferaSimpleParser;
 struct SferaParserRange;
@@ -290,17 +264,18 @@ namespace SphereUI {
         void setName(const char* value);
         Window* controlAt(std::size_t index) const;
         void addModalReference(Window& window);
+        void beginModal(Window* owner);
         const char* getName() const;
         const char* getResourceName() const;
         void setResourceName(const char* value);
         virtual bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range);
-        virtual std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second);
+        virtual std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second);
         virtual void setPosition(int x, int y);
         virtual void draw();
         virtual void handleInput(const WindowInput& input);
         virtual void setOpacity(float opacity);
         virtual bool hitTest(int screen_x, int screen_y);
-        virtual void dispatchMessage(int target_group, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second, SphereUI::UiControlKind target_kind);
+        virtual void dispatchMessage(int target_group, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second, SphereUI::UiControlKind target_kind);
         virtual void setFont(int font_id);
         virtual int getFont() const;
         virtual ~Window();
@@ -328,7 +303,7 @@ namespace SphereUI {
         void click();
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
     };
@@ -353,7 +328,7 @@ namespace SphereUI {
 
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         virtual void playClickSound();
@@ -406,11 +381,12 @@ namespace SphereUI {
         int caret_position{};
         std::size_t observed_length{};
         void updatePassword();
+        void setEditText(std::string_view value);
         EditCtrl();
 
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         ~EditCtrl() override;
@@ -451,6 +427,9 @@ namespace SphereUI {
         void appendLine(const char* text, std::uint32_t color);
         void appendFormattedLine(const char* text, std::uint32_t color);
         void addText(const char* text, std::uint32_t color);
+        void appendMessageText(std::string_view text, std::uint32_t color);
+        bool setRowText(std::size_t index, std::string_view text);
+        std::string_view rowText(std::size_t index) const;
         void clearRows();
         void removeRow(std::size_t logical_index);
         void selectRow(int index);
@@ -458,7 +437,7 @@ namespace SphereUI {
         void drawSelection(int x, int y, int row_y, bool restore_viewport);
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
     };
@@ -477,9 +456,10 @@ namespace SphereUI {
 
         void clearHistory();
         void appendHistory(const char* text, std::uint32_t color, std::uint32_t mask);
+        void appendFilteredText(std::string_view text, std::uint32_t packed_color);
         void applyFilter(std::uint32_t mask);
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
     };
 
     class FontPicker : public Window {
@@ -490,7 +470,7 @@ namespace SphereUI {
 
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         void setFont(int font_id) override;
@@ -542,7 +522,7 @@ namespace SphereUI {
         std::vector<RenderedRow> rendered_rows;
         void addMessage(const char* text, std::uint32_t channel, std::uint32_t color);
         void addChannel(std::uint32_t channel);
-        void setChannels(const std::uint32_t* values, std::size_t count);
+        void setChannels(std::span<const std::uint32_t> values);
         void clearChannels();
         void rebuildVisible();
         void updateParentPosition();
@@ -555,7 +535,7 @@ namespace SphereUI {
 
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         void setFont(int font_id) override;
@@ -594,15 +574,15 @@ namespace SphereUI {
         HyperTextCtrl();
 
         void copyHyperTextState(const HyperTextCtrl& source, CloneContext& context);
-        void queuePage(const char* name, bool remember);
-        void queueBuffer(const char* buffer, std::size_t size);
+        void queuePage(std::string_view name, bool remember);
+        void queueBuffer(std::string_view buffer);
         void updateDocument(bool resize_to_content);
         void updateScroll();
         void openLink(const char* target);
         static std::uint32_t parseTextFormat(const char* name);
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
     };
@@ -654,7 +634,7 @@ namespace SphereUI {
 
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         ~HyperTextEditControl() override;
@@ -672,9 +652,11 @@ namespace SphereUI {
         ImageCtrl();
 
         void setImage(const struct ImageDescription* description);
+        void setImageName(std::string_view name);
+        void setRotationDegrees(float degrees);
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         void setOpacity(float opacity) override;
@@ -713,12 +695,12 @@ namespace SphereUI {
         void copyItemState(const ListItemCtrl& source, CloneContext& context);
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         void setOpacity(float opacity) override;
         bool hitTest(int screen_x, int screen_y) override;
-        void dispatchMessage(int target_group, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second, SphereUI::UiControlKind target_kind) override;
+        void dispatchMessage(int target_group, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second, SphereUI::UiControlKind target_kind) override;
     };
 
     class CMenuListControl : public Window {
@@ -760,7 +742,7 @@ namespace SphereUI {
         void drawFooter();
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
     };
@@ -796,7 +778,7 @@ namespace SphereUI {
         void setLine(std::uint32_t index, const char* text);
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
     };
@@ -827,7 +809,7 @@ namespace SphereUI {
         void refreshProgressDisplay();
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
     };
@@ -860,7 +842,7 @@ namespace SphereUI {
         void ensureCaretVisible();
         void moveCaret(std::uint32_t key);
         void setContent(const char* text);
-        void copyContent(char* destination, std::uint32_t capacity) const;
+        void copyContent(std::span<char> destination) const;
         void insertCharacter(std::uint8_t character);
         void insertAt(std::uint32_t column, std::uint8_t character, std::uint32_t row);
         std::uint32_t mergeRows(std::uint32_t destination, std::uint32_t source);
@@ -869,7 +851,7 @@ namespace SphereUI {
         void drawCaret(float left, float top);
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         ~RichEditCtrl() override;
@@ -918,7 +900,7 @@ namespace SphereUI {
         void getParameters(struct ScrollParameters& parameters) const;
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         virtual void updateControlState();
@@ -974,7 +956,7 @@ namespace SphereUI {
         void setOverlay(std::shared_ptr<const UiSprite>& destination, const char* image);
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         bool hitTest(int screen_x, int screen_y) override;
@@ -1001,7 +983,7 @@ namespace SphereUI {
         int currentValue() const;
         bool loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
-        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) override;
+        std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
         void draw() override;
         void handleInput(const WindowInput& input) override;
         virtual void updateStatus();
@@ -1034,7 +1016,7 @@ namespace SphereUI::Runtime {
     void clipboardText(std::string& result);
     CDescriptionWindow* descriptionWindow();
     std::unique_ptr<Window> makeControl(SphereUI::UiControlKind kind);
-    void broadcastMessage(Window* root, int group, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second, SphereUI::UiControlKind kind);
+    void broadcastMessage(Window* root, int group, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second, SphereUI::UiControlKind kind);
 }
 
 namespace SphereUI::Runtime {
@@ -1233,3 +1215,10 @@ enum class UiControlKind {
 }
 
 namespace SphereUI::Runtime { void setTextInputActive(bool active); }
+
+namespace SphereUI::Runtime {
+    const char* keyName(std::uint32_t key);
+    std::uint32_t scanCode(std::uint32_t virtualKey);
+    std::uint32_t virtualKey(std::uint32_t scanCode);
+    void setSystemCursorVisible(bool visible);
+}

@@ -58,6 +58,7 @@
       <PreprocessorDefinitions>WIN32;UNICODE;_UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;DIRECTINPUT_VERSION=0x0800;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -114,10 +115,57 @@
     <ClInclude Include="semantic_window.h" />
     <ClInclude Include="sfera_sound.h" />
     <ClInclude Include="sfera_sound_runtime.h" />
-    <ClInclude Include="sfera_vorbis.h" />
+    <ClInclude Include="semantic_types.h" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="third_party\stb_vorbis.c" />
-  </ItemGroup>
+  <!-- The supplied project omitted this existing dependency. Keep the source pinned,
+       verify its Git blob identity, and cache it with build inputs rather than vendoring
+       another project file. Offline builds: /p:SferaVorbisSource=C:\path\stb_vorbis.c. -->
+  <UsingTask TaskName="PrepareSferaVorbis" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Destination ParameterType="System.String" Required="true" />
+      <LocalSource ParameterType="System.String" Required="false" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Net" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Security.Cryptography" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        const string expected = "3e5c2504c08f76b9d04e4adfbce80818631e835e";
+        Func<byte[], bool> verified = bytes => {
+            if (bytes == null) return false;
+            byte[] prefix = Encoding.ASCII.GetBytes("blob " + bytes.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\0");
+            byte[] blob = new byte[prefix.Length + bytes.Length];
+            Buffer.BlockCopy(prefix, 0, blob, 0, prefix.Length);
+            Buffer.BlockCopy(bytes, 0, blob, prefix.Length, bytes.Length);
+            using (var hash = SHA1.Create())
+                return BitConverter.ToString(hash.ComputeHash(blob)).Replace("-", "").ToLowerInvariant() == expected;
+        };
+        try {
+            string path = Path.GetFullPath(Destination);
+            byte[] bytes = File.Exists(path) ? File.ReadAllBytes(path) : null;
+            if (!verified(bytes)) {
+                if (!String.IsNullOrWhiteSpace(LocalSource)) bytes = File.ReadAllBytes(LocalSource);
+                else {
+                    Log.LogMessage("Restoring pinned stb_vorbis v1.22 into the build cache.");
+                    using (var download = new WebClient())
+                        bytes = download.DownloadData("https://raw.githubusercontent.com/nothings/stb/1ee679ca2ef753a528db5ba6801e1067b40481b8/stb_vorbis.c");
+                }
+                if (!verified(bytes)) throw new InvalidDataException("Unexpected stb_vorbis source identity; expected Git blob " + expected);
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllBytes(path, bytes);
+            }
+        } catch (Exception error) {
+            Log.LogError("Vorbis source is unavailable: " + error.Message + ". Supply the pinned file with /p:SferaVorbisSource=... for an offline build.");
+        }
+        return !Log.HasLoggedErrors;
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="RestoreSferaVorbis" BeforeTargets="ClCompile" Condition="'$(DesignTimeBuild)' != 'true'">
+    <PrepareSferaVorbis Destination="$(IntDir)stb_vorbis.c" LocalSource="$(SferaVorbisSource)" />
+    <ItemGroup><FileWrites Include="$(IntDir)stb_vorbis.c" /></ItemGroup>
+  </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

@@ -1,29 +1,48 @@
-#include "semantic_window.h"
 #include "semantic_classes.h"
+#include "zlib.h"
 #include "semantic_static.h"
-#include <shellapi.h>
+#include <commctrl.h>
+#include <dinput.h>
+#include <objbase.h>
+
 #include <algorithm>
 #include <array>
 #include <bit>
 #include <charconv>
+#include <climits>
+#include <fcntl.h>
+#include <float.h>
+#include <mbctype.h>
+#include <cerrno>
+#include <cctype>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <cstdio>
+#include <io.h>
+#include <share.h>
+#include <sys/stat.h>
+#include <sys/locking.h>
+#include <sys/utime.h>
+#include <memory>
+#include <new>
+#include <fstream>
+#include <filesystem>
+#include <iterator>
+#include <stdexcept>
+#include <system_error>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <span>
-#include <cmath>
-#include <cstdio>
-#include <cstring>
-#include <cstdlib>
 #include <vector>
-#include <new>
-#include <memory>
-#include <limits>
-#include <stdexcept>
-#include <fstream>
-#include <iterator>
-#include <type_traits>
 #include <utility>
-#include <climits>
-#include <sys/stat.h>
+#include <ws2tcpip.h>
+#include <shellapi.h>
+
 namespace {
     template<class T> struct NamedValue {
         const char* name;
@@ -97,13 +116,6 @@ namespace SphereUI::detail {
     }
 
     // Copy at most capacity - 1 characters; even a truncated result is NUL-terminated.
-    void copyText(std::span<char> destination, const char* source) {
-        if (destination.empty()) return;
-        std::size_t length = 0u;
-        if (source != nullptr) while (length < destination.size() - 1u && source[length] != '\0') ++length;
-        if (length != 0u) std::copy_n(source, length, destination.data());
-        destination[length] = '\0';
-    }
 
     void serializeHyperTextElements(std::span<const HyperTextRun> elements, std::string& hyper_text, std::string& plain);
     std::string escapeHyperText(std::string_view source);
@@ -147,7 +159,7 @@ namespace SphereUI::Runtime {
     std::unique_ptr<Window> makeControl(SphereUI::UiControlKind kind);
     static std::uint32_t keyCode(const char* name);
 
-    void broadcastMessage(Window* root, int group, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second, SphereUI::UiControlKind kind);
+    void broadcastMessage(Window* root, int group, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second, SphereUI::UiControlKind kind);
     static int findImage(const char* name);
     static void playClickSound();
     static void playScrollSound(bool page);
@@ -162,7 +174,7 @@ namespace SphereUI::detail {
     namespace {
 
         template<class T, std::size_t Size> T lookup(const char* name, const NamedValue<T> (&values)[Size], T fallback) {
-            for (const auto& entry : values) if (SferaSimpleParser::equalsIgnoreCase(name, entry.name)) return entry.value;
+            for (const auto& entry : values) if (SferaText::asciiEqual(name, entry.name)) return entry.value;
             return fallback;
         }
     }
@@ -284,7 +296,7 @@ void SphereUI::Window::appendResource(std::shared_ptr<const UiSprite> resource) 
 std::shared_ptr<const SphereUI::UiSprite> SphereUI::Window::findResource(const char* name_to_find) const {
     if (resource_parent != nullptr) if (auto resource = resource_parent->findResource(name_to_find)) return resource;
     const auto found = std::find_if(resources.begin(), resources.end(), [name_to_find](const auto& resource) {
-        return SferaSimpleParser::equalsIgnoreCase(resource->name.c_str(), name_to_find);
+        return SferaText::asciiEqual(resource->name.c_str(), name_to_find);
     });
     return found == resources.end() ? nullptr : *found;
 }
@@ -365,10 +377,10 @@ void SphereUI::detail::serializeHyperTextElements(std::span<const HyperTextRun> 
 }
 
 void SphereUI::Runtime::setTextInputActive(bool active) {
-    g_sfera_texture_cache_runtime.render_gate = active ? 1u : 0u;
+    g_sfera_direct_input_runtime.text_filter = active ? 1u : 0u;
 }
 
-void SphereUI::Runtime::broadcastMessage(Window* root, int group, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second, SphereUI::UiControlKind kind) {
+void SphereUI::Runtime::broadcastMessage(Window* root, int group, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second, SphereUI::UiControlKind kind) {
     if (root != nullptr) {
         root->dispatchMessage(group, message, first, second, kind);
         return;
@@ -386,102 +398,24 @@ namespace {
     constexpr UiKeyBinding uiKeyBindings[] = { {
         "ESCAPE", VK_ESCAPE, 1u
     }, {"SCRL_LOCK", VK_SCROLL, 70u}, {"PAUSE", VK_PAUSE, 197u}, {"BACKSPACE", VK_BACK, 14u}, {"SPACE", VK_SPACE, 57u}, {"END", VK_END, 207u}, {"HOME", VK_HOME, 199u}, {"LEFT", VK_LEFT, 203u}, {"UP", VK_UP, 200u}, {"RIGHT", VK_RIGHT, 205u}, {"DOWN", VK_DOWN, 208u}, {"INSERT", VK_INSERT, 210u}, {"DELETE", VK_DELETE, 211u}, {"ENTER", VK_RETURN, 28u}, {"CAPSLOCK", VK_CAPITAL, 58u}, {"NUMPADMULT", VK_MULTIPLY, 55u}, {"NUMPADADD", VK_ADD, 78u}, {"NUMLOCK", VK_NUMLOCK, 69u}, {"NUMPADSUBT", VK_SUBTRACT, 74u}, {"NUMPADDIV", VK_DIVIDE, 181u}, {"NUMPADPNT", VK_DECIMAL, 83u}, {"PAGEUP", VK_PRIOR, 201u}, {"PAGEDOWN", VK_NEXT, 209u}, {"`", VK_OEM_3, 41u}, {"-", VK_OEM_MINUS, 12u}, {"=", VK_OEM_PLUS, 13u}, {"\\", VK_OEM_5, 43u}, {"[", VK_OEM_4, 26u}, {"]", VK_OEM_6, 27u}, {";", VK_OEM_1, 39u}, {"'", VK_OEM_7, 40u}, {",", VK_OEM_COMMA, 51u}, {".", VK_OEM_PERIOD, 52u}, {"/", VK_OEM_2, 53u}, {"TAB", VK_TAB, 15u}, {"CTRL", VK_CONTROL, 29u}, {"SHIFT", VK_SHIFT, 42u}};
-    const char* uiKeyName(std::uint32_t code) {
-        static const auto names = [] {
-            std::array<std::array<char, 12>, 256> result{};
-            for (const auto& binding : uiKeyBindings) SphereUI::detail::copyText(result[binding.code], binding.name);
-            for (std::size_t value = '0'; value <= 'Z'; ++value) if (value <= '9' || value >= 'A') result[value][0] = value;
-            for (std::size_t index = 0u; index != 12u; ++index) std::snprintf(result[VK_F1 + index].data(), result[VK_F1 + index].size(), "F%zu", index + 1u);
-            for (std::size_t index = 0u; index != 10u; ++index) std::snprintf(result[VK_NUMPAD0 + index].data(), result[VK_NUMPAD0 + index].size(), "NUMPAD%zu", index);
-            return result;
-        }();
-        return code < names.size() && names[code][0] != '\0' ? names[code].data() : nullptr;
-    }
 
-    std::uint32_t uiScanCode(std::uint32_t key) {
-        if (key >= VK_F1 && key <= VK_F10) return 59u + key - VK_F1;
-        if (key == VK_F11 || key == VK_F12) return 87u + key - VK_F11;
-        if (key >= '1' && key <= '9') return 2u + key - '1';
-        if (key == '0') return 11u;
-        if (key == VK_NUMPAD0) return 82u;
-        if (key >= VK_NUMPAD1 && key <= VK_NUMPAD9) {
-            const auto digit = key - VK_NUMPAD0;
-            return 83u - 4u * ((digit + 2u) / 3u) + ((digit - 1u) % 3u);
-        }
-        struct Row {
-            const char* keys;
-            std::uint32_t first_scan;
-        };
 
-        static constexpr Row rows[] = { {
-            "QWERTYUIOP", 16u
-        }, {"ASDFGHJKL", 30u}, {"ZXCVBNM", 44u}};
-        for (const auto& row : rows) if (const auto* position = std::strchr(row.keys, static_cast<int>(key))) return row.first_scan + static_cast<std::uint32_t>(position - row.keys);
-        for (const auto& binding : uiKeyBindings) if (binding.code == key) return binding.scan;
-        return 0u;
-    }
 
-    std::uint32_t uiVirtualKey(std::uint32_t scan) {
-        for (std::size_t key = 0u; key <= 255u; ++key) if (uiScanCode(key) == scan) return key;
-        return 0u;
-    }
 
-    std::uint32_t soundVolume() {
-        return g_sfera_sound_runtime.soundVolume();
-    }
 
-    void setSoundVolume(std::uint32_t value) {
-        g_sfera_sound_runtime.setSoundVolume(value);
-    }
 
-    void setMusicVolume(std::uint32_t value) {
-        g_sfera_sound_runtime.setMusicVolume(value);
-    }
+
 
     void playUiSound(const char* filename) {
         g_sfera_sound_runtime.playUiSound(filename);
     }
 }
 
-std::uint64_t SphereUI::Runtime::clockTicks() {
-    auto& clock = g_sfera_high_resolution_clock_runtime;
-    if (!clock.initialized) {
-        LARGE_INTEGER frequency{}, anchor{};
-        ::QueryPerformanceFrequency(&frequency);
-        std::uint64_t normalized = frequency.QuadPart;
-        clock.frequency_shift = 0u;
-        while (normalized > 2000000u) {
-            normalized >>= 1u;
-            ++clock.frequency_shift;
-        }
-        clock.performance_frequency = normalized;
-        ::QueryPerformanceCounter(&anchor);
-        clock.counter_anchor = anchor.QuadPart;
-        clock.initialized = true;
-    }
-    LARGE_INTEGER now{};
-    ::QueryPerformanceCounter(&now);
-    const auto anchor = clock.counter_anchor;
-    const std::uint64_t delta = static_cast<std::int64_t>(static_cast<std::uint64_t>(now.QuadPart) - anchor) >> clock.frequency_shift;
-    auto elapsed = clock.elapsed_counter + delta;
-    clock.counter_anchor = anchor + (delta << clock.frequency_shift);
-    const auto frequency = clock.performance_frequency;
-    if (frequency == 0u) return 0u;
-    auto epoch = clock.epoch_microseconds;
-    const auto epoch_ticks = frequency * 1000u;
-    if (elapsed > epoch_ticks) {
-        const auto epochs = (elapsed - 1u) / epoch_ticks;
-        elapsed -= epochs * epoch_ticks;
-        epoch += epochs * 1000000000u;
-    }
-    clock.elapsed_counter = elapsed;
-    clock.epoch_microseconds = epoch;
-    return (epoch + elapsed * 1000000u / frequency) / 100u;
-}
+std::uint64_t SphereUI::Runtime::clockTicks() { return WorldClock::nowTicks(); }
 
 std::uint32_t SphereUI::Runtime::keyCode(const char* name) {
     if (name == nullptr) return 0u;
-    for (std::size_t code = 0u; code <= 255u; ++code) if (const auto* candidate = uiKeyName(code); candidate != nullptr && SferaSimpleParser::equalsIgnoreCase(name, candidate)) return code;
+    for (std::size_t code = 0u; code <= 255u; ++code) if (const auto* candidate = SphereUI::Runtime::keyName(code); candidate != nullptr && SferaText::asciiEqual(name, candidate)) return code;
     return 0u;
 }
 
@@ -502,7 +436,7 @@ void SphereUI::Runtime::playWindowSound(bool opening) {
 }
 
 std::uint32_t SphereUI::Runtime::milliseconds() {
-    return ::GetTickCount();
+    return WorldClock::milliseconds();
 }
 
 bool SphereUI::Runtime::keyDown(std::uint32_t key) {
@@ -510,15 +444,15 @@ bool SphereUI::Runtime::keyDown(std::uint32_t key) {
 }
 
 bool SphereUI::Runtime::descriptionAutoPopup() {
-    return g_sfera_interface_runtime.description_auto_popup;
+    return g_sfera_interface.description_auto_popup;
 }
 
 SphereUI::CDescriptionWindow* SphereUI::Runtime::descriptionWindow() {
-    return g_sfera_interface_runtime.description_control;
+    return g_sfera_interface.description_control;
 }
 
 void SphereUI::Runtime::setDescriptionWindow(CDescriptionWindow* window) {
-    g_sfera_interface_runtime.description_control = window;
+    g_sfera_interface.description_control = window;
 }
 
 bool SphereUI::Runtime::playerHeading(float& heading) {
@@ -533,7 +467,7 @@ bool SphereUI::Runtime::playerHeading(float& heading) {
 void SphereUI::Runtime::openExternalLink(const char* target, bool mail) {
     if (target == nullptr) return;
     ::ShellExecuteA(nullptr, "open", mail ? target : "explorer", mail ? nullptr : target, nullptr, SW_SHOWNORMAL);
-    ::ShowWindow(g_sfera_window_runtime.main_window_handle, SW_MINIMIZE);
+    ::ShowWindow(SferaClientApplication::main_window, SW_MINIMIZE);
 }
 
 void SphereUI::Runtime::clipboardText(std::string& result) {
@@ -571,642 +505,6 @@ namespace SphereUI::Runtime {
 }
 
 namespace {
-    using namespace SphereUI;
-
-    void queueInterfaceRefresh() {
-        g_sfera_interface.queueEvent({nullptr, 0u, UiMessage::refreshInterface, 0u, 0u});
-    }
-
-    Window* optionChild(Window* window, std::uint32_t index) {
-        return window == nullptr ? nullptr : window->controlAt(index);
-    }
-
-    void optionMessage(Window* window, std::uint32_t index, SphereUI::UiMessage message, std::uintptr_t first = 0u, std::uintptr_t second = 0u) {
-        if (auto* child = optionChild(window, index)) child->handleMessage(message, first, second);
-    }
-
-    void optionText(Window* window, std::uint32_t index, const char* text) {
-        if (auto* child = optionChild(window, index)) child->setText(text);
-    }
-
-    void optionLabel(Window* window, std::uint32_t index, const char* key) {
-        optionText(window, index, g_sfera_interface.localizedText(key));
-    }
-
-    void optionToggleLabel(Window* window, std::uint32_t index, std::uint32_t value) {
-        optionLabel(window, index, value != 0u ? "UISTR_WT_OPT16" : "UISTR_WT_OPT17");
-    }
-
-    void setOptionsVisible(bool show);
-    void setInterfaceOptionsVisible(bool show);
-    void setGraphicsOptionsVisible(bool show);
-    void setFontOptionsVisible(bool show);
-    Window* beginOptionsDialog(const char* name, WindowEventHandler handler, bool show) {
-        auto* window = g_sfera_interface.findWindow(name);
-        if (!show) {
-            if (window != nullptr) {
-                g_sfera_interface.closeWindow(window);
-            }
-            return window;
-        }
-        if (window != nullptr) return nullptr;
-        setOptionsVisible(false);
-        window = g_sfera_interface.openWindow(name);
-        if (window != nullptr) g_sfera_interface.bindEventHandler(window, handler);
-        return window;
-    }
-
-    void setOptionsVisible(bool show) {
-        auto* window = g_sfera_interface.findWindow("options");
-        if (show) {
-            if (window == nullptr) if (auto* created = g_sfera_interface.openWindow("options")) g_sfera_interface.bindEventHandler(created, WindowEventHandler::options);
-        } else if (window != nullptr) g_sfera_interface.closeWindow(window);
-    }
-
-    void setSoundOptionsVisible(bool show) {
-        auto* window = beginOptionsDialog("sound_options", WindowEventHandler::sound_options, show);
-        if (window == nullptr) return;
-        auto& saved_music = g_sfera_sphere_options_runtime.saved_music_volume;
-        auto& saved_sound = g_sfera_options_dialog_runtime.audio_settings;
-        auto& values = g_sfera_graphics_options_runtime.graphics_values;
-        if (show) {
-            saved_music = g_sfera_sound_runtime.musicVolume();
-            saved_sound = soundVolume();
-            optionMessage(window, 7u, UiMessage::setScrollRange, 0u, 100u);
-            optionMessage(window, 8u, UiMessage::setScrollRange, 0u, 100u);
-            optionMessage(window, 7u, UiMessage::setScrollValue, saved_music);
-            optionMessage(window, 8u, UiMessage::setScrollValue, saved_sound);
-            values[7] = g_sfera_sound_runtime.hardwareMixing();
-            values[12] = values[7];
-            optionLabel(window, 9u, values[12] != 0u ? "UISTR_WT_OPT34" : "UISTR_WT_OPT33");
-            return;
-        }
-        setMusicVolume(saved_music);
-        setSoundVolume(saved_sound);
-        setOptionsVisible(true);
-        g_sfera_sound_runtime.setHardwareMixing(values[7] != 0u);
-        InterfaceConfiguration::open("config.cfg");
-        InterfaceConfiguration::writeInteger("SNDVOL", saved_sound);
-        InterfaceConfiguration::writeInteger("MUSVOL", saved_music);
-        InterfaceConfiguration::writeInteger("HWMIX", values[7]);
-        InterfaceConfiguration::save();
-    }
-
-    std::uint32_t bindingCount() {
-        return g_sfera_mbc_runtime.namedValue("SSKS_NUMBER");
-    }
-
-    const char* bindingName(std::uint32_t key) {
-        const auto* name = uiKeyName(key);
-        return name == nullptr ? "???" : name;
-    }
-
-    Window* bindingRow(Window* window, std::uint32_t slot) {
-        auto* list = optionChild(window, 5u);
-        return list == nullptr || list->control_kind != UiControlKind::listItem ? nullptr : static_cast<ListItemCtrl*>(list)->itemAt(slot);
-    }
-
-    void refreshBindingLabel(Window* window, std::uint32_t slot) {
-        optionText(bindingRow(window, slot), 3u, bindingName(g_sfera_control_options.working_bindings[slot]));
-    }
-
-    void refreshMouseBindingLabel(Window* window) {
-        optionLabel(window, 4u, g_sfera_graphics_options_runtime.dialog_state == 0u ? "UISTR_WT_OPT23" : "UISTR_WT_OPT24");
-    }
-
-    bool availableBinding(std::uint32_t key) {
-        const auto count = bindingCount();
-        for (std::size_t slot = 0u; slot < count; ++slot) if (g_sfera_control_options.working_bindings[slot] == key) return false;
-        return key != 0u && key != VK_ESCAPE && key != VK_F1 && key != VK_RETURN && key - '0' > 9u && key != VK_SHIFT && key != VK_CONTROL && key - VK_LEFT > 3u;
-    }
-
-    void setControlOptionsVisible(bool show) {
-        auto* window = beginOptionsDialog("control_options", WindowEventHandler::control_options, show);
-        if (window == nullptr) return;
-        auto& state = g_sfera_control_options;
-        const auto count = bindingCount();
-        if (show) {
-            std::fill(std::begin(state.configured_bindings), std::end(state.configured_bindings), 0u);
-            for (std::size_t slot = 0u; slot < std::max(5u, count); ++slot) {
-                const auto key = g_sfera_mbc_runtime.namedValue("SSKS", slot);
-                state.configured_bindings[slot] = slot < 5u ? uiVirtualKey(key) : key;
-            }
-            state.configured_bindings[63] = g_sfera_mbc_runtime.namedValue("INMS");
-            std::copy(std::begin(state.configured_bindings), std::end(state.configured_bindings), std::begin(state.working_bindings));
-            optionLabel(window, 4u, state.configured_bindings[63] == 0u ? "UISTR_WT_OPT23" : "UISTR_WT_OPT24");
-            for (std::size_t slot = 0u; slot < count; ++slot) {
-                optionMessage(window, 5u, UiMessage::appendListItem);
-                std::snprintf(g_sfera_options_dialog_runtime.widget_key_name, sizeof(g_sfera_options_dialog_runtime.widget_key_name), "UISTR_WT_KEY%02zu", slot + 1u);
-                optionLabel(bindingRow(window, slot), 2u, g_sfera_options_dialog_runtime.widget_key_name);
-                refreshBindingLabel(window, slot);
-            }
-            g_sfera_options_dialog_runtime.widget_keys_initialized = true;
-            return;
-        }
-        setOptionsVisible(true);
-        g_sfera_mbc_runtime.setNamedValue("INMS", state.configured_bindings[63]);
-        for (std::size_t slot = 0u; slot < std::max(5u, count); ++slot) g_sfera_mbc_runtime.setNamedValue("SSKS", slot < 5u ? uiScanCode(state.configured_bindings[slot]) : state.configured_bindings[slot], slot);
-        queueInterfaceRefresh();
-        g_sfera_options_dialog_runtime.widget_keys_initialized = false;
-    }
-
-    constexpr std::uint32_t interfaceControlIds[] = {7u, 8u, 9u, 11u, 12u, 15u, 16u, 19u, 21u};
-    constexpr const char* interfaceSettingKeys[] = {"ISSN", "ISAD", "INSN", "INAW", "IAPM", "MBST", "BALR"};
-    void setInterfaceOptionsVisible(bool show) {
-        auto* window = beginOptionsDialog("interface_options", WindowEventHandler::interface_options, show);
-        if (window == nullptr) return;
-        auto& state = g_sfera_graphics_options_runtime;
-        if (show) {
-            for (std::size_t index = 0u; index < 5u; ++index) state.saved_interface_values[index] = index == 2u ? g_sfera_interface_runtime.sounds_enabled : g_sfera_mbc_runtime.namedValue(interfaceSettingKeys[index]);
-            InterfaceConfiguration::open("config.cfg");
-            state.saved_interface_values[5] = InterfaceConfiguration::readInteger("MBST", state.saved_interface_values[5]);
-            state.saved_interface_values[6] = missingConfigValue;
-            state.saved_interface_values[6] = InterfaceConfiguration::readInteger("BALR", state.saved_interface_values[6]);
-            if (static_cast<int>(state.saved_interface_values[6]) < 0) {
-                state.saved_interface_values[6] = 1u;
-                InterfaceConfiguration::writeInteger("BALR", 1u);
-                InterfaceConfiguration::save();
-            }
-            state.saved_interface_values[7] = g_sfera_interface_runtime.description_auto_popup;
-            state.saved_interface_values[8] = g_sfera_interface_runtime.invite_messages;
-            std::copy(std::begin(state.saved_interface_values), std::end(state.saved_interface_values), std::begin(state.interface_values));
-            for (std::size_t index = 0u; index < std::size(interfaceControlIds); ++index) optionToggleLabel(window, interfaceControlIds[index], state.interface_values[index]);
-            return;
-        }
-        setOptionsVisible(true);
-        for (std::size_t index = 0u; index < std::size(interfaceSettingKeys); ++index) g_sfera_mbc_runtime.setNamedValue(interfaceSettingKeys[index], state.saved_interface_values[index]);
-        g_sfera_interface_runtime.description_auto_popup = state.saved_interface_values[7];
-        g_sfera_interface_runtime.invite_messages = state.saved_interface_values[8];
-        InterfaceConfiguration::open("config.cfg");
-        InterfaceConfiguration::writeInteger("MBST", state.saved_interface_values[5]);
-        InterfaceConfiguration::writeInteger("BALR", state.saved_interface_values[6]);
-        InterfaceConfiguration::writeInteger("HARDWARE_CURSOR", g_sfera_graphics_runtime.hardware_cursor_enabled);
-        InterfaceConfiguration::writeInteger("DESCR_AUTO_POPUP", g_sfera_interface_runtime.description_auto_popup);
-        InterfaceConfiguration::writeInteger("INVITE_MESSAGES", g_sfera_interface_runtime.invite_messages);
-        InterfaceConfiguration::save();
-        g_sfera_interface_runtime.sounds_enabled = state.saved_interface_values[2];
-        queueInterfaceRefresh();
-        g_sfera_interface_runtime.cross_enabled = state.saved_interface_values[3];
-    }
-
-    void resetSavedWindowPositions() {
-        g_sfera_interface.saved_positions.clear();
-        for (const auto& window : g_sfera_interface.windows) if (window != nullptr && window->save_last_position) window->alignToScreen(true);
-    }
-
-    std::vector<std::uint32_t>& savedChatFonts() {
-        return g_sfera_options_dialog_runtime.saved_chat_fonts;
-    }
-
-    std::vector<std::uint32_t>& editedChatFonts() {
-        return g_sfera_options_dialog_runtime.edited_chat_fonts;
-    }
-
-    void setFontOptionsVisible(bool show) {
-        auto* window = g_sfera_interface.findWindow("font_options");
-        if (show) {
-            if (window != nullptr) return;
-            setInterfaceOptionsVisible(false);
-            setOptionsVisible(false);
-            window = g_sfera_interface.openWindow("font_options");
-            if (window == nullptr) return;
-            g_sfera_interface.bindEventHandler(window, WindowEventHandler::font_options);
-            auto& saved = savedChatFonts();
-            auto& edited = editedChatFonts();
-            saved.reserve(2u);
-            edited.reserve(2u);
-            saved.push_back(4u);
-            saved.push_back(4u);
-            InterfaceConfiguration::open("config.cfg");
-            saved.at(0u) = InterfaceConfiguration::readInteger("CHAT_LIST_FONT", saved.at(0u));
-            saved.at(1u) = InterfaceConfiguration::readInteger("CHAT_EDIT_FONT", saved.at(1u));
-            for (std::size_t index = 0u; index < 2u; ++index) if (auto* control = optionChild(window, index + 3u)) control->setFont(saved.at(index));
-            edited = saved;
-            return;
-        }
-        if (window == nullptr) return;
-        g_sfera_interface.closeWindow(window);
-        setInterfaceOptionsVisible(true);
-        InterfaceConfiguration::open("config.cfg");
-        InterfaceConfiguration::writeInteger("CHAT_LIST_FONT", savedChatFonts().at(0u));
-        InterfaceConfiguration::writeInteger("CHAT_EDIT_FONT", savedChatFonts().at(1u));
-        InterfaceConfiguration::save();
-        queueInterfaceRefresh();
-    }
-}
-
-namespace {
-    using OptionsDisplayMode = SphereUI::DisplayMode;
-
-    std::uint32_t findOptionsMode(const OptionsDisplayMode& requested) {
-        const std::uint32_t count = g_sfera_graphics_runtime.d3d_runtime->display_modes.size();
-        for (std::size_t index = 0u; index < count; ++index) {
-            const auto mode = g_sfera_graphics_runtime.d3d_runtime->display_modes.at(index);
-            if (mode.width == requested.width && mode.height == requested.height && mode.depth == requested.depth) return index;
-        }
-        for (std::size_t index = count; index != 0u; --index) {
-            const auto mode = g_sfera_graphics_runtime.d3d_runtime->display_modes.at(index - 1u);
-            if (mode.depth == requested.depth && mode.width <= g_sfera_scene_control_runtime.timing_anchor && mode.height <= g_sfera_recovered_static_runtime.scene_state_07) return index - 1u;
-        }
-        return count - 1u;
-    }
-
-    void setOptionsModeLabel(Window* window, std::uint32_t index) {
-        const auto mode = g_sfera_graphics_runtime.d3d_runtime->display_modes.at(index);
-        const auto text = std::to_string(static_cast<int>(mode.width)) + "x" + std::to_string(static_cast<int>(mode.height)) + " " + std::to_string(static_cast<int>(mode.depth));
-        optionText(window, 7u, text.c_str());
-    }
-
-    const char* graphicsBooleanLabel(std::uint32_t value) {
-        return value < 2u ? g_sfera_sphere_options_runtime.option_labels[5u + value] : g_sfera_options_dialog_runtime.graphics_unknown_label;
-    }
-
-    void optionSelection(Window* window, std::uint32_t index, std::uint32_t maximum, std::uint32_t value) {
-        optionMessage(window, index, UiMessage::setSpinRange, 0u, maximum);
-        optionMessage(window, index, UiMessage::setSpinValue, value);
-    }
-
-    void setupLodOptions(Window* window) {
-        const auto enabled = g_sfera_graphics_runtime.lods_enabled;
-        optionToggleLabel(window, 41u, enabled);
-        optionSelection(window, 43u, 1u, enabled);
-        optionMessage(window, 46u, UiMessage::setScrollRange, 0u, enabled ? 14u : 0u);
-        if (enabled) optionMessage(window, 46u, UiMessage::setScrollValue, static_cast<std::uint32_t>(static_cast<std::int64_t>(std::trunc(g_sfera_input_device_runtime.lod_distance - 12.0))));
-    }
-
-    void setupFogOptions(Window* window) {
-        const auto automatic = g_sfera_client_config_runtime.auto_fog;
-        optionToggleLabel(window, 37u, automatic);
-        optionSelection(window, 39u, 1u, automatic);
-        optionMessage(window, 28u, UiMessage::setScrollRange, 0u, automatic ? 0u : 170u);
-        if (!automatic) optionMessage(window, 28u, UiMessage::setScrollValue, static_cast<std::uint32_t>(static_cast<std::int64_t>(std::trunc(g_sfera_graphics_runtime.fog_distance - 30.0))));
-    }
-
-    void setGraphicsOptionsVisible(bool show) {
-        auto* window = beginOptionsDialog("gfx_options", WindowEventHandler::graphics_options, show);
-        if (window == nullptr) return;
-        auto& values = g_sfera_graphics_options_runtime.graphics_values;
-        auto& state = g_sfera_options_dialog_runtime;
-        auto& graphics = g_sfera_graphics_runtime;
-        auto* shadows = g_sfera_shadows.get();
-        if (shadows == nullptr) throw std::runtime_error("Shadow manager is unavailable");
-        if (show) {
-            g_sfera_sphere_options_runtime.saved_fog_distance = graphics.fog_distance;
-            g_sfera_sphere_options_runtime.saved_lod_distance = g_sfera_input_device_runtime.lod_distance;
-            g_sfera_sphere_options_runtime.saved_lods_enabled = graphics.lods_enabled;
-            values[9] = g_sfera_client_config_runtime.auto_fog;
-            values[8] = g_sfera_client_config_runtime.effects_enabled;
-            g_sfera_graphics_options_runtime.graphics_page = state.reflection_quality;
-            constexpr const char* label_keys[] = {"UISTR_WT_OPT21", "UISTR_WT_OPT20", "UISTR_WT_OPT19", "UISTR_WT_OPT18", "UISTR_WT_OPT17", "UISTR_WT_OPT17", "UISTR_WT_OPT16"};
-            for (std::size_t index = 0u; index < std::size(label_keys); ++index) detail::copyText(g_sfera_sphere_options_runtime.option_labels[index], g_sfera_interface.localizedText(label_keys[index]));
-            detail::copyText(state.graphics_unknown_label, g_sfera_interface.localizedText("UISTR_WT_OPT36"));
-            InterfaceConfiguration::open("config.cfg");
-            OptionsDisplayMode mode{static_cast<unsigned int>(graphics.display_width), static_cast<unsigned int>(graphics.display_height), g_sfera_graphics_display_depth_bits};
-            mode.width = InterfaceConfiguration::readInteger("XRES", mode.width);
-            mode.height = InterfaceConfiguration::readInteger("YRES", mode.height);
-            g_sfera_graphics_runtime.d3d_runtime->enumerateDisplayModes(g_sfera_window_runtime.windowed);
-            values[5] = findOptionsMode(mode);
-            values[1] = mode.depth;
-            values[2] = shadows->quality;
-            values[3] = g_sfera_main_render_runtime.grass_depth_mode;
-            values[4] = g_sfera_window_runtime.windowed;
-            values[6] = graphics.post_effects_enabled;
-            values[10] = values[0];
-            values[11] = mode.depth;
-            state.comparison_graphics_value = values[4];
-            optionSelection(window, 15u, static_cast<std::uint32_t>(g_sfera_graphics_runtime.d3d_runtime->display_modes.size()) - 1u, values[5]);
-            optionSelection(window, 17u, 4u, values[2]);
-            optionSelection(window, 18u, 2u, values[3]);
-            optionMessage(window, 26u, UiMessage::setSpinRange, 0u, 1u);
-            optionToggleLabel(window, 31u, !g_sfera_client_config_runtime.effects_enabled);
-            optionMessage(window, 26u, UiMessage::setSpinValue, !g_sfera_client_config_runtime.effects_enabled);
-            setupLodOptions(window);
-            setOptionsModeLabel(window, values[5]);
-            optionText(window, 9u, g_sfera_sphere_options_runtime.option_labels[values[2]]);
-            optionText(window, 10u, graphicsBooleanLabel(values[3]));
-            setupFogOptions(window);
-            optionSelection(window, 24u, 3u, state.reflection_quality);
-            optionText(window, 22u, g_sfera_sphere_options_runtime.option_labels[4u - state.reflection_quality]);
-            optionMessage(window, 34u, UiMessage::setSpinRange, 0u, 1u);
-            optionLabel(window, 35u, values[4] != 0u ? "UISTR_WT_OPT61" : "UISTR_WT_OPT62");
-            optionMessage(window, 34u, UiMessage::setSpinValue, values[4] == 0u);
-            const auto* features = graphics.d3d_runtime.get();
-            const bool post_supported = features != nullptr && features->supports_post_effects;
-            if (!post_supported) values[6] = state.graphics_snapshot[6] = graphics.post_effects_enabled = false;
-            optionSelection(window, 51u, post_supported ? 1u : 0u, values[6]);
-            optionText(window, 49u, graphicsBooleanLabel(values[6]));
-            std::copy_n(values, 7u, state.graphics_snapshot);
-            return;
-        }
-        setOptionsVisible(true);
-        shadows->quality = values[2];
-        g_sfera_main_render_runtime.grass_depth_mode = values[3];
-        g_sfera_window_runtime.windowed = values[4];
-        InterfaceConfiguration::open("config.cfg");
-        const auto mode = g_sfera_graphics_runtime.d3d_runtime->display_modes.at(values[5]);
-        const std::pair<const char*, std::uint32_t> settings[] = { {
-            "XRES", mode.width
-        }, {"YRES", mode.height}, {"DEPTH", mode.depth}, {"GRASS", values[3]}, {"WINDOWED", values[4]}, {"SHAD", values[2]}, {"AUTOFOG", g_sfera_client_config_runtime.auto_fog}, {"FOGDIST", static_cast<std::uint32_t>(static_cast<int>(std::trunc(graphics.fog_distance)))}, {"REFLQUAL", state.reflection_quality}, {"EFFECTS", g_sfera_client_config_runtime.effects_enabled}, {"LODS", graphics.lods_enabled}, {"LOD_DISTANCE", static_cast<std::uint32_t>(static_cast<int>(std::trunc(g_sfera_input_device_runtime.minimum_lod_distance)))}, {"MIN_LOD_DIST", static_cast<std::uint32_t>(static_cast<int>(std::trunc(g_sfera_input_device_runtime.lod_distance)))}, {"POSTEFFECTS", values[6]}};
-        for (const auto& setting : settings) InterfaceConfiguration::writeInteger(setting.first, setting.second);
-        g_sfera_effect_manager.effects_enabled = g_sfera_client_config_runtime.effects_enabled;
-        InterfaceConfiguration::save();
-        if (values[10] != values[0] || values[11] != values[1] || state.comparison_graphics_value != values[4])
-            g_sfera_render_lookup_runtime.quit_requested = true;
-    }
-
-    void handleHelpEvent(Window* window, const WindowEvent& event) {
-        if (event.message == UiMessage::close) {
-            g_sfera_interface.showHelpPage(nullptr);
-            return;
-        }
-        if (event.message == UiMessage::leftClick) {
-            if (event.control_id == 1u) g_sfera_interface.showHelpPage("Language\\helpindex.hts");
-            else if (event.control_id == 2u) optionMessage(window, 3u, UiMessage::previousHyperTextPage);
-            return;
-        }
-        if (event.message != UiMessage::hyperTextPageChanged) return;
-        auto* control = static_cast<HyperTextCtrl*>(event.source);
-        if (control == nullptr) return;
-        const auto* document = control->document.get();
-        const auto* name = document == nullptr ? nullptr : document->name.c_str();
-        if (name != nullptr && SferaSimpleParser::equalsIgnoreCase(name, "Language\\helpindex.hts")) control->handleMessage(UiMessage::clearHyperTextHistory, 0u, 0u);
-        optionMessage(window, 2u, UiMessage::setEnabled, control->history.size() == 0u ? 0u : 1u);
-    }
-
-    void handleSoundOptionsEvent(Window* window, const WindowEvent& event) {
-        if (event.message == UiMessage::horizontalScroll) {
-            if (event.control_id == 7u) setMusicVolume(event.first);
-            else setSoundVolume(event.first);
-            return;
-        }
-        if (event.message == UiMessage::close) {
-            setSoundOptionsVisible(false);
-            return;
-        }
-        if (event.message != UiMessage::leftClick) return;
-        if (event.control_id == 1u) {
-            optionMessage(window, 7u, UiMessage::getScrollValue, reinterpret_cast<std::uintptr_t>(&g_sfera_sphere_options_runtime.saved_music_volume));
-            optionMessage(window, 8u, UiMessage::getScrollValue, reinterpret_cast<std::uintptr_t>(&g_sfera_options_dialog_runtime.audio_settings));
-            g_sfera_graphics_options_runtime.graphics_values[7] = g_sfera_graphics_options_runtime.graphics_values[12];
-        }
-        if (event.control_id == 1u || event.control_id == 2u) setSoundOptionsVisible(false);
-        else if (event.control_id == 9u) {
-            auto& mixing = g_sfera_graphics_options_runtime.graphics_values[12];
-            mixing = mixing == 0u;
-            optionLabel(window, 9u, mixing != 0u ? "UISTR_WT_OPT34" : "UISTR_WT_OPT33");
-        }
-    }
-
-    void handleControlOptionsEvent(Window* window, const WindowEvent& event) {
-        auto& state = g_sfera_control_options;
-        if (event.message == UiMessage::close) {
-            setControlOptionsVisible(false);
-            return;
-        }
-        if (event.message == UiMessage::controlBindingCaptured) {
-            if (state.active_slot == invalidIndex) return;
-            g_sfera_client_process_runtime.ui_bridge = 0u;
-            g_sfera_interface.capture_control_binding = false;
-            g_sfera_main_command_state_runtime.command_state = 0u;
-            auto* current = g_sfera_interface.findWindow("control_options");
-            if (current == nullptr) return;
-            if (availableBinding(event.first)) state.working_bindings[state.active_slot] = event.first;
-            refreshBindingLabel(current, state.active_slot);
-            return;
-        }
-        if (event.message == UiMessage::listItemEvent && static_cast<UiMessage>(event.first) == UiMessage::leftClick && HIWORD(event.second) == 3u) {
-            state.active_slot = LOWORD(event.second);
-            optionText(bindingRow(window, state.active_slot), 3u, "");
-            g_sfera_client_process_runtime.ui_bridge = 1u;
-            g_sfera_interface.capture_control_binding = true;
-            g_sfera_main_command_state_runtime.command_state = 0u;
-            return;
-        }
-        if (event.message != UiMessage::leftClick) return;
-        if (event.control_id == 1u) std::copy(std::begin(state.working_bindings), std::end(state.working_bindings), std::begin(state.configured_bindings));
-        if (event.control_id == 1u || event.control_id == 2u) {
-            setControlOptionsVisible(false);
-            return;
-        }
-        if (event.control_id == 4u) {
-            auto& mode = g_sfera_graphics_options_runtime.dialog_state;
-            mode = mode == 0u;
-            refreshMouseBindingLabel(window);
-        } else if (event.control_id == 6u) {
-            constexpr std::uint32_t defaults[] = {'W', 'S', 'A', 'D', VK_SPACE, VK_OEM_3, VK_OEM_MINUS, VK_TAB, 'R', 'I', 'K', 'H', 'T', 'N', 'P', 'M', 'J', 'O', 'Y', VK_OEM_2};
-            g_sfera_graphics_options_runtime.dialog_state = 0u;
-            std::copy(std::begin(defaults), std::end(defaults), std::begin(state.working_bindings));
-            optionLabel(window, 4u, state.configured_bindings[63] == 0u ? "UISTR_WT_OPT23" : "UISTR_WT_OPT24");
-            for (std::size_t slot = 0u, count = bindingCount(); slot < count; ++slot) refreshBindingLabel(window, slot);
-        }
-    }
-
-    void handleInterfaceOptionsEvent(Window* window, const WindowEvent& event) {
-        auto& state = g_sfera_graphics_options_runtime;
-        if (event.message == UiMessage::close) {
-            setInterfaceOptionsVisible(false);
-            return;
-        }
-        if (event.message != UiMessage::leftClick) return;
-        if (event.control_id == 1u) std::copy(std::begin(state.interface_values), std::end(state.interface_values), std::begin(state.saved_interface_values));
-        if (event.control_id == 1u || event.control_id == 2u) {
-            setInterfaceOptionsVisible(false);
-            return;
-        }
-        if (event.control_id == 6u) {
-            resetSavedWindowPositions();
-            return;
-        }
-        if (event.control_id == 22u) {
-            setFontOptionsVisible(true);
-            return;
-        }
-        for (std::size_t index = 0u; index < std::size(interfaceControlIds); ++index) if (event.control_id == interfaceControlIds[index]) {
-            auto& value = state.interface_values[index];
-            value = value == 0u;
-            if (index == 0u) g_sfera_mbc_runtime.setNamedValue(interfaceSettingKeys[index], value);
-            if (index == 3u) g_sfera_interface_runtime.cross_enabled = value;
-            optionToggleLabel(window, interfaceControlIds[index], value);
-            if (index == 2u) g_sfera_interface_runtime.sounds_enabled = value;
-            else if (index != 3u) {
-                if (index != 0u && index < std::size(interfaceSettingKeys)) g_sfera_mbc_runtime.setNamedValue(interfaceSettingKeys[index], value);
-                queueInterfaceRefresh();
-            }
-            return;
-        }
-    }
-
-    void handleGraphicsOptionsEvent(Window* window, const WindowEvent& event) {
-        auto& state = g_sfera_options_dialog_runtime;
-        auto& values = g_sfera_graphics_options_runtime.graphics_values;
-        auto& graphics = g_sfera_graphics_runtime;
-        if (event.message == UiMessage::close) {
-            setGraphicsOptionsVisible(false);
-            return;
-        }
-        if (event.message == UiMessage::leftClick) {
-            if (event.control_id == 1u) {
-                std::copy_n(state.graphics_snapshot, 7u, values);
-                auto* lod = g_sfera_recovered_static_runtime.render_state_08.get();
-                if (lod != nullptr) lod->setDistances(g_sfera_input_device_runtime.lod_distance, g_sfera_input_device_runtime.minimum_lod_distance);
-                setGraphicsOptionsVisible(false);
-            } else if (event.control_id == 2u) {
-                setGraphicsOptionsVisible(false);
-                graphics.fog_distance = g_sfera_sphere_options_runtime.saved_fog_distance;
-                g_sfera_input_device_runtime.lod_distance = g_sfera_sphere_options_runtime.saved_lod_distance;
-                g_sfera_client_config_runtime.auto_fog = values[9];
-                g_sfera_client_config_runtime.effects_enabled = values[8];
-                graphics.lods_enabled = g_sfera_sphere_options_runtime.saved_lods_enabled;
-                state.reflection_quality = g_sfera_graphics_options_runtime.graphics_page;
-            }
-            return;
-        }
-        if (event.message == UiMessage::spinValueChanged) switch (event.control_id) {
-            case 15u:
-                state.graphics_snapshot[5] = event.first;
-                setOptionsModeLabel(window, event.first);
-                break;
-            case 17u:
-                {
-                    state.graphics_snapshot[2] = event.first;
-                    auto* shadows = g_sfera_shadows.get();
-                    if (shadows != nullptr) shadows->quality = event.first;
-                    optionText(window, 9u, g_sfera_sphere_options_runtime.option_labels[event.first]);
-                    break;
-                }
-            case 18u:
-                state.graphics_snapshot[3] = event.first;
-                g_sfera_main_render_runtime.grass_depth_mode = event.first;
-                optionText(window, 10u, graphicsBooleanLabel(event.first));
-                break;
-            case 24u:
-                state.reflection_quality = event.first;
-                optionText(window, 22u, g_sfera_sphere_options_runtime.option_labels[4u - event.first]);
-                break;
-            case 26u:
-                g_sfera_client_config_runtime.effects_enabled = event.first == 0u;
-                optionText(window, 31u, event.first < 2u ? "" : graphicsBooleanLabel(event.first));
-                break;
-            case 34u:
-                {
-                    state.graphics_snapshot[4] = event.first != 1u;
-                    optionLabel(window, 35u, state.graphics_snapshot[4] == 1u ? "UISTR_WT_OPT61" : "UISTR_WT_OPT62");
-                    const auto selected = g_sfera_graphics_runtime.d3d_runtime->display_modes.at(state.graphics_snapshot[5]);
-                    g_sfera_graphics_runtime.d3d_runtime->enumerateDisplayModes(state.graphics_snapshot[4] == 1u);
-                    state.graphics_snapshot[5] = findOptionsMode(selected);
-                    optionSelection(window, 15u, static_cast<std::uint32_t>(g_sfera_graphics_runtime.d3d_runtime->display_modes.size()) - 1u, state.graphics_snapshot[5]);
-                    setOptionsModeLabel(window, state.graphics_snapshot[5]);
-                    state.graphics_snapshot[0] = 0u;
-                    break;
-                }
-            case 39u:
-                {
-                    const bool automatic = event.first == 1u;
-                    optionToggleLabel(window, 37u, automatic);
-                    optionMessage(window, 28u, UiMessage::setScrollRange, 0u, automatic ? 0u : 170u);
-                    if (automatic) graphics.saved_fog_distance = graphics.fog_distance;
-                    else {
-                        graphics.fog_distance = graphics.saved_fog_distance;
-                        optionMessage(window, 28u, UiMessage::setScrollValue, static_cast<std::uint32_t>(static_cast<std::int64_t>(std::trunc(graphics.fog_distance - 30.0))));
-                    }
-                    g_sfera_client_config_runtime.auto_fog = automatic;
-                    break;
-                }
-            case 43u:
-                {
-                    const bool enabled = event.first == 1u;
-                    optionText(window, 41u, enabled ? g_sfera_sphere_options_runtime.option_labels[6] : "");
-                    optionMessage(window, 46u, UiMessage::setScrollRange, 0u, enabled ? 14u : 0u);
-                    if (enabled) optionMessage(window, 46u, UiMessage::setScrollValue, static_cast<std::uint32_t>(static_cast<std::int64_t>(std::trunc(g_sfera_input_device_runtime.lod_distance - 12.0))));
-                    graphics.lods_enabled = enabled;
-                    break;
-                }
-            case 51u:
-                state.graphics_snapshot[6] = event.first;
-                graphics.post_effects_enabled = event.first;
-                optionText(window, 49u, event.first < 2u ? "" : graphicsBooleanLabel(event.first));
-                break;
-            default:
-                break;
-        } else if (event.message != UiMessage::horizontalScroll) return;
-        if (event.control_id == 28u) graphics.fog_distance = event.first + 30.0;
-        else if (event.control_id == 46u) g_sfera_input_device_runtime.lod_distance = event.first + 12.0;
-    }
-
-    void handleFontOptionsEvent(const WindowEvent& event) {
-        if (event.message == UiMessage::selectedFontChanged) {
-            if (event.control_id == 3u || event.control_id == 4u) editedChatFonts().at(event.control_id - 3u) = event.first;
-            return;
-        }
-        if (event.message == UiMessage::leftClick) {
-            if (event.control_id == 1u) savedChatFonts() = editedChatFonts();
-            else if (event.control_id != 2u) return;
-        } else if (event.message != UiMessage::close) return;
-        setFontOptionsVisible(false);
-    }
-}
-
-void SphereUI::Runtime::invokeEventHandler(WindowEventHandler handler, Window* window, const WindowEvent& event) {
-    switch (handler) {
-        case WindowEventHandler::none:
-            return;
-        case WindowEventHandler::description:
-            if (window != nullptr) static_cast<CDescriptionWindow*>(window)->handleEvent(event);
-            return;
-        case WindowEventHandler::help:
-            handleHelpEvent(window, event);
-            return;
-        case WindowEventHandler::authors:
-            if (event.message == UiMessage::close && beginOptionsDialog("authors", handler, false) != nullptr) setOptionsVisible(true);
-            return;
-        case WindowEventHandler::quit:
-            if (event.message == UiMessage::leftClick && event.control_id == 1u) g_sfera_render_lookup_runtime.quit_requested = true;
-            else if (event.message == UiMessage::close && beginOptionsDialog("quit", handler, false) != nullptr) setOptionsVisible(true);
-            return;
-        case WindowEventHandler::sound_options:
-            handleSoundOptionsEvent(window, event);
-            return;
-        case WindowEventHandler::control_options:
-            handleControlOptionsEvent(window, event);
-            return;
-        case WindowEventHandler::interface_options:
-            handleInterfaceOptionsEvent(window, event);
-            return;
-        case WindowEventHandler::graphics_options:
-            handleGraphicsOptionsEvent(window, event);
-            return;
-        case WindowEventHandler::font_options:
-            handleFontOptionsEvent(event);
-            return;
-        case WindowEventHandler::options:
-            if (event.message == UiMessage::close) setOptionsVisible(false);
-            else if (event.message == UiMessage::leftClick) switch (event.control_id) {
-                case 3u:
-                    setGraphicsOptionsVisible(true);
-                    break;
-                case 4u:
-                    setSoundOptionsVisible(true);
-                    break;
-                case 5u:
-                    setControlOptionsVisible(true);
-                    break;
-                case 6u:
-                    setInterfaceOptionsVisible(true);
-                    break;
-                case 7u:
-                    beginOptionsDialog("authors", WindowEventHandler::authors, true);
-                    break;
-                case 8u:
-                    beginOptionsDialog("quit", WindowEventHandler::quit, true);
-                    break;
-                default:
-                    break;
-            }
-            return;
-    }
-}
-
-namespace {
     constexpr std::string_view numericWhitespace = " \t\n\r\f\v";
     template<class Integer> bool readInteger(std::string_view& input, Integer& output, int base) {
         const auto first = input.find_first_not_of(numericWhitespace);
@@ -1231,11 +529,6 @@ namespace {
         std::string_view input(text == nullptr ? "" : text);
         return readInteger(input, color, 16);
     }
-    // The legacy message ABI has no destination capacity; callers must reserve strlen(source) + 1 bytes.
-    void copyMessageText(char* destination, const char* source) {
-        std::copy_n(source, std::char_traits<char>::length(source) + 1u, destination);
-    }
-
     class ViewportScope {
         SphereUI::UiViewport saved{};
         bool changed = false;
@@ -1261,7 +554,6 @@ namespace {
             return changed;
         }
     };
-
 
     constexpr NamedValue<std::uint32_t> buttonStyles[] = { {
         "LOSTCHECK", ButtonStyle::releaseOutside
@@ -1362,7 +654,7 @@ namespace {
             if (reset) value = 0u;
             for (std::size_t index = 0u; index < parser.tokenCount(); index += 2u) {
                 const char* name = token(index);
-                for (const auto& flag : names) if (SferaSimpleParser::equalsIgnoreCase(name, flag.name)) value |= flag.value;
+                for (const auto& flag : names) if (SferaText::asciiEqual(name, flag.name)) value |= flag.value;
             }
         }
 
@@ -1375,13 +667,13 @@ namespace {
 
         void status(const char* key, std::uint32_t& mode) {
             const char* value = string(key);
-            if (value != nullptr) mode = SferaSimpleParser::equalsIgnoreCase(value, "PERCENT") ? 1u : SferaSimpleParser::equalsIgnoreCase(value, "STYLE1") ? 2u : 0u;
+            if (value != nullptr) mode = SferaText::asciiEqual(value, "PERCENT") ? 1u : SferaText::asciiEqual(value, "STYLE1") ? 2u : 0u;
         }
 
         void drawMethod(SphereUI::Window& window, bool own_resources = false) {
             const char* method = string("drawMethod");
-            if (SferaSimpleParser::equalsIgnoreCase(method, "NONE")) window.behavior_flags |= WindowStyle::skipDrawing;
-            else if (SferaSimpleParser::equalsIgnoreCase(method, "SPRITE")) {
+            if (SferaText::asciiEqual(method, "NONE")) window.behavior_flags |= WindowStyle::skipDrawing;
+            else if (SferaText::asciiEqual(method, "SPRITE")) {
                 const char* name = token(1u, true);
                 if (name != nullptr) {
                     auto* owner = own_resources ? &window : window.parent;
@@ -1453,7 +745,6 @@ namespace {
 
     void drawChild(SphereUI::Window* address, std::uint32_t alpha);
     void inputChild(SphereUI::Window* address, const SphereUI::WindowInput& input);
-    template<class Value> void storeValue(std::uintptr_t address, Value value);
     template<class T, class Copy> std::unique_ptr<SphereUI::Window> cloneControl(const T& source, SphereUI::Window::CloneContext& context, Copy copy) {
         auto result = std::make_unique<T>();
         result->initializeCopy(source, context);
@@ -1616,7 +907,7 @@ std::unique_ptr<SphereUI::Window> SphereUI::Window::cloneInto(CloneContext& cont
     return result;
 }
 
-std::uint32_t SphereUI::Window::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::Window::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     if (message >= UiMessage::setTooltipLine && message <= UiMessage::setTooltipTextColor) {
         auto* tip = tooltip.get();
         if (tip == nullptr) {
@@ -1634,9 +925,6 @@ std::uint32_t SphereUI::Window::handleMessage(SphereUI::UiMessage message, std::
         case UiMessage::setInputEnabled:
             input_enabled = first != 0u;
             break;
-        case UiMessage::getInputEnabled:
-            storeValue(first, input_enabled);
-            break;
         case UiMessage::setTextRgb:
             text_color = SferaColor::fromArgb(first).withAlpha(alpha).argb();
             break;
@@ -1644,15 +932,9 @@ std::uint32_t SphereUI::Window::handleMessage(SphereUI::UiMessage message, std::
             hidden = first != 0u;
             if (hidden) hide_tip();
             break;
-        case UiMessage::getHidden:
-            storeValue(first, hidden);
-            break;
         case UiMessage::setEnabled:
             disabled = first == 0u;
             if (disabled) hide_tip();
-            break;
-        case UiMessage::getDisabled:
-            storeValue(first, disabled);
             break;
         case UiMessage::setTextAlignment:
             text_alignment = first;
@@ -1663,25 +945,10 @@ std::uint32_t SphereUI::Window::handleMessage(SphereUI::UiMessage message, std::
         case UiMessage::setPosition:
             setPosition(static_cast<int>(first), static_cast<int>(second));
             break;
-        case UiMessage::getChildUnderCursor:
-            {
-                const auto position = CCursorManager::instance().position();
-                storeValue(first, static_cast<std::uint32_t>(childControlAt(position.x, position.y)));
-                break;
-            }
-        case UiMessage::getModal:
-            storeValue(first, modal_owner != nullptr);
-            break;
         case UiMessage::endModal:
             if (modal_owner != nullptr) {
                 modal_owner = nullptr;
                 handleMessage(UiMessage::animateVisibility, 0u, 0u);
-            }
-            break;
-        case UiMessage::beginModal:
-            if (modal_owner == nullptr) {
-                modal_owner = reinterpret_cast<Window*>(first);
-                handleMessage(UiMessage::animateVisibility, 1u, 0u);
             }
             break;
         case UiMessage::setSize:
@@ -1779,7 +1046,7 @@ bool SphereUI::Window::hitTest(int screen_x, int screen_y) {
     return true;
 }
 
-void SphereUI::Window::dispatchMessage(int target_group, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second, SphereUI::UiControlKind target_kind) {
+void SphereUI::Window::dispatchMessage(int target_group, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second, SphereUI::UiControlKind target_kind) {
     detail::forEachChild(*this, [&](Window& child) {
         if (target_group != -1 && child.group != target_group) return;
         const auto identity = child.registration_id;
@@ -1805,8 +1072,8 @@ bool SphereUI::ButtonCtrl::loadUi(const char* , SferaSimpleParser& parser, const
     reader.sprite("uncheckedImage", *this, idle_image);
     reader.flags("buttonStyle", button_flags, buttonStyles);
     const char* method = reader.string("drawMethod");
-    if (SferaSimpleParser::equalsIgnoreCase(method, "SPRITE")) button_flags |= ButtonStyle::stateImages;
-    if (SferaSimpleParser::equalsIgnoreCase(method, "NONE")) behavior_flags |= WindowStyle::skipDrawing;
+    if (SferaText::asciiEqual(method, "SPRITE")) button_flags |= ButtonStyle::stateImages;
+    if (SferaText::asciiEqual(method, "NONE")) behavior_flags |= WindowStyle::skipDrawing;
     if (const char* name = reader.string("hotKey", true)) {
         hotkey = Runtime::keyCode(name);
         std::string_view arguments(parser.valueText());
@@ -1834,7 +1101,7 @@ std::unique_ptr<SphereUI::Window> SphereUI::ButtonCtrl::cloneInto(CloneContext& 
     });
 }
 
-std::uint32_t SphereUI::ButtonCtrl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::ButtonCtrl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     if (message == UiMessage::activateButton) {
         click();
         return 1u;
@@ -1889,7 +1156,6 @@ void SphereUI::ButtonCtrl::handleInput(const WindowInput& input) {
     }
 }
 
-
 bool SphereUI::CheckBox::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
 
     UiReader reader(parser, range);
@@ -1919,13 +1185,10 @@ std::unique_ptr<SphereUI::Window> SphereUI::CheckBox::cloneInto(CloneContext& co
     });
 }
 
-std::uint32_t SphereUI::CheckBox::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::CheckBox::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
         case UiMessage::setChecked:
             checked = first != 0u;
-            return 1u;
-        case UiMessage::getChecked:
-            storeValue(first, checked);
             return 1u;
         case UiMessage::activateButton:
             playClickSound();
@@ -2060,22 +1323,16 @@ std::unique_ptr<SphereUI::Window> SphereUI::EditCtrl::cloneInto(CloneContext& co
     });
 }
 
-std::uint32_t SphereUI::EditCtrl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+void SphereUI::EditCtrl::setEditText(std::string_view value) {
+    text.assign(value);
+    updatePassword();
+}
+
+std::uint32_t SphereUI::EditCtrl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
         case UiMessage::setInputEnabled:
             setInputFocus(first != 0u, submit_on_blur);
             return 1u;
-        case UiMessage::setEditText:
-            setText(reinterpret_cast<const char*>(first));
-            updatePassword();
-            break;
-        case UiMessage::getEditText:
-            if (auto* output = reinterpret_cast<char*>(first)) {
-                const auto length = std::min(text.size(), std::size_t{250});
-                std::memcpy(output, getText(), length);
-                output[length] = '\0';
-            }
-            break;
         case UiMessage::getEditFocus:
             return input_enabled;
         case UiMessage::moveEditCaretToEnd:
@@ -2207,7 +1464,7 @@ std::unique_ptr<SphereUI::Window> SphereUI::ListCtrl::cloneInto(CloneContext& co
     });
 }
 
-std::uint32_t SphereUI::ListCtrl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::ListCtrl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
         case UiMessage::verticalScroll:
         case UiMessage::setListScroll:
@@ -2217,21 +1474,6 @@ std::uint32_t SphereUI::ListCtrl::handleMessage(SphereUI::UiMessage message, std
         case UiMessage::updateScrollLayout:
             if (first != 0u) updateLayout();
             else if (auto* bar = scrollbar.get()) bar->setParameters({0u, ScrollField::all, 0, 0, 0, 0, 0});
-            return 1u;
-        case UiMessage::appendListText:
-            {
-                const bool at_bottom = detail::addCoordinate(vertical_offset, 5) >= maximum_scroll;
-                addText(reinterpret_cast<const char*>(first), second);
-                if (chatlike && at_bottom) {
-                    vertical_offset = maximum_scroll;
-                    if (auto* bar = scrollbar.get()) bar->setParameters({0u, ScrollField::position, 0, 0, 0, vertical_offset, 0});
-                    updateVisibleRange();
-                }
-                return 1u;
-            }
-        case UiMessage::setListText:
-            if (first >= rows.size()) return 0u;
-            rows.at(first).text.assign(second == 0u ? " " : reinterpret_cast<const char*>(second));
             return 1u;
         case UiMessage::setListColor:
             if (first >= rows.size()) return 0u;
@@ -2247,28 +1489,11 @@ std::uint32_t SphereUI::ListCtrl::handleMessage(SphereUI::UiMessage message, std
         case UiMessage::setListSelection:
             selectRow(static_cast<int>(first));
             return 1u;
-        case UiMessage::getListSelection:
-            storeValue(first, selected_index);
-            return 1u;
-        case UiMessage::getListText:
-            if (second >= rows.size() || first == 0u) return 0u;
-            copyMessageText(reinterpret_cast<char*>(first), rows.at(physicalIndex(second)).text.data());
-            return 1u;
-        case UiMessage::getListSize:
-            storeValue(first, rows.size());
-            return 1u;
-        case UiMessage::getListColor:
-            if (second >= rows.size()) return 0u;
-            storeValue(first, rows.at(physicalIndex(second)).color);
-            return 1u;
         case UiMessage::clearList:
             clearRows();
             return 1u;
         case UiMessage::removeListRow:
             removeRow(first);
-            return 1u;
-        case UiMessage::getListScroll:
-            storeValue(first, vertical_offset);
             return 1u;
         default:
             return Window::handleMessage(message, first, second);
@@ -2333,7 +1558,6 @@ void SphereUI::ListCtrl::handleInput(const WindowInput& input) {
     }
 }
 
-
 std::unique_ptr<SphereUI::Window> SphereUI::FilterListCtrl::cloneInto(CloneContext& context) const {
     return cloneControl(*this, context, [](FilterListCtrl& destination, const FilterListCtrl& source, SphereUI::Window::CloneContext& context) {
         destination.copyListState(source, context);
@@ -2343,17 +1567,8 @@ std::unique_ptr<SphereUI::Window> SphereUI::FilterListCtrl::cloneInto(CloneConte
     });
 }
 
-std::uint32_t SphereUI::FilterListCtrl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::FilterListCtrl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
-        case UiMessage::appendFilteredListText:
-            if (first != 0u) {
-                const auto components = SferaColor::fromArgb(second);
-                const auto mask = components.alpha();
-                const auto color = components.withAlpha(0u).argb();
-                appendHistory(reinterpret_cast<const char*>(first), color, mask);
-                if ((filter_mask & mask) != 0u) ListCtrl::handleMessage(UiMessage::appendListText, first, color);
-            }
-            return 1u;
         case UiMessage::clearFilteredList:
             clearHistory();
             clearRows();
@@ -2365,7 +1580,6 @@ std::uint32_t SphereUI::FilterListCtrl::handleMessage(SphereUI::UiMessage messag
             return ListCtrl::handleMessage(message, first, second);
     }
 }
-
 
 bool SphereUI::FontPicker::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
@@ -2386,13 +1600,9 @@ std::unique_ptr<SphereUI::Window> SphereUI::FontPicker::cloneInto(CloneContext& 
     });
 }
 
-std::uint32_t SphereUI::FontPicker::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::FontPicker::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     if (message == UiMessage::setSelectedFont) {
         setFont(first);
-        return 1u;
-    }
-    if (message == UiMessage::getSelectedFont) {
-        if (auto* window = preview.get()) storeValue(first, window->getFont());
         return 1u;
     }
     return Window::handleMessage(message, first, second);
@@ -2431,7 +1641,6 @@ int SphereUI::FontPicker::getFont() const {
     return Window::getFont();
 }
 
-
 bool SphereUI::ImageCtrl::loadUi(const char* , SferaSimpleParser& parser, const SferaParserRange& range) {
 
     UiReader reader(parser, range);
@@ -2439,7 +1648,7 @@ bool SphereUI::ImageCtrl::loadUi(const char* , SferaSimpleParser& parser, const 
     reader.sprite("image", *this, resource_reference);
     reader.integer("alpha", base_alpha);
     reader.flags("imageStyle", image_style, imageStyles, true);
-    if (reader.has("rotate")) handleMessage(UiMessage::setImageRotation, std::bit_cast<std::uint32_t>(parser.readFloat(0u)), 0u);
+    if (reader.has("rotate")) setRotationDegrees(parser.readFloat(0u));
     return true;
 }
 
@@ -2452,31 +1661,10 @@ std::unique_ptr<SphereUI::Window> SphereUI::ImageCtrl::cloneInto(CloneContext& c
     });
 }
 
-std::uint32_t SphereUI::ImageCtrl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::ImageCtrl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
-        case UiMessage::setImageName:
-            {
-                ImageDescription description{};
-                const char* name = reinterpret_cast<const char*>(first);
-                if (name == nullptr) setImage(nullptr);
-                else {
-                    detail::copyText(description.name, name);
-                    setImage(&description);
-                }
-                return 1u;
-            }
-        case UiMessage::setImageRotation:
-            {
-                const float degrees = std::bit_cast<float>(static_cast<std::uint32_t>(first));
-                rotated = degrees != 0.0f;
-                rotation_radians = degrees / 180.0f * 3.1415929794311523f;
-                return 1u;
-            }
-        case UiMessage::setImageDescription:
-            setImage(reinterpret_cast<const ImageDescription*>(first));
-            return 1u;
         case UiMessage::setImageAlpha:
-            base_alpha = std::min<std::uintptr_t>(first, 255u);
+            base_alpha = std::min<std::uint32_t>(first, 255u);
             setOpacity(opacity);
             return 1u;
         default:
@@ -2514,7 +1702,6 @@ void SphereUI::ImageCtrl::setOpacity(float new_opacity) {
     opacity = new_opacity;
 }
 
-
 bool SphereUI::ListItemCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
     loadPart(*this, vertical_scroll, reader, "vscrollbar", filename, parser, UiControlKind::scrollBar, 1u);
@@ -2549,7 +1736,7 @@ std::unique_ptr<SphereUI::Window> SphereUI::ListItemCtrl::cloneInto(CloneContext
     });
 }
 
-std::uint32_t SphereUI::ListItemCtrl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::ListItemCtrl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
         case UiMessage::horizontalScroll:
             horizontal_offset = first;
@@ -2567,14 +1754,8 @@ std::uint32_t SphereUI::ListItemCtrl::handleMessage(SphereUI::UiMessage message,
             addItem();
             updateLayout();
             return 1u;
-        case UiMessage::getListItemSelection:
-            storeValue(first, selected_index);
-            return 1u;
         case UiMessage::setListItemSelection:
             selected_index = first < items.size() ? static_cast<int>(first) : -1;
-            return 1u;
-        case UiMessage::getListItemCount:
-            storeValue(first, items.size());
             return 1u;
         case UiMessage::removeListItem:
             if (first < items.size()) {
@@ -2661,10 +1842,9 @@ bool SphereUI::ListItemCtrl::hitTest(int screen_x, int screen_y) {
     return true;
 }
 
-void SphereUI::ListItemCtrl::dispatchMessage(int target_group, SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second, SphereUI::UiControlKind target_kind) {
+void SphereUI::ListItemCtrl::dispatchMessage(int target_group, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second, SphereUI::UiControlKind target_kind) {
     for (std::size_t index = 0u; index < items.size(); ++index) if (auto* child = itemAt(index)) child->dispatchMessage(target_group, message, first, second, target_kind);
 }
-
 
 bool SphereUI::ToolTipCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
@@ -2697,17 +1877,8 @@ std::unique_ptr<SphereUI::Window> SphereUI::ToolTipCtrl::cloneInto(CloneContext&
     });
 }
 
-std::uint32_t SphereUI::ToolTipCtrl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::ToolTipCtrl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
-        case UiMessage::setTooltipLine:
-            setLine(first, reinterpret_cast<const char*>(second));
-            return 1u;
-        case UiMessage::getTooltipLine:
-            if (first != 0u && second < lines.size()) copyMessageText(reinterpret_cast<char*>(first), lines.at(second).data());
-            return 1u;
-        case UiMessage::appendTooltipLine:
-            appendLine(reinterpret_cast<const char*>(first));
-            return 1u;
         case UiMessage::setTooltipBackground:
             background_color = first;
             return 1u;
@@ -2770,7 +1941,6 @@ void SphereUI::ToolTipCtrl::handleInput(const WindowInput& input) {
         hover_started = Runtime::clockTicks();
     }
 }
-
 
 std::unique_ptr<SphereUI::Window> SphereUI::CMinimapControl::cloneInto(CloneContext& context) const {
     return cloneControl(*this, context, [](CMinimapControl& target, const CMinimapControl& source, SphereUI::Window::CloneContext&) {
@@ -2855,7 +2025,7 @@ std::unique_ptr<SphereUI::Window> SphereUI::ProgressBar::cloneInto(CloneContext&
     });
 }
 
-std::uint32_t SphereUI::ProgressBar::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::ProgressBar::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     if (message < UiMessage::setProgressValue || message > UiMessage::getProgressValue) return Window::handleMessage(message, first, second);
     switch (message) {
         case UiMessage::setProgressValue:
@@ -2863,13 +2033,6 @@ std::uint32_t SphereUI::ProgressBar::handleMessage(SphereUI::UiMessage message, 
             return 1u;
         case UiMessage::setProgressRange:
             setProgressRange(static_cast<int>(first), static_cast<int>(second));
-            return 1u;
-        case UiMessage::getProgressRange:
-            storeValue(first, minimum);
-            storeValue(second, maximum);
-            return 1u;
-        case UiMessage::getProgressValue:
-            storeValue(first, current);
             return 1u;
         default:
             return 0u;
@@ -2929,7 +2092,7 @@ std::unique_ptr<SphereUI::Window> SphereUI::ScrollBar::cloneInto(CloneContext& c
     return cloneControl(*this, context, copyScrollFields);
 }
 
-std::uint32_t SphereUI::ScrollBar::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::ScrollBar::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
         case UiMessage::setScrollValue:
             current = std::min(std::max(static_cast<int>(first), minimum), maximum);
@@ -2941,22 +2104,9 @@ std::uint32_t SphereUI::ScrollBar::handleMessage(SphereUI::UiMessage message, st
             enableNavigationButtons(*this);
             updateControlState();
             return 1u;
-        case UiMessage::getScrollRange:
-            storeValue(first, minimum);
-            storeValue(second, maximum);
-            return 1u;
-        case UiMessage::setScrollParameters:
-            if (auto* parameters = reinterpret_cast<const ScrollParameters*>(first)) setParameters(*parameters);
-            return 1u;
-        case UiMessage::getScrollParameters:
-            if (auto* parameters = reinterpret_cast<ScrollParameters*>(first)) getParameters(*parameters);
-            return 1u;
         case UiMessage::increaseScroll:
         case UiMessage::decreaseScroll:
             if (moveScroll(*this, message == UiMessage::increaseScroll, step)) loadControlParameters();
-            return 1u;
-        case UiMessage::getScrollValue:
-            storeValue(first, current);
             return 1u;
         default:
             return Window::handleMessage(message, first, second);
@@ -3045,7 +2195,6 @@ void SphereUI::ScrollBar::handleInput(const WindowInput& input) {
     updateControlState();
     if (parent != nullptr) loadControlParameters();
 }
-
 
 void SphereUI::ScrollBar::updateControlState() {
     const auto span = detail::subtractCoordinate(maximum, minimum);
@@ -3152,7 +2301,7 @@ std::unique_ptr<SphereUI::Window> SphereUI::SpinButton::cloneInto(CloneContext& 
     return cloneControl(*this, context, copySpinFields);
 }
 
-std::uint32_t SphereUI::SpinButton::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::SpinButton::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
         case UiMessage::setSpinValue:
             setCurrentValue(static_cast<int>(first));
@@ -3160,21 +2309,11 @@ std::uint32_t SphereUI::SpinButton::handleMessage(SphereUI::UiMessage message, s
         case UiMessage::setSpinRange:
             setRange(static_cast<int>(first), static_cast<int>(second));
             return 1u;
-        case UiMessage::getSpinRange:
-            storeValue(first, minimum);
-            storeValue(second, maximum);
-            return 1u;
         case UiMessage::updateSpinStatus:
             updateStatus();
             return 1u;
         case UiMessage::setSpinStep:
             setStep(static_cast<int>(first));
-            return 1u;
-        case UiMessage::getSpinStep:
-            storeValue(first, step);
-            return 1u;
-        case UiMessage::getSpinValue:
-            storeValue(first, current);
             return 1u;
         default:
             break;
@@ -3214,7 +2353,6 @@ void SphereUI::SpinButton::handleInput(const WindowInput& input) {
     }
     if (!status_valid) updateStatus();
 }
-
 
 void SphereUI::SpinButton::updateStatus() {
     auto* owner = parent;
@@ -3325,14 +2463,7 @@ namespace {
         if (auto* child = address) child->handleInput(input);
     }
 
-    template<class Value> void storeValue(std::uintptr_t address, Value value) {
-        if (address == 0) return;
-        if constexpr (sizeof(Value) > sizeof(std::uint32_t)) {
-            if (std::cmp_greater(value, std::numeric_limits<std::uint32_t>::max()) || (std::is_signed_v<Value> && std::cmp_less(value, std::numeric_limits<int>::min()))) throw std::overflow_error("UI result exceeds an MBC word");
-        }
-        const auto word = value;
-        std::memcpy(reinterpret_cast<void*>(address), &word, sizeof(word));
-    }
+
 }
 
 const char* SphereUI::Window::getText() const {
@@ -3379,9 +2510,22 @@ void SphereUI::ButtonCtrl::click() {
     if ((button_flags & ButtonStyle::showHelp) != 0u) g_sfera_interface.showHelpPage(getHelp());
 }
 
+void SphereUI::ImageCtrl::setImageName(std::string_view name) {
+    ImageDescription description{};
+    const auto length = std::min(name.size(), sizeof(description.name) - 1u);
+    std::memcpy(description.name, name.data(), length);
+    description.name[length] = '\0';
+    setImage(&description);
+}
+
+void SphereUI::ImageCtrl::setRotationDegrees(float degrees) {
+    rotated = degrees != 0.0f;
+    rotation_radians = degrees / 180.0f * 3.1415929794311523f;
+}
+
 void SphereUI::ImageCtrl::setImage(const ImageDescription* description) {
     if (description == nullptr) { resource_reference.reset(); return; }
-    if (resource_reference && SferaSimpleParser::equalsIgnoreCase(resource_reference->name.c_str(), description->name)) return;
+    if (resource_reference && SferaText::asciiEqual(resource_reference->name.c_str(), description->name)) return;
     auto replacement = parent ? parent->findResource(description->name) : nullptr;
     if (!replacement) replacement = g_sfera_interface.sharedSprite(description->name);
     if (!replacement) {
@@ -3605,7 +2749,7 @@ void SphereUI::CDescriptionWindow::close() {
 
 void SphereUI::CDescriptionWindow::update() {
     if (Runtime::keyDown(42u) || Runtime::keyDown(54u)) return;
-    if ((!Runtime::descriptionAutoPopup() && !pinned) || (!hidden && Runtime::milliseconds() >= hide_deadline)) close();
+    if ((!Runtime::descriptionAutoPopup() && !pinned) || (!hidden && WorldClock::deadlineReached(Runtime::milliseconds(), hide_deadline))) close();
 }
 
 void SphereUI::CDescriptionWindow::handleEvent(const WindowEvent& event) {
@@ -3636,8 +2780,10 @@ void SphereUI::CDescriptionWindow::showDescription(const char* text, const Windo
         if (content == nullptr) content = &child;
     });
     if (content == nullptr) throw std::runtime_error("description content control is missing");
-    content->handleMessage(UiMessage::loadHyperTextBuffer, reinterpret_cast<std::uintptr_t>(text), std::strlen(text));
-    content->handleMessage(UiMessage::resizeToHyperText, 0u, 0u);
+    if (auto* hypertext = dynamic_cast<HyperTextCtrl*>(content)) {
+        hypertext->queueBuffer(std::string_view(text, std::strlen(text)));
+        hypertext->handleMessage(UiMessage::resizeToHyperText, 0u, 0u);
+    }
     height = detail::addCoordinate(frame_height, content->height);
     SferaCursorPosition position{};
     calculatePosition(&position);
@@ -3661,7 +2807,7 @@ void SphereUI::CDescriptionWindow::requestDescription(const char* text, bool for
         show_deadline = Runtime::milliseconds() + 500u;
     }
     if (displayed_source == pending_source) hide_deadline = Runtime::milliseconds() + 250u;
-    else if (Runtime::milliseconds() >= show_deadline) showDescription(text, pending_source, 250u, false);
+    else if (WorldClock::deadlineReached(Runtime::milliseconds(), show_deadline)) showDescription(text, pending_source, 250u, false);
 }
 
 SphereUI::ListItemCtrl::ListItemCtrl() {
@@ -3837,6 +2983,28 @@ void SphereUI::ListCtrl::addText(const char* text, std::uint32_t color) {
     }
 }
 
+void SphereUI::ListCtrl::appendMessageText(std::string_view text, std::uint32_t color) {
+    const bool at_bottom = detail::addCoordinate(vertical_offset, 5) >= maximum_scroll;
+    const std::string value(text);
+    addText(value.c_str(), color);
+    if (chatlike && at_bottom) {
+        vertical_offset = maximum_scroll;
+        if (auto* bar = scrollbar.get()) bar->setParameters({0u, ScrollField::position, 0, 0, 0, vertical_offset, 0});
+        updateVisibleRange();
+    }
+}
+
+bool SphereUI::ListCtrl::setRowText(std::size_t index, std::string_view value) {
+    if (index >= rows.size()) return false;
+    rows.at(index).text.assign(value);
+    return true;
+}
+
+std::string_view SphereUI::ListCtrl::rowText(std::size_t index) const {
+    if (index >= rows.size()) return {};
+    return rows.at(physicalIndex(index)).text;
+}
+
 void SphereUI::ListCtrl::clearRows() {
     rows.clear();
     selected_index = -1;
@@ -3897,6 +3065,15 @@ void SphereUI::FilterListCtrl::clearHistory() {
 
 void SphereUI::FilterListCtrl::appendHistory(const char* text, std::uint32_t color, std::uint32_t mask) {
     appendCircular(history, maximum_items, history_write, HistoryEntry{text == nullptr ? " " : text, color, mask});
+}
+
+void SphereUI::FilterListCtrl::appendFilteredText(std::string_view text, std::uint32_t packed_color) {
+    const auto components = SferaColor::fromArgb(packed_color);
+    const auto mask = components.alpha();
+    const auto color = components.withAlpha(0u).argb();
+    const std::string value(text);
+    appendHistory(value.c_str(), color, mask);
+    if ((filter_mask & mask) != 0u) appendMessageText(text, color);
 }
 
 void SphereUI::FilterListCtrl::applyFilter(std::uint32_t mask) {
@@ -4028,22 +3205,16 @@ std::size_t SphereUI::CMenuListControl::itemAtPoint(int point_x, int point_y) co
     return index < items.size() ? index : maximum_items;
 }
 
-std::uint32_t SphereUI::CMenuListControl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::CMenuListControl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
         case UiMessage::clearMenu:
             clearItems();
-            break;
-        case UiMessage::appendMenuItem:
-            addItem(reinterpret_cast<const char*>(first), second != 0u);
             break;
         case UiMessage::activateMenuItem:
             if (first < items.size() && items.at(first).enabled != 0u) notifyParent(*this, UiMessage::menuItemActivated, first, items.size());
             break;
         case UiMessage::setMenuItemEnabled:
             if (first < items.size()) items.at(first).enabled = second != 0u;
-            break;
-        case UiMessage::setMenuItemText:
-            if (first < items.size()) items.at(first).text.assign(second == 0u ? "" : reinterpret_cast<const char*>(second));
             break;
         default:
             return Window::handleMessage(message, first, second);
@@ -4095,7 +3266,6 @@ void SphereUI::CMenuListControl::handleInput(const WindowInput& input) {
     }
     if (const auto* owner = parent; owner != nullptr && !owner->containsPoint(position.x, position.y) && (input.mouse_flags & 3u) != 0u) closeMenu();
 }
-
 
 SphereUI::SlotCtrl::SlotCtrl() {
     fill_alpha = 128u;
@@ -4174,11 +3344,8 @@ std::unique_ptr<SphereUI::Window> SphereUI::SlotCtrl::cloneInto(CloneContext& co
     });
 }
 
-std::uint32_t SphereUI::SlotCtrl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::SlotCtrl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
-        case UiMessage::setSlotItem:
-            setItem(reinterpret_cast<const char*>(first));
-            break;
         case UiMessage::setSlotHighlight:
             if (first == 0u) {
                 fill_alpha = 128u;
@@ -4188,9 +3355,6 @@ std::uint32_t SphereUI::SlotCtrl::handleMessage(SphereUI::UiMessage message, std
                 fill_alpha = 140u;
                 fill_color = border_color = first == 1u ? UiColor::slotRejected : UiColor::slotAccepted;
             }
-            break;
-        case UiMessage::setSlotDescription:
-            description.assign(first == 0u ? "" : reinterpret_cast<const char*>(first));
             break;
         case UiMessage::setSlotCount:
             setItemCount(first);
@@ -4203,15 +3367,6 @@ std::uint32_t SphereUI::SlotCtrl::handleMessage(SphereUI::UiMessage message, std
             break;
         case UiMessage::setSlotBorderColor:
             border_color = first;
-            break;
-        case UiMessage::setSlotTopLeftOverlay:
-            setOverlay(top_left_overlay, reinterpret_cast<const char*>(first));
-            break;
-        case UiMessage::setSlotBottomRightOverlay:
-            setOverlay(bottom_right_overlay, reinterpret_cast<const char*>(first));
-            break;
-        case UiMessage::setSlotBottomLeftOverlay:
-            setOverlay(bottom_left_overlay, reinterpret_cast<const char*>(first));
             break;
         default:
             return Window::handleMessage(message, first, second);
@@ -4278,7 +3433,6 @@ void SphereUI::SlotCtrl::handleInput(const WindowInput& input) {
         drag_started = true;
     }
 }
-
 
 SphereUI::RichEditCtrl::RichEditCtrl() {
     cursor_visible = true;
@@ -4369,16 +3523,16 @@ void SphereUI::RichEditCtrl::setContent(const char* text) {
     ensureCaretVisible();
 }
 
-void SphereUI::RichEditCtrl::copyContent(char* destination, std::uint32_t capacity) const {
-    if (destination == nullptr || capacity == 0u) return;
+void SphereUI::RichEditCtrl::copyContent(std::span<char> destination) const {
+    if (destination.empty()) return;
     std::size_t copied = 0u;
-    for (std::size_t index = 0u; index < lines.size() && copied + 1u < capacity; ++index) {
+    for (std::size_t index = 0u; index < lines.size() && copied + 1u < destination.size(); ++index) {
         const auto& line = lines.at(index);
-        const auto count = std::min<std::size_t>(line.size(), capacity - copied - 1u);
-        std::memcpy(destination + copied, line.data(), count);
+        const auto count = std::min<std::size_t>(line.size(), destination.size() - copied - 1u);
+        std::memcpy(destination.data() + copied, line.data(), count);
         copied += count;
         if (count < line.size()) break;
-        if (copied + 1u < capacity) destination[copied++] = '\n';
+        if (copied + 1u < destination.size()) destination[copied++] = '\n';
     }
     destination[copied] = 0;
 }
@@ -4507,14 +3661,8 @@ std::unique_ptr<SphereUI::Window> SphereUI::RichEditCtrl::cloneInto(CloneContext
     });
 }
 
-std::uint32_t SphereUI::RichEditCtrl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::RichEditCtrl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
-        case UiMessage::setRichEditContent:
-            if (first != 0u) setContent(reinterpret_cast<const char*>(first));
-            return 1u;
-        case UiMessage::getRichEditContent:
-            if (first != 0u) copyContent(reinterpret_cast<char*>(first), second);
-            return 1u;
         case UiMessage::verticalScroll:
             first_row = std::max(0, static_cast<int>(first));
             return 1u;
@@ -4594,23 +3742,22 @@ void SphereUI::HyperTextCtrl::copyHyperTextState(const HyperTextCtrl& source, Cl
 }
 
 std::uint32_t SphereUI::HyperTextCtrl::parseTextFormat(const char* name) {
-    if (SferaSimpleParser::equalsIgnoreCase(name, "RIGHT")) return 1u;
-    if (SferaSimpleParser::equalsIgnoreCase(name, "CENTER")) return 2u;
-    if (SferaSimpleParser::equalsIgnoreCase(name, "PARAGRAPH")) return 3u;
+    if (SferaText::asciiEqual(name, "RIGHT")) return 1u;
+    if (SferaText::asciiEqual(name, "CENTER")) return 2u;
+    if (SferaText::asciiEqual(name, "PARAGRAPH")) return 3u;
     return 0u;
 }
 
-void SphereUI::HyperTextCtrl::queuePage(const char* name, bool remember) {
+void SphereUI::HyperTextCtrl::queuePage(std::string_view name, bool remember) {
     if (transition_active) return;
-    if (name == nullptr || *name == '\0') { pending_page = std::monostate{}; return; }
-    PageRequest request{std::string(name, std::min(std::char_traits<char>::length(name), std::size_t{255})), remember};
+    if (name.empty()) { pending_page = std::monostate{}; return; }
+    PageRequest request{std::string(name.substr(0u, 255u)), remember};
     pending_page = std::move(request);
 }
 
-void SphereUI::HyperTextCtrl::queueBuffer(const char* buffer, std::size_t size) {
-    if (transition_active || buffer == nullptr || size == 0u) return;
-    std::string bytes(buffer, size);
-    pending_page = std::move(bytes);
+void SphereUI::HyperTextCtrl::queueBuffer(std::string_view buffer) {
+    if (transition_active || buffer.empty()) return;
+    pending_page = std::string(buffer);
 }
 
 void SphereUI::HyperTextCtrl::updateScroll() {
@@ -4670,11 +3817,11 @@ void SphereUI::HyperTextCtrl::openLink(const char* target) {
     const std::string value(target);
     const auto separator = value.find(':');
     const auto scheme = value.substr(0u, separator);
-    if (SferaSimpleParser::equalsIgnoreCase(scheme.c_str(), "HTS")) {
+    if (SferaText::asciiEqual(scheme.c_str(), "HTS")) {
         if (separator == std::string::npos) return;
         const auto first = value.find_first_not_of('\\', separator + 1u);
         if (first != std::string::npos) queuePage(value.c_str() + first, true);
-    } else Runtime::openExternalLink(value.c_str(), SferaSimpleParser::equalsIgnoreCase(scheme.c_str(), "mailto"));
+    } else Runtime::openExternalLink(value.c_str(), SferaText::asciiEqual(scheme.c_str(), "mailto"));
 }
 
 bool SphereUI::HyperTextCtrl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
@@ -4688,7 +3835,7 @@ bool SphereUI::HyperTextCtrl::loadUi(const char* filename, SferaSimpleParser& pa
         const char* second = reader.token(1u);
         if (second != nullptr) readHexColor(second, hover_color);
     }
-    if (const char* value = reader.string("flags")) if (SferaSimpleParser::equalsIgnoreCase(value, "DISCARD_OLD_TEXT")) discard_old_text = true;
+    if (const char* value = reader.string("flags")) if (SferaText::asciiEqual(value, "DISCARD_OLD_TEXT")) discard_old_text = true;
     return true;
 }
 
@@ -4699,7 +3846,7 @@ std::unique_ptr<SphereUI::Window> SphereUI::HyperTextCtrl::cloneInto(CloneContex
     });
 }
 
-std::uint32_t SphereUI::HyperTextCtrl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::HyperTextCtrl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
         case UiMessage::verticalScroll:
             if (document != nullptr) {
@@ -4716,14 +3863,8 @@ std::uint32_t SphereUI::HyperTextCtrl::handleMessage(SphereUI::UiMessage message
                 queuePage(name.c_str(), false);
             }
             return 1u;
-        case UiMessage::loadHyperTextPage:
-            queuePage(reinterpret_cast<const char*>(first), second != 0u);
-            return 1u;
         case UiMessage::clearHyperTextHistory:
             history.clear();
-            return 1u;
-        case UiMessage::loadHyperTextBuffer:
-            queueBuffer(reinterpret_cast<const char*>(first), second);
             return 1u;
         case UiMessage::resizeToHyperText:
             updateDocument(true);
@@ -4788,7 +3929,6 @@ void SphereUI::HyperTextCtrl::handleInput(const WindowInput& input) {
     }
 }
 
-
 SphereUI::HyperTextChatListControl::HyperTextChatListControl() {
     control_kind = UiControlKind::hyperTextChat;
     item_link_color = link_color = UiColor::white;
@@ -4811,7 +3951,6 @@ std::unique_ptr<SphereUI::Window> SphereUI::HyperTextChatListControl::cloneInto(
         cloneOwned(copy.scrollbar, source.scrollbar, copy, context);
     });
 }
-
 
 bool SphereUI::HyperTextChatListControl::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
     UiReader reader(parser, range);
@@ -4877,11 +4016,8 @@ void SphereUI::HyperTextChatListControl::addChannel(std::uint32_t channel) {
     updateScroll(false);
 }
 
-void SphereUI::HyperTextChatListControl::setChannels(const std::uint32_t* values, std::size_t count) {
-    if (values == nullptr && count != 0u) return;
-    std::vector<std::uint32_t> replacement;
-    if (count != 0u) replacement.assign(values, values + count);
-    channels = std::move(replacement);
+void SphereUI::HyperTextChatListControl::setChannels(std::span<const std::uint32_t> values) {
+    channels.assign(values.begin(), values.end());
     scroll_offset = 0u;
     rebuildVisible();
     updateScroll(false);
@@ -5032,39 +4168,16 @@ void SphereUI::HyperTextChatListControl::handleInput(const WindowInput& input) {
     }
 }
 
-std::uint32_t SphereUI::HyperTextChatListControl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::HyperTextChatListControl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
         case UiMessage::verticalScroll:
             readScroll();
             return 1u;
-        case UiMessage::appendChatMessage:
-            if (first != 0u && second != 0u) {
-                const auto* parameters = reinterpret_cast<const std::uint32_t*>(second);
-                addMessage(reinterpret_cast<const char*>(first), parameters[0], parameters[1]);
-            }
-            return 1u;
         case UiMessage::addChatChannel:
             addChannel(first);
             return 1u;
-        case UiMessage::setChatChannels:
-            setChannels(reinterpret_cast<const std::uint32_t*>(second), first);
-            return 1u;
         case UiMessage::clearChatChannels:
             clearChannels();
-            return 1u;
-        case UiMessage::getChatPlainText:
-        case UiMessage::getChatHyperText:
-            if (second != 0u) copyMessageText(reinterpret_cast<char*>(second), messageText(first, message == UiMessage::getChatPlainText));
-            return 1u;
-        case UiMessage::getSelectedChatLink:
-            if (first != 0u) copyMessageText(reinterpret_cast<char*>(first), selected_link_text.data());
-            if (second != 0u) copyMessageText(reinterpret_cast<char*>(second), selected_link_value.data());
-            return 1u;
-        case UiMessage::getSelectedChatHyperText:
-            if (first != 0u) copyMessageText(reinterpret_cast<char*>(first), selected_hyper_text.data());
-            return 1u;
-        case UiMessage::getSelectedChatPlainText:
-            if (first != 0u) copyMessageText(reinterpret_cast<char*>(first), selected_plain_text.data());
             return 1u;
         default:
             return Window::handleMessage(message, first, second);
@@ -5432,15 +4545,15 @@ bool SphereUI::HyperTextEditControl::loadUi(const char*, SferaSimpleParser& pars
     reader.count("maxHyperTextLength", maximum_hyper_length);
     reader.count("maxHistoryLength", maximum_history);
     cursor_type = 1u;
-    if (const char* value = reader.string("cursorType")) cursor_type = SferaSimpleParser::equalsIgnoreCase(value, "none") ? 0u : SferaSimpleParser::equalsIgnoreCase(value, "uline") ? 2u : 1u;
+    if (const char* value = reader.string("cursorType")) cursor_type = SferaText::asciiEqual(value, "none") ? 0u : SferaText::asciiEqual(value, "uline") ? 2u : 1u;
     edit_modes.reset();
     if (reader.has("editMode")) for (std::size_t index = 0u; index < parser.tokenCount(); ++index) {
         const char* value = reader.token(index);
-        if (SferaSimpleParser::equalsIgnoreCase(value, "enterPlainText")) edit_modes.set(PlainText);
-        else if (SferaSimpleParser::equalsIgnoreCase(value, "numbersOnly")) {
+        if (SferaText::asciiEqual(value, "enterPlainText")) edit_modes.set(PlainText);
+        else if (SferaText::asciiEqual(value, "numbersOnly")) {
             edit_modes.set(PlainText);
             edit_modes.set(Numeric);
-        } else if (SferaSimpleParser::equalsIgnoreCase(value, "password")) {
+        } else if (SferaText::asciiEqual(value, "password")) {
             edit_modes.set(PlainText);
             edit_modes.set(Password);
         }
@@ -5453,21 +4566,10 @@ bool SphereUI::HyperTextEditControl::loadUi(const char*, SferaSimpleParser& pars
     return true;
 }
 
-std::uint32_t SphereUI::HyperTextEditControl::handleMessage(SphereUI::UiMessage message, std::uintptr_t first, std::uintptr_t second) {
+std::uint32_t SphereUI::HyperTextEditControl::handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
     switch (message) {
         case UiMessage::setInputEnabled:
             setInputFocus(first != 0u);
-            return 1u;
-        case UiMessage::setHyperEditContent:
-            if (first != 0u) setContent(reinterpret_cast<const char*>(first), second);
-            return 1u;
-        case UiMessage::getHyperEditPlainText:
-        case UiMessage::getHyperEditHyperText:
-            if (first != 0u) copyMessageText(reinterpret_cast<char*>(first), message == UiMessage::getHyperEditPlainText ? visible_text.data() : hyper_text.data());
-            return 1u;
-        case UiMessage::getHyperEditLengths:
-            storeValue(first, visible_text.size());
-            storeValue(second, hyper_text.size());
             return 1u;
         case UiMessage::setHyperEditTextColor:
             plain_color = first;
@@ -5708,3 +4810,2915 @@ SphereUI::Window* SphereUI::Window::controlAt(std::size_t index) const {
 void SphereUI::Window::addModalReference(Window& window) {
     modal_references.push_back(&window);
 }
+
+void SphereUI::Window::beginModal(Window* owner) {
+    if (modal_owner != nullptr) return;
+    modal_owner = owner;
+    animateVisibility(true);
+}
+
+namespace {
+    template<class T> std::size_t vacantGuiSlot(const std::vector<std::unique_ptr<T>>& slots) {
+        const auto slot = std::find(slots.begin(), slots.end(), nullptr);
+        if (slot == slots.end()) WorldDiagnostics::fail("Array bounds exceeded");
+        return static_cast<std::size_t>(slot - slots.begin());
+    }
+
+    void eraseGuiControl(std::uint32_t handle, const GameUiElement& item) {
+        WorldGuiControls::detachFromWindow(item.windowHandle, item.windowSlot);
+        WorldGuiControls::elements.at(handle).reset();
+    }
+
+    template<class Build> std::uint32_t createGuiControl(std::uint32_t windowHandle, const char* operation, Build&& build) {
+        auto* window = GameInterface::window(windowHandle, operation);
+        if (!window) { windowHandle = 0; window = GameInterface::window(windowHandle); }
+        if (!window) WorldDiagnostics::fail("create_control: root window is unavailable");
+        const auto handle = static_cast<std::uint32_t>(vacantGuiSlot(WorldGuiControls::elements));
+        auto item = std::make_unique<GameUiElement>();
+        item->windowHandle = windowHandle;
+        const bool keep = build(*item, *window);
+        item->windowSlot = window->attach(handle);
+        WorldGuiControls::elements[handle] = std::move(item);
+        if (!keep) { eraseGuiControl(handle, *WorldGuiControls::elements[handle]); return UINT32_MAX; }
+        window->recalculateSize();
+        return handle;
+    }
+}
+GameUiElement* WorldGuiControls::control(std::uint32_t handle) {
+    return handle < elements.size() ? elements[handle].get() : nullptr;
+}
+void WorldGuiControls::detachFromWindow(std::uint32_t windowHandle, std::uint32_t slot) {
+    auto* owner = GameInterface::window(windowHandle);
+    if (!owner) WorldDiagnostics::fail("internal error 75248635");
+    owner->detach(slot);
+}
+void WorldGuiControls::destroySprite(std::uint32_t handle) {
+    auto* item = control(handle);
+    if (!item) { WorldDiagnostics::warning("delete_sprite: wrong handle"); return; }
+    eraseGuiControl(handle, *item);
+}
+void WorldGuiControls::destroyText(std::uint32_t handle) {
+    if (handle == UINT32_MAX) WorldDiagnostics::fail("Wrong hand was used!");
+    auto* item = control(handle);
+    if (!item) WorldDiagnostics::fail("delete_text: wrong handle");
+    eraseGuiControl(handle, *item);
+}
+void WorldGuiControls::removeForObject(std::uint32_t objectHandle) {
+    for (std::uint32_t handle = 0; handle < elements.size(); ++handle) {
+        const auto* item = control(handle);
+        if (item && item->objectHandle == objectHandle) eraseGuiControl(handle, *item);
+    }
+}
+
+// Font codecs, sprite resources, hypertext and both UI render adapters.
+namespace {
+    struct PcxHeader {
+        static constexpr std::size_t encodedSize = 128;
+        static constexpr std::uint8_t runMarker = 3u << 6;
+        std::uint16_t minimum_y;
+        std::uint16_t maximum_y;
+        static PcxHeader decode(const std::uint8_t* bytes) noexcept { return {SferaBinary::readLittleEndian<std::uint16_t>(bytes + 6), SferaBinary::readLittleEndian<std::uint16_t>(bytes + 10)}; }
+    };
+
+}
+
+bool SphereUI::FontFace::load(const char* display_name, const char* filename, const char* texture_name) {
+    if (filename == nullptr || texture_name == nullptr) return false;
+    std::ifstream stream(filename, std::ios::binary);
+    if (!stream) {
+        const std::string message = std::string("Can't open font '") + filename + "'";
+        if (auto* log = g_sfera_error_log_runtime.outputs[1u]; log != nullptr) log->write(message.c_str());
+        return false;
+    }
+    std::array<char, 4> signature{};
+    if (!stream.read(signature.data(), signature.size()) || std::string_view(signature.data(), signature.size()) != "SFNT") return false;
+    FontFace replacement;
+    std::string stored_name, stored_texture;
+    if (!std::getline(stream, stored_name, '\0') || stored_name.size() >= 256u || !std::getline(stream, stored_texture, '\0') || stored_texture.size() >= 256u) return false;
+    replacement.name = display_name == nullptr ? stored_name : display_name;
+    const auto texture_id = g_sfera_textures.find(texture_name);
+    if (texture_id == -1) {
+        const std::string message = std::string("Can't load texture '") + texture_name + "' for font '" + replacement.name + "'";
+        InterfaceRenderer::reportError(message.c_str());
+        return false;
+    }
+    replacement.texture = static_cast<std::uint32_t>(texture_id);
+    std::array<std::uint8_t, 8> metrics{};
+    if (!stream.read(reinterpret_cast<char*>(metrics.data()), metrics.size())) return false;
+    replacement.line_height = SferaBinary::readLittleEndian<int>(metrics.data());
+    replacement.baseline = SferaBinary::readLittleEndian<int>(metrics.data() + 4);
+    // SFNT stores 224 little-endian records, including a legacy two-byte gap after advance.
+    std::array<std::uint8_t, FontGlyph::encodedSize> record{};
+    for (auto& glyph : std::span(replacement.glyphs).subspan(32u)) {
+        if (!stream.read(reinterpret_cast<char*>(record.data()), record.size())) return false;
+        glyph = FontGlyph::decode(record.data());
+        glyph.bearing_y = static_cast<std::uint16_t>(glyph.bearing_y) - static_cast<std::uint16_t>(replacement.baseline);
+    }
+    *this = std::move(replacement);
+    return true;
+}
+
+SphereUI::FontFactory::FontFactory() = default;
+SphereUI::FontFactory::~FontFactory() = default;
+
+void SphereUI::FontFactory::initialize() {
+    vertices.resize(1200u);
+    std::fill(vertices.begin(), vertices.end(), SferaScreenVertex{});
+    quad_indices.resize(2400u);
+    vertex_count = 0u;
+}
+
+void SphereUI::FontFactory::clear() {
+    faces.clear();
+    vertices.clear();
+    quad_indices.clear();
+    vertex_count = 0u;
+}
+
+bool SphereUI::FontFactory::load(const char* filename, const char* texture_name) {
+    auto loaded = std::make_unique<FontFace>();
+    if (!loaded->load(nullptr, filename, texture_name)) return false;
+    faces.push_back(std::move(loaded));
+    return true;
+}
+
+void SphereUI::FontFactory::loadNamedFont(const char* name) {
+    if (name == nullptr) return;
+    std::string localized_name(name);
+    const char* suffix = g_sfera_font_runtime.language_suffix;
+    if (*suffix != '\0' && !SferaText::asciiEqual(suffix, "_e")) localized_name += suffix;
+    const std::string filename = "Effects\\" + localized_name + ".sfn";
+    if (!load(filename.c_str(), localized_name.c_str())) {
+        const std::string message = "Can't load font '" + localized_name + "'";
+        InterfaceRenderer::reportError(message.c_str());
+    }
+}
+
+void SphereUI::FontFactory::loadConfiguration() {
+    InterfaceConfiguration::open("fonts.cfg");
+    if (InterfaceConfiguration::empty()) {
+        InterfaceRenderer::reportError("File 'fonts.cfg' doesn't exist or contains no font configuration.");
+        return;
+    }
+    std::uint32_t count = 0u;
+    count = InterfaceConfiguration::readInteger("NEW_FONTS_NUMBER", count);
+    for (std::uint32_t index = 0u; index < count; ++index) {
+        const std::string key = "NEW_FONT_" + std::to_string(index);
+        const auto text = InterfaceConfiguration::value(key);
+        const std::string_view value = text.value_or(std::string_view{});
+        const auto end = value.find('"', 1u);
+        if (value.empty() || value.front() != '"' || end == std::string_view::npos) {
+            const std::string message = "Missing quoted font name for '" + key + "' in fonts.cfg.";
+            InterfaceRenderer::reportError(message.c_str());
+            continue;
+        }
+        std::string name(value.substr(1u, end - 1u));
+        std::replace(name.begin(), name.end(), '\r', ' ');
+        std::erase(name, '\n');
+        loadNamedFont(name.c_str());
+    }
+}
+
+std::size_t SphereUI::FontFactory::count() const noexcept {
+    return faces.size();
+}
+
+const SphereUI::FontFace& SphereUI::FontFactory::face(int font) const {
+    if (font < 2 || std::size_t(font - 2) >= faces.size()) throw std::out_of_range("invalid font index");
+    return *faces[font - 2u];
+}
+
+std::uint32_t SphereUI::InterfaceRenderer::tracking(int font) noexcept {
+    return font >= 0 && font < 2 ? g_sfera_font_runtime.faces[font].code_base : 0u;
+}
+
+bool SferaInterfaceCursor::loadTextures() {
+    for (std::size_t index = 0u; index < textures.size(); ++index) {
+        const char* name = sfera_cursor_texture_name(static_cast<std::uint32_t>(index));
+        textures[index] = g_sfera_textures.find(name);
+        if (textures[index] == -1) SphereUI::InterfaceRenderer::reportError((std::string("Cursor texture '") + name + "' not found").c_str());
+    }
+    kind = 0u;
+    images = {};
+    labels = {};
+    return true;
+}
+
+void SferaInterfaceCursor::setImage(std::size_t layer, const char* texture, int x, int y) {
+    if (layer >= images.size()) return;
+    auto& image = images[layer];
+    image.x = x;
+    image.y = y;
+    image.texture = texture == nullptr ? -1 : g_sfera_textures.find(texture);
+    const auto extent = image.texture == -1 ? SphereUI::TextExtent{32, 32} : g_sfera_textures.size(image.texture);
+    image.width = extent.width;
+    image.height = extent.height;
+}
+
+void SferaInterfaceCursor::setImageSize(std::size_t layer, int width, int height) {
+    if (layer >= images.size()) return;
+    images[layer].width = width;
+    images[layer].height = height;
+}
+
+void SferaInterfaceCursor::setText(std::size_t layer, const char* text, int x, int y, int font, std::uint32_t color) {
+    if (layer >= labels.size()) return;
+    auto& label = labels[layer];
+    label.x = x;
+    label.y = y;
+    label.font = font;
+    label.color = color;
+    label.text = text == nullptr ? std::string{} : std::string(text, std::min(std::strlen(text), std::size_t{63u}));
+}
+
+void SferaInterfaceCursor::setKind(std::uint32_t cursor_kind) {
+    if (cursor_kind >= textures.size() && cursor_kind != 255u) return;
+    kind = cursor_kind;
+    centered_hotspot = cursor_kind >= 2u && cursor_kind < textures.size();
+}
+
+void SferaInterfaceCursor::draw(float x, float y) const {
+    auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get());
+    if (!system_visible || device == nullptr) return;
+    RenderStateScope state(*g_sfera_graphics_runtime.d3d_runtime, RenderStateScope::FailurePolicy::Skip);
+    if (!state) return;
+    if (centered_hotspot) { x -= 16.0f; y -= 16.0f; }
+    device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+    device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+    device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+    if (kind < textures.size() && textures[kind] != 0u) SphereUI::InterfaceRenderer::drawTexture(g_sfera_textures.resource(textures[kind]), x, y, x + 32.0f, y + 32.0f, -1);
+    for (const auto& image : images) {
+        if (image.texture == -1) continue;
+        const float left = x + static_cast<float>(image.x), top = y + static_cast<float>(image.y);
+        SphereUI::InterfaceRenderer::drawTexture(g_sfera_textures.resource(image.texture), left, top, left + static_cast<float>(image.width), top + static_cast<float>(image.height), -1);
+    }
+    device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    const SphereUI::UiRect clip{SphereUI::InterfaceRenderer::clip_rectangle.left, SphereUI::InterfaceRenderer::clip_rectangle.top, SphereUI::InterfaceRenderer::clip_rectangle.right, SphereUI::InterfaceRenderer::clip_rectangle.bottom};
+    for (const auto& label : labels) if (!label.text.empty()) SphereUI::InterfaceRenderer::drawText(label.text.c_str(), static_cast<int>(static_cast<double>(x) + label.x), static_cast<int>(static_cast<double>(y) + label.y), label.color, label.font, true, clip, SferaColor::fromArgb(label.color).alpha() == 255u);
+}
+
+CCursorManager* CCursorManager::initialized = nullptr;
+
+CCursorManager::~CCursorManager() { initialized = nullptr; }
+
+CCursorManager& CCursorManager::instance() { static CCursorManager manager; initialized = &manager; return manager; }
+
+bool CCursorManager::hasActiveCursor() noexcept { return initialized != nullptr && initialized->active != nullptr; }
+
+void CCursorManager::focusChanged(bool focused) noexcept {
+    if (!focused) {
+        ::ClipCursor(nullptr);
+        if (::GetCapture() == SferaClientApplication::main_window) ::ReleaseCapture();
+    }
+    if (!initialized) return;
+    if (!focused) {
+        initialized->hardware.clip_enabled = false;
+        initialized->software.active = false;
+    } else if (initialized->active) {
+        initialized->active->show();
+        initialized->active->apply();
+    }
+}
+
+void CCursorManager::shutdown() noexcept {
+    focusChanged(false);
+    if (!initialized) return;
+    ::SetCursor(nullptr);
+    initialized->hardware.cursor_handle.reset();
+    initialized->active = nullptr;
+    SphereUI::Runtime::setSystemCursorVisible(true);
+}
+
+CCursor* CCursorManager::currentCursor() const noexcept { return active; }
+
+CCursor* CCursorManager::activeCursor() const {
+    if (active == nullptr) { CSphereError error; error.write("CCursorManager::GetActiveCursor(): attempt to retrieve current cursor while one is not set"); }
+    return active;
+}
+
+void CCursorManager::select(std::uint32_t mode) {
+    if (mode > 1u) return;
+    CCursor* selected = mode == 0u ? static_cast<CCursor*>(&software) : static_cast<CCursor*>(&hardware);
+    if (selected == active) return;
+    CCursor* previous = active;
+    active = selected;
+    selected->copyStateFrom(previous);
+    if (previous != nullptr) previous->deactivate();
+    selected->activate();
+}
+
+bool CCursorManager::usesSoftwareCursor() const noexcept { return active == &software; }
+
+SferaCursorPosition CCursorManager::position() const {
+    SferaCursorPosition result{};
+    if (active != nullptr) active->getPosition(&result);
+    return result;
+}
+
+SphereUI::CursorGeometry CCursorManager::geometry() const {
+    if (active == nullptr) return {};
+    SferaCursorPosition position{};
+    active->getPosition(&position);
+    const auto dimensions = active == &software ? SphereUI::TextExtent{static_cast<int>(software.texture_width), static_cast<int>(software.texture_height)} : SphereUI::TextExtent{static_cast<int>(hardware.texture_width), static_cast<int>(hardware.texture_height)};
+    const auto kind = active->cursorKind();
+    const auto* name = kind < 4u ? sfera_cursor_texture_name(kind) : nullptr;
+    return {position.x, position.y, dimensions.width, dimensions.height, name != nullptr && name[0] != '_'};
+}
+
+void SphereUI::InterfaceRenderer::drawTexture(IDirect3DBaseTexture9* texture, float left, float top, float right, float bottom, std::uint32_t color, float u, float v, bool textured) {
+    auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get());
+    if (device == nullptr) return;
+    (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetTexture(0u, texture));
+    std::array<SferaScreenVertex, 4> vertices{};
+    const float offset = textured ? 0.5f : 0.0f;
+    for (std::size_t index = 0u; index < 4u; ++index) {
+        auto& vertex = vertices[index];
+        vertex.x = (index == 0u || index == 3u ? left : right) - offset;
+        vertex.y = (index < 2u ? top : bottom) - offset;
+        vertex.z = 0.0f;
+        vertex.rhw = 1.0f;
+        vertex.diffuse = color;
+        if (textured) {
+            vertex.u = index == 0u || index == 3u ? 0.0f : u;
+            vertex.v = index < 2u ? 0.0f : v;
+        }
+    }
+    (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1));
+    (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, 2u, vertices.data(), sizeof(SferaScreenVertex)));
+}
+
+void SphereUI::InterfaceRenderer::reportError(const char* message) {
+    for (std::uint32_t index : {1u, 0u}) if (auto* output = g_sfera_error_log_runtime.outputs[index]) {
+        if (index == 1u) output->write("*** ERROR ****************************************************:");
+        output->write(message);
+    }
+}
+
+void SphereUI::InterfaceRenderer::setSpriteRenderMode(std::uint32_t mode) {
+    if (mode == SphereUI::InterfaceRenderer::sprite_render_mode) return;
+    if (auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get()); device != nullptr && mode <= 2u) {
+        device->SetRenderState(D3DRS_ALPHABLENDENABLE, mode == 0u ? FALSE : TRUE);
+        if (mode != 0u) { device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA); device->SetRenderState(D3DRS_DESTBLEND, mode == 2u ? D3DBLEND_ONE : D3DBLEND_INVSRCALPHA); }
+    }
+    SphereUI::InterfaceRenderer::sprite_render_mode = mode;
+}
+
+void SphereUI::UiSprite::resetParts(std::size_t count) {
+    if (parts.size() != count) parts = std::vector<SpritePart>(count);
+}
+
+void SphereUI::SpritePart::setTexture(const char* image_name, const UiRect* texture_rectangle, const UiRect* sprite_rectangle) {
+    texture_name = image_name == nullptr ? "" : image_name;
+    texture = g_sfera_textures.find(image_name);
+    if (texture < 0) {
+        const auto message = std::string("Sprite::Texture not found '") + (image_name == nullptr ? "" : image_name) + "'";
+        SphereUI::InterfaceRenderer::reportError(message.c_str());
+    }
+    const auto extent = g_sfera_textures.size(texture);
+    const auto coordinate = [](int value, int maximum) { return maximum == 0 ? 0.0f : static_cast<float>(static_cast<double>(value) / maximum); };
+    const auto source = texture_rectangle == nullptr ? UiRect{0, 0, extent.width, extent.height} : *texture_rectangle;
+    const float left = texture_rectangle == nullptr ? 0.0f : coordinate(source.left, extent.width), top = texture_rectangle == nullptr ? 0.0f : coordinate(source.top, extent.height), right = texture_rectangle == nullptr ? 1.0f : coordinate(source.right, extent.width), bottom = texture_rectangle == nullptr ? 1.0f : coordinate(source.bottom, extent.height);
+    for (std::size_t index = 0; index < 4; ++index) {
+        u[index] = index == 0 || index == 3 ? left : right;
+        v[index] = index < 2 ? top : bottom;
+    }
+    rectangle = sprite_rectangle == nullptr ? UiRect{0, 0, extent.width, extent.height} : *sprite_rectangle;
+}
+
+namespace {
+    void uiSpriteLoadDiagnostic(const char* filename, const SferaParserRange& range, const char* message) {
+        char buffer[1024]{};
+        std::snprintf(buffer, sizeof(buffer), "Sprite::Load(%s,%td,%td) -> %s", filename == nullptr ? "" : filename, range.begin, range.end, message);
+        SphereUI::InterfaceRenderer::reportError(buffer);
+    }
+}
+
+void SphereUI::UiSprite::setImage(const char* name) {
+    this->name = name == nullptr ? "" : name;
+    resetParts(1u);
+    auto& part = parts.front();
+    part.setTexture(name, nullptr, nullptr);
+    width = part.rectangle.right;
+    height = part.rectangle.bottom;
+}
+
+bool SphereUI::UiSprite::loadUi(const char* filename, SferaSimpleParser& parser, const SferaParserRange& range) {
+    std::string text;
+    if (parser.findValue("name", &range) && parser.readQuotedString(0u, text)) name = text;
+    else uiSpriteLoadDiagnostic(filename, range, "Name not specified.");
+    if (parser.findValue("size", &range)) {
+        width = parser.readInt(0u);
+        height = parser.readInt(1u);
+    } else uiSpriteLoadDiagnostic(filename, range, "Size not specified.");
+    struct ScanScope {
+        SferaSimpleParser& parser;
+        SferaParserRange saved{};
+        explicit ScanScope(SferaSimpleParser& source) : parser(source) { parser.getScanRange(&saved); }
+
+        ~ScanScope() { parser.setScanRange(&saved); }
+    } scan(parser);
+    std::size_t count = 0u;
+    parser.setScanRange(&range);
+    while (parser.nextValue("texture")) ++count;
+    if (count == 0u) uiSpriteLoadDiagnostic(filename, range, "At least one texture must be specified.");
+    resetParts(count);
+    std::size_t index = 0u;
+    parser.setScanRange(&range);
+    while (parser.nextValue("texture")) {
+        if (!parser.readQuotedString(0u, text)) continue;
+        int rectangles[8]{};
+        if (!parser.readIntSequence(1u, rectangles)) uiSpriteLoadDiagnostic(filename, range, "Incorrect number of args in 'texture'.");
+        const UiRect source{rectangles[0], rectangles[1], rectangles[2], rectangles[3]};
+        const UiRect destination{rectangles[4], rectangles[5], rectangles[6], rectangles[7]};
+        parts[index++].setTexture(text.c_str(), &source, &destination);
+    }
+    parser.setScanRange(&range);
+    while (parser.nextValue("tcoords")) {
+        int values[9]{};
+        if (!parser.readIntSequence(0u, values)) uiSpriteLoadDiagnostic(filename, range, "Incorrect number of args in 'tcoords'.");
+        const int part_index = values[0];
+        if (part_index < 0 || std::cmp_greater_equal(part_index, count) || parts[part_index].texture < 0) continue;
+        const auto size = g_sfera_textures.size(parts[part_index].texture);
+        for (std::size_t vertex = 0u; vertex < 4u; ++vertex) {
+            parts[part_index].u[vertex] = size.width == 0 ? 0.0f : static_cast<float>(static_cast<double>(values[vertex * 2u + 1u]) / size.width);
+            parts[part_index].v[vertex] = size.height == 0 ? 0.0f : static_cast<float>(static_cast<double>(values[vertex * 2u + 2u]) / size.height);
+        }
+    }
+    return true;
+}
+
+SphereUI::UiViewport SphereUI::InterfaceRenderer::viewport() {
+    D3DVIEWPORT9 value{};
+    if (auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get())) (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->GetViewport(&value));
+    return {value.X, value.Y, value.Width, value.Height, value.MinZ, value.MaxZ};
+}
+
+void SphereUI::InterfaceRenderer::setViewport(const UiViewport& value) {
+    if (auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get())) {
+        const D3DVIEWPORT9 viewport{value.x, value.y, value.width, value.height, value.minimum_z, value.maximum_z};
+        device->SetViewport(&viewport);
+    }
+}
+
+namespace {
+    std::array<SferaScreenVertex, 4> spriteQuad(const SphereUI::SpritePart& part, float left, float top, float right, float bottom, std::uint32_t color) {
+        std::array<SferaScreenVertex, 4> vertices{};
+        for (std::size_t index = 0u; index < vertices.size(); ++index) {
+            auto& vertex = vertices[index];
+            vertex.x = index == 0u || index == 3u ? left : right;
+            vertex.y = index < 2u ? top : bottom;
+            vertex.rhw = 1.0f;
+            vertex.diffuse = color;
+            vertex.u = part.u[index];
+            vertex.v = part.v[index];
+        }
+        return vertices;
+    }
+}
+
+void SphereUI::UiSprite::drawParts(float left, float top, float right, float bottom, std::uint32_t color, bool natural) const {
+    if (parts.size() == 0u && !natural) return;
+    auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get());
+    if (device == nullptr) return;
+    device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+    device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+    device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+    if (parts.size() == 0u) return;
+    const float scale_x = natural ? 1.0f : (right - left) / static_cast<float>(width), scale_y = natural ? 1.0f : (bottom - top) / static_cast<float>(height);
+    left -= 0.5f;
+    top -= 0.5f;
+    int previous_texture = -1;
+    for (std::size_t index = 0u; index < parts.size(); ++index) {
+        const auto& part = parts[index];
+        if (part.texture != previous_texture) {
+            g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetTexture(0u, g_sfera_textures.resource(part.texture));
+            previous_texture = part.texture;
+        }
+        const auto position = [natural](int value, float scale) {
+            const auto result = static_cast<float>(value) * scale;
+            return natural ? result : std::floor(result);
+        };
+        const auto vertices = spriteQuad(part, left + position(part.rectangle.left, scale_x), top + position(part.rectangle.top, scale_y), left + (natural ? static_cast<float>(part.rectangle.right) : position(part.rectangle.right, scale_x)), top + (natural ? static_cast<float>(part.rectangle.bottom) : position(part.rectangle.bottom, scale_y)), color);
+        (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1));
+        (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, 2u, vertices.data(), sizeof(SferaScreenVertex)));
+    }
+}
+
+void SphereUI::UiSprite::drawRotated(float left, float top, float right, float bottom, std::uint32_t color, float rotation) const {
+    if (parts.size() == 0u) return;
+    const auto& part = parts.front();
+    auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get());
+    if (device == nullptr) return;
+    const float sine = std::sin(static_cast<double>(rotation)), cosine = std::cos(static_cast<double>(rotation));
+    const float width = right - left, height = bottom - top, center_x = (left + right) * 0.5f - 0.5f, center_y = (top + bottom) * 0.5f - 0.5f;
+    auto vertices = spriteQuad(part, -width * 0.5f, -height * 0.5f, width * 0.5f, height * 0.5f, color);
+    for (auto& vertex : vertices) {
+        const float local_x = vertex.x, local_y = vertex.y;
+        vertex.x = center_x + local_x * cosine - local_y * sine;
+        vertex.y = center_y + local_x * sine + local_y * cosine;
+    }
+    g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetTexture(0u, g_sfera_textures.resource(part.texture));
+    (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, 2u, vertices.data(), sizeof(SferaScreenVertex)));
+}
+
+void SphereUI::UiSprite::draw(float left, float top, float right, float bottom, std::uint32_t color, float rotation) const {
+    if (rotation == 0.0f) drawParts(left, top, right, bottom, color, false);
+    else drawRotated(left, top, right, bottom, color, rotation);
+}
+
+void SphereUI::UiSprite::drawNatural(float left, float top, std::uint32_t color) const {
+    drawParts(left, top, left + width, top + height, color, true);
+}
+
+const char* SphereUI::InterfaceManager::localizedPath(const char* filename) {
+    if (filename == nullptr || g_sfera_font_runtime.language_suffix[0] == '\0') return filename;
+    resolved_ui_path = filename;
+    const auto extension = resolved_ui_path.rfind('.');
+    resolved_ui_path.insert(extension == std::string::npos ? resolved_ui_path.size() : extension, g_sfera_font_runtime.language_suffix);
+    return resolved_ui_path.c_str();
+}
+
+std::shared_ptr<const SphereUI::UiSprite> SphereUI::InterfaceManager::sharedSprite(const char* name) {
+    if (name == nullptr) return {};
+    const auto found = std::find_if(sprites.begin(), sprites.end(), [name](const auto& sprite) {
+        return SferaText::asciiEqual(sprite->name.c_str(), name);
+    });
+    return found == sprites.end() ? nullptr : *found;
+}
+
+std::shared_ptr<const SphereUI::UiSprite> SphereUI::InterfaceManager::acquireSprite(const char* name) {
+    if (name == nullptr) return {};
+    if (auto sprite = sharedSprite(name)) return sprite;
+    if (g_sfera_textures.find(name) == -1) return {};
+    auto sprite = std::make_shared<UiSprite>();
+    sprite->setImage(name);
+    return sprite;
+}
+
+void SphereUI::InterfaceManager::loadSprites(const char* filename) {
+    SferaSimpleParser parser{};
+    parser.load(filename);
+    parser.setBlockRange(nullptr);
+    SferaParserRange range{};
+    std::vector<std::shared_ptr<const UiSprite>> replacement;
+    while (parser.nextBlock("sprite", &range)) {
+        auto sprite = std::make_shared<UiSprite>();
+        sprite->loadUi(filename, parser, range);
+        replacement.push_back(std::move(sprite));
+    }
+    sprites = std::move(replacement);
+}
+
+void SphereUI::InterfaceManager::clearSprites() {
+    sprites.clear();
+}
+
+bool SphereUI::InterfaceManager::loadWindowTemplates(const char* filename) {
+    SferaSimpleParser parser{};
+    parser.load(filename);
+    parser.setBlockRange(nullptr);
+    SferaParserRange range{};
+    while (parser.nextBlock("windowUI", &range)) {
+        auto window = Runtime::makeControl(SphereUI::UiControlKind::window);
+        if (window == nullptr) throw std::bad_alloc();
+        if (!window->loadUi(filename, parser, range)) continue;
+        if (window->getResourceName()[0] == '\0') {
+            const auto message = std::string("Window name is missing in ") + (filename == nullptr ? "" : filename) + " at lines " + std::to_string(range.begin) + "-" + std::to_string(range.end);
+            CSphereError error;
+            error.write(message.c_str());
+        }
+        window_templates.push_back(std::move(window));
+
+    }
+    return true;
+}
+
+SphereUI::Window* SphereUI::InterfaceManager::templateWindow(const char* name) const {
+    if (name == nullptr) return nullptr;
+    const auto found = std::find_if(window_templates.begin(), window_templates.end(), [name](const auto& window) { return window != nullptr && SferaText::asciiEqual(window->getResourceName(), name); });
+    return found == window_templates.end() ? nullptr : found->get();
+}
+
+void SphereUI::InterfaceManager::clearWindowTemplates() {
+    window_templates.clear();
+}
+
+void SphereUI::InterfaceManager::loadHyperTexts() {
+    const std::string suffix = std::string(g_sfera_font_runtime.language_suffix) + ".hts";
+    std::error_code error;
+    for (std::filesystem::directory_iterator entry("Language", error), end; !error && entry != end; entry.increment(error)) {
+        if (entry->is_directory(error)) continue;
+        const auto basename = entry->path().filename().string();
+        if (basename.size() < suffix.size() || !SferaText::asciiEqual(basename.c_str() + basename.size() - suffix.size(), suffix.c_str())) continue;
+        auto document = std::make_unique<HyperTextDocument>();
+        if (!document->load(entry->path().string().c_str())) continue;
+        auto name = entry->path().string();
+        if (g_sfera_font_runtime.language_suffix[0] != '\0') if (const auto language = name.rfind('_'); language != std::string::npos) name.replace(language, std::string::npos, ".hts");
+        document->setName(name.c_str());
+        hypertext_documents.push_back(std::move(document));
+    }
+}
+
+SphereUI::HyperTextDocument* SphereUI::InterfaceManager::findHyperText(const char* name) const {
+    if (name == nullptr) return nullptr;
+    const auto found = std::find_if(hypertext_documents.begin(), hypertext_documents.end(), [name](const auto& document) { return document != nullptr && SferaText::asciiEqual(document->name.c_str(), name); });
+    return found == hypertext_documents.end() ? nullptr : found->get();
+}
+
+void SphereUI::InterfaceManager::clearHyperTexts() {
+    hypertext_documents.clear();
+}
+
+bool SphereUI::InterfaceManager::loadLocalizedStrings() {
+    localized_strings.push_back({"null", "NULL"});
+    SferaSimpleParser parser{};
+    parser.load(localizedPath("Language\\strings.ui"));
+    SferaParserRange range{};
+    if (!parser.findBlock("stringsUI", &range, nullptr, 1)) return true;
+    parser.setScanRange(&range);
+    while (parser.nextValue("string")) {
+        std::string key, value;
+        if (parser.readString(0u, key) && parser.readQuotedString(1u, value)) localized_strings.push_back({key, value});
+    }
+    return true;
+}
+
+std::string_view SphereUI::InterfaceManager::localizedValue(const char* key) const {
+    const auto found = std::find_if(localized_strings.begin(), localized_strings.end(), [key](const LocalizedTextEntry& entry) { return key != nullptr && SferaText::asciiEqual(entry.key.c_str(), key); });
+    if (found != localized_strings.end()) return found->value;
+    if (!localized_strings.empty()) return localized_strings.front().value;
+    return {};
+}
+
+const char* SphereUI::InterfaceManager::localizedText(const char* key) const {
+    return localized_strings.empty() ? (key == nullptr ? "" : key) : localizedValue(key).data();
+}
+
+void SphereUI::InterfaceManager::clearLocalizedStrings() {
+    localized_strings.clear();
+}
+
+SphereUI::SavedWindowPosition* SphereUI::InterfaceManager::savedPosition(const char* name, bool create) {
+    if (name == nullptr) return nullptr;
+    const auto found = std::find_if(saved_positions.begin(), saved_positions.end(), [name](const SavedWindowPosition& position) { return position.name == name; });
+    if (found != saved_positions.end()) return &*found;
+    return create ? &saved_positions.emplace_back(SavedWindowPosition{name}) : nullptr;
+}
+
+bool SphereUI::InterfaceManager::findSavedPosition(const char* name, SferaCursorPosition& position) {
+    const auto* saved = savedPosition(name, false);
+    if (saved == nullptr) return false;
+    position = {saved->x, saved->y};
+    return true;
+}
+
+void SphereUI::InterfaceManager::saveWindowPosition(Window& window) {
+    auto* saved = savedPosition(window.getName(), true);
+    if (saved != nullptr) window.getAbsolutePosition(saved->x, saved->y);
+}
+
+std::size_t SphereUI::InterfaceManager::savedPositionsSize() const {
+    if (saved_positions.empty()) return 0u;
+    std::size_t size = 4u;
+    for (const auto& position : saved_positions) {
+        if (size > std::numeric_limits<std::size_t>::max() - 9u || position.name.size() > std::numeric_limits<std::size_t>::max() - 9u - size) throw std::length_error("Saved window positions exceed the native buffer size limit");
+        size += position.name.size() + 9u;
+    }
+    return size;
+}
+
+void SphereUI::InterfaceManager::writeSavedPositions(std::span<std::byte> destination) const {
+    if (destination.empty()) return;
+    if (destination.size() < std::max<std::size_t>(4u, savedPositionsSize())) throw std::length_error("Saved window positions do not fit in the destination");
+    std::memcpy(destination.data(), "UIV1", 4u);
+    destination = destination.subspan(4u);
+    for (const auto& position : saved_positions) {
+        std::memcpy(destination.data(), position.name.c_str(), position.name.size() + 1u);
+        destination = destination.subspan(position.name.size() + 1u);
+        const float coordinates[] = {static_cast<float>(static_cast<double>(position.x) / g_sfera_graphics_runtime.display_width), static_cast<float>(static_cast<double>(position.y) / g_sfera_graphics_runtime.display_height)};
+        std::memcpy(destination.data(), coordinates, sizeof(coordinates));
+        destination = destination.subspan(sizeof(coordinates));
+    }
+}
+
+void SphereUI::InterfaceManager::readSavedPositions(std::span<const std::byte> source) {
+    saved_positions.clear();
+    if (source.size() < 4u || std::memcmp(source.data(), "UIV1", 4u) != 0) return;
+    source = source.subspan(4u);
+    while (!source.empty()) {
+        const auto end = std::find(source.begin(), source.end(), std::byte{});
+        if (end == source.end()) return;
+        const std::size_t name_size = end - source.begin();
+        if (source.size() - name_size - 1u < sizeof(float) * 2u) return;
+        SavedWindowPosition position{std::string(reinterpret_cast<const char*>(source.data()), name_size)};
+        source = source.subspan(name_size + 1u);
+        float coordinates[2]{};
+        std::memcpy(coordinates, source.data(), sizeof(coordinates));
+        source = source.subspan(sizeof(coordinates));
+        const double x = static_cast<double>(coordinates[0]) * g_sfera_graphics_runtime.display_width;
+        const double y = static_cast<double>(coordinates[1]) * g_sfera_graphics_runtime.display_height;
+        if (!std::isfinite(x) || !std::isfinite(y) || x < std::numeric_limits<int>::min() || x > std::numeric_limits<int>::max() || y < std::numeric_limits<int>::min() || y > std::numeric_limits<int>::max()) return;
+        position.x = x;
+        position.y = y;
+        saved_positions.push_back(std::move(position));
+    }
+}
+
+namespace {
+    using SphereUI::HyperDocumentNode;
+    using SphereUI::HyperTextCommand;
+    using SphereUI::HyperTextImageAlignment;
+    struct HyperDocumentFragment {
+        HyperDocumentNode node{};
+        std::string text;
+    };
+    struct HyperDocumentRow {
+        std::vector<HyperDocumentFragment> fragments;
+        int width = 0;
+        int height = 0;
+        int baseline = 0;
+        std::uint32_t initial_color = D3DCOLOR_XRGB(255, 255, 255);
+        bool paragraph_end = false;
+    };
+    std::string_view hyperTrim(std::string_view text) {
+        const auto first = text.find_first_not_of(" \t\r\n");
+        if (first == std::string_view::npos) return {};
+        const auto last = text.find_last_not_of(" \t\r\n");
+        return text.substr(first, last - first + 1u);
+    }
+
+    bool hyperEquals(std::string_view text, const char* expected) {
+        return SferaText::asciiEqual(std::string(text).c_str(), expected);
+    }
+
+    std::string hyperUnescape(std::string_view text) {
+        std::string result;
+        result.reserve(text.size());
+        for (std::size_t index = 0u; index < text.size(); ++index) {
+            char character = text[index];
+            if (character == '\\') {
+                if (++index == text.size()) break;
+                character = text[index];
+                if (character == '[') character = '<';
+                else if (character == ']') character = '>';
+            }
+            result += character;
+        }
+        return result;
+    }
+
+    bool hyperLinkParameters(std::string_view parameters, std::string& target, std::uint32_t& kind) {
+        auto value = hyperTrim(parameters);
+        if (value.empty() || value.front() != '=') return false;
+        value = hyperTrim(value.substr(1u));
+        if (value.size() < 2u || value.front() != '"') return false;
+        std::size_t end = 1u;
+        for (; end < value.size(); ++end) {
+            if (value[end] == '\\' && end + 1u < value.size()) ++end;
+            else if (value[end] == '"') break;
+        }
+        if (end == value.size()) return false;
+        value = value.substr(1u, end - 1u);
+        target.assign(value);
+        const auto colon = value.find(':');
+        const auto scheme = value.substr(0u, colon);
+        kind = hyperEquals(scheme, "hts") ? 0u : hyperEquals(scheme, "item") ? 1u : hyperEquals(scheme, "player") ? 2u : hyperEquals(scheme, "mailto") ? 3u : 4u;
+        if (kind == 1u || kind == 2u) target = hyperUnescape(target);
+        return true;
+    }
+
+    SphereUI::TextExtent hyperTextExtent(std::string_view text, int font) {
+        auto result = SphereUI::InterfaceRenderer::measureText(std::string(text).c_str(), font, true);
+        if (text.empty()) result.width = 0;
+        else if (font < 2u) result.width = std::max(0, result.width - 2);
+        return result;
+    }
+
+    std::size_t hyperWordEnd(std::string_view text, std::size_t first, bool controls = false) {
+        const auto separator = [controls](char character) {
+            return character == ' ' || (controls && (character == '\t' || character == '\r' || character == '\n'));
+        };
+        auto end = first;
+        while (end < text.size() && separator(text[end])) ++end;
+        while (end < text.size() && !separator(text[end])) ++end;
+        return end;
+    }
+
+}
+
+SphereUI::HyperTextCommand SphereUI::HyperTextParser::command(std::string_view name) {
+    if (hyperEquals(name, "br")) return HyperTextCommand::lineBreak;
+    if (hyperEquals(name, "cl")) return HyperTextCommand::color;
+    if (hyperEquals(name, "l")) return HyperTextCommand::linkStart;
+    if (hyperEquals(name, "/l") || hyperEquals(name, "\\l")) return HyperTextCommand::linkEnd;
+    if (hyperEquals(name, "sp")) return HyperTextCommand::preserveSpaces;
+    if (hyperEquals(name, "tab")) return HyperTextCommand::tab;
+    if (hyperEquals(name, "img")) return HyperTextCommand::image;
+    if (hyperEquals(name, "t")) return HyperTextCommand::tooltipStart;
+    if (hyperEquals(name, "/t") || hyperEquals(name, "\\t")) return HyperTextCommand::tooltipEnd;
+    return HyperTextCommand::unknown;
+}
+
+bool SphereUI::HyperTextParser::parseCommand(std::string_view tag, HyperDocumentNode& node, std::string& argument) {
+    const auto equals = tag.find('=');
+    std::string name;
+    for (char character : hyperTrim(tag.substr(0, equals))) if (character != ' ') name += character;
+    node.command = command(name);
+    if (node.command == HyperTextCommand::unknown) return false;
+    auto value = equals == std::string_view::npos ? std::string_view{} : hyperTrim(tag.substr(equals + 1));
+    if (!value.empty() && value.front() == '"') {
+        value.remove_prefix(1);
+        value = value.substr(0, value.find('"'));
+    }
+    argument.assign(value);
+    if (node.command == HyperTextCommand::color) node.color = static_cast<std::uint32_t>(std::strtoul(argument.c_str(), nullptr, 16)) | D3DCOLOR_XRGB(0, 0, 0);
+    else if (node.command == HyperTextCommand::image) parseImage(argument, node);
+    return true;
+}
+
+void SphereUI::HyperTextParser::parseImage(std::string_view argument, HyperDocumentNode& node) {
+    std::vector<std::string> fields;
+    while (!argument.empty()) {
+        const auto comma = argument.find(',');
+        const auto field = hyperTrim(argument.substr(0, comma));
+        if (!field.empty()) fields.emplace_back(field);
+        if (comma == std::string_view::npos) break;
+        argument.remove_prefix(comma + 1);
+    }
+    if (fields.empty()) return;
+    node.sprite = g_sfera_interface.acquireSprite(fields.front().c_str());
+    if (node.sprite == nullptr) return;
+    if (fields.size() > 1 && hyperEquals(fields[1], "BOT")) node.image_alignment = HyperTextImageAlignment::bottom;
+    else if (fields.size() > 1 && hyperEquals(fields[1], "MID")) node.image_alignment = HyperTextImageAlignment::middle;
+    const auto padding = [&](std::size_t index) { return std::strtol(fields[index].c_str(), nullptr, 10); };
+    int right = 0, bottom = 0;
+    if (fields.size() == 4 || fields.size() >= 6) {
+        node.image_x = padding(2);
+        node.image_y = padding(3);
+    }
+    if (fields.size() >= 6) {
+        right = padding(4);
+        bottom = padding(5);
+    }
+    node.image_width = node.sprite->width + node.image_x + right;
+    node.image_height = node.sprite->height + node.image_y + bottom;
+}
+
+SphereUI::HyperTextDocument::HyperTextDocument(std::string_view text, int width, std::uint32_t format, int font) {
+    if (!text.empty()) {
+        parse(text);
+        layout(width, format, font);
+    }
+}
+
+void SphereUI::HyperTextDocument::setName(const char* value) {
+    name = value == nullptr ? "" : value;
+}
+
+bool SphereUI::HyperTextDocument::load(const char* filename) {
+    SferaSimpleParser parser;
+    parser.load(filename);
+    SferaParserRange range{};
+    const bool found = parser.findBlock("hypertext", &range, nullptr, 1);
+    if (found) load(parser, range);
+    return found;
+}
+
+void SphereUI::HyperTextDocument::load(const SferaSimpleParser& parser, const SferaParserRange& range) {
+    std::string input;
+    for (auto index = range.begin; index < range.end - 1; ++index) {
+        auto line = parser.lineAt(index);
+        if (line.data() == nullptr) continue;
+        const auto first = line.find_first_not_of(' ');
+        if (first != std::string_view::npos) input += line.substr(first);
+        input += ' ';
+    }
+    parse(input);
+}
+
+void SphereUI::HyperTextDocument::parse(std::string_view input) {
+    std::vector<HyperDocumentNode> parsed(1);
+    std::vector<HyperTextRegion> parsed_links, parsed_tooltips;
+    input = input.substr(0, input.find('\0'));
+    for (std::size_t index = 0; index < input.size();) {
+        if (input[index] != '<') {
+            if (input[index] != '\n') parsed.back().text += input[index];
+            ++index;
+            continue;
+        }
+        const auto end = input.find('>', index + 1);
+        if (end == std::string_view::npos) {
+            parsed.back().text.append(input.substr(index));
+            break;
+        }
+        HyperDocumentNode node;
+        std::string argument;
+        if (!HyperTextParser::parseCommand(input.substr(index + 1, end - index - 1), node, argument)) {
+            parsed.back().text += input[index++];
+            continue;
+        }
+        if (node.command == HyperTextCommand::linkStart || node.command == HyperTextCommand::tooltipStart) {
+            HyperTextRegion region;
+            const auto* target = node.command == HyperTextCommand::tooltipStart && !argument.empty() && argument.front() == '#' ? g_sfera_interface.localizedText(argument.c_str() + 1) : argument.c_str();
+            region.target = target == nullptr ? "" : target;
+            auto& regions = node.command == HyperTextCommand::linkStart ? parsed_links : parsed_tooltips;
+            node.region_index = regions.size();
+            regions.push_back(std::move(region));
+        }
+        parsed.push_back(std::move(node));
+        index = end + 1;
+    }
+    nodes = std::move(parsed);
+    links = std::move(parsed_links);
+    tooltips = std::move(parsed_tooltips);
+    lines.clear();
+    line_height = 0;
+}
+
+std::unique_ptr<SphereUI::HyperTextDocument> SphereUI::HyperTextDocument::clone(int width, std::uint32_t format, int font) const {
+    if (nodes.empty()) return nullptr;
+    auto document = std::make_unique<HyperTextDocument>(*this);
+    document->resetRegions();
+    document->layout(width, format, font);
+    return document;
+}
+
+void SphereUI::HyperTextDocument::layout(int width, std::uint32_t format, int font) {
+    width = std::max(width, 1);
+    const auto tracking = InterfaceRenderer::tracking(font);
+    const auto space = hyperTextExtent(" ", font);
+    line_height = std::max(space.height, 1);
+    this->font = font;
+    std::vector<HyperDocumentFragment> originals;
+    for (const auto& node : nodes) originals.push_back({node, node.text});
+    std::vector<HyperDocumentRow> rows(1u);
+    rows.back().height = line_height;
+    const auto new_row = [&](bool paragraph) {
+        rows.back().paragraph_end = paragraph;
+        rows.emplace_back();
+        rows.back().height = line_height;
+    };
+    for (const auto& original : originals) {
+        auto node = original.node;
+        if (node.command == HyperTextCommand::lineBreak) new_row(true);
+        if (node.command == HyperTextCommand::tab) node.spacing = std::max(space.width, 0) * 4;
+        auto& row = rows.back();
+        if (node.command == HyperTextCommand::image) {
+            row.width += node.image_width;
+            row.height = std::max<int>(row.height, node.image_height);
+            const auto shift = std::max(0, node.image_height - line_height);
+            row.baseline = std::max(row.baseline, node.image_alignment == HyperTextImageAlignment::bottom ? shift : node.image_alignment == HyperTextImageAlignment::middle ? shift / 2 : 0);
+        } else if (node.command == HyperTextCommand::tab) row.width += node.spacing;
+        row.fragments.push_back({node, {}});
+        auto text = std::string_view(original.text);
+        std::size_t start = 0u;
+        while (start < text.size()) {
+            const auto remaining = text.substr(start);
+            const auto full_extent = hyperTextExtent(remaining, font);
+            if (rows.back().width + full_extent.width <= width) {
+                auto& current = rows.back();
+                if (current.fragments.empty()) current.fragments.push_back({{}, {}});
+                current.fragments.back().text.append(remaining);
+                current.width += full_extent.width;
+                break;
+            }
+            const auto end = hyperWordEnd(text, start);
+            const auto word = text.substr(start, end - start);
+            const auto extent = hyperTextExtent(word, font);
+            auto visible = word;
+            if (rows.back().width != 0 && rows.back().width + extent.width > width) {
+                new_row(false);
+                if (start != 0u && !visible.empty() && visible.front() == ' ') {
+                    ++start;
+                    visible.remove_prefix(1u);
+                }
+                if (hyperTextExtent(text.substr(start), font).width <= width) continue;
+            }
+            if (!visible.empty()) {
+                auto& current = rows.back();
+                if (current.fragments.empty() || current.fragments.back().node.command == HyperTextCommand::horizontalSpace) current.fragments.push_back({{}, {}});
+                auto& fragment = current.fragments.back();
+                fragment.text.append(visible);
+                current.width += hyperTextExtent(visible, font).width + tracking;
+            }
+            start = end;
+        }
+    }
+    if (originals.empty()) rows.clear();
+    for (auto& row : rows) {
+        for (auto& fragment : row.fragments) if (!fragment.text.empty()) {
+            if (fragment.node.command != HyperTextCommand::preserveSpaces) {
+                const auto first = fragment.text.find_first_not_of(' ');
+                fragment.text.erase(0u, first == std::string::npos ? fragment.text.size() : first);
+            }
+            break;
+        }
+        for (auto fragment = row.fragments.rbegin(); fragment != row.fragments.rend(); ++fragment) if (!fragment->text.empty()) {
+            const auto last = fragment->text.find_last_not_of(' ');
+            fragment->text.resize(last == std::string::npos ? 0u : last + 1u);
+            break;
+        }
+        row.width = 0;
+        for (auto& fragment : row.fragments) {
+            fragment.node.width = hyperTextExtent(fragment.text, font).width;
+            row.width += fragment.node.width;
+            if (fragment.node.command == HyperTextCommand::tab || fragment.node.command == HyperTextCommand::horizontalSpace) row.width += fragment.node.spacing;
+            else if (fragment.node.command == HyperTextCommand::image) row.width += fragment.node.image_width;
+        }
+    }
+    std::vector<HyperDocumentRow> final_rows;
+    final_rows.reserve(rows.size());
+    std::uint32_t color = D3DCOLOR_XRGB(255, 255, 255);
+    for (std::size_t index = 0u; index < rows.size(); ++index) {
+        auto& row = rows[index];
+        HyperDocumentRow result{};
+        result.height = row.height;
+        result.baseline = row.baseline;
+        result.initial_color = color;
+        const auto spare = std::max(0, width - row.width);
+        if (format == 1u || format == 2u) {
+            HyperDocumentNode padding{};
+            padding.command = HyperTextCommand::horizontalSpace;
+            padding.spacing = format == 1u ? spare : spare / 2;
+            result.fragments.push_back({padding, {}});
+        }
+        std::size_t gaps = 0u;
+        if (format == 3u && !row.paragraph_end) for (const auto& fragment : row.fragments) for (std::size_t character = 0u; character < fragment.text.size(); ++character) if (fragment.text[character] == ' ' && character != 0u && fragment.text[character - 1u] != ' ') ++gaps;
+        std::size_t used_gaps = 0u;
+        int distributed = 0;
+        for (auto& fragment : row.fragments) {
+            if (fragment.node.command == HyperTextCommand::color) color = fragment.node.color;
+            if (gaps == 0u) {
+                result.fragments.push_back(std::move(fragment));
+                continue;
+            }
+            std::size_t start = 0u;
+            bool command = true;
+            while (start < fragment.text.size()) {
+                const auto word = fragment.text.find_first_not_of(' ', start);
+                auto end = word == std::string::npos ? fragment.text.size() : fragment.text.find(' ', word);
+                if (end == std::string::npos) end = fragment.text.size();
+                else {
+                    while (end < fragment.text.size() && fragment.text[end] == ' ') ++end;
+                }
+                auto node = command ? fragment.node : HyperDocumentNode{};
+                command = false;
+                const auto text = fragment.text.substr(start, end - start);
+                node.width = hyperTextExtent(text, font).width + (end < fragment.text.size() ? tracking : 0);
+                result.fragments.push_back({node, text});
+                if (!text.empty() && text.back() == ' ' && text.find_first_not_of(' ') != std::string::npos) {
+                    const auto added = ++used_gaps == gaps ? spare - distributed : spare / static_cast<int>(gaps);
+                    HyperDocumentNode padding{};
+                    padding.command = HyperTextCommand::horizontalSpace;
+                    padding.spacing = added;
+                    distributed += added;
+                    result.fragments.push_back({padding, {}});
+                }
+                start = end;
+            }
+            if (command) result.fragments.push_back(std::move(fragment));
+        }
+        final_rows.push_back(std::move(result));
+    }
+    std::vector<HyperDocumentLine> replacement;
+    replacement.reserve(final_rows.size());
+    for (auto& row : final_rows) {
+        HyperDocumentLine line;
+        line.height = row.height;
+        line.baseline = row.baseline;
+        line.initial_color = row.initial_color;
+        line.nodes.reserve(row.fragments.size());
+        for (auto& fragment : row.fragments) {
+            fragment.node.text = std::move(fragment.text);
+            line.nodes.push_back(std::move(fragment.node));
+        }
+        replacement.push_back(std::move(line));
+    }
+    lines = std::move(replacement);
+}
+
+bool SphereUI::HyperTextRegion::contains(int x, int y) const {
+    if (!visible) return false;
+    return std::any_of(rectangles.begin(), rectangles.end(), [=](const UiRect& bounds) { return x >= bounds.left && x < bounds.right && y >= bounds.top && y < bounds.bottom; });
+}
+
+void SphereUI::HyperTextRegion::addRectangle(const UiRect& rectangle, const UiRect& clip) {
+    const UiRect bounds{std::max(rectangle.left, clip.left), std::max(rectangle.top, clip.top), std::min(rectangle.right, clip.right), std::min(rectangle.bottom, clip.bottom)};
+    if (bounds.right <= bounds.left || bounds.bottom <= bounds.top) return;
+    rectangles.push_back(bounds);
+    visible = true;
+}
+
+int SphereUI::HyperTextDocument::totalHeight() const {
+    std::int64_t height = 0;
+    for (const auto& line : lines) height += line.height;
+    return std::clamp<std::int64_t>(height, 0, std::numeric_limits<int>::max());
+}
+
+void SphereUI::HyperTextDocument::resetRegions() {
+    for (auto* group : {&links, &tooltips}) for (auto& region : *group) {
+        region.visible = false;
+        region.hovered = false;
+        region.rectangles.clear();
+    }
+}
+
+SphereUI::UiRect SphereUI::HyperTextDocument::linkRectangle(int left, int right, int y, int baseline) const {
+    const auto inset = font < 2u ? 2 : 0;
+    const auto bottom_inset = font == 0u ? 2 : font == 1u ? 3 : 0;
+    return {left, y + baseline + inset, right + inset, y + baseline * 2 + line_height + bottom_inset};
+}
+
+void SphereUI::HyperTextDocument::draw(int left, int top, int clip_offset, int clip_height, std::uint32_t alpha) {
+    const auto viewport = SphereUI::InterfaceRenderer::viewport();
+    const UiRect clip{static_cast<int>(viewport.x), std::max(top, static_cast<int>(viewport.y)), static_cast<int>(viewport.x + viewport.width), std::min(top + std::max(clip_height, 0), static_cast<int>(viewport.y + viewport.height))};
+    for (auto* group : {&links, &tooltips}) for (auto& region : *group) {
+        region.rectangles.clear();
+        region.visible = false;
+    }
+    const auto opacity = std::min(alpha, 255u);
+    auto y = top + clip_offset;
+    HyperTextRegion* link = nullptr;
+    HyperTextRegion* tooltip = nullptr;
+    for (const auto& line : lines) {
+        auto x = left, link_left = left, tooltip_left = left;
+        auto color = line.initial_color;
+        const auto baseline = line.baseline;
+        for (const auto& node : line.nodes) {
+            if (node.command == HyperTextCommand::color) color = node.color;
+            else if (node.command == HyperTextCommand::linkStart) {
+                link = node.region_index < links.size() ? &links[node.region_index] : nullptr;
+                link_left = x;
+            } else if (node.command == HyperTextCommand::linkEnd) {
+                if (link != nullptr) link->addRectangle(linkRectangle(link_left, x, y, baseline), clip);
+                link = nullptr;
+            } else if (node.command == HyperTextCommand::tooltipStart) {
+                tooltip = node.region_index < tooltips.size() ? &tooltips[node.region_index] : nullptr;
+                tooltip_left = x;
+            } else if (node.command == HyperTextCommand::tooltipEnd) {
+                if (tooltip != nullptr) tooltip->addRectangle({tooltip_left, y, x, y + line.height}, clip);
+                tooltip = nullptr;
+            } else if (node.command == HyperTextCommand::horizontalSpace || node.command == HyperTextCommand::tab) {
+                x += node.spacing;
+                if (link != nullptr && link_left == left) link_left = x;
+                if (tooltip != nullptr && tooltip_left == left) tooltip_left = x;
+            } else if (node.command == HyperTextCommand::image) {
+                if (node.sprite != nullptr && y + line.height > clip.top && y < clip.bottom) node.sprite->drawNatural(static_cast<float>(x + node.image_x), static_cast<float>(y + node.image_y), SferaColor::rgba(255u, 255u, 255u, opacity).argb());
+                x += node.image_width;
+            }
+            if (!node.text.empty() && y + line.height > clip.top && y < clip.bottom) {
+                const auto text_color = link == nullptr ? color : link->hovered ? hover_color : link_color;
+                SphereUI::InterfaceRenderer::drawText(node.text.c_str(), x, y + baseline, SferaColor::fromArgb(text_color).withAlpha(opacity).argb(), font, true, clip, alpha == 255u);
+            }
+            x += node.width;
+        }
+        if (link != nullptr) link->addRectangle(linkRectangle(link_left, x, y, baseline), clip);
+        if (tooltip != nullptr) tooltip->addRectangle({tooltip_left, y, x, y + line.height}, clip);
+        y += line.height;
+        if (y >= clip.bottom) break;
+    }
+}
+
+void SphereUI::HyperTextParser::parseElements(std::string_view text, std::vector<HyperTextRun>& elements, std::string& plain) {
+    std::vector<HyperTextRun> parsed{};
+    std::string output, pending, parameters, target;
+    std::uint32_t kind = 4u;
+    bool link = false;
+    const std::string input(text);
+    const auto flush = [&](bool linked) {
+        if (pending.empty()) return;
+        const auto decoded = hyperUnescape(pending);
+        if (!decoded.empty()) {
+            if (linked) parsed.push_back({decoded, HyperTextRun::Link{{}, parameters, target, kind}});
+            else parsed.push_back({decoded, HyperTextGeometry{}});
+            output += decoded;
+        }
+        pending.clear();
+    };
+    for (std::size_t index = 0u; index < input.size();) {
+        if (input[index] != '<') {
+            pending += input[index++];
+            continue;
+        }
+        const auto end = input.find('>', index + 1u);
+        if (end == std::string::npos || end == index + 1u) {
+            pending.append(input, index, std::string::npos);
+            break;
+        }
+        const auto tag = hyperTrim(std::string_view(input).substr(index + 1u, end - index - 1u));
+        const auto name_end = tag.find_first_of(" =\t\r\n");
+        const auto name = tag.substr(0u, name_end);
+        if (hyperEquals(name, "l")) {
+            std::string new_target;
+            std::uint32_t new_kind = 4u;
+            const auto remainder = name_end == std::string_view::npos ? std::string_view{} : hyperTrim(tag.substr(name_end));
+            if (hyperLinkParameters(remainder, new_target, new_kind)) {
+                flush(false);
+                parameters.assign(remainder);
+                target = std::move(new_target);
+                kind = new_kind;
+                link = true;
+            } else flush(false);
+        } else if (hyperEquals(name, "/l") || hyperEquals(name, "\\l")) {
+            flush(link);
+            link = false;
+        } else flush(false);
+        index = end + 1u;
+    }
+    if (!link) flush(false);
+    elements = std::move(parsed);
+    plain = std::move(output);
+}
+
+void SphereUI::HyperTextChatListItem::layout(int width, int font) {
+    width = std::max(width, 1);
+    std::vector<HyperTextRun> output{};
+    std::vector<UiIndexRange> replacement_rows{};
+    int x = 0;
+    std::uint32_t first = 0u;
+    const auto wrap = [&](std::string_view separator) {
+        if (output.size() > first) replacement_rows.push_back({first, output.size() - 1u});
+        output.push_back({std::string(separator), std::monostate{}});
+        first = output.size();
+        x = 0;
+    };
+    const auto append = [&](HyperTextRun element) {
+        if (auto* geometry = element.geometry()) {
+            const auto extent = hyperTextExtent(std::string_view(element.text.data(), element.text.size()), font);
+            *geometry = {x, 0, extent.width, extent.height};
+            x += extent.width;
+        }
+        output.push_back(std::move(element));
+    };
+    for (const auto& element : elements) {
+        if (element.isWrap()) {
+            if (element.text.size() != 0u) wrap(std::string_view(element.text.data(), element.text.size()));
+            continue;
+        }
+        if (element.link() != nullptr) {
+            const auto extent = hyperTextExtent(std::string_view(element.text.data(), element.text.size()), font);
+            if (x != 0 && x + extent.width > width) wrap({});
+            append(element);
+            continue;
+        }
+        if (!element.isPlain()) continue;
+        const std::string_view text(element.text.data(), element.text.size());
+        std::string pending;
+        const auto flush = [&]() {
+            if (!pending.empty()) {
+                append({pending, HyperTextGeometry{}});
+                pending.clear();
+            }
+        };
+        for (std::size_t position = 0u; position < text.size();) {
+            const auto end = hyperWordEnd(text, position, true);
+            const auto token = text.substr(position, end - position);
+            const auto combined = pending + std::string(token);
+            if (x + hyperTextExtent(combined, font).width <= width || (x == 0 && pending.empty())) pending = combined;
+            else {
+                flush();
+                auto visible = token;
+                const auto leading = visible.find_first_not_of(" \t\r\n");
+                const auto spaces = leading == std::string_view::npos ? visible.size() : leading;
+                wrap(visible.substr(0u, spaces));
+                visible.remove_prefix(spaces);
+                pending.assign(visible);
+            }
+            position = end;
+        }
+        flush();
+    }
+    if (output.size() > first) replacement_rows.push_back({first, output.size() - 1u});
+    elements = std::move(output);
+    rows = std::move(replacement_rows);
+}
+
+SphereUI::InterfaceManager::~InterfaceManager() { shutdown(); }
+
+bool SphereUI::InterfaceManager::prepareResources() {
+    if (initialized) return false;
+    g_sfera_fonts.initialize();
+    InterfaceConfiguration::open("control.cfg");
+    g_sfera_interface.cross_enabled = true;
+    g_sfera_interface.cross_enabled = InterfaceConfiguration::readInteger("EN_CROSS", g_sfera_interface.cross_enabled) != 0;
+    g_sfera_interface.sounds_enabled = InterfaceConfiguration::readInteger("INTFS_SOUNDS", g_sfera_interface.sounds_enabled) != 0;
+    if (!cursor) {
+        cursor = std::make_unique<SferaInterfaceCursor>();
+        cursor->loadTextures();
+    }
+    g_sfera_fonts.loadConfiguration();
+    cursor->setKind(255u);
+    setCursorKind(255u, 0, 0);
+    setCursorImage(nullptr, 0, 0);
+    loadLocalizedStrings();
+    loadWindowTemplates("Effects\\loadscreen.ui");
+    loadSprites("Effects\\sprites.ui");
+    return true;
+}
+
+void SphereUI::InterfaceManager::finishInitialization() { drag_drop_active = false; initialized = true; }
+
+bool SphereUI::InterfaceManager::shutdown() {
+    const bool was_initialized = initialized;
+    clearWindows();
+    tooltip.reset();
+    clearWindowTemplates();
+    clearHyperTexts();
+    g_sfera_fonts.clear();
+    clearLocalizedStrings();
+    events.clear();
+    cursor.reset();
+    cursor_name.clear();
+    g_sfera_interface.cursor_kind = 255u;
+    clearSprites();
+    event_handlers.clear();
+    initialized = false;
+    drag_drop_active = false;
+    return was_initialized;
+}
+
+void SphereUI::InterfaceManager::clearWindows() {
+    help_window = nullptr;
+    load_screen = nullptr;
+    g_sfera_interface.description_control = nullptr;
+    while (!windows.empty()) {
+        auto window = std::move(windows.front());
+        windows.pop_front();
+    }
+}
+
+void SphereUI::InterfaceManager::queueEvent(const WindowEvent& event) {
+    detail::enqueueWindowEvent(events, event);
+}
+
+bool SphereUI::InterfaceManager::pollEvent(WindowEvent& event) {
+    if (events.empty()) return false;
+    event = events.front();
+    events.pop_front();
+    return true;
+}
+
+SphereUI::Window* SphereUI::InterfaceManager::findWindow(const char* name, bool exact) const {
+    if (name == nullptr) return nullptr;
+    const auto found = std::find_if(windows.begin(), windows.end(), [name, exact](const auto& window) { return window != nullptr && (exact ? std::strcmp(window->getResourceName(), name) == 0 : SferaText::asciiEqual(window->getResourceName(), name)); });
+    return found == windows.end() ? nullptr : found->get();
+}
+
+SphereUI::Window* SphereUI::InterfaceManager::windowUnderCursor() const {
+    SferaCursorPosition position{};
+    CCursorManager::instance().activeCursor()->getPosition(&position);
+    const auto found = std::find_if(windows.rbegin(), windows.rend(), [&position](const auto& window) { return window != nullptr && !window->hidden && !window->hit_transparent && window->containsPoint(position.x, position.y); });
+    return found == windows.rend() ? nullptr : found->get();
+}
+
+bool SphereUI::InterfaceManager::hasEscapeWindow() const {
+    return std::any_of(windows.begin(), windows.end(), [](const auto& window) { return window != nullptr && !window->hidden && (window->behavior_flags & WindowStyle::handleEscape) != 0u; });
+}
+
+SphereUI::Window* SphereUI::InterfaceManager::addTopLevelWindow(std::unique_ptr<Window> window) {
+    if (!window) return nullptr;
+    auto* result = window.get();
+    windows.push_back(std::move(window));
+    return result;
+}
+
+void SphereUI::InterfaceManager::raiseWindow(Window& window) {
+    const auto found = std::find_if(windows.begin(), windows.end(), [&window](const auto& owner) { return owner.get() == &window; });
+    if (found != windows.end()) windows.splice(windows.end(), windows, found);
+}
+
+void SphereUI::InterfaceManager::lowerWindow(Window& window) {
+    const auto found = std::find_if(windows.begin(), windows.end(), [&window](const auto& owner) { return owner.get() == &window; });
+    if (found != windows.end()) windows.splice(windows.begin(), windows, found);
+}
+
+void SphereUI::InterfaceManager::collectCoveredWindows(Window& window) {
+    if (!g_sfera_interface.cross_enabled) return;
+    UiRect bounds{};
+    window.getAbsolutePosition(bounds.left, bounds.top);
+    bounds.right = bounds.left + window.width;
+    bounds.bottom = bounds.top + window.height;
+    const auto area = static_cast<std::int64_t>(window.width) * window.height;
+    if (area <= 0) return;
+    for (auto current = windows.rbegin(); current != windows.rend(); ++current) {
+        Window* other = current->get();
+        if (other == nullptr || other == &window || other->hidden || other->isAnimating() || other->close_completed || (other->behavior_flags & WindowStyle::preventOverlap) != 0u) continue;
+        UiRect other_bounds{};
+        other->getAbsolutePosition(other_bounds.left, other_bounds.top);
+        other_bounds.right = other_bounds.left + other->width;
+        other_bounds.bottom = other_bounds.top + other->height;
+        if (other_bounds.right < bounds.left || bounds.right < other_bounds.left || other_bounds.bottom < bounds.top || bounds.bottom < other_bounds.top) continue;
+        const bool contains_window = other_bounds.left < bounds.left && other_bounds.right > bounds.right && other_bounds.top < bounds.top && other_bounds.bottom > bounds.bottom;
+        if (contains_window) { window.addModalReference(*other); continue; }
+        const bool contained_window = other_bounds.left > bounds.left && other_bounds.right < bounds.right && other_bounds.top > bounds.top && other_bounds.bottom < bounds.bottom;
+        int covered_width = other->width;
+        int covered_height = other->height;
+        if (!contained_window) {
+            if (other_bounds.left < bounds.left) covered_width = std::min(bounds.right, other_bounds.right) - bounds.left;
+            else if (other_bounds.left > bounds.left) covered_width = bounds.right - other_bounds.left;
+            if (other_bounds.top < bounds.top) covered_height = std::min(bounds.bottom, other_bounds.bottom) - bounds.top;
+            else if (other_bounds.top > bounds.top) covered_height = bounds.bottom - other_bounds.top;
+        }
+        const auto covered_area = static_cast<std::int64_t>(covered_width) * covered_height;
+        if (static_cast<float>(static_cast<double>(covered_area) / area) > 0.3f) window.addModalReference(*other);
+    }
+}
+
+SphereUI::Window* SphereUI::InterfaceManager::openWindow(const char* name, int x, int y, std::uint32_t flags) {
+    if (name == nullptr) return nullptr;
+    std::string template_name(name);
+    if (const auto separator = template_name.rfind(':'); separator != std::string::npos) template_name.resize(separator);
+    Window* original = templateWindow(template_name.c_str());
+    if (original == nullptr) return nullptr;
+    auto window = original->clone();
+    if (window == nullptr) { InterfaceRenderer::reportError("Cannot clone the requested window template."); return nullptr; }
+    window->setName(name);
+    if ((flags & explicitPosition) != 0u) window->setPosition(x, y);
+    else {
+        const SavedWindowPosition* saved = savedPosition(name, false);
+        const bool valid_position = saved != nullptr && (saved->x < g_sfera_graphics_runtime.display_width - 15 || saved->y < g_sfera_graphics_runtime.display_height - 15);
+        if (valid_position && window->save_last_position && findWindow(name, true) == nullptr) window->setPosition(saved->x, saved->y);
+        else {
+            if ((flags & centerOnScreen) != 0u) window->alignment_flags = SphereUI::alignCenterX | SphereUI::alignCenterY;
+            window->alignToScreen(false);
+        }
+    }
+    if ((flags & preserveVisibility) == 0u) window->hidden = false;
+    if (!window->hidden && (flags & skipOpeningAnimation) == 0u) window->startAnimation(SphereUI::WindowAnimation::Phase::Showing);
+    window->input_enabled = true;
+    collectCoveredWindows(*window);
+    for (auto* reference : window->modal_references) if (isRegistered(reference) && !reference->modal_owner) { reference->modal_owner = window.get(); reference->handleMessage(UiMessage::animateVisibility, 1u, 0u); }
+    return addTopLevelWindow(std::move(window));
+}
+
+void SphereUI::InterfaceManager::closeWindow(Window* window, bool animated) {
+    if (window == nullptr) return;
+    if (window->control_id != 0u) InterfaceRenderer::reportError("Cannot close a child control through the interface manager.");
+    window->beginClose(animated);
+}
+
+void SphereUI::InterfaceManager::showHelpPage(const char* name) {
+    if (name == nullptr) { closeWindow(help_window); help_window = nullptr; return; }
+    if (findHyperText(name) == nullptr) return;
+    if (help_window == nullptr) {
+        help_window = openWindow("help");
+        bindEventHandler(help_window, WindowEventHandler::help);
+    } else raiseWindow(*help_window);
+    if (help_window == nullptr) return;
+    auto* control = dynamic_cast<HyperTextCtrl*>(help_window->controlAt(3u));
+    if (control == nullptr) return;
+    if (control->document != nullptr && SferaText::asciiEqual(control->document->name.c_str(), name)) return;
+    sendMessage(help_window->controlAt(2u), UiMessage::setEnabled, control->history.size() != 0u ? 1u : 0u, 0u);
+    control->queuePage(name, true);
+}
+
+void SphereUI::InterfaceManager::setTooltipText(const char* text) {
+    if (text == nullptr) { if (tooltip != nullptr && !tooltip_disabled) tooltip->reset(); return; }
+    if (!tooltip) tooltip = std::make_unique<ToolTipCtrl>();
+    if (tooltip == nullptr) return;
+    tooltip->setLine(0u, text);
+    SferaCursorPosition position{};
+    CCursorManager::instance().activeCursor()->getPosition(&position);
+    tooltip->showAt(position.x, position.y);
+}
+
+void SphereUI::InterfaceManager::setCursorKind(std::uint32_t kind, int x, int y) {
+    if (!cursor) return;
+    const char* texture = nullptr;
+    if (kind == 64u || kind == 65u) { texture = "curseye"; kind = 64u; }
+    else if (kind == 66u || kind == 67u) texture = "cursman";
+    else if (kind != 255u) return;
+    else { x = 0; y = 0; }
+    cursor->setImage(0u, texture, x, y);
+    g_sfera_interface.cursor_kind = kind;
+}
+
+void SphereUI::InterfaceManager::setCursorImage(const char* texture, int x, int y) {
+    if (!cursor) return;
+    if (texture == nullptr) { x = 0; y = 0; }
+    cursor->setImage(1u, texture, x, y);
+    cursor_name = texture == nullptr ? "" : texture;
+}
+
+std::uint32_t SphereUI::InterfaceManager::sendMessage(Window* window, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) {
+    if (message == UiMessage::beginDragDrop) { drag_drop_active = true; return 1u; }
+    if (message < UiMessage::close) InterfaceRenderer::reportError("Unknown interface manager message.");
+    return isRegistered(window) ? window->handleMessage(message, first, second) : 0u;
+}
+
+void SphereUI::InterfaceManager::draw() {
+    const auto saved_clip = SphereUI::InterfaceRenderer::clip_rectangle;
+    InterfaceRenderer::setSpriteRenderMode(1u);
+    try {
+        if (g_sfera_interface.ui_enabled) {
+            for (const auto& owner : windows) if (auto* window = owner.get()) window->draw();
+            for (const auto& owner : windows) if (auto* window = owner.get()) window->drawToolTips();
+        }
+        if (tooltip != nullptr && !tooltip_disabled) tooltip->draw();
+        if (cursor && cursor->system_visible) {
+            SphereUI::InterfaceRenderer::clip_rectangle.left = 0;
+            SphereUI::InterfaceRenderer::clip_rectangle.top = 0;
+            SphereUI::InterfaceRenderer::clip_rectangle.right = g_sfera_graphics_runtime.display_width;
+            SphereUI::InterfaceRenderer::clip_rectangle.bottom = g_sfera_graphics_runtime.display_height;
+            CCursor* active = CCursorManager::instance().activeCursor();
+            SferaCursorPosition position{};
+            active->getPosition(&position);
+            if (active->isInsideViewport()) cursor->draw(static_cast<float>(position.x), static_cast<float>(position.y));
+        }
+    } catch (...) { SphereUI::InterfaceRenderer::clip_rectangle = saved_clip; InterfaceRenderer::setSpriteRenderMode(0u); throw; }
+    SphereUI::InterfaceRenderer::clip_rectangle = saved_clip;
+    InterfaceRenderer::setSpriteRenderMode(0u);
+}
+
+void SphereUI::InterfaceManager::showLoadingScreen(bool visible, int width, int height, bool english) {
+    if (!visible) { closeWindow(load_screen); load_screen = nullptr; return; }
+    if (load_screen == nullptr) {
+        load_screen = openWindow("loadscreen", 0, 0, skipOpeningAnimation);
+        if (load_screen == nullptr) return;
+        lowerWindow(*load_screen);
+    }
+    load_screen->setPosition(0, 0);
+    load_screen->handleMessage(UiMessage::setSize, 0u, 0u);
+    const int image_width = std::min(width, 1024);
+    const int image_height = std::min(height, 768);
+    const int left = width > 1024 ? (width - 1024) / 2 : 0;
+    const int top = height > 768 ? (height - 768) / 2 : 0;
+    sendMessage(load_screen->controlAt(2u), UiMessage::setPosition, left, top);
+    sendMessage(load_screen->controlAt(2u), UiMessage::setSize, image_width, image_height);
+    sendMessage(load_screen->controlAt(1u), UiMessage::setPosition, 0u, 0u);
+    sendMessage(load_screen->controlAt(1u), UiMessage::setSize, width, height);
+    if (auto* image = dynamic_cast<ImageCtrl*>(load_screen->controlAt(2u))) { ImageDescription description{}; ::strcpy_s(description.name, sizeof(description.name), english ? "english_sphere1" : "russian_sphere1"); image->setImage(&description); }
+    const int progress_left = left + static_cast<int>(image_width * 0.3701171875);
+    const int progress_top = top + static_cast<int>(image_height * 0.83203125);
+    const int progress_width = image_width * 0.2490234375;
+    const int progress_height = image_height * 0.0247395833;
+    for (const auto index : {3u, 4u}) {
+        sendMessage(load_screen->controlAt(index), UiMessage::setPosition, progress_left, progress_top);
+        sendMessage(load_screen->controlAt(index), UiMessage::setSize, progress_width, progress_height);
+    }
+    sendMessage(load_screen->controlAt(3u), UiMessage::setProgressValue, 100u, 0u);
+    sendMessage(load_screen->controlAt(5u), UiMessage::setPosition, left + 375, top + 520);
+    sendMessage(load_screen->controlAt(5u), UiMessage::setSize, 620u, 90u);
+}
+
+void SphereUI::InterfaceManager::setLoadingProgress(int percent) {
+    if (load_screen != nullptr) sendMessage(load_screen->controlAt(3u), UiMessage::setProgressValue, static_cast<std::uint32_t>(std::clamp(percent, 0, 100)), 0u);
+}
+
+void SphereUI::InterfaceManager::update(std::uint8_t key, std::uint8_t character, std::uint32_t mouse_buttons, int wheel_delta) {
+    const auto& keyboard = g_sfera_direct_input_runtime.keyboard_state;
+    if (key == VK_F12 && keyboard[DIK_LCONTROL] != 0u) g_sfera_interface.ui_enabled = !g_sfera_interface.ui_enabled;
+    else if (key == VK_F1) showHelpPage("Language\\helpindex.hts");
+    if (!g_sfera_interface.ui_enabled) return;
+    if (g_sfera_direct_input_runtime.binding_capture != 0u && g_sfera_direct_input_runtime.binding_key != 0u && capture_control_binding) {
+        const WindowEvent event{nullptr, 0u, UiMessage::controlBindingCaptured, g_sfera_direct_input_runtime.binding_key, 0u};
+        Runtime::invokeEventHandler(WindowEventHandler::control_options, nullptr, event);
+        g_sfera_direct_input_runtime.binding_key = 0u;
+    }
+    if (auto* description = g_sfera_interface.description_control) description->update();
+    SferaCursorPosition position{};
+    CCursorManager::instance().activeCursor()->getPosition(&position);
+    WindowInput input{position.x, position.y, wheel_delta, 0u, mouse_buttons, key, character, 0u};
+    const auto previous_buttons = g_sfera_interface.previous_input_modifiers;
+    const auto changed_buttons = mouse_buttons ^ previous_buttons;
+    input.mouse_flags = (changed_buttons & mouse_buttons & 3u) | ((changed_buttons & previous_buttons & 3u) << 2u);
+    g_sfera_interface.previous_input_modifiers = mouse_buttons;
+    if (keyboard[DIK_LSHIFT] != 0u) input.key_modifiers |= 1u;
+    if (keyboard[DIK_RSHIFT] != 0u) input.key_modifiers |= 2u;
+    if (keyboard[DIK_LCONTROL] != 0u) input.key_modifiers |= 4u;
+    if (g_sfera_direct_input_runtime.modifier_08 != 0u) input.key_modifiers |= 8u;
+    if (keyboard[DIK_LMENU] != 0u) input.key_modifiers |= 16u;
+    if (g_sfera_direct_input_runtime.modifier_20 != 0u) input.key_modifiers |= 32u;
+    std::vector<std::pair<Window*, std::uint64_t>> closing_candidates;
+    closing_candidates.reserve(windows.size());
+    for (const auto& window : windows) closing_candidates.emplace_back(window.get(), window->registration_id);
+    for (const auto& [window, identity] : closing_candidates) {
+        if (!isRegistered(window, identity) || !window->close_completed) continue;
+        std::vector<Window*> references;
+        references = window->modal_references;
+        for (Window* reference : references) {
+            if (!isRegistered(reference) || reference->isAnimating() || std::find_if(windows.begin(), windows.end(), [reference](const auto& owner) { return owner.get() == reference; }) == windows.end()) continue;
+            reference->handleMessage(UiMessage::endModal, 0u, 0u);
+        }
+        if (!isRegistered(window, identity)) continue;
+        if (window->control_id != 0u) { InterfaceRenderer::reportError("Cannot destroy a child control through the interface manager."); continue; }
+        const auto owned = std::find_if(windows.begin(), windows.end(), [window](const auto& owner) { return owner.get() == window; });
+        if (owned != windows.end()) {
+            auto removed = std::move(*owned);
+            windows.erase(owned);
+        }
+    }
+    Window* target = nullptr;
+    for (auto window = windows.rbegin(); window != windows.rend(); ++window) if (isRegistered(window->get()) && (*window)->hidden == 0u && ((*window)->dragging != 0u || (*window)->containsPoint(position.x, position.y))) {
+        target = window->get();
+        break;
+    }
+    if (auto* description = g_sfera_interface.description_control; description != nullptr && !description->hidden) {
+        for (auto window = windows.rbegin(); window != windows.rend(); ++window) if (isRegistered(window->get()) && (*window)->dragging != 0u) {
+            target = window->get();
+            break;
+        }
+    }
+    if ((input.mouse_flags & MouseInput::leftPress) != 0u && target != nullptr && target->can_go_top && !target->hit_transparent && !target->hidden) raiseWindow(*target);
+    if (auto* description = g_sfera_interface.description_control; description != nullptr && !description->hidden) raiseWindow(*description);
+    bool completed_drag = false;
+    if (drag_drop_active) {
+        for (const auto& owner : windows) if (auto* window = owner.get()) {
+            if (!isRegistered(window) || !window->can_drag_drop) continue;
+            const bool entered = window == target;
+            if (entered == window->drag_over) continue;
+            window->queueEvent({window, 0u, entered ? UiMessage::dragEnter : UiMessage::dragLeave, 0u, 0u});
+            window->drag_over = entered;
+        }
+        if ((input.mouse_flags & MouseInput::leftRelease) != 0u) {
+            const bool accepted = isRegistered(target) && target->can_drag_drop && target->hitTest(position.x, position.y);
+            if (!accepted) queueEvent({nullptr, 0u, UiMessage::dropToScene, static_cast<std::uint32_t>(position.x), static_cast<std::uint32_t>(position.y)});
+            for (const auto& owner : windows) if (auto* window = owner.get()) {
+                if (!isRegistered(window) || !window->drag_over) continue;
+                window->queueEvent({window, 0u, UiMessage::dragLeave, 0u, 0u});
+                window->drag_over = false;
+            }
+            completed_drag = true;
+        }
+    }
+    if (input.key_code == VK_ESCAPE) {
+        const auto window = std::find_if(windows.rbegin(), windows.rend(), [this](const auto& candidate) { return isRegistered(candidate.get()) && !candidate->hidden && (candidate->behavior_flags & WindowStyle::handleEscape) != 0u; });
+        if (window != windows.rend()) (*window)->queueEvent({window->get(), 0u, UiMessage::close, 0u, 0u});
+    }
+    Runtime::setTextInputActive(false);
+    input.mouse_x = input.mouse_y = 0;
+    std::vector<std::pair<Window*, std::uint64_t>> input_order;
+    input_order.reserve(windows.size());
+    for (auto window = windows.rbegin(); window != windows.rend(); ++window) input_order.emplace_back(window->get(), (*window)->registration_id);
+    for (const auto& [window, identity] : input_order) {
+        if (!isRegistered(window, identity)) continue;
+        if (window == target) { input.mouse_x = position.x; input.mouse_y = position.y; }
+        if (window->input_enabled && !window->hidden) window->handleInput(input);
+        input.mouse_x = input.mouse_y = 0;
+        if (!isRegistered(window, identity)) continue;
+        if (window->isAnimating()) window->updateAnimation();
+        if (isRegistered(window, identity) && hasEventHandler(window)) window->processEvents();
+    }
+    if (tooltip != nullptr && !tooltip_disabled) tooltip->handleInput(input);
+    if (completed_drag) drag_drop_active = false;
+}
+
+void SphereUI::InterfaceManager::registerWindow(Window& window) {
+    if (registered_windows.contains(&window)) return;
+    if (next_registration_id == 0u) throw std::overflow_error("UI registration identity exhausted");
+    registered_windows.insert(&window);
+    window.registration_id = next_registration_id++;
+}
+void SphereUI::InterfaceManager::unregisterWindow(Window& window) {
+    unbindEventHandler(&window);
+    std::erase_if(events, [&window](const WindowEvent& event) { return event.source == &window; });
+    for (auto* observer : registered_windows) {
+        std::erase(observer->modal_references, &window);
+        std::erase_if(observer->events, [&window](const WindowEvent& event) { return event.source == &window; });
+        if (observer->parent == &window) observer->parent = nullptr;
+        if (observer->modal_owner == &window) observer->modal_owner = nullptr;
+        if (observer->overlay == &window) observer->overlay = nullptr;
+        if (observer->resource_parent == &window) observer->resource_parent = nullptr;
+        if (auto* description = dynamic_cast<CDescriptionWindow*>(observer); description && description != &window) {
+            if (description->displayed_source == &window) description->displayed_source = nullptr;
+            if (description->pending_source == &window) description->pending_source = nullptr;
+        }
+    }
+
+    registered_windows.erase(&window);
+    if (help_window == &window) help_window = nullptr;
+    if (load_screen == &window) load_screen = nullptr;
+    if (g_sfera_interface.description_control == &window) g_sfera_interface.description_control = nullptr;
+}
+bool SphereUI::InterfaceManager::isRegistered(const Window* window) const { return window != nullptr && registered_windows.contains(const_cast<Window*>(window)); }
+bool SphereUI::InterfaceManager::isRegistered(const Window* window, std::uint64_t registration_id) const {
+    return isRegistered(window) && window->registration_id == registration_id;
+}
+void SphereUI::InterfaceManager::bindEventHandler(Window* window, WindowEventHandler handler) {
+    if (window == nullptr) return;
+    if (handler == WindowEventHandler::none) event_handlers.erase(window);
+    else event_handlers.insert_or_assign(window, handler);
+}
+void SphereUI::InterfaceManager::copyEventHandler(Window* destination, const Window* source) {
+    if (destination == nullptr || destination == source) return;
+    const auto binding = event_handlers.find(source);
+    bindEventHandler(destination, binding == event_handlers.end() ? WindowEventHandler::none : binding->second);
+}
+bool SphereUI::InterfaceManager::hasEventHandler(const Window* window) const { return window != nullptr && event_handlers.contains(window); }
+void SphereUI::InterfaceManager::dispatchEvent(Window* window, const WindowEvent& event) {
+    const auto binding = event_handlers.find(window);
+    Runtime::invokeEventHandler(binding == event_handlers.end() ? WindowEventHandler::none : binding->second, window, event);
+}
+void SphereUI::InterfaceManager::unbindEventHandler(const void* window) { event_handlers.erase(static_cast<const Window*>(window)); }
+
+void SphereUI::UiSprite::setDescription(const ImageDescription& description) {
+    name = description.name;
+    resetParts(1u);
+    const auto flags = description.image.flags;
+    const auto* rectangle = (flags & 2u) != 0u ? &description.image.rectangle : nullptr;
+    const char* texture_name = (flags & 4u) != 0u ? description.image.texture_name : description.name;
+    auto& part = parts.front();
+    part.setTexture(texture_name, rectangle, rectangle);
+    width = (flags & 1u) != 0u ? description.image.width : part.rectangle.right;
+    height = (flags & 1u) != 0u ? description.image.height : part.rectangle.bottom;
+}
+
+namespace SphereUI::detail {
+
+    int addCoordinate(int left, int right);
+    int subtractCoordinate(int left, int right);
+}
+
+std::optional<std::string_view> SphereUI::InterfaceConfiguration::value(std::string_view key) {
+    const auto offset = SferaText::configValueOffset(text_, key);
+    if (offset == std::string::npos) return std::nullopt;
+    return std::string_view(text_).substr(offset);
+}
+
+void SphereUI::InterfaceConfiguration::open(const char* filename) {
+    close();
+    if (!filename) return;
+    filename_.assign(filename, std::min(std::strlen(filename), SferaConfigTextRuntime::filename_capacity - 1));
+    auto bytes = SferaFileManager::readBounded(filename_.c_str(), SferaConfigTextRuntime::text_capacity);
+    if (!bytes || bytes->empty()) return;
+    try {
+        if (bytes->size() >= 14 && std::memcmp(bytes->data(), "SPHR", 4) == 0) {
+            const auto key = (*bytes)[8];
+            for (const auto offset : {9u, 17u, 20u}) if (offset < bytes->size()) (*bytes)[offset] ^= key;
+            auto decoded = SferaZStream32::decompressUiConfig(std::span<const std::uint8_t>(*bytes).subspan(8), SferaConfigTextRuntime::text_capacity - 1);
+            text_.assign(reinterpret_cast<const char*>(decoded.data()), decoded.size());
+        } else text_.assign(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+    } catch (const std::exception&) { close(); }
+}
+
+int SphereUI::InterfaceConfiguration::readInteger(const char* key, int fallback) {
+    const auto text = value(key ? std::string_view(key) : std::string_view{});
+    int result = fallback;
+    return text && SferaText::readNumber(*text, result) ? result : fallback;
+}
+
+void SphereUI::InterfaceConfiguration::writeInteger(const char* key, int value) {
+    if (key && !SferaText::replaceConfigValue(text_, key, std::to_string(value), false, SferaConfigTextRuntime::text_capacity))
+        throw std::length_error("UI configuration too large");
+}
+
+void SphereUI::InterfaceConfiguration::save() {
+    if (!filename_.empty()) SferaFileManager::writeFile(filename_.c_str(), text_.data(), text_.size());
+}
+
+namespace {
+    bool interfaceDepth(float depth, float& z, float& reciprocal);
+
+    std::uint8_t uiAtlasGlyph(std::uint8_t character) {
+        return g_sfera_font_runtime.glyphs[character].defined != 0u ? character : static_cast<std::uint8_t>('|');
+    }
+
+    void uiFontQuad(SferaScreenVertex* vertices, float left, float top, float right, float bottom, std::uint32_t color, float u0, float v0, float u1, float v1, bool clockwise) {
+        for (std::uint32_t index = 0u; index < 4u; ++index) {
+            const auto corner = clockwise || index < 2u ? index : 5u - index;
+            const bool on_right = corner == 1u || corner == 2u, on_bottom = corner >= 2u;
+            vertices[index] = {on_right ? right : left, on_bottom ? bottom : top, 0.0f, 1.0f, color, clockwise ? vertices[index].specular : 0u, on_right ? u1 : u0, on_bottom ? v1 : v0};
+        }
+    }
+
+    void uiFontTriangles(std::uint16_t* indices, std::uint32_t first, bool clockwise) {
+        constexpr std::uint16_t atlas[] = {0u, 1u, 2u, 0u, 2u, 3u};
+        constexpr std::uint16_t face[] = {2u, 0u, 3u, 1u, 3u, 0u};
+        const auto* order = clockwise ? atlas : face;
+        for (std::uint32_t index = 0u; index < 6u; ++index) indices[index] = first + order[index];
+    }
+
+    void uiSubmitFont(const SferaScreenVertex* vertices, std::uint32_t vertex_count, const std::uint16_t* indices, std::uint32_t index_count) {
+        if (vertex_count == 0u) return;
+        if (auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get())) (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0u, vertex_count, index_count / 3u, indices, D3DFMT_INDEX16, vertices, sizeof(SferaScreenVertex)));
+    }
+
+    void uiDrawAtlasText(const char* text, int x, int top, std::uint32_t color, int font, int scale, const SphereUI::UiRect& clip, float depth, bool configureAlpha) {
+        auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get());
+        if (device == nullptr) return;
+        const int size = static_cast<std::uint32_t>(scale) * 30u;
+        if (top > clip.bottom || SphereUI::detail::addCoordinate(top, size) <= clip.top) return;
+        if (configureAlpha && SferaColor::fromArgb(color).alpha() != 255) g_sfera_graphics_runtime.d3d_runtime->setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA);
+        float z, reciprocal;
+        if (!interfaceDepth(depth, z, reciprocal)) return;
+        IDirect3DBaseTexture9* texture = nullptr;
+        std::uint32_t vertex_count = 0u, index_count = 0u;
+        const auto flush = [&]() {
+            if (vertex_count == 0u) return;
+            (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetTexture(0u, texture));
+            (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE));
+            (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1));
+            (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetRenderState(D3DRS_LIGHTING, FALSE));
+            (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetRenderState(D3DRS_CLIPPING, FALSE));
+            uiSubmitFont(SphereUI::InterfaceRenderer::glyph_vertices, vertex_count, SphereUI::InterfaceRenderer::quad_indices, index_count);
+            vertex_count = 0u;
+            index_count = 0u;
+        };
+        for (const auto* cursor = reinterpret_cast<const unsigned char*>(text); *cursor != 0u && *cursor != '\n'; ++cursor) {
+            const auto character = uiAtlasGlyph(*cursor);
+            if (x <= clip.right && SphereUI::detail::addCoordinate(x, size) > clip.left) {
+                const auto& glyph = g_sfera_font_runtime.glyphs[character];
+                const auto next_texture = g_sfera_font_runtime.faces[font].texture(glyph.texture_index);
+                if ((texture != nullptr && texture != next_texture) || vertex_count + 4u > std::size(SphereUI::InterfaceRenderer::glyph_vertices)) flush();
+                texture = next_texture;
+                const auto left = static_cast<float>(x) - 0.5f, upper = static_cast<float>(top) - 0.5f;
+                uiFontQuad(SphereUI::InterfaceRenderer::glyph_vertices + vertex_count, left, upper, left + size, upper + size, color, glyph.u, glyph.v, glyph.u + 30.0f / 256.0f, glyph.v + 30.0f / 256.0f, true);
+                for (std::uint32_t corner = 0; corner < 4; ++corner) {
+                    SphereUI::InterfaceRenderer::glyph_vertices[vertex_count + corner].z = z;
+                    SphereUI::InterfaceRenderer::glyph_vertices[vertex_count + corner].rhw = reciprocal;
+                }
+                uiFontTriangles(SphereUI::InterfaceRenderer::quad_indices + index_count, vertex_count, true);
+                vertex_count += 4u;
+                index_count += 6u;
+            }
+            x = SphereUI::detail::addCoordinate(x, static_cast<int>((g_sfera_font_runtime.faces[font].widths[character] + g_sfera_font_runtime.faces[font].code_base) * static_cast<std::uint32_t>(scale)));
+        }
+        flush();
+        (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE));
+    }
+}
+
+void SphereUI::InterfaceRenderer::drawFaceText(const char* text, int x, int y, std::uint32_t color, int font, const SphereUI::UiRect& clip) {
+    const auto& face = g_sfera_fonts.face(font);
+    if (y > clip.bottom || SphereUI::detail::addCoordinate(y, face.line_height) <= clip.top || (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get()) == nullptr) return;
+    auto* texture = g_sfera_textures.resource(face.texture);
+    if (auto* device = (g_sfera_graphics_runtime.d3d_runtime == nullptr ? nullptr : g_sfera_graphics_runtime.d3d_runtime->native_device.Get())) (g_sfera_graphics_runtime.d3d_runtime->last_hresult = device->SetTexture(0u, texture));
+    const auto* glyphs = face.glyphs.data();
+    auto& factory = g_sfera_fonts;
+    auto* vertices = factory.vertices.data();
+    if (factory.vertices.empty()) throw std::runtime_error("font vertex buffer is unavailable");
+    if (factory.vertex_count >= 1200u) factory.vertex_count = 0u;
+    std::uint32_t batch_first = factory.vertex_count, batch_count = 0u, index_count = 0u;
+    const float origin = static_cast<float>(x) - 0.5f;
+    float left = origin, top = static_cast<float>(y) - 0.5f;
+    const auto flush = [&]() {
+        uiSubmitFont(vertices + batch_first, batch_count, factory.quad_indices.data(), index_count);
+        batch_count = 0u;
+        index_count = 0u;
+        batch_first = factory.vertex_count;
+    };
+    for (const auto* cursor = reinterpret_cast<const unsigned char*>(text); *cursor != 0u; ++cursor) {
+        const auto character = *cursor;
+        if (character == '\n') {
+            left = origin;
+            top += face.line_height;
+            continue;
+        }
+        if (character < 32u) continue;
+        const auto& glyph = glyphs[character];
+        if (character == ' ' || left + glyph.width <= static_cast<float>(clip.left)) {
+            left += glyph.advance;
+            continue;
+        }
+        if (left > static_cast<float>(clip.right)) break;
+        const auto glyph_left = left + glyph.bearing_x, glyph_top = top - glyph.bearing_y;
+        uiFontQuad(vertices + factory.vertex_count, glyph_left, glyph_top, glyph_left + glyph.width, glyph_top + glyph.height, color, glyph.u0, glyph.v0, glyph.u1, glyph.v1, false);
+        uiFontTriangles(factory.quad_indices.data() + index_count, batch_count, false);
+        factory.vertex_count += 4u;
+        batch_count += 4u;
+        index_count += 6u;
+        if (factory.vertex_count > 1194u) {
+            flush();
+            factory.vertex_count = 0u;
+            batch_first = 0u;
+        }
+        left += glyph.advance;
+    }
+    flush();
+}
+
+SphereUI::TextExtent SphereUI::InterfaceRenderer::measureText(const char* text, int font, bool initialized) {
+    const auto* cursor = reinterpret_cast<const unsigned char*>(text == nullptr ? "" : text);
+    std::uint32_t width = 0u, line_width = 0u, extra_height = 0u;
+    if (font >= 2u) {
+        const auto& face = g_sfera_fonts.face(font);
+        const auto* glyphs = face.glyphs.data();
+        for (; *cursor != 0u; ++cursor) {
+            if (*cursor == '\n') {
+                width = std::max(width, line_width);
+                line_width = 0u;
+                extra_height += static_cast<std::uint32_t>(face.line_height);
+            } else {
+                constexpr std::uint8_t lowercase_yo = 184u, lowercase_e = 229u, uppercase_yo = 168u, uppercase_e = 197u;
+                const auto character = *cursor == lowercase_yo ? lowercase_e : *cursor == uppercase_yo ? uppercase_e : *cursor;
+                line_width += static_cast<std::uint32_t>(glyphs[character].advance);
+            }
+        }
+        return {static_cast<int>(std::max(width, line_width)), static_cast<int>(extra_height + static_cast<std::uint32_t>(face.line_height))};
+    }
+    std::uint32_t lines = 1u;
+    const auto& face = g_sfera_font_runtime.faces[font];
+    for (; *cursor != 0u; ++cursor) {
+        if (*cursor == '\n') {
+            const auto completed_width = initialized ? line_width : 0u;
+            if (static_cast<int>(completed_width) > static_cast<int>(width)) width = completed_width;
+            if (++lines == 300u) throw std::length_error("too many lines in font measurement");
+            line_width = 0u;
+        } else {
+            if (static_cast<int>(line_width) > 0) line_width += face.code_base;
+            line_width += g_sfera_font_runtime.faces[font].widths[uiAtlasGlyph(*cursor)];
+        }
+    }
+    if (static_cast<int>(line_width) > static_cast<int>(width)) width = line_width;
+    const auto height = initialized ? (lines - 1u) * face.cell_step - face.origin + face.span + 2u : 0u;
+    return {static_cast<int>(width + 2u), static_cast<int>(height + (font == 1u ? 2u : 0u))};
+}
+
+void SphereUI::InterfaceRenderer::drawText(const char* text, int x, int y, std::uint32_t color, int font, bool initialized, const UiRect& clip, bool opaque) {
+    SphereUI::InterfaceRenderer::clip_rectangle.left = clip.left;
+    SphereUI::InterfaceRenderer::clip_rectangle.top = clip.top;
+    SphereUI::InterfaceRenderer::clip_rectangle.right = clip.right;
+    SphereUI::InterfaceRenderer::clip_rectangle.bottom = clip.bottom;
+    const bool disable_blending = opaque && font < 2u;
+    if (disable_blending) SphereUI::InterfaceRenderer::setSpriteRenderMode(0u);
+    if (font < 2u) uiDrawAtlasText(text == nullptr ? "" : text, x, SphereUI::detail::subtractCoordinate(SphereUI::detail::subtractCoordinate(y, 2), static_cast<int>(g_sfera_font_runtime.faces[font].origin)), color, font, initialized ? 1 : 0, clip, 0.0f, false);
+    else drawFaceText(text == nullptr ? "" : text, x, y, color, font, clip);
+    if (disable_blending) SphereUI::InterfaceRenderer::setSpriteRenderMode(1u);
+}
+
+namespace {
+    bool chatRussianVowelOrSign(std::uint8_t value) {
+
+        constexpr std::u32string_view vowels = U"\u0443\u0435\u044b\u0430\u043e\u044d\u044f\u0438\u044e\u044c\u044a";
+        return vowels.find(SferaText::unicodeCp1251()[value]) != std::u32string_view::npos;
+    }
+
+    bool chatKeyboardAmbiguous(std::uint8_t value) {
+
+        constexpr std::u32string_view aliases = U"\u0435e\u0443y\u043ak\u0433r\u04373\u0445x\u0438u\u043e0o\u0440p\u0441c\u0430a\u0442mE\u0415\u0423YK\u041a\u0417X\u0425O\u041e\u0420PC\u0421A\u0410";
+        return aliases.find(SferaText::unicodeCp1251()[value]) != std::u32string_view::npos;
+    }
+
+    const std::array<std::array<std::uint8_t, 256>, 2>& chatCharacterMaps() {
+        static const auto maps = [] {
+
+            std::array<std::array<std::uint8_t, 256>, 2> result{};
+            for (std::size_t character = 0; character < 256; ++character) {
+                auto value = SferaText::lowercaseCp1251()[character];
+                const auto letter = SferaText::unicodeCp1251()[value];
+                if (!((letter >= U'a' && letter <= U'z') || (letter >= U'\u0430' && letter <= U'\u044f') || letter == U'\u0451')) value = ' ';
+                result[0][character] = result[1][character] = value;
+            }
+            for (auto character : {'0', '3', '6'}) result[0][character] = character;
+            const auto aliases = [&](std::size_t alphabet, std::string_view group) { for (std::size_t alias = 1; alias < group.size(); ++alias) for (auto& value : result[alphabet]) if (value == static_cast<std::uint8_t>(group[alias])) value = group.front(); };
+            for (auto group : {"\345\270e", "\344g", "\3416b", "\363y", "\352k", "\343r", "\3473", "\365x", "\350\351u", "\3560o", "\360p", "\361c", "\340a", "\354m", "\355h"}) aliases(0u, group);
+            for (auto group : {"\350\351i", "\363u", "\352k", "\345e\270", "\366c", "\355n", "\343g", "\347z", "\365h", "\344d", "\353l", "\356o", "\360r", "\357p", "\340a", "\342v", "\364f", "\361s", "\354m", "\362t", "\341b"}) aliases(1u, group);
+            return result;
+        }();
+        return maps;
+    }
+
+    bool hasPlayerPrefix(std::span<const HyperTextRun> elements) {
+        return elements.size() >= 2u && elements[0].link() != nullptr && elements[0].link()->link_kind == 2u
+            && elements[1].isPlain() && elements[1].text.starts_with(": ");
+    }
+
+    void serializeChatResult(std::span<const HyperTextRun> elements, std::string* raw, std::string* visible) {
+        std::string ignored_raw, ignored_visible;
+        SphereUI::detail::serializeHyperTextElements(elements, raw != nullptr ? *raw : ignored_raw, visible != nullptr ? *visible : ignored_visible);
+    }
+
+}
+
+SphereUI::ChatFilter::ChatFilter() {
+    SphereRender::ConfigDocument::setStorageMode(SphereRender::ConfigDocument::StorageMode::Encoded);
+    const std::string filename = std::string("xadd\\matbase") + g_sfera_font_runtime.language_suffix + ".dat";
+    g_sfera_files.setErrorReporting(false);
+    const auto size = g_sfera_files.fileSize(filename.c_str());
+    g_sfera_files.setErrorReporting(true);
+    if (size == -1) return;
+    auto configuration = SphereRender::ConfigDocument::open(filename.c_str());
+    const auto count = configuration.arraySize("words");
+    if (!count) { WorldDiagnostics::fail("CMatFilter::CMatFilter: array words absent in matbase.dat"); return; }
+    rules.reserve(*count);
+    for (std::size_t index = 0u; index < *count; ++index) {
+        const auto* item = configuration.objectAt("words", index);
+        const char* word = item != nullptr ? item->text("w") : nullptr;
+        if (word == nullptr) { WorldDiagnostics::fail("CMatFilter::CMatFilter: field 'w' absent in one of array's elements"); continue; }
+        const auto kind = item->integer("t");
+        if (!kind) { WorldDiagnostics::fail("CMatFilter::CMatFilter: field 't' absent in one of array's elements"); continue; }
+        Rule rule{word, static_cast<std::uint32_t>(*kind)};
+        for (std::size_t exception = 0u; exception < item->arraySize("e").value_or(0u); ++exception) {
+            if (const auto* value = item->textAt("e", exception)) rule.exceptions.emplace_back(value);
+            else WorldDiagnostics::fail("CMatFilter::CMatFilter: error reading exceptions");
+        }
+        rules.push_back(std::move(rule));
+    }
+}
+
+SphereUI::ChatFilter::ChatFilter(std::vector<Rule> entries) : rules(std::move(entries)) {}
+
+std::string SphereUI::ChatFilter::normalize(std::string_view text, std::size_t alphabet) {
+    std::string result(text);
+    const auto& map = chatCharacterMaps()[alphabet != 0u];
+    for (auto& value : result) value = map[static_cast<std::uint8_t>(value)];
+    return result;
+}
+
+bool SphereUI::ChatFilter::matchesWord(std::string_view word, std::size_t alphabet) const {
+    for (const auto& rule : rules) {
+        const auto pattern = normalize(rule.word, alphabet);
+        const auto position = word.find(pattern);
+        if (position == std::string_view::npos) continue;
+        switch (rule.kind) {
+            case 0u: if (word != pattern) continue; break;
+            case 1u: break;
+            case 2u: if (position != 0u) continue; break;
+            case 3u: if (position != 0u && !chatRussianVowelOrSign(static_cast<std::uint8_t>(word[position - 1u]))) continue; break;
+            case 4u: if (position != 0u || (word.size() != pattern.size() && !chatRussianVowelOrSign(static_cast<std::uint8_t>(word[pattern.size()])))) continue; break;
+            default: continue;
+        }
+        bool excepted = false;
+        for (const auto& exception : rule.exceptions) {
+            if (exception.empty()) continue;
+            const auto text = normalize(std::string_view(exception).substr(1u), alphabet);
+            if (exception.front() == '0' && position >= text.size()) excepted = word.substr(position - text.size(), text.size()) == text;
+            else if (exception.front() == '1') excepted = word.substr(position + pattern.size()).starts_with(text);
+            if (excepted) break;
+        }
+        if (!excepted) return true;
+    }
+    return false;
+}
+
+bool SphereUI::ChatFilter::matchesMessage(std::string_view message, std::size_t alphabet) const {
+    auto text = normalize(message, alphabet);
+    text.erase(std::unique(text.begin(), text.end()), text.end());
+    std::vector<std::string_view> words;
+    for (std::size_t first = 0u; first < text.size();) {
+        first = text.find_first_not_of(' ', first);
+        if (first == std::string::npos) break;
+        auto last = text.find(' ', first);
+        if (last == std::string::npos) last = text.size();
+        words.emplace_back(text.data() + first, last - first);
+        first = last;
+    }
+    for (std::size_t first = 0u; first < words.size(); ++first) {
+        if (matchesWord(words[first], alphabet)) return true;
+        if (words[first].size() > 3u) continue;
+        std::string joined(words[first]);
+        for (auto next = first + 1u; next < words.size() && words[next].size() <= 3u; ++next) {
+            joined += words[next];
+            if (matchesWord(joined, alphabet)) return true;
+        }
+    }
+    return false;
+}
+
+bool SphereUI::ChatFilter::rejects(std::string_view message) const {
+    if (rules.empty()) return false;
+    std::string visible(message);
+    bool tag = false;
+    for (auto& character : visible) {
+        const char value = character;
+        if (value == '<') tag = true;
+        if (tag) character = ' ';
+        if (value == '>') tag = false;
+    }
+    return matchesMessage(visible, 0u) || matchesMessage(visible, 1u);
+}
+
+bool SphereUI::ChatFilter::invalidIdentifier(std::string_view name) {
+
+    std::uint32_t alphabet = 0u;
+    for (std::uint8_t character : name) {
+        std::uint32_t current = 0u;
+        if (character == '-' || character == ' ' || character == '_' || (character >= '0' && character <= '9')) current = 0u;
+        else if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z')) current = 1u;
+        else if (const auto letter = SferaText::unicodeCp1251()[character]; (letter >= U'\u0410' && letter <= U'\u044f') || letter == U'\u0401' || letter == U'\u0451') current = 2u;
+        else return true;
+        if (alphabet == 0u) alphabet = current;
+        else if (alphabet != current && chatKeyboardAmbiguous(character)) return true;
+    }
+    return false;
+}
+
+std::string SphereUI::HyperTextParser::plainText(std::string_view input) {
+    std::vector<HyperTextRun> elements;
+    std::string plain;
+    parseElements(input, elements, plain);
+    return plain;
+}
+
+std::string SphereUI::HyperTextParser::buildLink(std::string_view scheme, std::string_view target, std::string_view caption) {
+    return "<l=\"" + std::string(scheme) + "://" + detail::escapeHyperText(target) + "\">" + std::string(caption) + "</l>";
+}
+
+bool SphereUI::HyperTextParser::extractPlayerPrefix(std::string_view input, std::string* output, std::string* plain) {
+    std::vector<HyperTextRun> elements;
+    std::string visible;
+    parseElements(input, elements, visible);
+    if (!hasPlayerPrefix(elements)) return false;
+    serializeChatResult(std::span(elements).first(1u), output, plain);
+    return true;
+}
+
+bool SphereUI::HyperTextParser::removePlayerPrefix(std::string_view input, std::string* output, std::string* plain) {
+    std::vector<HyperTextRun> elements;
+    std::string visible;
+    parseElements(input, elements, visible);
+    if (elements.empty()) return false;
+    if (hasPlayerPrefix(elements)) {
+        elements[1].text.erase(0u, 2u);
+        elements.erase(elements.begin(), elements.begin() + (elements[1].text.empty() ? 2u : 1u));
+    }
+    serializeChatResult(elements, output, plain);
+    return true;
+}
+
+bool SphereUI::HyperTextParser::eraseRange(std::string_view input, std::size_t first, std::size_t last, std::string* output, std::string* plain) {
+    std::vector<HyperTextRun> elements;
+    std::string visible;
+    parseElements(input, elements, visible);
+    if (elements.empty()) return false;
+    const std::uint64_t end = static_cast<std::uint64_t>(last) + 1u;
+    std::uint64_t offset = 0u;
+    std::vector<HyperTextRun> selected;
+    for (const auto& element : elements) {
+        const std::uint64_t next = offset + element.text.size();
+        const bool overlap = first <= last && offset < end && next > first;
+        if (!overlap || offset < first || next > end || (first >= offset && last < next)) {
+            auto copy = element;
+            if (overlap) {
+                const std::size_t begin = first > offset ? first - offset : 0u;
+                const std::size_t count = std::min(next, end) - offset - begin;
+                copy.text.erase(begin, count);
+            }
+            selected.push_back(std::move(copy));
+        }
+        offset = next;
+    }
+    if (first <= last && first < offset) elements = std::move(selected);
+    serializeChatResult(elements, output, plain);
+    return true;
+}
+
+void SphereUI::InterfaceManager::loadAllWindowTemplates() {
+    std::vector<std::filesystem::path> files;
+    std::error_code error;
+    for (std::filesystem::directory_iterator entry("Effects", error), end; !error && entry != end; entry.increment(error)) if (!entry->is_directory(error) && SferaText::asciiEqual(entry->path().extension().string().c_str(), ".ui")) files.push_back(entry->path());
+    float completed = 0.0f;
+    const float fraction = files.empty() ? 0.0f : static_cast<float>(1.0 / static_cast<double>(files.size()));
+    for (const auto& file : files) {
+        if (SferaText::asciiEqual(file.filename().string().c_str(), "loadscreen.ui")) continue;
+        loadWindowTemplates(file.string().c_str());
+        completed += fraction;
+        GameInterface::updateLoadingProgress(static_cast<std::uint32_t>(static_cast<int>(static_cast<double>(completed) * 30.0 + 30.0)));
+    }
+}
+
+bool SphereUI::InterfaceManager::initializeResources() {
+    if (!prepareResources()) return false;
+    GameInterface::updateLoadingProgress(15u);
+    loadHyperTexts();
+    GameInterface::updateLoadingProgress(30u);
+    loadAllWindowTemplates();
+    finishInitialization();
+    return true;
+}
+
+void SphereUI::InterfaceManager::showOptions(bool visible) {
+    auto* window = findWindow("options");
+    if (visible && window == nullptr) { window = openWindow("options", 0, 0, 0u); if (window != nullptr) bindEventHandler(window, WindowEventHandler::options); }
+    else if (!visible && window != nullptr) closeWindow(window, true);
+}
+
+namespace {
+    bool interfaceDepth(float depth, float& z, float& reciprocal) {
+        z = 0.0f;
+        reciprocal = 1.0f;
+        if (!(depth > 0.001f)) return true;
+        const double nearPlane = g_sfera_camera.near_distance, farPlane = g_sfera_camera.far_distance;
+        if (depth < nearPlane || depth > farPlane) return false;
+        z = (farPlane - nearPlane * farPlane / depth) / (farPlane - nearPlane);
+        reciprocal = 1.0 / depth;
+        return true;
+    }
+
+    void interfaceQuad(SferaScreenVertex* vertices, float left, float top, float right, float bottom, std::uint32_t color, const float* uv, float z, float reciprocal, bool clearSpecular) {
+        for (std::size_t corner = 0; corner < 4; ++corner) {
+            const bool onRight = corner == 1 || corner == 2, onBottom = corner >= 2;
+            auto& vertex = vertices[corner];
+            vertex = {onRight ? right : left, onBottom ? bottom : top, z, reciprocal, color, clearSpecular ? 0u : vertex.specular, uv ? uv[corner * 2] : (onRight ? 1.0f : 0.0f), uv ? uv[corner * 2 + 1] : (onBottom ? 1.0f : 0.0f)};
+        }
+    }
+
+    void interfaceNamedQuad(int left, int top, int width, int height, const char* name, std::uint32_t color, std::uint32_t alpha, float depth, const float* uv, bool worldSpace) {
+        if (width == 0 || height == 0) return;
+        auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+        const auto texture = g_sfera_textures.find(name);
+        device.checkResult(device.native_device->SetTexture(0, g_sfera_textures.resource(texture)), "SetTexture");
+        if (alpha != 255 || g_sfera_textures.hasAlpha(texture)) device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA);
+        float z, reciprocal;
+        if (!interfaceDepth(depth, z, reciprocal)) return;
+        auto* vertices = SceneSky::sun_quad;
+        const float x = static_cast<float>(left) - 0.5f, y = static_cast<float>(top) - 0.5f;
+        interfaceQuad(vertices, x, y, x + width, y + height, color, uv, z, reciprocal, true);
+        device.checkResult(device.native_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE), "SetRenderState");
+        device.checkResult(device.native_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1), "SetFVF");
+        if (worldSpace) device.drawVertices(D3DPT_TRIANGLEFAN, 14, vertices, 4, nullptr, 0, sizeof(SferaScreenVertex));
+        else device.checkResult(device.native_device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, 2, vertices, sizeof(SferaScreenVertex)), "DrawPrimitiveUP");
+        device.last_hresult = device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    }
+}
+
+HRESULT GameInterface::drawSpriteQuad(std::uint32_t color, const float* uv, float left, float top, float right, float bottom) {
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    auto* vertices = GameInterface::sprite_quad;
+    interfaceQuad(vertices, left - 0.5f, top - 0.5f, right - 0.5f, bottom - 0.5f, color, uv, 0.0f, 1.0f, false);
+    return device.checkResult(device.native_device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, 2, vertices, sizeof(SferaScreenVertex)), "DrawPrimitiveUP");
+}
+
+HRESULT GameInterface::drawSpriteTexture(std::uint32_t color, int texture, float left, float top, float right, float bottom, const float* uv, bool) {
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    if (texture <= 0) device.checkResult(device.native_device->SetTexture(0, nullptr), "SetTexture");
+    else SphereRender::SceneRenderer::bindTexture(texture);
+    return drawSpriteQuad(color, uv, left, top, right, bottom);
+}
+
+void GameInterface::drawTexture(int left, int top, int width, int height, const char* name, std::uint32_t alpha, float depth, const float* uv) {
+    interfaceNamedQuad(left, top, width, height, name, SferaColor::rgba(255u, 255u, 255u, alpha).argb(), alpha, depth, uv, true);
+}
+
+void GameInterface::tintTexture(int left, int top, int width, int height, const char* name, std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint32_t alpha, const float* uv) {
+    interfaceNamedQuad(left, top, width, height, name, SferaColor::rgba(red, green, blue, alpha).argb(), alpha, 0.0f, uv, false);
+}
+
+void GameInterface::drawFullscreenOverlay() {
+    const auto alpha = g_sfera_interface.overlay_alpha;
+    if (alpha == 0) return;
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    auto* vertices = SceneSky::sun_quad;
+    interfaceQuad(vertices, 0.0f, 0.0f, static_cast<float>(g_sfera_graphics_runtime.display_width), static_cast<float>(g_sfera_graphics_runtime.display_height), SferaColor::rgba(255u, 255u, 255u, alpha).argb(), nullptr, 0.0f, 1.0f, true);
+    device.setAlphaBlending(D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA);
+    device.checkResult(device.native_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1), "SetFVF");
+    device.drawVertices(D3DPT_TRIANGLEFAN, 14, vertices, 4, nullptr, 0, sizeof(SferaScreenVertex));
+    device.last_hresult = device.native_device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+}
+
+std::uint32_t GameInterface::fontHeight(int font, std::uint32_t scale) { return g_sfera_font_runtime.faces[font].span * scale; }
+std::uint32_t GameInterface::glyphWidth(std::uint32_t character, int font) { return g_sfera_font_runtime.faces[font].widths[character] + g_sfera_font_runtime.faces[font].code_base; }
+std::uint32_t GameInterface::textHeight(int font, std::uint32_t scale, std::uint32_t lines) { return ((lines - 1) * g_sfera_font_runtime.faces[font].cell_step + g_sfera_font_runtime.faces[font].span) * scale; }
+std::uint32_t GameInterface::lineOffset(int font, std::uint32_t scale, std::uint32_t line) { return g_sfera_font_runtime.faces[font].cell_step * scale * line; }
+
+void GameInterface::setRenderState() {
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    device.checkResult(device.native_device->SetVertexShader(nullptr), "SetVertexShader");
+    device.checkResult(device.native_device->SetPixelShader(nullptr), "SetPixelShader");
+    device.checkResult(device.native_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE), "SetRenderState");
+    for (auto state : {D3DRS_ZENABLE, D3DRS_ZWRITEENABLE, D3DRS_LIGHTING, D3DRS_FOGENABLE}) device.checkResult(device.native_device->SetRenderState(state, FALSE), "SetRenderState");
+    device.checkResult(device.native_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1), "SetFVF");
+    device.setColorOperation(0, D3DTOP_MODULATE, D3DTA_TEXTURE, D3DTA_DIFFUSE);
+    device.setAlphaOperation(0, D3DTOP_MODULATE, D3DTA_TEXTURE, D3DTA_DIFFUSE);
+    for (auto state : {D3DSAMP_ADDRESSU, D3DSAMP_ADDRESSV}) device.checkResult(device.native_device->SetSamplerState(0, state, D3DTADDRESS_CLAMP), "SetSamplerState");
+}
+
+void GameInterface::restoreRenderState() {
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    for (auto state : {D3DSAMP_ADDRESSU, D3DSAMP_ADDRESSV}) device.checkResult(device.native_device->SetSamplerState(0, state, D3DTADDRESS_WRAP), "SetSamplerState");
+    for (auto state : {D3DRS_LIGHTING, D3DRS_FOGENABLE, D3DRS_ZWRITEENABLE, D3DRS_ZENABLE}) device.checkResult(device.native_device->SetRenderState(state, TRUE), "SetRenderState");
+    device.checkResult(device.native_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW), "SetRenderState");
+}
+
+void GameInterface::drawFrame() {
+    setRenderState();
+    g_sfera_interface.draw();
+
+    const int elapsed = static_cast<std::uint32_t>(WorldClock::nowTicks()) - static_cast<std::uint32_t>(SferaClientApplication::frame_anchor);
+    ++SferaClientApplication::frame_samples;
+    if (elapsed > 1000) {
+        SferaClientApplication::measured_fps = static_cast<double>(static_cast<int>(SferaClientApplication::frame_samples)) * 10000.0 / elapsed;
+        SferaClientApplication::frame_samples = 0;
+        const auto now = WorldClock::nowTicks();
+        SferaClientApplication::frame_anchor = now;
+    }
+    restoreRenderState();
+}
+
+void GameInterface::finishLoading() {
+    g_sfera_interface.showLoadingScreen(false, g_sfera_graphics_runtime.display_width, g_sfera_graphics_runtime.display_height, false);
+    ::_chmod("loadcount.bin", _S_IREAD | _S_IWRITE);
+    SferaFileManager::ScopedFile file(g_sfera_files, g_sfera_files.create("loadcount.bin"));
+    if (file.get() < 0) return;
+    const auto work = GameInterface::loading_completed;
+    g_sfera_files.write(file.get(), &work, sizeof(work));
+    file.close();
+}
+
+void GameInterface::updateLoadingProgress(std::uint32_t increment) {
+    auto& work = GameInterface::loading_completed;
+    work = work + static_cast<std::uint64_t>(increment);
+    const auto total = std::max(static_cast<int>(GameInterface::loading_total - 80), 1);
+    const auto progress = std::min(static_cast<int>(work * 100u) / total, 100);
+    if (static_cast<std::uint32_t>(progress) == g_sfera_graphics_runtime.rebuild_percent) return;
+    g_sfera_graphics_runtime.rebuild_percent = progress;
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    SceneScope scene(device);
+    if (!scene) return;
+    g_sfera_interface.setLoadingProgress(progress);
+    g_sfera_interface.update(0, 0, 0, 0);
+    drawAll();
+    scene.finish();
+    device.waitForGpu();
+    device.present();
+}
+
+void GameInterface::drawAtlasText(const char* text, int x, int y, std::uint32_t color, int scale, int font, float depth) {
+
+    uiDrawAtlasText(text, x, y, color, font, scale, {SphereUI::InterfaceRenderer::clip_rectangle.left, SphereUI::InterfaceRenderer::clip_rectangle.top, SphereUI::InterfaceRenderer::clip_rectangle.right, SphereUI::InterfaceRenderer::clip_rectangle.bottom}, depth, true);
+}
+
+namespace {
+    void interfaceWindowBorder(const GameUiWindow& window) {
+        const auto width = window.contentRight - window.contentLeft + 1, height = window.contentBottom - window.contentTop + 1;
+        const float u = static_cast<float>(width) / 256.0f, v = static_cast<float>(height) / 256.0f;
+        const float background[] = {0, 0, u, 0, u, v, 0, v};
+        GameInterface::drawTexture(window.contentLeft, window.contentTop, width, height, "winfon", window.opacity, 0, background);
+        const float cornerUv[] = {0, 6.0f / 256, 6.0f / 256, 6.0f / 256, 6.0f / 256, 12.0f / 256, 0, 12.0f / 256};
+        for (std::size_t corner = 0; corner < 4; ++corner) {
+            float uv[8];
+            for (std::size_t vertex = 0; vertex < 4; ++vertex) {
+                const auto source = (vertex + 4 - corner) % 4;
+                uv[vertex * 2] = cornerUv[source * 2];
+                uv[vertex * 2 + 1] = cornerUv[source * 2 + 1];
+            }
+            const bool right = corner == 1 || corner == 2, bottom = corner >= 2;
+            GameInterface::drawTexture(right ? window.contentRight + 1 : window.left, bottom ? window.contentBottom + 1 : window.top, right ? window.right - window.contentRight : window.contentLeft - window.left, bottom ? window.bottom - window.contentBottom : window.contentTop - window.top, "wf_bord", window.opacity, 0, uv);
+        }
+        const float horizontal[] = {0, 0, u, 0, u, 6.0f / 256, 0, 6.0f / 256};
+        GameInterface::drawTexture(window.contentLeft, window.top, width, window.contentTop - window.top, "wf_bord", window.opacity, 0, horizontal);
+        GameInterface::drawTexture(window.contentLeft, window.contentBottom + 1, width, window.bottom - window.contentBottom, "wf_bord", window.opacity, 0, horizontal);
+        const float vertical[] = {0, 6.0f / 256, 0, 0, v, 0, v, 6.0f / 256};
+        GameInterface::drawTexture(window.left, window.contentTop, window.contentLeft - window.left, height, "wf_bord", window.opacity, 0, vertical);
+        GameInterface::drawTexture(window.contentRight + 1, window.contentTop, window.right - window.contentRight, height, "wf_bord", window.opacity, 0, vertical);
+    }
+
+    void interfaceElement(const GameUiElement& element, int scrollX, int scrollY) {
+        int x = 0, y = 0;
+        auto alpha = element.alpha;
+        float depth = 0;
+        if (element.objectHandle != UINT32_MAX) {
+            SferaVec3F projected;
+            if (!g_sfera_camera.projectObjectTop(element.objectHandle, projected, element.height_factor)) return;
+            x = projected.x;
+            y = projected.y;
+            const auto& object = *g_sfera_world_objects.object(element.objectHandle);
+            const auto& reference = *g_sfera_world_objects.object(1);
+            const auto delta = reference.position - object.position;
+            const float squaredDistance = static_cast<double>(delta.x) * delta.x + static_cast<double>(delta.y) * delta.y + static_cast<double>(delta.z) * delta.z;
+            const float distance = std::sqrt(static_cast<double>(squaredDistance));
+            if (distance > 100.0f) return;
+            alpha = 255u - static_cast<std::uint32_t>(static_cast<int>(static_cast<double>(distance) / 100.0 * 255.0));
+            depth = static_cast<double>(g_sfera_camera.frame_transform.inverseTransformPoint(object.position).z) - 2.0;
+            if (g_sfera_camera.near_distance > depth) depth = static_cast<double>(g_sfera_camera.near_distance) + static_cast<double>(0.01f);
+        }
+        if (const auto* sprite = std::get_if<GameUiElement::Sprite>(&element.content)) {
+            const auto opacity = static_cast<int>(element.alpha * alpha) / 255;
+            GameInterface::drawTexture(sprite->left - scrollX + x, sprite->top - scrollY + y, sprite->width, sprite->height, sprite->texture.c_str(), opacity, depth, nullptr);
+        } else {
+            const auto& text = std::get<GameUiElement::Text>(element.content);
+            const auto opacity = static_cast<int>(SferaColor::fromArgb(element.color).alpha() * alpha) / 255;
+            const auto color = SferaColor::fromArgb(element.color).withAlpha(static_cast<std::uint32_t>(opacity)).argb();
+            for (const auto& line : text.lines) GameInterface::drawAtlasText(text.bytes.c_str() + line.offset, line.x - scrollX + x, line.y - scrollY + y, color, text.font_scale, text.font, depth);
+        }
+    }
+}
+
+void GameInterface::drawWindow(int handle) {
+    auto* window = GameInterface::window(handle);
+    if (!window) {
+        WorldDiagnostics::message[0] = 0;
+        WorldDiagnostics::appendScriptContext("draw_window: wrong handle");
+        WorldDiagnostics::flushScriptContext();
+        return;
+    }
+    if (handle != 0 && window->opacity != 0) interfaceWindowBorder(*window);
+    auto& device = *g_sfera_graphics_runtime.d3d_runtime;
+    const D3DVIEWPORT9 viewport{static_cast<DWORD>(window->contentLeft), static_cast<DWORD>(window->contentTop), static_cast<DWORD>(window->contentRight - window->contentLeft + 1), static_cast<DWORD>(window->contentBottom - window->contentTop + 1), 0, 1};
+    device.last_hresult = device.native_device->SetViewport(&viewport);
+    SphereUI::InterfaceRenderer::clip_rectangle = {window->contentLeft, window->contentTop, window->contentRight, window->contentBottom};
+    const int scrollX = window->scrollX, scrollY = window->scrollY;
+    for (auto control : window->controls) {
+        if (control == UINT32_MAX) continue;
+        auto* value = WorldGuiControls::control(control);
+        if (!value) WorldDiagnostics::fail("internal error 37185837");
+        interfaceElement(*value, scrollX, scrollY);
+    }
+    const D3DVIEWPORT9 fullViewport{0u, 0u, static_cast<DWORD>(g_sfera_graphics_runtime.display_width), static_cast<DWORD>(g_sfera_graphics_runtime.display_height), 0.0f, 1.0f};
+    device.last_hresult = device.native_device->SetViewport(&fullViewport);
+}
+
+std::vector<int> GameInterface::orderedWindows(WindowOrder order) {
+    std::vector<int> result;
+    result.reserve(windows.size());
+    for (std::uint32_t handle = 0; handle < windows.size(); ++handle)
+        if (window(handle)) result.push_back(static_cast<int>(handle));
+    SferaAlgorithms::stableSort(result, [order](int handle) {
+        const auto& item = *window(handle);
+        const std::uint32_t bits = item.layer * 1000u + item.order;
+        return std::bit_cast<std::int32_t>(order == WindowOrder::HitTest ? 0u - bits : bits);
+    });
+    return result;
+}
+
+void GameInterface::drawAll() {
+    for (int handle : orderedWindows(WindowOrder::Draw)) drawWindow(handle);
+}
+
+GameUiWindow* GameInterface::window(std::uint32_t handle, const char* operation) {
+    const auto& windows = GameInterface::windows;
+    auto* result = handle < windows.size() ? windows[handle].get() : nullptr;
+    if (!result && operation) {
+        WorldDiagnostics::message[0] = '\0';
+        WorldDiagnostics::appendScriptContext(operation);
+        WorldDiagnostics::appendScriptContext(": wrong handle");
+        WorldDiagnostics::flushScriptContext();
+    }
+    return result;
+}
+
+std::uint32_t GameInterface::createWindow(int left, int top, int right, int bottom, std::uint32_t layer, std::uint32_t opacity) {
+    const auto handle = vacantGuiSlot(GameInterface::windows);
+    auto created = std::make_unique<GameUiWindow>();
+    created->visible = true;
+    created->scrollable = true;
+    created->opacity = opacity;
+    created->left = created->contentLeft = left;
+    created->right = created->contentRight = right;
+    created->top = created->contentTop = top;
+    created->bottom = created->contentBottom = bottom;
+    created->width = right - left + 1;
+    created->height = bottom - top + 1;
+    created->layer = layer;
+    created->order = static_cast<std::uint32_t>(std::count_if(windows.begin(), windows.end(), [](const auto& item) { return item != nullptr; }));
+    GameInterface::windows.at(handle) = std::move(created);
+    return handle;
+}
+
+void GameInterface::destroyWindow(std::uint32_t handle) {
+    auto* removed = window(handle, "delete_window");
+    if (!removed) return;
+    for (const auto controlHandle : removed->controls) {
+        if (controlHandle == UINT32_MAX) continue;
+        const auto* item = WorldGuiControls::control(controlHandle);
+        if (!item) WorldDiagnostics::fail("Window contains a missing control");
+        eraseGuiControl(controlHandle, *item);
+    }
+    for (std::uint32_t index = 0; index < GameInterface::windows.size(); ++index) {
+        auto* other = window(index);
+        if (other && other->order > removed->order) --other->order;
+    }
+    if (GameInterface::active_window == handle) GameInterface::active_window = UINT32_MAX;
+    windows.at(handle).reset();
+}
+
+std::uint32_t GameUiWindow::attach(std::uint32_t control) {
+    const auto slot = std::find(controls.begin(), controls.end(), UINT32_MAX);
+    if (slot != controls.end()) { *slot = control; return static_cast<std::uint32_t>(slot - controls.begin()); }
+    if (controls.size() >= 7000) WorldDiagnostics::fail("MNO_CONTROLS_IN_WINDOW exceed");
+    controls.push_back(control);
+    return static_cast<std::uint32_t>(controls.size() - 1);
+}
+
+void GameUiWindow::detach(std::uint32_t slot) {
+    if (slot >= std::size(controls)) WorldDiagnostics::fail("Window control slot is outside the control table");
+    if (controls[slot] == UINT32_MAX) WorldDiagnostics::fail("internal error 86557243");
+    controls[slot] = UINT32_MAX;
+}
+
+void GameUiWindow::recalculateSize() {
+    int maximumRight = 0, maximumBottom = 0;
+    for (auto handle : controls) {
+        if (handle == UINT32_MAX) continue;
+        const auto* item = WorldGuiControls::control(handle);
+        if (!item) WorldDiagnostics::fail("internal error 47581837");
+        maximumRight = std::max(maximumRight, item->right);
+        maximumBottom = std::max(maximumBottom, item->bottom);
+    }
+    width = std::max(maximumRight + 1, contentRight - contentLeft + 1);
+    height = std::max(maximumBottom + 1, contentBottom - contentTop + 1);
+}
+
+void GameUiWindow::enqueueInput(std::uint32_t control, std::uint32_t message) {
+    if (events.size() < 10) events.push_back({control, message});
+}
+
+bool GameUiWindow::takeInput(std::uint32_t& control, std::uint32_t& message) {
+    if (events.empty()) return false;
+    const auto event = events.front();
+    events.pop_front();
+    control = event.control;
+    message = event.message;
+    return true;
+}
+
+SferaCursorPosition GameUiWindow::contentPosition(SferaCursorPosition point) const {
+    if (point.x < contentLeft || point.x >= contentRight || point.y < contentTop || point.y >= contentBottom) return {-1, -1};
+    return {point.x - contentLeft + static_cast<int>(scrollX), point.y - contentTop + static_cast<int>(scrollY)};
+}
+
+void GameUiWindow::scrollBy(float dx, float dy, SferaCursorPosition& cursor) {
+    scrollX -= dx;
+    scrollY -= dy;
+    const auto clampAxis = [](float& scroll, int limit, int& position) {
+        if (scroll < 0.0f) { position = static_cast<double>(position) + scroll; scroll = 0.0f; }
+        const float maximum = limit;
+        if (scroll > maximum) { position = static_cast<double>(scroll) - maximum + position; scroll = maximum; }
+    };
+    clampAxis(scrollX, width - (contentRight - contentLeft + 1), cursor.x);
+    clampAxis(scrollY, height - (contentBottom - contentTop + 1), cursor.y);
+}
+
+void GameUiElement::layoutText(const char* text, const GameUiWindow& window, int x, int y) {
+    if (!text || window.font >= g_sfera_font_runtime.faces.size()) WorldDiagnostics::fail("Invalid text or font");
+    Text layout;
+    layout.bytes = text;
+    layout.bytes.push_back('\n');
+    layout.font = window.font;
+    layout.font_scale = window.fontScale;
+    std::array<int, 300> widths{};
+    int maximumWidth = 0;
+    std::size_t begin = 0;
+    for (std::size_t offset = 0; offset < layout.bytes.size(); ++offset) {
+        auto& width = widths[layout.lines.size()];
+        if (layout.bytes[offset] == '\n') {
+            width *= static_cast<int>(layout.font_scale);
+            maximumWidth = std::max(maximumWidth, width);
+            layout.lines.push_back({begin});
+            if (layout.lines.size() == widths.size()) WorldDiagnostics::fail("MNO_LINES_IN_TEXT exceeded");
+            begin = offset + 1;
+        } else {
+            if (width > 0) width += g_sfera_font_runtime.faces[layout.font].code_base;
+            const auto character = static_cast<unsigned char>(layout.bytes[offset]);
+            width += g_sfera_font_runtime.faces[layout.font].widths[g_sfera_font_runtime.glyphs[character].defined ? character : 124u];
+        }
+    }
+    if (layout.lines.empty() || maximumWidth == 0) WorldDiagnostics::fail("Empty text created");
+    color = window.textColor;
+    alpha = 255;
+    const auto textWidth = maximumWidth + 2;
+    const int textHeight = GameInterface::textHeight(layout.font, layout.font_scale, static_cast<std::uint32_t>(layout.lines.size()));
+    WorldGuiControls::text_width = textWidth;
+    WorldGuiControls::text_height = textHeight;
+    const auto style = window.textStyle;
+    left = x;
+    top = y;
+    if (style & GameUiWindow::centerHorizontal) left -= textWidth / 2;
+    if (style & GameUiWindow::alignBottom) top -= textHeight;
+    else if (style & GameUiWindow::centerVertical) top -= textHeight / 2;
+    right = left + textWidth - 1;
+    bottom = top + textHeight - 1;
+    const auto fitAxis = [](int& begin, int& end, int maximum) {
+        if (end > maximum) { begin += maximum - end; end = maximum; }
+        if (begin < 0) { end -= begin; begin = 0; }
+    };
+    if (style & GameUiWindow::fitHorizontal) fitAxis(left, right, window.contentRight - window.contentLeft);
+    if (style & GameUiWindow::fitVertical) fitAxis(top, bottom, window.contentBottom - window.contentTop);
+    for (std::uint32_t line = 0; line < layout.lines.size(); ++line) {
+        layout.lines[line].x = window.contentLeft + left + ((style & GameUiWindow::centerLines) ? (textWidth - widths[line]) / 2 : 0);
+        layout.lines[line].y = window.contentTop + top + static_cast<int>((line * g_sfera_font_runtime.faces[layout.font].cell_step - g_sfera_font_runtime.faces[layout.font].origin) * layout.font_scale);
+    }
+    content = std::move(layout);
+}
+
+std::uint32_t WorldGuiControls::createText(int x, int y, const char* text, std::uint32_t windowHandle) {
+    return createGuiControl(windowHandle, "create_text: wrong window", [&](GameUiElement& item, const GameUiWindow& window) {
+        item.layoutText(text, window, x, y);
+        return (window.textStyle & GameUiWindow::measureOnly) == 0;
+    });
+}
+
+std::uint32_t WorldGuiControls::createSprite(int x, int y, int width, int height, const char* texture, std::uint32_t windowHandle, std::uint32_t alpha) {
+    return createGuiControl(windowHandle, "create_sprite: wrong window", [&](GameUiElement& item, const GameUiWindow& window) {
+        if (texture == nullptr) WorldDiagnostics::fail("Sprite texture name is null");
+        const std::string_view name(texture);
+        if (name.size() >= 40) WorldDiagnostics::fail("Sprite texture name is too long");
+        item.content = GameUiElement::Sprite{std::string(name), window.contentLeft + x, window.contentTop + y, width, height};
+        item.left = x;
+        item.top = y;
+        item.right = x + width - 1;
+        item.bottom = y + height - 1;
+        item.alpha = alpha;
+        return true;
+    });
+}
+
+void WorldGuiControls::setAppearance(std::uint32_t handle, std::uint32_t alpha, std::optional<std::uint32_t> color) {
+    auto* item = control(handle);
+    if (!item) WorldDiagnostics::fail(color ? "text_color: wrong handle" : "set_sprite_alpha: wrong handle");
+    item->alpha = alpha;
+    if (color) item->color = *color;
+}
+
+void WorldGuiControls::destroyAllText() {
+    for (std::uint32_t handle = 0; handle < WorldGuiControls::elements.size(); ++handle) {
+        const auto* item = control(handle);
+        if (item && item->isText()) destroyText(handle);
+    }
+}
+
+GameUiHit GameInterface::hitTest(SferaCursorPosition point) {
+    GameUiHit hit{};
+    for (int handle : orderedWindows(WindowOrder::HitTest)) {
+        const auto& item = *window(handle);
+        if (!item.visible || point.x < item.left || point.x > item.right || point.y < item.top || point.y > item.bottom) continue;
+        hit.window = handle;
+        hit.border = point.x < item.contentLeft || point.x > item.contentRight || point.y < item.contentTop || point.y > item.contentBottom;
+        break;
+    }
+    if (hit.border) return hit;
+    const auto* owner = window(hit.window);
+    if (!owner) return hit;
+    const double x = static_cast<float>(point.x), y = static_cast<float>(point.y);
+    for (auto handle : owner->controls) {
+        if (handle == UINT32_MAX) continue;
+        const auto* item = WorldGuiControls::control(handle);
+        if (!item) WorldDiagnostics::fail("Window contains a missing control");
+        const double left = static_cast<double>(item->left + owner->contentLeft) - owner->scrollX;
+        const double right = static_cast<double>(item->right + owner->contentLeft) - owner->scrollX;
+        const double top = static_cast<double>(item->top + owner->contentTop) - owner->scrollY;
+        const double bottom = static_cast<double>(item->bottom + owner->contentTop) - owner->scrollY;
+        if (x >= left && x <= right && y >= top && y <= bottom) { hit.control = handle; break; }
+    }
+    return hit;
+}
+
+void GameInterface::updateInput() {
+    auto& cursor = *CCursorManager::instance().activeCursor();
+    auto& active = GameInterface::active_window;
+    const auto buttons = g_sfera_direct_input_runtime.mouse.buttons;
+    if (g_sfera_interface.world_interaction_enabled) {
+        if (active != 0u) cursor.updatePosition();
+        if (active == UINT32_MAX) {
+            if (buttons & 2u) active = hitTest(CCursorManager::instance().position()).window;
+        } else if (!(buttons & 2u)) active = UINT32_MAX;
+        else if (active != 0u) {
+            auto* selected = window(active);
+            if (selected && selected->scrollable) {
+                auto position = CCursorManager::instance().position();
+                selected->scrollBy(static_cast<float>(static_cast<double>(g_sfera_direct_input_runtime.mouse.dx) * 1.5), static_cast<float>(static_cast<double>(g_sfera_direct_input_runtime.mouse.dy) * 1.5), position);
+                cursor.setPosition(position.x, position.y);
+            }
+        }
+        cursor.show();
+    }
+    const auto previous = g_sfera_interface.world_input_buttons;
+    if ((buttons & 1u) != (previous & 1u)) {
+        const auto hit = g_sfera_interface.world_interaction_enabled ? hitTest(CCursorManager::instance().position()) : GameUiHit{};
+        if (auto* selected = window(hit.window)) selected->enqueueInput(hit.control, (buttons & 1u) ? 1u : 2u);
+    }
+    g_sfera_interface.world_input_buttons = buttons;
+}
+
+void GameFontAtlas::clear() noexcept {
+    for (auto& face : faces) face.pages.clear();
+}
+
+void GameFontAtlas::load(int font, const char* filename, int outline, std::uint32_t spacing, std::uint32_t emptyWidth) {
+    if (font < 0 || static_cast<std::size_t>(font) >= faces.size() || outline < 0 || outline > 3) WorldDiagnostics::fail("Invalid bitmap font parameters");
+    const auto image = g_sfera_files.readAll(filename);
+    constexpr std::size_t sourceWidth = 280;
+    constexpr std::size_t sourceCell = 26;
+    constexpr std::size_t atlasWidth = 256;
+    constexpr std::size_t atlasCell = 32;
+    constexpr std::size_t paletteBytes = 256 * 3;
+    if (image.size() < PcxHeader::encodedSize + paletteBytes) WorldDiagnostics::fail("Truncated font image");
+    const auto header = PcxHeader::decode(image.data());
+    if (header.maximum_y < header.minimum_y) WorldDiagnostics::fail("Invalid font image height");
+    const auto height = std::uint32_t(header.maximum_y) - header.minimum_y + 1;
+    const auto palette = image.size() - paletteBytes;
+    std::vector<std::uint8_t> mask(sourceWidth * height);
+    std::size_t source = PcxHeader::encodedSize;
+    for (std::size_t destination = 0; destination < mask.size();) {
+        if (source >= palette) WorldDiagnostics::fail("Truncated font image pixels");
+        auto color = image[source++];
+        std::size_t count = 1;
+        if (color > PcxHeader::runMarker) {
+            count = color - PcxHeader::runMarker;
+            if (source >= palette) WorldDiagnostics::fail("Truncated font image run");
+            color = image[source++];
+        }
+        if (count > mask.size() - destination) WorldDiagnostics::fail("Font image run exceeds its dimensions");
+        const auto entry = palette + std::size_t(color) * 3;
+        const auto white = image[entry] > 240 && image[entry + 1] > 240 && image[entry + 2] > 240;
+        std::fill_n(mask.begin() + destination, count, white ? 1u : 0u);
+        destination += count;
+    }
+    const auto language = SferaClientApplication::language;
+    const auto mappingPath = language == 0 || language == 1 ? std::string("fonts\\font.txt") : std::string("fonts\\font") + language_suffix + ".txt";
+    const auto mappingBytes = g_sfera_files.readAll(mappingPath.c_str());
+    const std::string_view mapping(reinterpret_cast<const char*>(mappingBytes.data()), mappingBytes.size());
+    std::array<SferaFontGlyphRuntime, 256> placements{};
+    std::array<std::uint32_t, 256> widths{};
+    std::array<std::uint16_t, atlasWidth * atlasWidth> pixels{};
+    std::vector<Microsoft::WRL::ComPtr<IDirect3DTexture9>> pages;
+    auto& graphics = *g_sfera_graphics_runtime.d3d_runtime;
+    const auto upload = [&]() {
+        Microsoft::WRL::ComPtr<IDirect3DTexture9> texture;
+        graphics.checkResult(graphics.native_device->CreateTexture(atlasWidth, atlasWidth, 1, 0,
+            D3DFMT_A4R4G4B4, D3DPOOL_MANAGED, texture.GetAddressOf(), nullptr), "CreateTexture(font)");
+        TextureMapping mapping(texture.Get());
+        graphics.checkResult(mapping.status(), "LockRect(font)");
+        graphics.checkResult(mapping.copyRows(std::as_bytes(std::span(pixels)), atlasWidth * sizeof(pixels[0]),
+            atlasWidth), "Upload font pixels");
+        graphics.checkResult(mapping.unlock(), "UnlockRect(font)");
+        pages.push_back(std::move(texture));
+        pixels.fill(0);
+    };
+    std::size_t symbols = 0;
+    int firstRow = sourceCell;
+    int lastRow = -1;
+    for (std::size_t position = 0; (position = mapping.find('#', position)) != std::string_view::npos;) {
+        auto end = position;
+        while (end != 0 && mapping[end - 1] == ' ') --end;
+        if (end < 2 || mapping[end - 2] < 'A' || mapping[end - 2] > 'Z' || mapping[end - 1] < '0' || mapping[end - 1] > '9') WorldDiagnostics::fail("wrong format of font1.txt");
+        const auto sourceX = 20 + sourceCell * (mapping[end - 1] - '0');
+        const auto sourceY = 20 + sourceCell * (mapping[end - 2] - 'A');
+        ++position;
+        while (position < mapping.size() && mapping[position] == ' ') ++position;
+        if (position + 1 >= mapping.size() || mapping[position] != '\'') WorldDiagnostics::fail("wrong format of font1.txt");
+        const std::uint8_t character = mapping[position + 1];
+        position += 2;
+        if (position < mapping.size() && mapping[position] == '\'') ++position;
+        if (sourceX + sourceCell > sourceWidth || sourceY + sourceCell > height || symbols >= 256u * 64u) WorldDiagnostics::fail("Font glyph is outside its image");
+        std::array<std::uint8_t, atlasCell * atlasCell> glyph{};
+        std::array<std::uint8_t, atlasCell * atlasCell> shadow{};
+        std::uint32_t rightmost = 0;
+        for (std::size_t y = 0; y < sourceCell; ++y) for (std::size_t x = 0; x < sourceCell; ++x) {
+            if (mask[(sourceY + y) * sourceWidth + sourceX + x] == 0) continue;
+            glyph[(y + 3) * atlasCell + x + 3] = 1;
+            rightmost = std::max(rightmost, static_cast<std::uint32_t>(x + 1));
+            firstRow = std::min(firstRow, static_cast<int>(y));
+            lastRow = std::max(lastRow, static_cast<int>(y));
+            for (int dy = 0; dy <= outline; ++dy) for (int dx = 0; dx <= outline; ++dx) {
+                const bool corner = (dx == -outline || dx == outline) && (dy == -outline || dy == outline);
+                if (outline == 1 || !corner) shadow[(y + 3 + dy) * atlasCell + x + 3 + dx] = 1;
+            }
+        }
+        const auto tileX = symbols % 8 * atlasCell;
+        const auto tileY = symbols / 8 % 8 * atlasCell;
+        for (std::size_t y = 0; y < atlasCell; ++y) for (std::size_t x = 0; x < atlasCell; ++x) pixels[(tileY + y) * atlasWidth + tileX + x] = glyph[y * atlasCell + x] ? std::numeric_limits<std::uint16_t>::max() : shadow[y * atlasCell + x] ? SferaColor::rgba(0u, 0u, 0u, 240u).argb4444() : 0u;
+        widths[character] = rightmost == 0 ? emptyWidth : rightmost;
+        placements[character] = {static_cast<std::uint32_t>(symbols / 64), static_cast<float>(tileX + 3 - outline) / atlasWidth, static_cast<float>(tileY + 3 - outline) / atlasWidth, true};
+        if (++symbols % 64 == 0) upload();
+    }
+    if (placements[124].defined == 0) WorldDiagnostics::fail("Symbol for CODE_FOR_UNDIFINED_SYMBOL is not found in font.txt");
+    if (lastRow < firstRow) WorldDiagnostics::fail("Font contains no visible glyphs");
+    if (symbols % 64 != 0) upload();
+    Face replacement;
+    replacement.widths = widths;
+    replacement.pages = std::move(pages);
+    replacement.span = lastRow - firstRow + 3;
+    replacement.origin = firstRow;
+    replacement.cell_step = 20 - firstRow;
+    replacement.code_base = spacing;
+    faces[font] = std::move(replacement);
+    std::copy(placements.begin(), placements.end(), std::begin(glyphs));
+}
+
+const char* SphereUI::Runtime::keyName(std::uint32_t code) {
+        static const auto names = [] {
+            std::array<std::array<char, 12>, 256> result{};
+            for (const auto& binding : uiKeyBindings) SferaText::copy(result[binding.code], binding.name);
+            for (std::size_t value = '0'; value <= 'Z'; ++value) if (value <= '9' || value >= 'A') result[value][0] = value;
+            for (std::size_t index = 0u; index != 12u; ++index) std::snprintf(result[VK_F1 + index].data(), result[VK_F1 + index].size(), "F%zu", index + 1u);
+            for (std::size_t index = 0u; index != 10u; ++index) std::snprintf(result[VK_NUMPAD0 + index].data(), result[VK_NUMPAD0 + index].size(), "NUMPAD%zu", index);
+            return result;
+        }();
+        return code < names.size() && names[code][0] != '\0' ? names[code].data() : nullptr;
+    }
+std::uint32_t SphereUI::Runtime::scanCode(std::uint32_t key) {
+        if (key >= VK_F1 && key <= VK_F10) return 59u + key - VK_F1;
+        if (key == VK_F11 || key == VK_F12) return 87u + key - VK_F11;
+        if (key >= '1' && key <= '9') return 2u + key - '1';
+        if (key == '0') return 11u;
+        if (key == VK_NUMPAD0) return 82u;
+        if (key >= VK_NUMPAD1 && key <= VK_NUMPAD9) {
+            const auto digit = key - VK_NUMPAD0;
+            return 83u - 4u * ((digit + 2u) / 3u) + ((digit - 1u) % 3u);
+        }
+        struct Row {
+            const char* keys;
+            std::uint32_t first_scan;
+        };
+
+        static constexpr Row rows[] = { {
+            "QWERTYUIOP", 16u
+        }, {"ASDFGHJKL", 30u}, {"ZXCVBNM", 44u}};
+        for (const auto& row : rows) if (const auto* position = std::strchr(row.keys, static_cast<int>(key))) return row.first_scan + static_cast<std::uint32_t>(position - row.keys);
+        for (const auto& binding : uiKeyBindings) if (binding.code == key) return binding.scan;
+        return 0u;
+    }
+std::uint32_t SphereUI::Runtime::virtualKey(std::uint32_t scan) {
+        for (std::size_t key = 0u; key <= 255u; ++key) if (SphereUI::Runtime::scanCode(key) == scan) return key;
+        return 0u;
+    }
+void SphereUI::Runtime::setSystemCursorVisible(bool visible) { if (visible) { while (::ShowCursor(TRUE) < 0) {} } else { while (::ShowCursor(FALSE) >= 0) {} } }
+namespace {
+bool cursor_uses_center_clip(std::uint32_t kind) { const char* name = kind < 4u ? sfera_cursor_texture_name(kind) : nullptr; return name != nullptr && name[0] != '_'; }
+}
+CHardwareCursor::CHardwareCursor() { SphereUI::Runtime::setSystemCursorVisible(false); }
+CHardwareCursor::~CHardwareCursor() {
+    if (clip_enabled) ::ClipCursor(nullptr);
+    if (::GetCursor() == cursor_handle.get()) ::SetCursor(nullptr);
+}
+void CHardwareCursor::copyStateFrom(const CCursor* previous) { SferaCursorPosition position{}; if (previous != nullptr) { saved_system_visible = previous->isSystemCursorVisible() ? 1u : 0u; kind = previous->cursorKind(); previous->getPosition(&position); } else { saved_system_visible = true; kind = 255u; getPosition(&position); } saved_x = position.x; saved_y = position.y; }
+void CHardwareCursor::activate() { setSystemCursorVisible(saved_system_visible); setCursorKind(kind); setPosition(saved_x, saved_y); }
+void CHardwareCursor::deactivate() {
+    if (std::exchange(clip_enabled, false)) ::ClipCursor(nullptr);
+    SphereUI::Runtime::setSystemCursorVisible(false);
+}
+void CHardwareCursor::apply() { ::SetCursor(cursor_handle.get()); }
+void CHardwareCursor::updatePosition() {}
+SferaCursorPosition* CHardwareCursor::getPosition(SferaCursorPosition* output) const { if (output == nullptr) return nullptr; if (SferaClientApplication::application_active) { POINT point{}; ::GetCursorPos(&point); ::ScreenToClient(SferaClientApplication::main_window, &point); output->x = point.x; output->y = point.y; } else { output->x = g_sfera_graphics_runtime.display_width / 2; output->y = g_sfera_graphics_runtime.display_height / 2; } return output; }
+void CHardwareCursor::setPosition(int x, int y) { if (!SferaClientApplication::application_active) return; POINT point{static_cast<LONG>(x), static_cast<LONG>(y)}; ::ClientToScreen(SferaClientApplication::main_window, &point); ::SetCursorPos(point.x, point.y); }
+void CHardwareCursor::show() {
+    const bool enabled = cursor_uses_center_clip(kind) && SferaClientApplication::application_active;
+    if (clip_enabled == enabled) return;
+    if (enabled) {
+        POINT point{static_cast<LONG>(g_sfera_graphics_runtime.display_width / 2u), static_cast<LONG>(g_sfera_graphics_runtime.display_height / 2u)};
+        ::ClientToScreen(SferaClientApplication::main_window, &point);
+        const RECT rectangle{point.x, point.y, point.x + 1, point.y + 1};
+        clip_enabled = ::ClipCursor(&rectangle) != FALSE;
+    } else { ::ClipCursor(nullptr); clip_enabled = false; }
+}
+bool CHardwareCursor::isInsideViewport() const { SferaCursorPosition position{}; getPosition(&position); return position.x >= 0 && position.x < g_sfera_graphics_runtime.display_width && position.y >= 0 && position.y < g_sfera_graphics_runtime.display_height; }
+bool CHardwareCursor::isSystemCursorVisible() const {
+    CURSORINFO cursor{sizeof(CURSORINFO)};
+    return ::GetCursorInfo(&cursor) && (cursor.flags & CURSOR_SHOWING) != 0;
+}
+void CHardwareCursor::setSystemCursorVisible(bool visible) { SphereUI::Runtime::setSystemCursorVisible(visible); }
+std::uint32_t CHardwareCursor::cursorKind() const { return kind; }
+void CHardwareCursor::setCursorKind(std::uint32_t new_kind) {
+    const char* name = new_kind < 4u ? sfera_cursor_texture_name(new_kind) : nullptr;
+    if (name == nullptr) {
+        ::SetCursor(nullptr);
+        cursor_handle.reset();
+        kind = new_kind; texture_width = texture_height = 0u;
+        show(); apply();
+        return;
+    }
+    struct BitmapDeleter { void operator()(HBITMAP bitmap) const noexcept { if (bitmap) ::DeleteObject(bitmap); } };
+    using BitmapOwner = std::unique_ptr<std::remove_pointer_t<HBITMAP>, BitmapDeleter>;
+    const std::string relative_path = std::string("textures\\cursors\\") + name + ".bmp";
+    BitmapOwner color;
+    for (const auto& path : g_sfera_files.candidatePaths(relative_path.c_str(), true)) {
+        color.reset(static_cast<HBITMAP>(::LoadImageA(nullptr, path.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION)));
+        if (color) break;
+    }
+    if (!color) throw std::runtime_error("CreateCursor(): failed to load cursor image from file");
+    BITMAP bitmap{};
+    if (::GetObjectA(color.get(), sizeof(bitmap), &bitmap) == 0 || bitmap.bmWidth != 32 ||
+        bitmap.bmHeight != 32 || bitmap.bmBitsPixel != 32 || bitmap.bmBits == nullptr)
+        throw std::runtime_error("CreateCursor(): invalid cursor image format");
+    const std::size_t mask_stride = (static_cast<std::size_t>(bitmap.bmWidth) + 15u) / 16u * 2u;
+    std::vector<std::uint8_t> mask_bits(mask_stride * static_cast<std::size_t>(bitmap.bmHeight), 0u);
+    const auto* pixels = static_cast<const std::uint32_t*>(bitmap.bmBits);
+    for (LONG y = 0; y < bitmap.bmHeight; ++y) for (LONG x = 0; x < bitmap.bmWidth; ++x)
+        if (SferaColor::fromArgb(pixels[static_cast<std::size_t>(y) * bitmap.bmWidth + x]).alpha() == 0u)
+            mask_bits[static_cast<std::size_t>(y) * mask_stride + static_cast<std::size_t>(x) / 8u] |= static_cast<std::uint8_t>(1u << (7 - x % 8));
+    BitmapOwner mask(::CreateBitmap(bitmap.bmWidth, bitmap.bmHeight, 1u, 1u, mask_bits.data()));
+    if (!mask) throw std::runtime_error("CreateCursor(): failed to create cursor mask");
+    const bool centered = cursor_uses_center_clip(new_kind);
+    ICONINFO info{};
+    info.fIcon = FALSE;
+    info.xHotspot = centered ? static_cast<DWORD>(bitmap.bmWidth / 2) : 0u;
+    info.yHotspot = centered ? static_cast<DWORD>(bitmap.bmHeight / 2) : 0u;
+    info.hbmMask = mask.get(); info.hbmColor = color.get();
+    CursorOwner replacement(static_cast<HCURSOR>(::CreateIconIndirect(&info)));
+    if (!replacement) throw std::runtime_error("CreateCursor(): failed to create cursor");
+    // Select the new cursor before releasing the old handle borrowed by Win32.
+    ::SetCursor(replacement.get());
+    cursor_handle = std::move(replacement);
+    kind = new_kind;
+    texture_width = static_cast<std::uint32_t>(bitmap.bmWidth);
+    texture_height = static_cast<std::uint32_t>(bitmap.bmHeight);
+    show();
+}
+CSoftwareCursor::CSoftwareCursor() { x = g_sfera_graphics_runtime.display_width / 2; y = g_sfera_graphics_runtime.display_height / 2; }
+void CSoftwareCursor::copyStateFrom(const CCursor* previous) { if (previous != nullptr) { SferaCursorPosition position{}; saved_system_visible = previous->isSystemCursorVisible() ? 1u : 0u; saved_kind = previous->cursorKind(); previous->getPosition(&position); saved_x = position.x; saved_y = position.y; } else { saved_system_visible = true; saved_kind = 255u; saved_x = g_sfera_graphics_runtime.display_width / 2; saved_y = g_sfera_graphics_runtime.display_height / 2; } }
+void CSoftwareCursor::activate() { if (auto* mouse = g_sfera_direct_input_runtime.mouse_device.Get()) { mouse->Unacquire(); const HRESULT result = mouse->SetCooperativeLevel(SferaClientApplication::main_window, DISCL_EXCLUSIVE | DISCL_FOREGROUND); if (FAILED(result)) { SferaClientApplication::terminateWithError("CSoftwareCursor::Activate(): SetCooperativeLevel() failed"); } mouse->Acquire(); } setSystemCursorVisible(saved_system_visible); setCursorKind(saved_kind); setPosition(saved_x, saved_y); }
+void CSoftwareCursor::deactivate() { if (auto* mouse = g_sfera_direct_input_runtime.mouse_device.Get()) { mouse->Unacquire(); const HRESULT result = mouse->SetCooperativeLevel(SferaClientApplication::main_window, DISCL_NONEXCLUSIVE | DISCL_FOREGROUND); if (FAILED(result)) { SferaClientApplication::terminateWithError("CSoftwareCursor::Deactivate(): SetCooperativeLevel() failed"); } mouse->Acquire(); } setSystemCursorVisible(true); setCursorKind(255u); }
+void CSoftwareCursor::apply() {}
+void CSoftwareCursor::updatePosition() { if (!active) return; x += static_cast<int>(std::trunc(static_cast<double>(g_sfera_direct_input_runtime.mouse.dx) * 1.5)); y += static_cast<int>(std::trunc(static_cast<double>(g_sfera_direct_input_runtime.mouse.dy) * 1.5)); }
+SferaCursorPosition* CSoftwareCursor::getPosition(SferaCursorPosition* output) const { if (output == nullptr) return nullptr; output->x = x; output->y = y; return output; }
+void CSoftwareCursor::setPosition(int new_x, int new_y) { x = new_x; y = new_y; }
+void CSoftwareCursor::show() { const int width = g_sfera_graphics_runtime.display_width; const int height = g_sfera_graphics_runtime.display_height; auto* mouse = g_sfera_direct_input_runtime.mouse_device.Get(); if (active) { const bool outside = x < 0 || x >= width || y < 0 || y >= height; if (outside || !SferaClientApplication::application_active) { if (!cursor_uses_center_clip(cursorKind())) { if (mouse != nullptr) mouse->Unacquire(); SphereUI::Runtime::setSystemCursorVisible(true); POINT point{x, y}; ::ClientToScreen(SferaClientApplication::main_window, &point); ::SetCursorPos(point.x, point.y); active = false; } } if (width > 0) x = std::clamp(x, 0, width - 1); if (height > 0) y = std::clamp(y, 0, height - 1); return; } POINT point{}; ::GetCursorPos(&point); ::ScreenToClient(SferaClientApplication::main_window, &point); if (point.x < 0 || point.x >= width || point.y < 0 || point.y >= height || !SferaClientApplication::application_active) return; x = point.x; y = point.y; SphereUI::Runtime::setSystemCursorVisible(false); if (mouse != nullptr) mouse->Acquire(); active = true; }
+bool CSoftwareCursor::isInsideViewport() const { return active; }
+bool CSoftwareCursor::isSystemCursorVisible() const { const auto* state = g_sfera_interface.cursor.get(); return state != nullptr && state->system_visible; }
+void CSoftwareCursor::setSystemCursorVisible(bool visible) { if (auto* state = g_sfera_interface.cursor.get()) state->system_visible = visible ? 1u : 0u; }
+std::uint32_t CSoftwareCursor::cursorKind() const { const auto* state = g_sfera_interface.cursor.get(); return state == nullptr ? 255u : state->kind; }
+void CSoftwareCursor::setCursorKind(std::uint32_t new_kind) {
+    auto* state = g_sfera_interface.cursor.get();
+    if (state != nullptr) state->setKind(new_kind);
+    texture_width = 0u;
+    texture_height = 0u;
+    const char* name = new_kind < 4u ? sfera_cursor_texture_name(new_kind) : nullptr;
+    if (name == nullptr) return;
+    const int index = g_sfera_textures.find(name);
+    if (index < 0) return;
+    const auto extent = g_sfera_textures.size(index);
+    texture_width = extent.width;
+    texture_height = extent.height;
+}
+

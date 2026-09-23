@@ -28,9 +28,6 @@
     <ClInclude Include="semantic_window.h"><Filter>semantic</Filter></ClInclude>
     <ClInclude Include="sfera_sound.h"><Filter>sound</Filter></ClInclude>
     <ClInclude Include="sfera_sound_runtime.h"><Filter>sound</Filter></ClInclude>
-    <ClInclude Include="sfera_vorbis.h"><Filter>sound</Filter></ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="third_party\stb_vorbis.c"><Filter>sound</Filter></None>
+    <ClInclude Include="semantic_types.h"><Filter>core</Filter></ClInclude>
   </ItemGroup>
 </Project>

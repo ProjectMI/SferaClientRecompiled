@@ -1,5 +1,4 @@
 #include "sfera_sound.h"
-#include "sfera_vorbis.h"
 
 #include <windows.h>
 #include <mmsystem.h>
@@ -167,22 +166,46 @@ LONG directSoundVolume(float gain) {
     return static_cast<LONG>(std::clamp<long>(static_cast<long>(std::lround(units)), DSBVOLUME_MIN, DSBVOLUME_MAX));
 }
 
-bool copyToBuffer(IDirectSoundBuffer8* buffer, const std::vector<std::uint8_t>& pcm) {
-    if (buffer == nullptr || pcm.empty()) return false;
-    void* first = nullptr;
-    void* second = nullptr;
-    DWORD first_size = 0u;
-    DWORD second_size = 0u;
-    HRESULT result = buffer->Lock(0u, static_cast<DWORD>(pcm.size()), &first, &first_size, &second, &second_size, DSBLOCK_ENTIREBUFFER);
-    if (result == DSERR_BUFFERLOST) {
-        if (FAILED(buffer->Restore())) return false;
-        result = buffer->Lock(0u, static_cast<DWORD>(pcm.size()), &first, &first_size, &second, &second_size, DSBLOCK_ENTIREBUFFER);
+class SoundBufferMapping {
+public:
+    explicit SoundBufferMapping(IDirectSoundBuffer8& buffer, DWORD bytes) : buffer_(&buffer) {
+        auto result = lock(bytes);
+        if (result == DSERR_BUFFERLOST && SUCCEEDED(buffer_->Restore())) result = lock(bytes);
+        locked_ = SUCCEEDED(result);
     }
-    if (FAILED(result)) return false;
-    if (first != nullptr && first_size != 0u) std::memcpy(first, pcm.data(), first_size);
-    if (second != nullptr && second_size != 0u) std::memcpy(second, pcm.data() + first_size, second_size);
-    buffer->Unlock(first, first_size, second, second_size);
-    return true;
+    SoundBufferMapping(const SoundBufferMapping&) = delete;
+    SoundBufferMapping& operator=(const SoundBufferMapping&) = delete;
+    ~SoundBufferMapping() { close(); }
+    bool copy(std::span<const std::uint8_t> source) const noexcept {
+        if (!locked_ || first_size_ > source.size() || second_size_ != source.size() - first_size_ ||
+            (first_size_ && !first_) || (second_size_ && !second_)) return false;
+        if (first_size_) std::memcpy(first_, source.data(), first_size_);
+        if (second_size_) std::memcpy(second_, source.data() + first_size_, second_size_);
+        return true;
+    }
+    bool close() noexcept {
+        if (!std::exchange(locked_, false)) return true;
+        return SUCCEEDED(buffer_->Unlock(first_, first_size_, second_, second_size_));
+    }
+private:
+    HRESULT lock(DWORD bytes) noexcept {
+        first_ = second_ = nullptr;
+        first_size_ = second_size_ = 0;
+        return buffer_->Lock(0, bytes, &first_, &first_size_, &second_, &second_size_, DSBLOCK_ENTIREBUFFER);
+    }
+    IDirectSoundBuffer8* buffer_;
+    void* first_ = nullptr;
+    void* second_ = nullptr;
+    DWORD first_size_ = 0;
+    DWORD second_size_ = 0;
+    bool locked_ = false;
+};
+
+bool copyToBuffer(IDirectSoundBuffer8* buffer, const std::vector<std::uint8_t>& pcm) {
+    if (buffer == nullptr || pcm.empty() || pcm.size() > std::numeric_limits<DWORD>::max()) return false;
+    SoundBufferMapping mapping(*buffer, static_cast<DWORD>(pcm.size()));
+    if (!mapping.copy(pcm)) return false;
+    return mapping.close();
 }
 
 bool createBuffer(IDirectSound8* device, const DecodedAudio& audio, bool spatial, ComPtr<IDirectSoundBuffer8>& buffer, ComPtr<IDirectSound3DBuffer8>& spatial_buffer) {
@@ -228,26 +251,21 @@ std::uint32_t secondsToBytes(const WAVEFORMATEX& format, float seconds, std::siz
     return static_cast<std::uint32_t>(std::min<std::size_t>(value, std::numeric_limits<std::uint32_t>::max()));
 }
 
-char* duplicateFilename(const char* filename) {
-    if (filename == nullptr) return nullptr;
-    const std::size_t length = std::strlen(filename) + 1u;
-    auto* copy = static_cast<char*>(std::malloc(length));
-    if (copy != nullptr) std::memcpy(copy, filename, length);
-    return copy;
-}
+
 }
 
 struct CSoundListener::Impl {
     ComPtr<IDirectSound3DListener8> native;
-    SferaSoundVec3 forward{0.0f, 0.0f, 1.0f};
-    SferaSoundVec3 up{0.0f, 1.0f, 0.0f};
+    SferaVec3F forward{0.0f, 0.0f, 1.0f};
+    SferaVec3F up{0.0f, 1.0f, 0.0f};
 };
 
 struct CSoundInterface::Impl {
     ComPtr<IDirectSound8> device;
     ComPtr<IDirectSoundBuffer> primary;
     std::unique_ptr<CSoundListener> listener_owner;
-    std::vector<CSoundStream*> streams;
+    // Registry ownership; update snapshots keep callbacks alive across unregister.
+    std::vector<std::shared_ptr<CSoundStream>> streams;
 };
 
 struct CSound::Impl {
@@ -266,12 +284,13 @@ struct CSoundStream::Impl {
     float play_signal = -1.0f;
     bool was_playing = false;
     bool looped = false;
+    bool registered = true;
 };
 
 CSoundListener::CSoundListener() : impl_(std::make_unique<Impl>()) {}
 CSoundListener::~CSoundListener() = default;
 
-void CSoundListener::GetOrientation(SferaSoundVec3* forward, SferaSoundVec3* up) const {
+void CSoundListener::GetOrientation(SferaVec3F* forward, SferaVec3F* up) const {
     if (forward != nullptr) *forward = impl_->forward;
     if (up != nullptr) *up = impl_->up;
 }
@@ -287,7 +306,7 @@ int CSoundListener::SetVelocity(float x, float y, float z, int deferred) {
     return SUCCEEDED(impl_->native->SetVelocity(x, y, z, applyMode(deferred))) ? 1 : 0;
 }
 
-int CSoundListener::SetOrientation(const SferaSoundVec3& forward, const SferaSoundVec3& up, int deferred) {
+int CSoundListener::SetOrientation(const SferaVec3F& forward, const SferaVec3F& up, int deferred) {
     impl_->forward = forward;
     impl_->up = up;
     if (!impl_->native) return 1;
@@ -298,21 +317,16 @@ CSoundInterface::CSoundInterface() : impl_(std::make_unique<Impl>()) {}
 CSoundInterface::~CSoundInterface() = default;
 
 int CSoundInterface::UpdateSettings() {
-    for (auto* stream : impl_->streams) {
-        if (stream != nullptr) stream->update();
-    }
-    if (listener != nullptr && listener->impl_->native) {
-        listener->impl_->native->CommitDeferredSettings();
-    }
+    const auto streams = impl_->streams;
+    // A callback may close the entire interface. Everything used afterwards is a local lease.
+    const auto nativeListener = listener ? listener->impl_->native : ComPtr<IDirectSound3DListener8>{};
+    for (const auto& stream : streams) if (stream->impl_->registered) stream->update();
+    if (nativeListener) nativeListener->CommitDeferredSettings();
     return 1;
 }
 
 CSound::CSound() : impl_(std::make_unique<Impl>()) {}
-CSound::~CSound() {
-    Stop();
-    std::free(filename);
-    filename = nullptr;
-}
+CSound::~CSound() { Stop(); }
 
 int CSound::LoadSound(const char* source_filename, std::uint32_t flags) {
     Stop();
@@ -325,10 +339,8 @@ int CSound::LoadSound(const char* source_filename, std::uint32_t flags) {
     ComPtr<IDirectSound3DBuffer8> spatial_buffer;
     if (!createBuffer(g_interface->impl_->device.Get(), audio, spatial, buffer, spatial_buffer)) return 0;
 
-    char* copied_filename = duplicateFilename(source_filename);
-    if (copied_filename == nullptr) return 0;
-    std::free(filename);
-    filename = copied_filename;
+    std::string copied_filename(source_filename);
+    filename = std::move(copied_filename);
     impl_->audio = std::move(audio);
     impl_->buffer = std::move(buffer);
     impl_->spatial = std::move(spatial_buffer);
@@ -495,10 +507,12 @@ void CSoundStream::update() {
         decoder_state = 1u;
         decode_callback(this, decode_state);
         decoder_state = 0u;
+        if (!impl_->registered) return;
     }
     if (fire_play) {
         play_event_position = UINT32_MAX;
         play_callback(this, play_state);
+        if (!impl_->registered) return;
     }
 
     if (!playing_now && impl_->was_playing) {
@@ -561,12 +575,15 @@ CSoundInterface* SI_GetInterface() {
 }
 
 void SI_Close() {
-    if (g_interface != nullptr) {
-        auto streams = g_interface->impl_->streams;
-        g_interface->impl_->streams.clear();
-        for (auto* stream : streams) delete stream;
-        g_interface.reset();
+    auto owner = std::move(g_interface);
+    if (!owner) return;
+    for (const auto& stream : owner->impl_->streams) {
+        stream->impl_->registered = false;
+        stream->decode_callback = nullptr;
+        stream->play_callback = nullptr;
+        stream->Stop();
     }
+    owner->impl_->streams.clear();
 }
 
 void SI_SetLogFile(const char*) {}
@@ -574,7 +591,7 @@ void SI_SetLogFile(const char*) {}
 void SI_SetStreamVolume(int percent) {
     g_stream_volume = std::clamp(percent, 0, 100);
     if (g_interface == nullptr) return;
-    for (auto* stream : g_interface->impl_->streams) {
+    for (const auto& stream : g_interface->impl_->streams) {
         if (stream != nullptr) stream->applyVolume();
     }
 }
@@ -588,21 +605,24 @@ CSoundStream* SI_StreamCreateFile(const char* filename, std::uint32_t) {
     ComPtr<IDirectSound3DBuffer8> unused;
     if (!createBuffer(g_interface->impl_->device.Get(), audio, false, buffer, unused)) return nullptr;
 
-    auto stream = std::unique_ptr<CSoundStream>(new CSoundStream());
+    auto stream = std::shared_ptr<CSoundStream>(new CSoundStream());
     stream->impl_->audio = std::move(audio);
     stream->impl_->buffer = std::move(buffer);
     stream->decode_event_position = UINT32_MAX;
     stream->play_event_position = UINT32_MAX;
     stream->applyVolume();
-    g_interface->impl_->streams.push_back(stream.get());
-    return stream.release();
+    g_interface->impl_->streams.push_back(stream);
+    return stream.get();
 }
 
 void SI_StreamFree(CSoundStream* stream) {
-    if (stream == nullptr) return;
-    if (g_interface != nullptr) {
-        auto& streams = g_interface->impl_->streams;
-        streams.erase(std::remove(streams.begin(), streams.end(), stream), streams.end());
-    }
-    delete stream;
+    if (stream == nullptr || !g_interface) return;
+    auto& streams = g_interface->impl_->streams;
+    const auto entry = std::find_if(streams.begin(), streams.end(), [stream](const auto& owned) { return owned.get() == stream; });
+    if (entry == streams.end()) return;
+    (*entry)->impl_->registered = false;
+    (*entry)->decode_callback = nullptr;
+    (*entry)->play_callback = nullptr;
+    (*entry)->Stop();
+    streams.erase(entry);
 }

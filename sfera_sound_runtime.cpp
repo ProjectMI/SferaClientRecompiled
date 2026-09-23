@@ -16,8 +16,6 @@
 #include <string_view>
 #include <utility>
 
-SferaSoundRuntime g_sfera_sound_runtime;
-
 namespace {
 std::uint32_t sfera_sound_decode_callback(CSoundStream* sound_stream, void* state) noexcept {
     auto* playback = static_cast<SferaSoundPlaybackState*>(state);
@@ -92,20 +90,16 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
     return 1u;
 }
 
-
-    std::uint64_t sound_clock_ticks() {
-        return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 100;
-    }
     float sound_elapsed(std::uint64_t start) {
-        return static_cast<float>(static_cast<std::int64_t>(sound_clock_ticks() - start)) * 0.0001f;
+        return static_cast<float>(static_cast<std::int64_t>(WorldClock::nowTicks() - start)) * 0.0001f;
     }
     std::uint32_t sound_flag(std::string_view token) {
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_TYPE_ENVIRONMENT")) return 1u << 0u;
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_RANDOM")) return 1u << 2u;
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_RANDOMMIX")) return 1u << 3u;
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_LOOPED")) return 1u << 4u;
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_USEREGION")) return 1u << 5u;
-        if (SferaSimpleParser::equalsIgnoreCase(token, "SF_PLAY_TIMEGROUPS")) return 1u << 6u;
+        if (SferaText::asciiEqual(token, "SF_TYPE_ENVIRONMENT")) return 1u << 0u;
+        if (SferaText::asciiEqual(token, "SF_PLAY_RANDOM")) return 1u << 2u;
+        if (SferaText::asciiEqual(token, "SF_PLAY_RANDOMMIX")) return 1u << 3u;
+        if (SferaText::asciiEqual(token, "SF_PLAY_LOOPED")) return 1u << 4u;
+        if (SferaText::asciiEqual(token, "SF_PLAY_USEREGION")) return 1u << 5u;
+        if (SferaText::asciiEqual(token, "SF_PLAY_TIMEGROUPS")) return 1u << 6u;
         return 0u;
     }
     void service_semantic_sound_cache() {
@@ -163,8 +157,8 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
         for (auto& entry : manager.cache) {
             CSound* sound = entry.sound.get();
             if (sound == nullptr || sound->IsSoundPlaying() != 0 || !sound->cache_available) continue;
-            const char* name = sound->filename;
-            if (name != nullptr && SferaSimpleParser::equalsIgnoreCase(filename, name)) {
+            const char* name = sound->filename.c_str();
+            if (name != nullptr && SferaText::asciiEqual(filename, name)) {
                 entry.idle_started = false;
                 return entry.sound;
             }
@@ -232,7 +226,7 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
                 }
                 effect.silence_active = false;
                 effect.distance_paused = true;
-                effect.transition_started_at = sound_clock_ticks();
+                effect.transition_started_at = WorldClock::nowTicks();
             }
             return false;
         }
@@ -305,7 +299,7 @@ std::shared_ptr<const CSoundEffect::Definition> CSoundEffect::loadDefinition(Sfe
                 parser.clearScanRange();
                 return nullptr;
             }
-            if (SferaSimpleParser::equalsIgnoreCase(text, "silence")) {
+            if (SferaText::asciiEqual(text, "silence")) {
                 source.silence = true;
                 source.silence_duration = real(2u);
             } else source.filename = text;
@@ -394,7 +388,7 @@ void CSoundEffect::start(const SferaVec3F* frame, bool after_start_time) {
     if (source.silence) {
         silence_active = true;
         silence_duration = source.silence_duration;
-        silence_started_at = sound_clock_ticks();
+        silence_started_at = WorldClock::nowTicks();
         return;
     }
     const char* filename = source.filename.c_str();
@@ -413,7 +407,7 @@ void CSoundEffect::start(const SferaVec3F* frame, bool after_start_time) {
     }
     if (after_start_time && (definition->flags & ((1u << 2u) | (1u << 3u) | (1u << 4u))) != 0u) {
         distance_paused = true;
-        transition_started_at = sound_clock_ticks();
+        transition_started_at = WorldClock::nowTicks();
         return;
     }
     auto sound = create_cached_sound(*manager, filename, (definition->flags & (1u << 0u)) != 0u ? nullptr : &sound_parameters, definition->cache_lifetime);
@@ -423,7 +417,7 @@ void CSoundEffect::start(const SferaVec3F* frame, bool after_start_time) {
         if (!after_start_time) play_sound(*sound, static_cast<int>(definition->flags & (1u << 4u)), 0.0f);
     }
     distance_paused = after_start_time ? 1u : 0u;
-    if (after_start_time) transition_started_at = sound_clock_ticks();
+    if (after_start_time) transition_started_at = WorldClock::nowTicks();
 }
 void CSoundEffect::update(const SferaVec3F* frame, float age) {
     service_semantic_sound_cache();
@@ -603,7 +597,7 @@ void SferaSoundEventList::parseGroup(std::size_t group, const char* text) {
         const std::string token(line.substr(begin, length));
 
         SoundEventRecord event;
-        if (SferaSimpleParser::equalsIgnoreCase(token.c_str(), "STP")) {
+        if (SferaText::asciiEqual(token.c_str(), "STP")) {
             event.type = SoundEventType::stop;
         } else if (!token.empty()) {
             auto digits = std::string_view(token).substr(1u);
@@ -947,7 +941,7 @@ void CSoundManager::clear() {
 
 bool SferaSoundRuntime::initialize() {
     SI_SetLogFile(nullptr);
-    if (SI_CreateInterface(g_sfera_window_runtime.main_window_handle, -1, 44100u, 0u) == nullptr) {
+    if (SI_CreateInterface(SferaClientApplication::main_window, -1, 44100u, 0u) == nullptr) {
         return false;
     }
 
@@ -997,14 +991,14 @@ void SferaSoundRuntime::update() {
         position.y - listener->position.y,
         position.z - listener->position.z};
 
-    SferaSoundVec3 forward{};
-    SferaSoundVec3 up{};
+    SferaVec3F forward{};
+    SferaVec3F up{};
     listener->GetOrientation(&forward, &up);
-    const SferaSoundVec3 next_forward{
+    const SferaVec3F next_forward{
         camera->orientation_basis[0].x,
         camera->orientation_basis[0].y,
         camera->orientation_basis[0].z};
-    const SferaSoundVec3 next_up{
+    const SferaVec3F next_up{
         -camera->orientation_basis[1].x,
         -camera->orientation_basis[1].y,
         -camera->orientation_basis[1].z};
@@ -1069,11 +1063,11 @@ void SferaSoundRuntime::setHardwareMixing(bool enabled) {
 
 void SferaSoundRuntime::playUiSound(const char* filename) {
     auto* manager = sound_manager.get();
-    if (!g_sfera_interface_runtime.sounds_enabled || filename == nullptr || SI_GetInterface() == nullptr || manager == nullptr || !manager->enabled) return;
+    if (!g_sfera_interface.sounds_enabled || filename == nullptr || SI_GetInterface() == nullptr || manager == nullptr || !manager->enabled) return;
 
     CSound* sound = nullptr;
     for (const auto& candidate : manager->sounds) {
-        if (candidate->filename != nullptr && SferaSimpleParser::equalsIgnoreCase(candidate->filename, filename) && candidate->IsSoundPlaying() == 0) {
+        if (!candidate->filename.empty() && SferaText::asciiEqual(candidate->filename, filename) && candidate->IsSoundPlaying() == 0) {
             if (candidate->cache_available) sound = candidate.get();
             break;
         }
