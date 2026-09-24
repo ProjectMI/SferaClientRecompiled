@@ -203,17 +203,17 @@ private:
 
 bool copyToBuffer(IDirectSoundBuffer8* buffer, const std::vector<std::uint8_t>& pcm) {
     if (buffer == nullptr || pcm.empty() || pcm.size() > std::numeric_limits<DWORD>::max()) return false;
-    const DWORD buffer_size = pcm.size();
+    const DWORD buffer_size = SferaNumeric::lowWord(pcm.size());
     SoundBufferMapping mapping(*buffer, buffer_size);
     if (!mapping.copy(pcm)) return false;
     return mapping.close();
 }
 
 bool createBuffer(IDirectSound8* device, const DecodedAudio& audio, bool spatial, ComPtr<IDirectSoundBuffer8>& buffer, ComPtr<IDirectSound3DBuffer8>& spatial_buffer) {
-    if (device == nullptr || audio.pcm.empty()) return false;
+    if (device == nullptr || audio.pcm.empty() || audio.pcm.size() > std::numeric_limits<DWORD>::max()) return false;
     DSBUFFERDESC description{};
-    description.dwSize = sizeof(description);
-    description.dwBufferBytes = audio.pcm.size();
+    description.dwSize = SferaNumeric::lowWord(sizeof(description));
+    description.dwBufferBytes = SferaNumeric::lowWord(audio.pcm.size());
     auto format = audio.format;
     description.lpwfxFormat = &format;
     description.dwFlags = DSBCAPS_CTRLVOLUME | DSBCAPS_GETCURRENTPOSITION2 | DSBCAPS_GLOBALFOCUS;
@@ -361,7 +361,7 @@ int CSound::SetAllParameters(const SferaSound3DParameters* parameters, int defer
     if (!impl_->spatial) return 1;
 
     DS3DBUFFER native{};
-    native.dwSize = sizeof(native);
+    native.dwSize = SferaNumeric::lowWord(sizeof(native));
     native.vPosition = {parameters->position.x, parameters->position.y, parameters->position.z};
     native.vConeOrientation = {
         parameters->cone_orientation.x,
@@ -546,7 +546,7 @@ CSoundInterface* SI_CreateInterface(HWND__* native_window, int, std::uint32_t sa
     if (FAILED(sound_interface->impl_->device->SetCooperativeLevel(window, DSSCL_PRIORITY))) return nullptr;
 
     DSBUFFERDESC primary_description{};
-    primary_description.dwSize = sizeof(primary_description);
+    primary_description.dwSize = SferaNumeric::lowWord(sizeof(primary_description));
     primary_description.dwFlags = DSBCAPS_PRIMARYBUFFER | DSBCAPS_CTRL3D;
     if (FAILED(sound_interface->impl_->device->CreateSoundBuffer(&primary_description, sound_interface->impl_->primary.GetAddressOf(), nullptr))) return nullptr;
 

@@ -946,8 +946,9 @@ namespace SphereUI {
     };
 
     struct ScrollParameters {
-        std::uint32_t size;
-        std::uint32_t mask;
+        static constexpr std::uint32_t wire_size = 28u;
+        std::uint32_t size = wire_size;
+        std::uint32_t mask{};
         int minimum;
         int maximum;
         int page_step;

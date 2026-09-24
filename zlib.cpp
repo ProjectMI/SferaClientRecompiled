@@ -1121,8 +1121,8 @@ int SferaZStream32::compressEnvelope(std::uint8_t* output, std::uint32_t& output
     for (const auto index : envelope_encoded_positions) {
         if (index < payloadSize) payload[index] ^= payload[0];
     }
-    const std::uint32_t originalSize = input.size();
-    for (std::size_t i = 0; i < sizeof(originalSize); ++i) output[4 + i] = ((originalSize >> (8u * i)) & 255u) ^ payload[envelope_length_mask_index];
+    const auto originalSize = input.size();
+    for (std::size_t i = 0; i < sizeof(std::uint32_t); ++i) output[4 + i] = ((originalSize >> (8u * i)) & 255u) ^ payload[envelope_length_mask_index];
     std::copy_n("SPHR", 4, output);
     outputSize = payloadSize + envelope_header_size;
     return 0;

@@ -1,4 +1,4 @@
-#include "semantic_classes.h"
+﻿#include "semantic_classes.h"
 #include "zlib.h"
 #include "semantic_static.h"
 #include <commctrl.h>
@@ -125,13 +125,10 @@ namespace SphereUI::detail {
         static_assert(std::is_integral_v<Integer>);
         if constexpr (std::is_signed_v<Integer>) {
             if (!std::in_range<std::int32_t>(value)) throw std::overflow_error("UI value exceeds 32-bit wire range");
-            const std::int32_t narrowed = value;
-            return SferaNumeric::word(narrowed);
-        } else {
-            if (!std::in_range<std::uint32_t>(value)) throw std::overflow_error("UI value exceeds 32-bit wire range");
-            const std::uint32_t narrowed = value;
-            return narrowed;
+        } else if (!std::in_range<std::uint32_t>(value)) {
+            throw std::overflow_error("UI value exceeds 32-bit wire range");
         }
+        return SferaNumeric::lowWord(value);
     }
 
     std::int32_t signedWord(std::uint32_t value) noexcept { return SferaNumeric::signedWord(value); }
@@ -140,8 +137,14 @@ namespace SphereUI::detail {
     int checkedInt(Integer value, std::string_view context) {
         static_assert(std::is_integral_v<Integer>);
         if (!std::in_range<int>(value)) throw std::overflow_error(std::string(context));
-        int result = value;
-        return result;
+        return SferaNumeric::signedWord(SferaNumeric::lowWord(value));
+    }
+
+    template<class Left, class Right>
+    int multiplyCoordinate(Left left, Right right) {
+        static_assert(std::is_integral_v<Left> && std::is_integral_v<Right>);
+        const auto product = std::int64_t{checkedInt(left, "UI coordinate factor exceeds int")} * checkedInt(right, "UI coordinate factor exceeds int");
+        return checkedInt(product, "UI coordinate product exceeds int");
     }
 
     template<class Left, class Right>
@@ -822,8 +825,7 @@ namespace {
 
     void notifyParent(SphereUI::Window& window, SphereUI::UiMessage message, std::size_t first = 0u, std::size_t second = 0u) {
         if (auto* owner = window.parent) {
-            if (first > std::numeric_limits<std::uint32_t>::max() || second > std::numeric_limits<std::uint32_t>::max()) throw std::overflow_error("UI event exceeds an MBC word");
-            owner->queueEvent({&window, window.control_id, message, first, second});
+            owner->queueEvent({&window, window.control_id, message, SphereUI::detail::wireWord(first), SphereUI::detail::wireWord(second)});
         }
     }
 
@@ -1589,11 +1591,11 @@ void SphereUI::ListCtrl::draw() {
         ViewportScope viewport(bounds);
         if (viewport) {
             auto row_y = detail::subtractCoordinate(bounds.top, cropped_y);
-            if (chatlike && rows.size() < std::max(visible_capacity, 0)) row_y = detail::addCoordinate(row_y, detail::subtractCoordinate(height, rows.size() * line_height));
+            if (chatlike && rows.size() < std::max(visible_capacity, std::ptrdiff_t{})) row_y = detail::addCoordinate(row_y, detail::subtractCoordinate(height, detail::multiplyCoordinate(rows.size(), line_height)));
             const auto first_y = row_y;
             const auto end = std::min(visible_end, std::ssize(rows));
             const auto mark_width = continue_mark ? InterfaceRenderer::measureText("  ...", font, font_initialized).width : 0;
-            for (auto index = std::max(visible_begin, 0); index < end; ++index) {
+            for (auto index = std::max(visible_begin, std::ptrdiff_t{}); index < end; ++index) {
                 const auto& row = rows.at(physicalIndex(index));
                 auto clip = bounds;
                 const auto row_color = SferaColor::fromArgb(row.color).withAlpha(alpha).argb();
@@ -1604,7 +1606,7 @@ void SphereUI::ListCtrl::draw() {
                 if (truncated) InterfaceRenderer::drawText("  ...", detail::addCoordinate(bounds.left, detail::addCoordinate(row.offset, detail::subtractCoordinate(width, mark_width))), row_y, row_color, font, true, bounds, alpha == 255u);
                 row_y = detail::addCoordinate(row_y, line_height);
             }
-            if (selected_index >= visible_begin && selected_index < end) drawSelection(bounds.left, bounds.top, detail::addCoordinate(first_y, (selected_index - visible_begin) * line_height), false);
+            if (selected_index >= visible_begin && selected_index < end) drawSelection(bounds.left, bounds.top, detail::addCoordinate(first_y, detail::multiplyCoordinate(selected_index - visible_begin, line_height)), false);
         }
     }
     drawChild(scrollbar.get(), alpha);
@@ -1620,11 +1622,11 @@ void SphereUI::ListCtrl::handleInput(const WindowInput& input) {
     if (rows.size() == 0u || (input.mouse_flags & MouseInput::leftPress) == 0u || !contains(windowBounds(*this), input.mouse_x, input.mouse_y)) return;
     const auto bounds = windowBounds(*this);
     auto first_y = detail::subtractCoordinate(bounds.top, cropped_y);
-    if (chatlike && rows.size() < std::max(visible_capacity, 0)) first_y = detail::addCoordinate(first_y, detail::subtractCoordinate(height, rows.size() * line_height));
+    if (chatlike && rows.size() < std::max(visible_capacity, std::ptrdiff_t{})) first_y = detail::addCoordinate(first_y, detail::subtractCoordinate(height, detail::multiplyCoordinate(rows.size(), line_height)));
     const auto offset = detail::subtractCoordinate(input.mouse_y, first_y);
     const auto relative = line_height > 0 && offset >= 0 ? SferaNumeric::word(offset / line_height) : invalidIndex;
     const auto index = visible_begin + relative;
-    const std::ptrdiff_t selected = index < rows.size() ? index : -1;
+    const std::ptrdiff_t selected = index < std::ssize(rows) ? index : -1;
     if (selected != selected_index) {
         selected_index = selected;
         notifyParent(*this, UiMessage::listSelectionChanged, detail::wireWord(selected));
@@ -1864,14 +1866,14 @@ void SphereUI::ListItemCtrl::draw() {
     {
         ViewportScope viewport(windowBounds(*this));
         if (!viewport) return;
-        if (selected_index >= std::max(visible_begin, 0) && selected_index < end) if (auto* item = itemAt(selected_index)) {
+        if (selected_index >= std::max(visible_begin, std::ptrdiff_t{}) && selected_index < end) if (auto* item = itemAt(selected_index)) {
             const float left = item->x, top = item->y, right = detail::addCoordinate(item->x, item->width), bottom = detail::addCoordinate(item->y, item->height);
             if (selection_sprite != nullptr) selection_sprite->draw(left, top, right, bottom, SferaColor::rgba(255u, 255u, 255u, alpha).argb());
             else InterfaceRenderer::drawTexture(nullptr, left, top, right, bottom, text_color, 0.0f, 0.0f, false);
         }
-        for (auto index = std::max(visible_begin, 0); index < end; ++index) if (auto* item = itemAt(index)) item->draw();
+        for (auto index = std::max(visible_begin, std::ptrdiff_t{}); index < end; ++index) if (auto* item = itemAt(index)) item->draw();
     }
-    for (auto index = std::max(visible_begin, 0); index < end; ++index) if (auto* item = itemAt(index)) item->drawToolTips();
+    for (auto index = std::max(visible_begin, std::ptrdiff_t{}); index < end; ++index) if (auto* item = itemAt(index)) item->drawToolTips();
 }
 
 void SphereUI::ListItemCtrl::handleInput(const WindowInput& input) {
@@ -1891,7 +1893,7 @@ void SphereUI::ListItemCtrl::handleInput(const WindowInput& input) {
     if (original == nullptr) return;
     const auto end = std::min(visible_end, std::ssize(items));
     auto item_x = detail::subtractCoordinate(bounds.left, cropped_x), item_y = detail::subtractCoordinate(bounds.top, cropped_y);
-    for (auto index = std::max(visible_begin, 0); index < end; ++index) if (auto* item = itemAt(index)) {
+    for (auto index = std::max(visible_begin, std::ptrdiff_t{}); index < end; ++index) if (auto* item = itemAt(index)) {
         if (user_move) item->setParent(this);
         else item->setPosition(item_x, item_y);
         item->handleInput(forwarded);
@@ -1899,8 +1901,8 @@ void SphereUI::ListItemCtrl::handleInput(const WindowInput& input) {
         else item_y = detail::addCoordinate(item_y, original->height);
     }
     if (!can_select || !inside || (input.mouse_flags & MouseInput::leftPress) == 0u) return;
-    int selected = -1;
-    for (auto index = std::max(visible_begin, 0); index < end; ++index) if (auto* item = itemAt(index)) if (contains(windowBounds(*item), input.mouse_x, input.mouse_y)) {
+    std::ptrdiff_t selected = -1;
+    for (auto index = std::max(visible_begin, std::ptrdiff_t{}); index < end; ++index) if (auto* item = itemAt(index)) if (contains(windowBounds(*item), input.mouse_x, input.mouse_y)) {
         selected = index;
         break;
     }
@@ -1921,7 +1923,7 @@ void SphereUI::ListItemCtrl::setOpacity(float opacity) {
 bool SphereUI::ListItemCtrl::hitTest(int screen_x, int screen_y) {
     const auto end = std::min(visible_end, std::ssize(items));
     if (hidden || visible_begin >= end) return false;
-    for (auto index = std::max(visible_begin, 0); index < end; ++index) if (auto* child = itemAt(index)) if (child->can_drag_drop && child->containsPoint(screen_x, screen_y) && child->hitTest(screen_x, screen_y)) break;
+    for (auto index = std::max(visible_begin, std::ptrdiff_t{}); index < end; ++index) if (auto* child = itemAt(index)) if (child->can_drag_drop && child->containsPoint(screen_x, screen_y) && child->hitTest(screen_x, screen_y)) break;
     return true;
 }
 
@@ -2941,12 +2943,12 @@ void SphereUI::ListItemCtrl::updateVisibleRange() {
     const auto integral = std::floor(fraction);
     const int cropped = extent > 0 ? (fraction - integral) * extent : 0;
     visible_begin = integral;
-    visible_end = std::min(detail::addCoordinate(detail::addCoordinate(visible_begin, visible_capacity), 1), std::ssize(items));
+    visible_end = std::min(visible_begin + visible_capacity + std::ptrdiff_t{1}, std::ssize(items));
     cropped_x = !horizontal ? horizontal_offset : cropped;
     cropped_y = !horizontal ? cropped : vertical_offset;
     if (user_move) {
         cropped_x = cropped_y = visible_begin = 0;
-        visible_end = items.size();
+        visible_end = std::ssize(items);
     }
 }
 
@@ -2956,8 +2958,8 @@ void SphereUI::ListItemCtrl::updateLayout() {
     const auto extent = !horizontal ? original->height : original->width;
     const auto available = !horizontal ? height : width;
     visible_capacity = extent > 0 ? available / extent + 1 : 0;
-    const auto total_width = horizontal ? SferaNumeric::signedWord(SferaNumeric::lowWord(items.size() * original->width)) : original->width;
-    const auto total_height = !horizontal ? SferaNumeric::signedWord(SferaNumeric::lowWord(items.size() * original->height)) : original->height;
+    const auto total_width = horizontal ? detail::multiplyCoordinate(items.size(), original->width) : original->width;
+    const auto total_height = !horizontal ? detail::multiplyCoordinate(items.size(), original->height) : original->height;
     maximum_x = std::max(0, detail::subtractCoordinate(total_width, width));
     maximum_y = std::max(0, detail::subtractCoordinate(total_height, height));
     horizontal_offset = std::clamp(horizontal_offset, 0, maximum_x);
@@ -3023,12 +3025,12 @@ void SphereUI::ListCtrl::updateVisibleRange() {
     const auto integral = std::floor(fraction);
     cropped_y = line_height > 0 ? (fraction - integral) * line_height : 0;
     visible_begin = integral;
-    visible_end = std::min(detail::addCoordinate(detail::addCoordinate(visible_begin, visible_capacity), 1), std::ssize(rows));
+    visible_end = std::min(visible_begin + visible_capacity + std::ptrdiff_t{1}, std::ssize(rows));
 }
 
 void SphereUI::ListCtrl::updateLayout() {
     visible_capacity = line_height > 0 ? height / line_height + 1 : 0;
-    const int extent = rows.size() * line_height;
+    const int extent = detail::multiplyCoordinate(rows.size(), line_height);
     maximum_scroll = height > extent ? 0 : std::max(0, detail::addCoordinate(detail::subtractCoordinate(extent, height), 1));
     if (auto* bar = scrollbar.get()) bar->setParameters({0u, ScrollField::all, 0, maximum_scroll, height, vertical_offset, line_height});
     updateVisibleRange();
@@ -3534,10 +3536,9 @@ void SphereUI::RichEditCtrl::updateScroll() {
     auto* scroll = scrollbar.get();
     if (scroll == nullptr) return;
     ScrollParameters parameters{};
-    parameters.size = sizeof(ScrollParameters);
     parameters.mask = ScrollField::all;
     parameters.minimum = 0;
-    parameters.maximum = detail::checkedInt(std::max(0, std::ssize(lines) - page_rows - 1), "Rich edit scroll range exceeds int");
+    parameters.maximum = detail::checkedInt(std::max(std::ptrdiff_t{}, std::ssize(lines) - page_rows - 1), "Rich edit scroll range exceeds int");
     parameters.page_step = detail::checkedInt(page_rows, "Rich edit page size exceeds int");
     parameters.current = detail::checkedInt(first_row, "Rich edit scroll position exceeds int");
     parameters.step = 1;
@@ -3546,19 +3547,19 @@ void SphereUI::RichEditCtrl::updateScroll() {
 
 void SphereUI::RichEditCtrl::ensureCaretVisible() {
     if (lines.size() == 0u) lines.push_back("");
-    caret_row = std::clamp(caret_row, 0, std::ssize(lines) - 1);
+    caret_row = std::clamp(caret_row, std::ptrdiff_t{}, std::ssize(lines) - 1);
     caret_column = std::clamp<std::ptrdiff_t>(caret_column, 0, std::ssize(lines.at(caret_row)));
-    first_row = std::max(0, std::clamp(first_row, caret_row - std::max(0, page_rows), caret_row));
+    first_row = std::max(std::ptrdiff_t{}, std::clamp(first_row, caret_row - std::max(std::ptrdiff_t{}, page_rows), caret_row));
     updateScroll();
 }
 
 void SphereUI::RichEditCtrl::moveCaret(std::uint32_t key) {
     ensureCaretVisible();
-    const int length = lines.at(caret_row).size();
+    const auto length = std::ssize(lines.at(caret_row));
     switch (key) {
         case VK_LEFT:
             if (caret_column > 0) --caret_column;
-            else if (caret_row > 0) caret_column = lines.at(--caret_row).size();
+            else if (caret_row > 0) caret_column = std::ssize(lines.at(--caret_row));
             break;
         case VK_RIGHT:
             if (caret_column < length) ++caret_column;
@@ -3580,10 +3581,10 @@ void SphereUI::RichEditCtrl::moveCaret(std::uint32_t key) {
             caret_column = length;
             break;
         case VK_PRIOR:
-            caret_row -= std::max(1, page_rows);
+            caret_row -= std::max(std::ptrdiff_t{1}, page_rows);
             break;
         case VK_NEXT:
-            caret_row += std::max(1, page_rows);
+            caret_row += std::max(std::ptrdiff_t{1}, page_rows);
             break;
         default:
             return;
@@ -3770,8 +3771,8 @@ void SphereUI::RichEditCtrl::draw() {
     {
         ViewportScope viewport(bounds);
         if (viewport) {
-            const auto start = std::clamp(first_row, 0, std::ssize(lines));
-            const auto finish = std::min(std::ssize(lines), start + std::max(0, page_rows) + 1);
+            const auto start = std::clamp(first_row, std::ptrdiff_t{}, std::ssize(lines));
+            const auto finish = std::min(std::ssize(lines), start + std::max(std::ptrdiff_t{}, page_rows) + 1);
             for (auto row = start; row < finish; ++row) InterfaceRenderer::drawText(lines.at(row), bounds.left, bounds.top + (row - start) * line_height, text_color, font, font_initialized, bounds, false);
             if (caret_row >= start && caret_row < finish) drawCaret(bounds.left, (bounds.top + (caret_row - start) * line_height));
         }
@@ -3897,7 +3898,7 @@ void SphereUI::HyperTextCtrl::updateDocument(bool resize_to_content) {
         maximum_scroll = std::max(0, extent - height);
         scroll_position = 0;
         updateScroll();
-        if (auto* scroll = scrollbar.get()) scroll->setParameters({sizeof(ScrollParameters), ScrollField::all, 0, maximum_scroll, height, 0, document->line_height});
+        if (auto* scroll = scrollbar.get()) scroll->setParameters({ScrollParameters::wire_size, ScrollField::all, 0, maximum_scroll, height, 0, document->line_height});
     }
     pending_page = std::monostate{};
 }
@@ -4165,7 +4166,7 @@ void SphereUI::HyperTextChatListControl::updateScroll(bool reset) {
         }
         skip -= count;
     }
-    if (auto* child = scrollbar.get()) child->setParameters({sizeof(ScrollParameters), ScrollField::all, 0, SferaNumeric::signedWord(SferaNumeric::lowWord(reset ? 0u : maximum)), 1, SferaNumeric::signedWord(SferaNumeric::lowWord(reset ? 0u : maximum - scroll_offset)), 1});
+    if (auto* child = scrollbar.get()) child->setParameters({ScrollParameters::wire_size, ScrollField::all, 0, SferaNumeric::signedWord(SferaNumeric::lowWord(reset ? 0u : maximum)), 1, SferaNumeric::signedWord(SferaNumeric::lowWord(reset ? 0u : maximum - scroll_offset)), 1});
 }
 
 void SphereUI::HyperTextChatListControl::readScroll() {
@@ -7702,7 +7703,7 @@ void GameFontAtlas::load(int font, const std::string& filename, int outline, int
         const auto tileY = symbols / 8 % 8 * atlasCell;
         for (std::size_t y = 0; y < atlasCell; ++y) for (std::size_t x = 0; x < atlasCell; ++x) pixels[(tileY + y) * atlasWidth + tileX + x] = glyph[y * atlasCell + x] ? std::numeric_limits<std::uint16_t>::max() : shadow[y * atlasCell + x] ? SferaColor::rgba(0u, 0u, 0u, 240u).argb4444() : 0u;
         widths[character] = rightmost == 0 ? emptyWidth : rightmost;
-        placements[character] = {(symbols / 64), 1.0f * (tileX + 3 - outline) / atlasWidth, 1.0f * (tileY + 3 - outline) / atlasWidth, true};
+        placements[character] = {SphereUI::detail::wireWord(symbols / 64u), 1.0f * (tileX + 3 - outline) / atlasWidth, 1.0f * (tileY + 3 - outline) / atlasWidth, true};
         if (++symbols % 64 == 0) upload();
     }
     if (placements[124].defined == 0) WorldDiagnostics::fail("Symbol for CODE_FOR_UNDIFINED_SYMBOL is not found in font.txt");
@@ -7792,7 +7793,8 @@ void CHardwareCursor::show() {
 }
 bool CHardwareCursor::isInsideViewport() const { SferaCursorPosition position{}; getPosition(&position); return position.x >= 0 && position.x < g_sfera_graphics_runtime.display_width && position.y >= 0 && position.y < g_sfera_graphics_runtime.display_height; }
 bool CHardwareCursor::isSystemCursorVisible() const {
-    CURSORINFO cursor{sizeof(CURSORINFO)};
+    CURSORINFO cursor{};
+    cursor.cbSize = SferaNumeric::lowWord(sizeof(cursor));
     return ::GetCursorInfo(&cursor) && (cursor.flags & CURSOR_SHOWING) != 0;
 }
 void CHardwareCursor::setSystemCursorVisible(bool visible) { SphereUI::Runtime::setSystemCursorVisible(visible); }

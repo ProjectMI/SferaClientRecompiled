@@ -95,12 +95,12 @@ void SferaSimpleParser::assign(std::string source) {
     source_ = std::move(source);
     lines_ = std::move(lines);
     token_.clear();
-    const std::ptrdiff_t line_count = lines_.size();
+    const std::ptrdiff_t line_count = std::ssize(lines_);
     scan_ = block_ = {0, line_count};
 }
 
 SferaParserRange SferaSimpleParser::boundedRange(const SferaParserRange* range) const {
-    const std::ptrdiff_t count = lines_.size();
+    const std::ptrdiff_t count = std::ssize(lines_);
     return range == nullptr ? SferaParserRange{0, count} : SferaParserRange{std::max(range->begin, std::ptrdiff_t{0}), std::min(range->end, count)};
 }
 
@@ -3829,7 +3829,7 @@ void SphereRender::TextureRepository::addFolder(const std::string& directory) {
         name.resize(name.find('.'));
         if (name.empty()) continue;
         if (entries.size() >= std::size_t{std::numeric_limits<int>::max()}) throw std::length_error("Resource ID range exhausted");
-        const int index = entries.size();
+        const int index = SferaNumeric::signedWord(SferaNumeric::lowWord(entries.size()));
         Entry entry;
         entry.name = name;
         entry.filename = iterator->path();
@@ -4970,7 +4970,7 @@ void DynamicStream<Element>::reserve(std::size_t count) {
     if (count > limit) throw std::length_error("Direct3D stream exceeds the API size limit");
     if (!device || !device->native_device) throw std::logic_error("Direct3D stream has no device");
     Microsoft::WRL::ComPtr<Buffer> replacement;
-    const UINT bytes = count * sizeof(Element);
+    const UINT bytes = SferaNumeric::lowWord(count * sizeof(Element));
     if constexpr (indexed) {
         device->checkResult(device->native_device->CreateIndexBuffer(bytes, D3DUSAGE_DYNAMIC,
             D3DFMT_INDEX16, D3DPOOL_DEFAULT, replacement.GetAddressOf(), nullptr), "CreateIndexBuffer");
@@ -7404,7 +7404,8 @@ void TerrainRenderer::drawWater() {
         indices.reserve((range.second - range.first) * 6u);
         for (std::size_t index = range.first; index < range.second; ++index) {
             const auto& water = waterSurfaces[index];
-            const std::uint16_t base = vertices.size();
+            if (vertices.size() > std::numeric_limits<std::uint16_t>::max() - 3u) throw std::length_error("Water batch exceeds 16-bit index range");
+            const std::uint16_t base = SferaNumeric::lowHalf(SferaNumeric::lowWord(vertices.size()));
             for (int corner = 0; corner < 4; ++corner) {
                 const int dx = corner == 1 || corner == 2 ? 1 : 0, dz = corner >= 2 ? 1 : 0;
                 const double phaseX = (water.x + dx) * 3.9269912242889404, phaseZ = (water.z + dz) * 2.3561947345733643;
@@ -9712,8 +9713,8 @@ void ShadowMap::projectModel(const SphereRender::Model& model, std::size_t index
     if (quality >= 3u || !valid || textures[level] == nullptr) return;
     if (world != nullptr) { const auto transposed = world->transposed(); g_sfera_graphics_runtime.d3d_runtime->setTransform(D3DTS_WORLD, transposed); }
     const auto& submesh = model.submeshes[index];
-    const auto face_count = std::min(submesh.face_count, 334u);
-    for (std::uint32_t face = 0u; face < face_count; ++face) { const auto& source = model.faces[submesh.first_face + face]; face_indices[face * 3u] = source.vertices[0]; face_indices[face * 3u + 1u] = source.vertices[2]; face_indices[face * 3u + 2u] = source.vertices[1]; }
+    const auto face_count = std::min(submesh.face_count, std::size_t{334u});
+    for (std::size_t face = 0u; face < face_count; ++face) { const auto& source = model.faces[submesh.first_face + face]; face_indices[face * 3u] = source.vertices[0]; face_indices[face * 3u + 1u] = source.vertices[2]; face_indices[face * 3u + 2u] = source.vertices[1]; }
     projectVertices(model.vertices.data() + submesh.first_vertex, submesh.vertex_count, face_indices.data(), face_count * 3u);
 }
 
