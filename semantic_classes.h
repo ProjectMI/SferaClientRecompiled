@@ -272,10 +272,12 @@ struct SferaSubeffectDefinition {
     enum class Kind { ParticleSystem, Mesh };
     std::ptrdiff_t definition_index{};
     Kind kind{};
-    std::uint8_t attach_mode{};
+    std::size_t attach_mode{};
 };
 
 class IEffect;
+class CScriptedEffect;
+class CRainEffect;
 
 struct SferaActiveEffect {
     std::uint16_t position_source{};
@@ -431,6 +433,10 @@ public:
     virtual std::unique_ptr<IEffect> createEffectResources() = 0;
     virtual void setParameters(std::span<const SferaEffectParameter> parameters);
     virtual void resetEffect();
+    virtual CScriptedEffect* asScriptedEffect() noexcept { return nullptr; }
+    virtual const CScriptedEffect* asScriptedEffect() const noexcept { return nullptr; }
+    virtual CRainEffect* asRainEffect() noexcept { return nullptr; }
+    virtual const CRainEffect* asRainEffect() const noexcept { return nullptr; }
     virtual void recycleEffect(std::unique_ptr<IEffect> effect) noexcept;
     virtual bool isEffectComplete() const;
     virtual ~IEffect() = default;
@@ -438,6 +444,8 @@ public:
 
 class CScriptedEffect : public IEffect {
 public:
+    CScriptedEffect* asScriptedEffect() noexcept override { return this; }
+    const CScriptedEffect* asScriptedEffect() const noexcept override { return this; }
     struct Definition {
         std::vector<SferaSubeffectDefinition> subeffects;
         std::vector<std::shared_ptr<const SferaEffectMeshDefinition>> meshes;
@@ -533,6 +541,8 @@ public:
 
 class CRainEffect : public IEffect {
 public:
+    CRainEffect* asRainEffect() noexcept override { return this; }
+    const CRainEffect* asRainEffect() const noexcept override { return this; }
     int resource_id{};
     std::vector<SferaRainParticle> particles;
     float spawn_radius{};
@@ -716,8 +726,8 @@ public:
 
 class CHardwareCursor : public CCursor {
 public:
-    std::uint32_t texture_width = 0u;
-    std::uint32_t texture_height = 0u;
+    int texture_width = 0;
+    int texture_height = 0;
     struct CursorDeleter { void operator()(HCURSOR cursor) const noexcept { if (cursor) ::DestroyCursor(cursor); } };
     using CursorOwner = std::unique_ptr<std::remove_pointer_t<HCURSOR>, CursorDeleter>;
     CursorOwner cursor_handle;
@@ -745,8 +755,8 @@ public:
 
 class CSoftwareCursor : public CCursor {
 public:
-    std::uint32_t texture_width = 0u;
-    std::uint32_t texture_height = 0u;
+    int texture_width = 0;
+    int texture_height = 0;
     int x = 0;
     int y = 0;
     bool active = 0u;
@@ -1026,7 +1036,7 @@ extern SferaFileManager g_sfera_files;
 
 struct QuickFileEntry {
     std::vector<std::uint8_t> bytes;
-    std::uint16_t module_id;
+    std::size_t module_id;
 };
 
 class QuickFile {
@@ -1179,7 +1189,7 @@ namespace SphereUI {
         bool load(const std::string& filename, std::string_view texture_name);
         void loadNamedFont(std::string_view name);
         void loadConfiguration();
-        std::size_t count() const noexcept;
+        int count() const noexcept;
         const FontFace& face(int font) const;
     private:
         friend class InterfaceRenderer;
@@ -1515,7 +1525,7 @@ class ModelParameters;
 class MaterialLibrary;
 struct Material;
 
-enum class CollisionKind { AxisAlignedBounds, OrientedBounds, Triangles, None };
+enum class CollisionKind : std::uint32_t { AxisAlignedBounds, OrientedBounds, Triangles, None };
 
 struct ModelVertex {
     SferaVec3F position{};
@@ -1632,7 +1642,7 @@ public:
     std::size_t frame_count = 0u;
     std::vector<ModelKeyframe> keyframes;
     std::vector<AnimationFrame> animation_frames;
-    std::vector<std::size_t> animation_lengths;
+    std::vector<int> animation_lengths;
     bool has_vertex_colors = false;
     std::vector<std::uint32_t> vertex_colors;
     std::vector<FaceColorIndices> face_colors;
@@ -1675,8 +1685,9 @@ public:
     Model& operator=(const Model&) = delete;
     static std::unique_ptr<Model> load(std::string_view model_name, std::string_view directory, const ModelParameters& parameters, const MaterialLibrary& materials);
     static std::unique_ptr<Model> decode(std::string_view model_name, std::span<const std::uint8_t> bytes, const ModelParameters& parameters, const MaterialLibrary& materials);
-    void prepareGrass(bool synchronized, float ground_y);
-    void prepareTree(float dead_radius, float phase_multiplier);
+    double relativeLod(double distance) const noexcept { return radius / distance * lod_distance; }
+    void prepareGrass(bool synchronized, double ground_y);
+    void prepareTree(double dead_radius, double phase_multiplier);
     void prepareVegetation(const ModelParameters& parameters);
     void initializeGrassGeometry(std::size_t vertices_needed, std::size_t faces_needed, float height);
     void finishGrassGeometry(std::span<const Submesh> groups);
@@ -1724,6 +1735,8 @@ struct SceneSortEntry;
 
     class ModelRepository {
     public:
+        static constexpr std::size_t invalid_index = std::numeric_limits<std::size_t>::max();
+
         struct Entry {
             std::string name;
             std::string directory;
@@ -1733,8 +1746,8 @@ struct SceneSortEntry;
         void initialize();
         void addFolder(const std::string& directory);
         void finishRegistration();
-        int find(std::string_view name) const;
-        std::shared_ptr<Model> model(int index);
+        std::size_t find(std::string_view name) const;
+        std::shared_ptr<Model> model(std::size_t index);
         void releaseModels();
         void evictUnused(std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now());
         void clear();
@@ -1742,7 +1755,7 @@ struct SceneSortEntry;
         ModelParameters parameters;
     private:
         std::vector<Entry> entries;
-        std::unordered_map<std::string, int> names;
+        std::unordered_map<std::string, std::size_t> names;
         std::size_t requests_since_scan = 0;
         std::size_t scan_index = 0;
     };
@@ -1759,11 +1772,11 @@ public:
     struct Variant {
         std::string filename;
         Microsoft::WRL::ComPtr<IDirect3DPixelShader9> pixel_shader;
-        int alpha_register = -1;
-        int down_filter_register = -1;
-        int water_gradient_register = -1;
-        int water_specular_register = -1;
-        int water_reflection_register = -1;
+        std::optional<UINT> alpha_register;
+        std::optional<UINT> down_filter_register;
+        std::optional<UINT> water_gradient_register;
+        std::optional<UINT> water_specular_register;
+        std::optional<UINT> water_reflection_register;
     };
     std::map<std::pair<bool, std::array<std::uint8_t, 8>>, Variant> variants;
     std::string vertex_directory;
@@ -1813,8 +1826,8 @@ private:
 };
 
 struct WaterMaterial {
-    std::uint32_t primary_animation;
-    std::uint32_t secondary_animation;
+    int primary_animation;
+    int secondary_animation;
     float primary_opacity;
     float secondary_opacity;
     float reflection_opacity;
@@ -1834,10 +1847,10 @@ struct SferaGraphicsRuntime {
     bool lods_enabled;
     bool hardware_cursor_enabled;
     float environment_factor;
-    uint32_t base_microtexture_id;
+    std::uint16_t base_microtexture_id;
     float view_scale;
     bool post_effects_enabled;
-    uint32_t rebuild_percent;
+    int rebuild_percent;
     int display_width;
     int display_height;
     std::unique_ptr<CD3D9Device> d3d_runtime;
@@ -1862,7 +1875,7 @@ struct SferaConfigTextRuntime {
     bool load(const std::string& filename);
     bool save(bool compressed = false) const;
     bool writeValue(std::string_view key, std::string_view value, bool quoted);
-    static std::string encodeBinary(std::span<const std::uint8_t> input);
+    static std::string encodeBinary(const std::uint8_t* input, std::size_t size);
     std::string filename;
     std::string text() const;
     std::size_t copyText(std::string_view source);
@@ -1917,9 +1930,9 @@ public:
     // A legacy tick is exactly 100 microseconds (10,000 ticks per second).
     static std::uint64_t microseconds() noexcept;
     static std::uint64_t nowTicks() noexcept { return microseconds() / 100u; }
-    static std::uint32_t milliseconds() noexcept { return static_cast<std::uint32_t>(microseconds() / 1000u); }
+    static std::uint32_t milliseconds() noexcept { return SferaNumeric::lowWord(microseconds() / 1000u); }
     static bool deadlineReached(std::uint32_t now, std::uint32_t deadline) noexcept {
-        return std::bit_cast<std::int32_t>(now - deadline) >= 0;
+        return SferaNumeric::signedWord(now - deadline) >= 0;
     }
     static std::uint32_t calendarTicks();
 };
@@ -1930,12 +1943,12 @@ struct WorldObject {
     WorldObject() = default;
     WorldObject(const WorldObject&) = delete;
     WorldObject& operator=(const WorldObject&) = delete;
-    ExtendedWorldObject* extended() noexcept;
-    const ExtendedWorldObject* extended() const noexcept;
+    virtual ExtendedWorldObject* extended() noexcept { return nullptr; }
+    virtual const ExtendedWorldObject* extended() const noexcept { return nullptr; }
     bool ownsModel() const noexcept { return std::holds_alternative<std::unique_ptr<SphereRender::Model>>(model_source); }
 
     struct ModelReference {
-        int id = 0;
+        std::size_t id = 0u;
         mutable std::shared_ptr<SphereRender::Model> asset;
     };
     std::variant<ModelReference, std::unique_ptr<SphereRender::Model>> model_source{ModelReference{}};
@@ -1959,6 +1972,8 @@ struct WorldObject {
     bool visible{};
 };
 struct ExtendedWorldObject : WorldObject {
+    ExtendedWorldObject* extended() noexcept override { return this; }
+    const ExtendedWorldObject* extended() const noexcept override { return this; }
     static constexpr std::size_t unregistered = std::numeric_limits<std::size_t>::max();
     std::size_t extended_object_index = unregistered;
     uint8_t motion_state{};
@@ -2002,9 +2017,6 @@ struct ExtendedWorldObject : WorldObject {
     SferaVec3F previous_bounds_rotation{};
     std::uint32_t last_simulation_tick{};
 };
-
-inline ExtendedWorldObject* WorldObject::extended() noexcept { return dynamic_cast<ExtendedWorldObject*>(this); }
-inline const ExtendedWorldObject* WorldObject::extended() const noexcept { return dynamic_cast<const ExtendedWorldObject*>(this); }
 
 class WorldObjects {
 public:
@@ -2134,7 +2146,7 @@ public:
     };
     struct Microtexture {
         std::uint16_t lookup_key;
-        std::uint32_t texture_id;
+        int texture_id;
         std::unique_ptr<TerrainTextureImage> image;
     };
     static std::vector<Microtexture> microtextures;
@@ -2169,7 +2181,7 @@ public:
     bool sameEdge(std::size_t first_contour, std::size_t first_edge, std::size_t second_contour, std::size_t second_edge) const;
     void setServerMap(std::span<const int> types, std::span<const int> servers);
     int serverByType(int type) const;
-    void buildServerMask(int server);
+    void buildServerMask(std::uint8_t server);
     int typeAt(float x, float z, int first_type, int last_type) const;
     int serverAt(float x, float z) const;
     bool nearServer(float x, float z, int server);
@@ -2371,7 +2383,7 @@ private:
 
 class Vegetation {
 private:
-    static constexpr std::uint32_t grid_side = 13;
+    static constexpr int grid_side = 13;
     std::vector<GrassCell> cells_;
     std::vector<GrassCell> previous_;
     std::vector<std::array<bool, 2>> occupancy_;
@@ -2419,7 +2431,7 @@ public:
     void findReflectiveWater(TerrainPatch& patch);
     void gatherReflectiveWater();
     void prepareAndDraw(TerrainPatch& patch);
-    void drawCells(TerrainPatch& patch, int first, int last);
+    void drawCells(TerrainPatch& patch, std::size_t first, std::size_t last);
     void drawLandscape();
     void drawWater();
 private:
@@ -2428,7 +2440,7 @@ private:
 extern TerrainRenderer g_sfera_terrain_renderer;
 struct TerrainTextureEntry {
     const TerrainCell* owner = nullptr;
-    uint8_t kind = 0;
+    int kind = 0;
 
     Microsoft::WRL::ComPtr<IDirect3DTexture9> resource;
     uint32_t use_count = 0;
@@ -2462,7 +2474,7 @@ public:
     uint32_t orientation_blocked{};
 
     void initializeResponseCurve();
-    double responseValue(int index) const noexcept;
+    float responseValue(int index) const noexcept;
     std::uint32_t probe(std::uint32_t handle, SferaVec3F displacement, float yaw);
     std::uint32_t probeGround(std::uint32_t handle, SferaVec3F displacement, float yaw, bool controlled = false);
     void moveFree(std::uint32_t handle, bool vertical, float yaw, float elapsed, bool controlled);
@@ -2540,7 +2552,7 @@ struct CharacterSkeleton {
     std::vector<std::string> names;
     std::vector<std::vector<std::size_t>> children;
     std::vector<CharacterPose> poses;
-    std::vector<std::size_t> animation_lengths;
+    std::vector<int> animation_lengths;
     std::array<std::size_t, 7> attachments{};
     std::vector<SferaMatrix4x4F> initial_pose;
     void calculate(std::size_t firstFrame, std::optional<std::size_t> upperFrame, std::size_t bone,
@@ -2575,9 +2587,9 @@ public:
     void clear();
     void initializeBounds();
     int classify(const SferaMatrix4x4F& world) const;
-    void setDistances(float minimum, float range);
+    void setDistances(double minimum, float range);
     void updateLodDistance();
-    double visibility(const WorldObject& object) const;
+    float visibility(const WorldObject& object) const;
     void setAppearance(int handle, const CharacterAppearance& appearance);
     bool getAppearance(int handle, CharacterAppearance& appearance) const;
     int partAnimationLength(const ExtendedWorldObject& object, int animation) const;
@@ -2600,7 +2612,7 @@ private:
 }
 
 namespace SphereRender {
-struct CameraRectangle { int left = 0, top = 0, right = 0, bottom = 0; bool operator==(const CameraRectangle&) const = default; };
+struct CameraRectangle { std::uint32_t left = 0, top = 0, right = 0, bottom = 0; bool operator==(const CameraRectangle&) const = default; };
 class GameCamera {
 public:
     uint32_t controlled_observer_mode{};
@@ -2626,7 +2638,7 @@ public:
     void volume(const CameraRectangle* rectangle, const SferaFrustumF** planes, const SferaVec3F** points);
     static void cameraAxes(SferaVec3F& forward, SferaVec3F& up);
     static void setupViewport(std::uint32_t x, std::uint32_t y, std::uint32_t width, std::uint32_t height);
-    static void rebuildVisibleVolume(int left, int top, int right, int bottom);
+    static void rebuildVisibleVolume(std::uint32_t left, std::uint32_t top, std::uint32_t right, std::uint32_t bottom);
     class Frame {
     public:
         Frame(std::uint32_t mode, bool reflection, float water_height);
@@ -2669,7 +2681,7 @@ public:
     static float reflection_height;
     static bool use_default_environment;
     static SferaRenderLookupEntry bone_visibility[256];
-    static uint32_t texture_animation_frame;
+    static int texture_animation_frame;
     static uint32_t secondary_pass;
     static SferaIntBounds3 projected_terrain_bounds;
     static SferaIntBounds3 clipped_terrain_bounds;
@@ -2736,7 +2748,13 @@ public:
     static float sun_glow;
     static std::unique_ptr<SkyEnvironment> high_resolution_environment;
     static uint16_t indices[594];
-    static float motion_terms[5];
+    struct Motion {
+        struct Offset { float x = 0.0f; float y = 0.0f; };
+        float angle = 0.0f;
+        Offset primary;
+        Offset secondary;
+    };
+    static Motion motion;
     static SferaVec3F previous_origin;
     static SferaVec3F projected_offset;
     static SferaVec3F projected_center;
@@ -2744,7 +2762,7 @@ public:
     static float glow_samples[120];
     static float elevation_samples[120];
     static float texture_phase_u;
-    static uint32_t sample_visible[120];
+    static bool sample_visible[120];
     static float screen_center_x;
     static float vertical_motion;
     static uint32_t sample_color;
@@ -2756,14 +2774,14 @@ public:
     static SferaVec3F flare_screen_position;
     static SkyState interpolated;
 
-    static void rotateUv(float x, float y, float angle, float& u, float& v);
-    static std::size_t buildLayerGeometry(const SceneSkyLayer& layer, float opacity);
+    static void rotateUv(double x, double y, double angle, float& u, float& v);
+    static std::size_t buildLayerGeometry(const SceneSkyLayer& layer, double opacity);
     static void layerColor(const SceneSkyLayer& layer, SferaVec3F& output);
     static void drawColorLayer(std::string_view texture, const SferaVec3F& color, std::size_t indices);
     static void drawMaskLayer(std::string_view texture, std::size_t indices);
     static void drawLayers(const SceneSkyLayers& layers);
     static void orbit(float& x, float& y, std::uint32_t orbit);
-    static float horizonFog(float elevation, float amount);
+    static float horizonFog(float elevation, double amount);
     static void sampleDirection(bool refresh, const SferaVec3F& direction);
     static double drawStars();
     static void drawSunMoon(float rotation);
@@ -2819,8 +2837,8 @@ public:
     };
     static void initialize(std::uint32_t default_quality);
     static void shutdown();
-    static void prepareObject(std::uint32_t handle, ExtendedWorldObject& object, float width, float spot_scale, float& extension);
-    static void drawObject(ExtendedWorldObject& object, float width, float extension);
+    static void prepareObject(std::uint32_t handle, ExtendedWorldObject& object, double width, float spot_scale, float& extension);
+    static void drawObject(ExtendedWorldObject& object, double width, float extension);
 private:
     std::array<Microsoft::WRL::ComPtr<IDirect3DTexture9>, 3> textures;
     std::optional<TextureMapping> mapping;
@@ -2852,7 +2870,7 @@ public:
     int sunsetState = 0;
     int sunriseState = 0;
     void load(const std::string& filename);
-    void interval(float time, int& first, int& second, float& fraction) const;
+    void interval(double time, int& first, int& second, float& fraction) const;
     void sample(float time, SkyState& output) const;
     void sunDirection(float time, SferaVec3F& output) const;
     void lighting(float time, SferaVec3F& sun, SferaVec3F& ambient) const;
@@ -2870,7 +2888,7 @@ struct EnvironmentZone {
 };
 class EnvironmentZones {
 public:
-    static void interval(float time, int& first, int& second, float& fraction);
+    static void interval(double time, int& first, int& second, float& fraction);
     void load(const std::string& filename);
     void calculate(bool useDefault, float x, float z, float time, const SkyEnvironment& sky, EnvironmentLighting& output);
     std::vector<EnvironmentZone> zones;
@@ -2892,7 +2910,6 @@ struct WeatherKeyframe { int time; std::array<float, 4> properties; };
 struct WeatherScenario { int duration = 0; WeatherSkyPair sky; float skyStart = 0.0f; float skyEnd = 0.0f; std::vector<WeatherKeyframe> keyframes; };
 class WeatherScenarios {
 public:
-    enum class Property { rain, lightning, wind, cloud };
     std::vector<SceneSkyLayer> textures;
     std::vector<WeatherSkyPair> pairs;
     std::vector<WeatherScenario> scenarios;
@@ -2904,8 +2921,8 @@ public:
     void locate(int time, std::size_t& sequenceIndex, int& startTime, int& localTime) const;
     int advance(std::size_t& sequenceIndex, std::size_t& keyframe) const;
     int retreat(std::size_t& sequenceIndex, std::size_t& keyframe) const;
-    double nextValue(std::size_t sequenceIndex, int time, Property property, int& distance) const;
-    double previousValue(std::size_t sequenceIndex, int time, Property property, int& distance) const;
+    double nextValue(std::size_t sequenceIndex, int time, std::size_t property, int& distance) const;
+    double previousValue(std::size_t sequenceIndex, int time, std::size_t property, int& distance) const;
     WeatherSkyPair selectSky(int time, float dayTime) const;
     void copyTexture(std::string_view name, SceneSkyLayer& output) const;
     static void windDirection(bool refresh, int seed, float& x, float& z);
@@ -2924,7 +2941,7 @@ struct SferaWeatherRuntime {
 namespace SphereUI {
 class ChatFilter {
 public:
-    struct Rule { std::string word; std::uint32_t kind = 0u; std::vector<std::string> exceptions; };
+    struct Rule { std::string word; int kind = 0; std::vector<std::string> exceptions; };
     ChatFilter();
     explicit ChatFilter(std::vector<Rule> entries);
     bool rejects(std::string_view message) const;
@@ -2953,7 +2970,7 @@ struct GameUiWindow {
     std::uint32_t textColor = 0u;
     std::uint32_t textStyle = 0u;
     int font = 0u;
-    std::uint32_t fontScale = 1u;
+    int fontScale = 1;
     struct Event { std::uint32_t control, message; };
     std::deque<Event> events;
     std::uint32_t attach(std::uint32_t control);
@@ -2970,7 +2987,7 @@ struct GameUiElement {
         struct Line { std::size_t offset; int x = 0, y = 0; };
         std::string bytes;
         std::vector<Line> lines;
-        std::uint32_t font_scale = 1;
+        int font_scale = 1;
         int font = 0;
     };
     struct Sprite {
@@ -2990,10 +3007,10 @@ struct GameUiElement {
 
 class GameInterface {
 public:
-    static uint32_t loading_completed;
+    static int loading_completed;
     static SferaScreenVertex sprite_quad[4];
     static uint32_t active_window;
-    static uint32_t loading_total;
+    static int loading_total;
     static uint32_t loading_guard;
 
     static std::vector<std::unique_ptr<GameUiWindow>> windows;
@@ -3005,10 +3022,10 @@ public:
     static void destroyWindow(std::uint32_t handle);
     static GameUiHit hitTest(SferaCursorPosition point);
     static void updateInput();
-    static std::uint32_t fontHeight(int font, std::uint32_t scale);
-    static std::uint32_t glyphWidth(std::uint32_t character, int font);
-    static std::uint32_t textHeight(int font, std::uint32_t scale, std::uint32_t lines);
-    static std::uint32_t lineOffset(int font, std::uint32_t scale, std::uint32_t line);
+    static int fontHeight(int font, int scale);
+    static int glyphWidth(std::uint32_t character, int font);
+    static int textHeight(int font, int scale, int lines);
+    static int lineOffset(int font, int scale, int line);
     static void drawAtlasText(std::string_view text, int x, int y, std::uint32_t color, int scale, int font, float depth);
     static HRESULT drawSpriteQuad(std::uint32_t color, const float* uv, float left, float top, float right, float bottom);
     static HRESULT drawSpriteTexture(std::uint32_t color, int texture, float left, float top, float right, float bottom, const float* uv, bool reserved = false);
@@ -3019,10 +3036,10 @@ public:
     static void restoreRenderState();
     static void drawFrame();
     enum class WindowOrder { Draw, HitTest };
-    static std::vector<int> orderedWindows(WindowOrder order);
+    static std::vector<std::uint32_t> orderedWindows(WindowOrder order);
     static void drawAll();
-    static void drawWindow(int window);
-    static void updateLoadingProgress(std::uint32_t increment);
+    static void drawWindow(std::uint32_t window);
+    static void updateLoadingProgress(int increment);
     static void finishLoading();
 };
 
@@ -3035,11 +3052,11 @@ struct SferaFontGlyphRuntime {
 class GameFontAtlas {
 public:
     struct Face {
-        std::uint32_t span = 0;
-        std::uint32_t origin = 0;
-        std::uint32_t cell_step = 0;
-        std::uint32_t code_base = 0;
-        std::array<std::uint32_t, 256> widths{};
+        int span = 0;
+        int origin = 0;
+        int cell_step = 0;
+        int code_base = 0;
+        std::array<int, 256> widths{};
         std::vector<Microsoft::WRL::ComPtr<IDirect3DTexture9>> pages;
         IDirect3DTexture9* texture(std::size_t page) const noexcept {
             return page < pages.size() ? pages[page].Get() : nullptr;
@@ -3053,7 +3070,7 @@ public:
     GameFontAtlas(const GameFontAtlas&) = delete;
     GameFontAtlas& operator=(const GameFontAtlas&) = delete;
     void clear() noexcept;
-    void load(int font, const std::string& filename, int outline, std::uint32_t spacing, std::uint32_t emptyWidth);
+    void load(int font, const std::string& filename, int outline, int spacing, int emptyWidth);
 };
 
 extern GameFontAtlas g_sfera_font_runtime;

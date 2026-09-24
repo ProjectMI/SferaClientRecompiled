@@ -58,6 +58,116 @@ struct SferaScreenVertex {
     float v;
 };
 
+namespace SferaNumeric {
+    template<class Enum> requires std::is_enum_v<Enum>
+    constexpr std::underlying_type_t<Enum> enumBits(Enum value) noexcept {
+        return static_cast<std::underlying_type_t<Enum>>(value);
+    }
+
+    template<class Enum> requires std::is_enum_v<Enum>
+    inline Enum enumFromBits(std::underlying_type_t<Enum> value) noexcept {
+        static_assert(sizeof(Enum) == sizeof(value));
+        Enum result{};
+        std::memcpy(&result, &value, sizeof(result));
+        return result;
+    }
+
+    inline std::uint32_t word(std::int32_t value) noexcept {
+        std::uint32_t result{};
+        std::memcpy(&result, &value, sizeof(result));
+        return result;
+    }
+
+    template<class Integer>
+        requires (std::is_integral_v<Integer> && !std::is_same_v<std::remove_cv_t<Integer>, bool>)
+    inline std::uint32_t lowWord(Integer value) noexcept {
+        using Unsigned = std::make_unsigned_t<Integer>;
+        Unsigned bits{};
+        if constexpr (std::is_signed_v<Integer>) std::memcpy(&bits, &value, sizeof(bits));
+        else bits = value;
+        return bits & UINT32_MAX;
+    }
+
+    template<class Integer>
+        requires (std::is_integral_v<Integer> && sizeof(Integer) <= sizeof(std::uint32_t) &&
+            !std::is_same_v<std::remove_cv_t<Integer>, bool>)
+    inline std::int32_t signedWord(Integer value) noexcept {
+        const std::uint32_t bits = lowWord(value);
+        std::int32_t result{};
+        std::memcpy(&result, &bits, sizeof(result));
+        return result;
+    }
+
+    template<class Integer>
+        requires (std::is_integral_v<Integer> && sizeof(Integer) > sizeof(std::uint32_t) &&
+            sizeof(Integer) <= sizeof(std::uint64_t) && !std::is_same_v<std::remove_cv_t<Integer>, bool>)
+    inline std::int64_t signedWord(Integer value) noexcept {
+        using Unsigned = std::make_unsigned_t<Integer>;
+        Unsigned bits{};
+        if constexpr (std::is_signed_v<Integer>) std::memcpy(&bits, &value, sizeof(bits));
+        else bits = value;
+        std::int64_t result{};
+        std::memcpy(&result, &bits, sizeof(result));
+        return result;
+    }
+
+    inline std::uint16_t lowHalf(std::uint32_t value) noexcept {
+        return value & 0xffffu;
+    }
+
+    inline std::uint8_t lowByte(std::uint32_t value) noexcept {
+        return value & 0xffu;
+    }
+
+    inline std::uint32_t magnitude(std::int32_t value) noexcept {
+        const auto bits = word(value);
+        return value < 0 ? 0u - bits : bits;
+    }
+
+    inline std::int16_t signedHalf(std::uint16_t value) noexcept {
+        std::int16_t result{};
+        std::memcpy(&result, &value, sizeof(result));
+        return result;
+    }
+
+    inline std::int8_t signedByte(std::uint8_t value) noexcept {
+        std::int8_t result{};
+        std::memcpy(&result, &value, sizeof(result));
+        return result;
+    }
+
+    inline std::int8_t signedByte(std::byte value) noexcept {
+        std::int8_t result{};
+        std::memcpy(&result, &value, sizeof(result));
+        return result;
+    }
+
+    inline int truncateInt(double value) noexcept {
+        constexpr double minimum = std::numeric_limits<int>::min();
+        constexpr double maximum_exclusive = std::numeric_limits<int>::max();
+        if (!std::isfinite(value) || value < minimum || value >= maximum_exclusive + 1.0)
+            return std::numeric_limits<int>::min();
+        return std::trunc(value);
+    }
+
+    inline std::int64_t truncateInt64(double value) noexcept {
+        if (!std::isfinite(value) || value < -9223372036854775808.0 || value >= 9223372036854775808.0)
+            return std::numeric_limits<std::int64_t>::min();
+        return std::trunc(value);
+    }
+
+    inline std::uint32_t truncatedWord(double value) noexcept {
+        return lowWord(truncateInt64(value));
+    }
+
+    inline float real32(double value) noexcept {
+        if (std::isnan(value)) return std::numeric_limits<float>::quiet_NaN();
+        if (value > std::numeric_limits<float>::max()) return std::numeric_limits<float>::infinity();
+        if (value < -std::numeric_limits<float>::max()) return -std::numeric_limits<float>::infinity();
+        return value;
+    }
+}
+
 namespace SferaAlgorithms {
     // Preserve input order for equal keys; NaNs sort last and never violate strict weak ordering.
     template<class Range, class Projection> void stableSort(Range&& values, Projection key) {
@@ -91,8 +201,9 @@ namespace SferaBinary {
         // gcount() alone cannot describe that partial write on every exception path.
         std::memcpy(input.data(), destination.data(), destination.size());
         const auto commit = [&] { std::memcpy(destination.data(), input.data(), input.size()); };
+        const std::streamsize read_size = input.size();
         try {
-            stream.read(input.data(), static_cast<std::streamsize>(input.size()));
+            stream.read(input.data(), read_size);
         } catch (...) {
             commit();
             throw;
@@ -118,14 +229,26 @@ namespace SferaBinary {
         }
         return value;
     }
+    inline float floatFromBits(std::uint32_t bits) noexcept {
+        float value{};
+        std::memcpy(&value, &bits, sizeof(value));
+        return value;
+    }
+    inline std::uint32_t floatBits(float value) noexcept {
+        std::uint32_t bits{};
+        std::memcpy(&bits, &value, sizeof(bits));
+        return bits;
+    }
     template<class T, class Byte> requires (std::is_integral_v<T> && !std::is_same_v<T, bool> &&
         (std::is_same_v<Byte, std::uint8_t> || std::is_same_v<Byte, std::byte>))
     void writeLittleEndian(Byte* bytes, T value) noexcept {
         // Unsigned arithmetic preserves the complete two's-complement representation.
         std::make_unsigned_t<T> bits = value;
         for (std::size_t index = 0; index < sizeof(T); ++index) {
-            if constexpr (std::is_same_v<Byte, std::byte>) bytes[index] = static_cast<std::byte>(bits & 255u);
-            else bytes[index] = bits & 255u;
+            if constexpr (std::is_same_v<Byte, std::byte>) {
+                const std::uint8_t byte = bits & 255u;
+                std::memcpy(bytes + index, &byte, 1u);
+            } else bytes[index] = bits & 255u;
             if constexpr (sizeof(T) > 1) bits >>= 8;
         }
     }
@@ -152,7 +275,7 @@ namespace SferaBinary {
             return std::string(value.begin(), value.begin() + count);
         }
         template<class T> T read() {
-            if constexpr (std::is_same_v<T, float>) return std::bit_cast<float>(read<std::uint32_t>());
+            if constexpr (std::is_same_v<T, float>) return floatFromBits(read<std::uint32_t>());
             else return readLittleEndian<T>(take(sizeof(T)).data());
         }
     private:
@@ -189,7 +312,7 @@ struct SferaVec3F {
         if constexpr (Divide) return {x / magnitude, y / magnitude, z / magnitude};
         else return *this * (1.0f / magnitude);
     }
-    SferaVec3F normalized(int diagnosticCode = 0) const;
+    SferaVec3F normalized(std::size_t diagnosticCode = 0) const;
     void normalize();
     template<class Accumulator = double> SferaVec3F cross(const SferaVec3F& other) const {
         const std::array<Accumulator, 3> components{x, y, z};
@@ -237,6 +360,18 @@ struct SferaVec4F {
 };
 
 namespace SferaMath {
+    inline double planarSquared(double first, double second) { return first * first + second * second; }
+    SferaVec3F anglesFromBasis(SferaVec3F forward, SferaVec3F up);
+    inline float fittedFieldOfView(double width, double height) {
+        constexpr double half_angle = 0.6f;
+        const float tangent = std::tan(half_angle);
+        const float aspect = height / width;
+        const float adjusted = tangent / (aspect / 0.75);
+        const double slope = adjusted;
+        const float angle = std::atan(slope);
+        const double rounded_angle = angle;
+        return rounded_angle + angle;
+    }
     inline float interpolate(float first, double second, float fraction) {
         return (second - first) * fraction + first;
     }
@@ -290,11 +425,14 @@ struct SferaMatrix4x4F {
     static SferaMatrix4x4F fromRollPitchYaw(float roll, float pitch, float yaw);
     static SferaMatrix4x4F fromEuler(const SferaVec3F& translation, const SferaVec3F& angles);
     static SferaMatrix4x4F fromQuaternion(const SferaQuaternionF& rotation, const SferaVec3F& translation = {});
+    template<class Accumulator = double> Accumulator projectComponent(std::size_t row, const SferaVec3F& point) const {
+        const std::array<Accumulator, 3> basis{m[row][0], m[row][1], m[row][2]};
+        return basis[0] * point.x + basis[1] * point.y + basis[2] * point.z + m[row][3];
+    }
     template<class Accumulator = double> SferaVec3F transformPoint(const SferaVec3F& point) const {
         SferaVec3F result{};
         for (std::size_t row = 0; row < 3; ++row) {
-            const std::array<Accumulator, 3> basis{m[row][0], m[row][1], m[row][2]};
-            result.setComponent(row, basis[0] * point.x + basis[1] * point.y + basis[2] * point.z + m[row][3]);
+            result.setComponent(row, projectComponent<Accumulator>(row, point));
         }
         return result;
     }
@@ -331,6 +469,8 @@ struct SferaPlaneF {
     SferaVec3F normal;
     float distance;
 
+    static SferaPlaneF throughPoint(const SferaVec3F& normal, const SferaVec3F& point);
+    static SferaPlaneF fromTriangle(const SferaVec3F& first, const SferaVec3F& second, const SferaVec3F& third);
     double evaluate(const SferaVec3F& point) const;
     int intersectLine(const SferaVec3F& start, const SferaVec3F& end, SferaVec3F& intersection) const;
 };
@@ -387,8 +527,10 @@ private:
 
 namespace SferaText {
     template<class Mapping> void transformBytes(std::string& text, Mapping mapping) {
-        for (auto& byte : std::as_writable_bytes(std::span(text)))
-            byte = static_cast<std::byte>(mapping(std::to_integer<std::uint8_t>(byte)));
+        for (auto& byte : std::as_writable_bytes(std::span(text))) {
+            const std::uint8_t mapped = mapping(std::to_integer<std::uint8_t>(byte));
+            std::memcpy(&byte, &mapped, sizeof(mapped));
+        }
     }
     inline void lowercaseLocale(std::string& text) {
         transformBytes(text, [](std::uint8_t value) { return std::tolower(value); });
@@ -397,13 +539,25 @@ namespace SferaText {
         using is_transparent = void;
         std::size_t operator()(std::string_view value) const noexcept { return std::hash<std::string_view>{}(value); }
     };
-    constexpr std::uint8_t asciiFold(std::uint8_t byte) noexcept {
-        return byte >= 'A' && byte <= 'Z' ? static_cast<std::uint8_t>(byte + ('a' - 'A')) : byte;
+    inline std::uint8_t byteValue(char value) noexcept {
+        std::uint8_t result{};
+        std::memcpy(&result, &value, sizeof(result));
+        return result;
     }
-    constexpr bool asciiEqual(std::string_view a, std::string_view b) noexcept {
+    constexpr std::uint8_t asciiFold(std::uint8_t byte) noexcept {
+        if (byte < 'A' || byte > 'Z') return byte;
+        const std::uint8_t folded = byte + ('a' - 'A');
+        return folded;
+    }
+    inline bool isSpace(char byte) noexcept {
+        return std::isspace(byteValue(byte)) != 0;
+    }
+    inline bool asciiEqual(std::string_view a, std::string_view b) noexcept {
         if (a.size() != b.size()) return false;
-        for (std::size_t i = 0; i < a.size(); ++i)
-            if (asciiFold(static_cast<std::uint8_t>(a[i])) != asciiFold(static_cast<std::uint8_t>(b[i]))) return false;
+        const auto first = std::as_bytes(std::span(a));
+        const auto second = std::as_bytes(std::span(b));
+        for (std::size_t i = 0; i < first.size(); ++i)
+            if (asciiFold(std::to_integer<std::uint8_t>(first[i])) != asciiFold(std::to_integer<std::uint8_t>(second[i]))) return false;
         return true;
     }
     const std::array<char32_t, 256>& unicodeCp1251();
@@ -431,7 +585,8 @@ namespace SferaText {
         const auto field = bytes.first(std::min(bytes.size(), limit));
         const auto end = std::find(field.begin(), field.end(), std::uint8_t{});
         if (end == field.end() && limit > bytes.size()) throw std::out_of_range("Unterminated text buffer");
-        return field.empty() ? 0u : static_cast<std::size_t>(end - field.begin());
+        const std::size_t length = end - field.begin();
+        return length;
     }
     inline std::string prefix(std::span<const std::uint8_t> bytes, std::size_t limit) {
         return fromBytes(bytes.first(length(bytes, limit)));
@@ -497,27 +652,25 @@ namespace SferaText {
         return std::nullopt;
     }
 
-    // Retain the existing CRT prefix, sign, locale and hexadecimal-float grammar.
+    // Numeric tokens historically used the CRT prefix grammar. Keep that behavior
+    // without using exceptions for routine parse failures: effect/UI definitions
+    // intentionally probe optional values and missing tokens are not exceptional.
     template<class Number> bool readNumber(std::string_view text, Number& output) {
         static_assert(std::is_same_v<Number, int> || std::is_same_v<Number, float>);
         const std::string input(text);
-        try {
-            if constexpr (std::is_same_v<Number, float>) output = std::stof(input);
-            else {
-                errno = 0;
-                output = std::stoi(input, nullptr, 10);
-            }
+        char* end = nullptr;
+        if constexpr (std::is_same_v<Number, float>) {
+            const float value = std::strtof(input.c_str(), &end);
+            if (end == input.c_str()) return false;
+            output = value;
             return true;
-        } catch (const std::invalid_argument&) {
-            return false;
-        } catch (const std::out_of_range&) {
-            if constexpr (std::is_same_v<Number, float>) {
-                // The legacy float parser accepts underflow/overflow. Keep its CRT
-                // result after stof has established that a numeric prefix exists.
-                output = std::strtof(input.c_str(), nullptr);
-                return true;
-            }
-            return false;
+        } else {
+            errno = 0;
+            const long value = std::strtol(input.c_str(), &end, 10);
+            if (end == input.c_str() || errno == ERANGE ||
+                value < std::numeric_limits<int>::min() || value > std::numeric_limits<int>::max()) return false;
+            output = value;
+            return true;
         }
     }
     inline std::size_t configValueOffset(std::string_view text, std::string_view key) {

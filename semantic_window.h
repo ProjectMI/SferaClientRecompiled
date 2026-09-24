@@ -67,7 +67,22 @@ namespace SphereUI {
     };
 
     class Window;
+    class CDescriptionWindow;
+    class CheckBox;
+    class EditCtrl;
+    class ListCtrl;
+    class FilterListCtrl;
+    class FontPicker;
+    class HyperTextChatListControl;
+    class HyperTextCtrl;
+    class HyperTextEditControl;
+    class ImageCtrl;
+    class ListItemCtrl;
+    class CMenuListControl;
+    class ProgressBar;
+    class RichEditCtrl;
     class ScrollBar;
+    class SlotCtrl;
     class SpinButton;
     class ButtonCtrl;
     class ToolTipCtrl;
@@ -111,10 +126,10 @@ namespace SphereUI {
     };
 
     struct UiViewport {
-        std::uint32_t x;
-        std::uint32_t y;
-        std::uint32_t width;
-        std::uint32_t height;
+        int x;
+        int y;
+        int width;
+        int height;
         float minimum_z;
         float maximum_z;
     };
@@ -146,7 +161,7 @@ namespace SphereUI {
         void setDescription(const struct ImageDescription& description);
     private:
         void drawParts(float left, float top, float right, float bottom, std::uint32_t color, bool natural) const;
-        void drawRotated(float left, float top, float right, float bottom, std::uint32_t color, float rotation) const;
+        void drawRotated(float left, float top, float right, float bottom, std::uint32_t color, double rotation) const;
     };
 
     struct UiMenuItem {
@@ -280,6 +295,44 @@ namespace SphereUI {
         virtual void dispatchMessage(int target_group, SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second, SphereUI::UiControlKind target_kind);
         virtual void setFont(int font_id);
         virtual int getFont() const;
+        virtual ButtonCtrl* asButtonCtrl() noexcept { return nullptr; }
+        virtual const ButtonCtrl* asButtonCtrl() const noexcept { return nullptr; }
+        virtual CDescriptionWindow* asDescriptionWindow() noexcept { return nullptr; }
+        virtual const CDescriptionWindow* asDescriptionWindow() const noexcept { return nullptr; }
+        virtual CheckBox* asCheckBox() noexcept { return nullptr; }
+        virtual const CheckBox* asCheckBox() const noexcept { return nullptr; }
+        virtual EditCtrl* asEditCtrl() noexcept { return nullptr; }
+        virtual const EditCtrl* asEditCtrl() const noexcept { return nullptr; }
+        virtual ListCtrl* asListCtrl() noexcept { return nullptr; }
+        virtual const ListCtrl* asListCtrl() const noexcept { return nullptr; }
+        virtual FilterListCtrl* asFilterListCtrl() noexcept { return nullptr; }
+        virtual const FilterListCtrl* asFilterListCtrl() const noexcept { return nullptr; }
+        virtual FontPicker* asFontPicker() noexcept { return nullptr; }
+        virtual const FontPicker* asFontPicker() const noexcept { return nullptr; }
+        virtual HyperTextChatListControl* asHyperTextChatListControl() noexcept { return nullptr; }
+        virtual const HyperTextChatListControl* asHyperTextChatListControl() const noexcept { return nullptr; }
+        virtual HyperTextCtrl* asHyperTextCtrl() noexcept { return nullptr; }
+        virtual const HyperTextCtrl* asHyperTextCtrl() const noexcept { return nullptr; }
+        virtual HyperTextEditControl* asHyperTextEditControl() noexcept { return nullptr; }
+        virtual const HyperTextEditControl* asHyperTextEditControl() const noexcept { return nullptr; }
+        virtual ImageCtrl* asImageCtrl() noexcept { return nullptr; }
+        virtual const ImageCtrl* asImageCtrl() const noexcept { return nullptr; }
+        virtual ListItemCtrl* asListItemCtrl() noexcept { return nullptr; }
+        virtual const ListItemCtrl* asListItemCtrl() const noexcept { return nullptr; }
+        virtual CMenuListControl* asMenuListControl() noexcept { return nullptr; }
+        virtual const CMenuListControl* asMenuListControl() const noexcept { return nullptr; }
+        virtual ProgressBar* asProgressBar() noexcept { return nullptr; }
+        virtual const ProgressBar* asProgressBar() const noexcept { return nullptr; }
+        virtual RichEditCtrl* asRichEditCtrl() noexcept { return nullptr; }
+        virtual const RichEditCtrl* asRichEditCtrl() const noexcept { return nullptr; }
+        virtual ScrollBar* asScrollBar() noexcept { return nullptr; }
+        virtual const ScrollBar* asScrollBar() const noexcept { return nullptr; }
+        virtual SlotCtrl* asSlotCtrl() noexcept { return nullptr; }
+        virtual const SlotCtrl* asSlotCtrl() const noexcept { return nullptr; }
+        virtual SpinButton* asSpinButton() noexcept { return nullptr; }
+        virtual const SpinButton* asSpinButton() const noexcept { return nullptr; }
+        virtual ToolTipCtrl* asToolTipCtrl() noexcept { return nullptr; }
+        virtual const ToolTipCtrl* asToolTipCtrl() const noexcept { return nullptr; }
         virtual ~Window();
 
     private:
@@ -288,6 +341,8 @@ namespace SphereUI {
 
     class ButtonCtrl : public Window {
     public:
+        ButtonCtrl* asButtonCtrl() noexcept override { return this; }
+        const ButtonCtrl* asButtonCtrl() const noexcept override { return this; }
         std::uint32_t visual_state{};
         std::shared_ptr<const UiSprite> idle_image{};
         std::shared_ptr<const UiSprite> pressed_image{};
@@ -312,6 +367,8 @@ namespace SphereUI {
 
     class CheckBox : public Window {
     public:
+        CheckBox* asCheckBox() noexcept override { return this; }
+        const CheckBox* asCheckBox() const noexcept override { return this; }
         std::shared_ptr<const UiSprite> unchecked_image{};
         std::shared_ptr<const UiSprite> unchecked_hover_image{};
         std::shared_ptr<const UiSprite> checked_image{};
@@ -338,6 +395,8 @@ namespace SphereUI {
 
     class CDescriptionWindow : public Window {
     public:
+        CDescriptionWindow* asDescriptionWindow() noexcept override { return this; }
+        const CDescriptionWindow* asDescriptionWindow() const noexcept override { return this; }
 
         const Window* displayed_source{};
         const Window* pending_source{};
@@ -367,6 +426,8 @@ namespace SphereUI {
 
     class EditCtrl : public Window {
     public:
+        EditCtrl* asEditCtrl() noexcept override { return this; }
+        const EditCtrl* asEditCtrl() const noexcept override { return this; }
         int cursor_offset_y{};
         bool numeric{};
         bool password{};
@@ -380,7 +441,7 @@ namespace SphereUI {
         bool cursor_uses_text_color{};
         bool submit_on_blur{};
 
-        int caret_position{};
+        std::size_t caret_position{};
         std::size_t observed_length{};
         void updatePassword();
         void setEditText(std::string_view value);
@@ -396,14 +457,16 @@ namespace SphereUI {
 
     class ListCtrl : public Window {
     public:
-        int visible_begin{};
-        int visible_end{};
+        ListCtrl* asListCtrl() noexcept override { return this; }
+        const ListCtrl* asListCtrl() const noexcept override { return this; }
+        std::ptrdiff_t visible_begin{};
+        std::ptrdiff_t visible_end{};
         std::vector<UiTextRow> rows{};
         std::size_t maximum_items{};
         std::size_t write_index{};
         int maximum_scroll{};
         int line_height{};
-        int visible_capacity{};
+        std::ptrdiff_t visible_capacity{};
         int vertical_offset{};
         int cropped_y{};
         bool chatlike{};
@@ -413,7 +476,7 @@ namespace SphereUI {
         std::unique_ptr<ScrollBar> scrollbar;
         bool can_select{};
 
-        int selected_index{};
+        std::ptrdiff_t selected_index{};
         int selection_border{};
         std::uint32_t selection_color{};
         std::uint32_t selection_line_color{};
@@ -446,6 +509,8 @@ namespace SphereUI {
 
     class FilterListCtrl : public ListCtrl {
     public:
+        FilterListCtrl* asFilterListCtrl() noexcept override { return this; }
+        const FilterListCtrl* asFilterListCtrl() const noexcept override { return this; }
         std::uint32_t filter_mask{};
         struct HistoryEntry {
             std::string text;
@@ -466,6 +531,8 @@ namespace SphereUI {
 
     class FontPicker : public Window {
     public:
+        FontPicker* asFontPicker() noexcept override { return this; }
+        const FontPicker* asFontPicker() const noexcept override { return this; }
         std::unique_ptr<SpinButton> selector;
         std::unique_ptr<Window> preview;
         FontPicker();
@@ -499,6 +566,8 @@ namespace SphereUI {
 
     class HyperTextChatListControl : public Window {
     public:
+        HyperTextChatListControl* asHyperTextChatListControl() noexcept override { return this; }
+        const HyperTextChatListControl* asHyperTextChatListControl() const noexcept override { return this; }
         std::deque<HyperTextChatListItem> messages{};
         std::vector<std::size_t> visible_messages{};
         std::vector<std::uint32_t> channels{};
@@ -509,7 +578,7 @@ namespace SphereUI {
         std::uint32_t item_link_color{};
         std::uint32_t link_color{};
         std::size_t maximum_items{};
-        std::uint32_t row_height{};
+        int row_height{};
         std::size_t page_rows{};
         int parent_x{};
         int parent_y{};
@@ -545,6 +614,8 @@ namespace SphereUI {
 
     class HyperTextCtrl : public Window {
     public:
+        HyperTextCtrl* asHyperTextCtrl() noexcept override { return this; }
+        const HyperTextCtrl* asHyperTextCtrl() const noexcept override { return this; }
         std::unique_ptr<HyperTextDocument> document;
         std::uint32_t text_format{};
         struct PageRequest {
@@ -591,6 +662,8 @@ namespace SphereUI {
 
     class HyperTextEditControl : public Window {
     public:
+        HyperTextEditControl* asHyperTextEditControl() noexcept override { return this; }
+        const HyperTextEditControl* asHyperTextEditControl() const noexcept override { return this; }
         std::deque<std::string> history{};
         std::size_t history_position{};
         std::size_t maximum_history{};
@@ -644,6 +717,8 @@ namespace SphereUI {
 
     class ImageCtrl : public Window {
     public:
+        ImageCtrl* asImageCtrl() noexcept override { return this; }
+        const ImageCtrl* asImageCtrl() const noexcept override { return this; }
         std::uint32_t image_style{};
         bool interaction_active{};
         std::shared_ptr<const UiSprite> fallback_image{};
@@ -666,13 +741,15 @@ namespace SphereUI {
 
     class ListItemCtrl : public Window {
     public:
+        ListItemCtrl* asListItemCtrl() noexcept override { return this; }
+        const ListItemCtrl* asListItemCtrl() const noexcept override { return this; }
         std::unique_ptr<Window> item_template;
         std::vector<std::unique_ptr<Window>> items;
         int horizontal_offset{};
         int vertical_offset{};
-        int visible_begin{};
-        int visible_end{};
-        int visible_capacity{};
+        std::ptrdiff_t visible_begin{};
+        std::ptrdiff_t visible_end{};
+        std::ptrdiff_t visible_capacity{};
         int cropped_x{};
         int cropped_y{};
         int maximum_y{};
@@ -682,14 +759,14 @@ namespace SphereUI {
         bool can_select{};
 
         std::shared_ptr<const UiSprite> selection_sprite{};
-        int selected_index{};
+        std::ptrdiff_t selected_index{};
         bool horizontal{};
         bool user_move{};
 
         ListItemCtrl();
 
         Window* itemAt(std::size_t index) const;
-        int addItem();
+        void addItem();
         void removeItem(std::size_t index);
         void clearItems();
         void updateLayout();
@@ -707,6 +784,8 @@ namespace SphereUI {
 
     class CMenuListControl : public Window {
     public:
+        CMenuListControl* asMenuListControl() noexcept override { return this; }
+        const CMenuListControl* asMenuListControl() const noexcept override { return this; }
         std::size_t maximum_items{};
         std::shared_ptr<const UiSprite> top_sprite{};
         std::shared_ptr<const UiSprite> middle_sprite{};
@@ -738,7 +817,7 @@ namespace SphereUI {
         void closeMenu();
         void updateParentPosition();
         void keepOnScreen();
-        std::size_t itemAtPoint(int x, int y) const;
+        std::size_t itemAtPoint(std::int64_t x, std::int64_t y) const;
         void drawHeader();
         void drawItem(std::size_t index, const std::shared_ptr<const UiSprite>& sprite, std::uint32_t color);
         void drawFooter();
@@ -751,6 +830,8 @@ namespace SphereUI {
 
     class ToolTipCtrl : public Window {
     public:
+        ToolTipCtrl* asToolTipCtrl() noexcept override { return this; }
+        const ToolTipCtrl* asToolTipCtrl() const noexcept override { return this; }
         int screen_x{};
         int screen_y{};
         bool hover_pending{};
@@ -796,6 +877,8 @@ namespace SphereUI {
 
     class ProgressBar : public Window {
     public:
+        ProgressBar* asProgressBar() noexcept override { return this; }
+        const ProgressBar* asProgressBar() const noexcept override { return this; }
         int minimum{};
         int maximum{};
         int current{};
@@ -827,16 +910,18 @@ namespace SphereUI {
 
     class RichEditCtrl : public Window {
     public:
+        RichEditCtrl* asRichEditCtrl() noexcept override { return this; }
+        const RichEditCtrl* asRichEditCtrl() const noexcept override { return this; }
         std::vector<std::string> lines{};
-        int caret_row{};
-        int caret_column{};
+        std::ptrdiff_t caret_row{};
+        std::ptrdiff_t caret_column{};
         std::uint64_t blink_started{};
         bool cursor_visible{};
 
         int cursor_width{};
         int line_height{};
-        int page_rows{};
-        int first_row{};
+        std::ptrdiff_t page_rows{};
+        std::ptrdiff_t first_row{};
         std::unique_ptr<ScrollBar> scrollbar;
         RichEditCtrl();
 
@@ -847,11 +932,11 @@ namespace SphereUI {
         void setContent(std::string_view text);
         std::string content(std::size_t limit = std::numeric_limits<std::size_t>::max()) const;
         void insertCharacter(std::string_view glyph);
-        void insertAt(std::uint32_t column, std::string glyph, std::uint32_t row);
-        std::uint32_t mergeRows(std::uint32_t destination, std::uint32_t source);
+        void insertAt(std::ptrdiff_t column, std::string glyph, std::ptrdiff_t row);
+        std::ptrdiff_t mergeRows(std::ptrdiff_t destination, std::ptrdiff_t source);
         void eraseCharacter(bool backward);
         void splitLine();
-        void drawCaret(float left, float top);
+        void drawCaret(int left, int top);
         bool loadUi(const std::string& filename, SferaSimpleParser& parser, const SferaParserRange& range) override;
         std::unique_ptr<Window> cloneInto(CloneContext& context) const override;
         std::uint32_t handleMessage(SphereUI::UiMessage message, std::uint32_t first, std::uint32_t second) override;
@@ -872,6 +957,8 @@ namespace SphereUI {
 
     class ScrollBar : public Window {
     public:
+        ScrollBar* asScrollBar() noexcept override { return this; }
+        const ScrollBar* asScrollBar() const noexcept override { return this; }
         std::shared_ptr<const UiSprite> scroll_resource{};
         int thumb_width{};
         int thumb_height{};
@@ -927,6 +1014,8 @@ namespace SphereUI {
 
     class SlotCtrl : public Window {
     public:
+        SlotCtrl* asSlotCtrl() noexcept override { return this; }
+        const SlotCtrl* asSlotCtrl() const noexcept override { return this; }
         std::shared_ptr<const UiSprite> full_sprite{};
         std::shared_ptr<const UiSprite> empty_sprite{};
         std::shared_ptr<const UiSprite> border_sprite{};
@@ -939,8 +1028,8 @@ namespace SphereUI {
         bool show_full_background{};
         bool has_item{};
 
-        int press_x{};
-        int press_y{};
+        std::int64_t press_x{};
+        std::int64_t press_y{};
         bool left_pressed{};
         bool right_pressed{};
         bool drag_started{};
@@ -969,6 +1058,8 @@ namespace SphereUI {
 
     class SpinButton : public Window {
     public:
+        SpinButton* asSpinButton() noexcept override { return this; }
+        const SpinButton* asSpinButton() const noexcept override { return this; }
         std::unique_ptr<ButtonCtrl> decrease_button;
         std::unique_ptr<ButtonCtrl> increase_button;
         int minimum{};

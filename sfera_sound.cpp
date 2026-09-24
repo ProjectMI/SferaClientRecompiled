@@ -22,9 +22,7 @@ template <typename T>
 HRESULT queryInterface(IUnknown* source, REFIID interface_id, ComPtr<T>& target) {
     target.Reset();
     if (source == nullptr) return E_POINTER;
-    return source->QueryInterface(
-        interface_id,
-        reinterpret_cast<void**>(target.GetAddressOf()));
+    return source->QueryInterface(interface_id, reinterpret_cast<void**>(target.GetAddressOf()));
 }
 
 struct DecodedAudio {
@@ -55,12 +53,13 @@ bool readBinaryFile(const std::string& filename, std::vector<std::uint8_t>& byte
 
     if (::_fseeki64(file, 0, SEEK_END) != 0) return false;
     const std::int64_t file_size = ::_ftelli64(file);
-    if (file_size <= 0 || static_cast<std::uint64_t>(file_size) > std::numeric_limits<std::size_t>::max() ||
+    if (file_size <= 0 || !std::in_range<std::size_t>(file_size) ||
         ::_fseeki64(file, 0, SEEK_SET) != 0) {
         return false;
     }
 
-    bytes.resize(static_cast<std::size_t>(file_size));
+    const std::size_t byte_count = file_size;
+    bytes.resize(byte_count);
     return std::fread(bytes.data(), 1u, bytes.size(), file) == bytes.size();
 }
 
@@ -116,9 +115,12 @@ bool decodeVorbis(const std::vector<std::uint8_t>& bytes, DecodedAudio& output) 
         return false;
     }
 
-    const std::uint32_t block_align = static_cast<std::uint32_t>(decoded.channels) * sizeof(std::int16_t);
-    const std::uint64_t bytes_per_second = static_cast<std::uint64_t>(decoded.sample_rate) * block_align;
-    const std::uint64_t pcm_size = static_cast<std::uint64_t>(decoded.samples.size()) * sizeof(std::int16_t);
+    const std::uint32_t sample_width = sizeof(std::int16_t);
+    const std::uint32_t block_align = decoded.channels * sample_width;
+    const std::uint64_t sample_rate = decoded.sample_rate;
+    const std::uint64_t sample_count = decoded.samples.size();
+    const std::uint64_t bytes_per_second = sample_rate * block_align;
+    const std::uint64_t pcm_size = sample_count * sample_width;
     if (block_align > std::numeric_limits<WORD>::max() ||
         bytes_per_second > std::numeric_limits<DWORD>::max() ||
         pcm_size == 0u || pcm_size > std::numeric_limits<DWORD>::max()) {
@@ -130,10 +132,11 @@ bool decodeVorbis(const std::vector<std::uint8_t>& bytes, DecodedAudio& output) 
     output.format.nChannels = decoded.channels;
     output.format.nSamplesPerSec = decoded.sample_rate;
     output.format.wBitsPerSample = 16u;
-    output.format.nBlockAlign = static_cast<WORD>(block_align);
-    output.format.nAvgBytesPerSec = static_cast<DWORD>(bytes_per_second);
+    output.format.nBlockAlign = block_align;
+    output.format.nAvgBytesPerSec = bytes_per_second;
     output.format.cbSize = 0u;
-    output.pcm.resize(static_cast<std::size_t>(pcm_size));
+    const std::size_t output_size = pcm_size;
+    output.pcm.resize(output_size);
     std::memcpy(output.pcm.data(), decoded.samples.data(), output.pcm.size());
     return true;
 }
@@ -158,8 +161,9 @@ float normalizedGain(float gain) {
 LONG directSoundVolume(float gain) {
     gain = normalizedGain(gain);
     if (gain <= 0.00001f) return DSBVOLUME_MIN;
-    const double units = 2000.0 * std::log10(static_cast<double>(gain));
-    return static_cast<LONG>(std::clamp<long>(std::lround(units), DSBVOLUME_MIN, DSBVOLUME_MAX));
+    const double precise_gain = gain;
+    const double units = 2000.0 * std::log10(precise_gain);
+    return std::clamp<long>(std::lround(units), DSBVOLUME_MIN, DSBVOLUME_MAX);
 }
 
 class SoundBufferMapping {
@@ -199,7 +203,8 @@ private:
 
 bool copyToBuffer(IDirectSoundBuffer8* buffer, const std::vector<std::uint8_t>& pcm) {
     if (buffer == nullptr || pcm.empty() || pcm.size() > std::numeric_limits<DWORD>::max()) return false;
-    SoundBufferMapping mapping(*buffer, static_cast<DWORD>(pcm.size()));
+    const DWORD buffer_size = pcm.size();
+    SoundBufferMapping mapping(*buffer, buffer_size);
     if (!mapping.copy(pcm)) return false;
     return mapping.close();
 }
@@ -242,8 +247,11 @@ std::uint32_t secondsToBytes(const WAVEFORMATEX& format, float seconds, std::siz
 
     const std::size_t aligned_size = total_bytes - total_bytes % block_align;
     const std::size_t last_block = aligned_size >= block_align ? aligned_size - block_align : 0u;
-    const double raw = static_cast<double>(seconds) * format.nAvgBytesPerSec;
-    std::size_t value = static_cast<std::size_t>(std::min<double>(raw, static_cast<double>(last_block)));
+    const double precise_seconds = seconds;
+    const double last_block_position = last_block;
+    const double raw = precise_seconds * format.nAvgBytesPerSec;
+    const auto bounded = SferaNumeric::truncateInt64(std::min(raw, last_block_position));
+    std::size_t value = bounded;
     value -= value % block_align;
     return std::min<std::size_t>(value, std::numeric_limits<std::uint32_t>::max());
 }
@@ -342,7 +350,7 @@ int CSound::LoadSound(const std::string& source_filename, std::uint32_t flags) {
     impl_->spatial = std::move(spatial_buffer);
     impl_->spatial_requested = spatial;
     impl_->requested_position = 0.0f;
-    duration_seconds = impl_->audio.format.nAvgBytesPerSec == 0u ? 0.0f : static_cast<float>(static_cast<double>(impl_->audio.pcm.size()) / impl_->audio.format.nAvgBytesPerSec);
+    duration_seconds = impl_->audio.format.nAvgBytesPerSec == 0u ? 0.0f : impl_->audio.pcm.size() * 1.0 / impl_->audio.format.nAvgBytesPerSec;
     SetVolume(impl_->volume);
     playback_finished = true;
     return 1;
@@ -392,7 +400,7 @@ float CSound::GetPlayTimepos() const {
     DWORD play = 0u;
     DWORD write = 0u;
     if (FAILED(impl_->buffer->GetCurrentPosition(&play, &write))) return impl_->requested_position;
-    return (static_cast<double>(play) / impl_->audio.format.nAvgBytesPerSec);
+    return play * 1.0 / impl_->audio.format.nAvgBytesPerSec;
 }
 
 int CSound::IsSoundPlaying() const {
@@ -407,7 +415,7 @@ void CSound::SetPlayTimepos(float seconds) {
     if (impl_->buffer) impl_->buffer->SetCurrentPosition(secondsToBytes(impl_->audio.format, impl_->requested_position, impl_->audio.pcm.size()));
 }
 
-int CSound::Play(int looped) {
+int CSound::Play(bool looped) {
     if (!impl_->buffer) return 0;
     HRESULT result = impl_->buffer->SetCurrentPosition(secondsToBytes(impl_->audio.format, impl_->requested_position, impl_->audio.pcm.size()));
     if (result == DSERR_BUFFERLOST) {
@@ -416,7 +424,7 @@ int CSound::Play(int looped) {
     }
     if (FAILED(result)) return 0;
     SetVolume(impl_->volume);
-    result = impl_->buffer->Play(0u, 0u, looped != 0 ? DSBPLAY_LOOPING : 0u);
+    result = impl_->buffer->Play(0u, 0u, looped ? DSBPLAY_LOOPING : 0u);
     if (FAILED(result)) return 0;
     playback_finished = false;
     return 1;
@@ -492,8 +500,8 @@ void CSoundStream::update() {
     if (!playing_now && !impl_->was_playing) return;
 
     const float current_time = playing_now
-        ? static_cast<float>(static_cast<double>(play_cursor) / impl_->audio.format.nAvgBytesPerSec)
-        : static_cast<float>(static_cast<double>(impl_->audio.pcm.size()) / impl_->audio.format.nAvgBytesPerSec);
+        ? play_cursor * 1.0 / impl_->audio.format.nAvgBytesPerSec
+        : impl_->audio.pcm.size() * 1.0 / impl_->audio.format.nAvgBytesPerSec;
 
     const bool fire_decode = decode_callback != nullptr && decode_event_position != UINT32_MAX && current_time >= impl_->decode_signal;
     const bool fire_play = play_callback != nullptr && play_event_position != UINT32_MAX && current_time >= impl_->play_signal;
@@ -547,15 +555,12 @@ CSoundInterface* SI_CreateInterface(HWND__* native_window, int, std::uint32_t sa
     primary_format.nChannels = 2u;
     primary_format.nSamplesPerSec = sample_rate == 0u ? 44100u : sample_rate;
     primary_format.wBitsPerSample = 16u;
-    primary_format.nBlockAlign = static_cast<WORD>(primary_format.nChannels * primary_format.wBitsPerSample / 8u);
+    primary_format.nBlockAlign = primary_format.nChannels * primary_format.wBitsPerSample / 8u;
     primary_format.nAvgBytesPerSec = primary_format.nSamplesPerSec * primary_format.nBlockAlign;
     sound_interface->impl_->primary->SetFormat(&primary_format);
 
     auto listener = std::make_unique<CSoundListener>();
-    if (SUCCEEDED(queryInterface(
-            sound_interface->impl_->primary.Get(),
-            IID_IDirectSound3DListener,
-            listener->impl_->native))) {
+    if (SUCCEEDED(queryInterface(sound_interface->impl_->primary.Get(), IID_IDirectSound3DListener, listener->impl_->native))) {
         listener->impl_->native->SetDistanceFactor(1.0f, DS3D_IMMEDIATE);
         listener->impl_->native->SetDopplerFactor(1.0f, DS3D_IMMEDIATE);
         listener->impl_->native->SetRolloffFactor(1.0f, DS3D_IMMEDIATE);

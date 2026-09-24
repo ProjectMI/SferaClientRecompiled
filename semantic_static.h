@@ -5,6 +5,7 @@
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 // Script VM, transport and application contracts.
 struct SferaSliceReference32 {
@@ -25,15 +26,18 @@ struct SferaMbcValue {
     bool isPointer() const;
     static std::size_t storageSize(Type valueType);
     std::size_t elementSize() const;
-    int integer() const;
+    std::int32_t integer() const;
+    std::uint32_t word() const noexcept { return value.base; }
     float real() const;
-    int asInteger() const;
+    std::int32_t asInteger() const;
+    std::uint32_t asWord() const;
     float asReal() const;
     void setReal(float number);
+    void setReal(double number);
     void detach();
     SferaSliceReference32& asSlice();
     void storeAs(Type destinationType, std::span<std::uint8_t> destination) const;
-    static int truncate(double number);
+    static std::int32_t truncate(double number);
     static std::int64_t truncateReal(double number);
 };
 
@@ -58,7 +62,7 @@ struct ScriptProgramDiagnostic {
 };
 
 struct SferaMbcExecutionContext {
-    std::uint32_t process_index{};
+    std::int32_t process_index = -1;
     int program_index = -1;
     std::uint32_t instruction_offset{};
     std::uint32_t process_id = UINT32_MAX;
@@ -166,11 +170,11 @@ struct SferaMbcProcessRecord {
     struct CleanupEntry { std::uint32_t handle; ResourceKind kind; std::uint64_t resource_lifetime = 0; };
     void registerResource(std::uint32_t handle, ResourceKind kind);
     void unregisterResource(std::uint32_t handle, ResourceKind kind);
-    void linkProgram(std::uint32_t index);
-    bool activateProgram(int index);
+    void linkProgram(std::size_t index);
+    bool activateProgram(std::size_t index);
     bool activateProgram(std::string_view name);
     void appendCommand(std::string_view command);
-    std::uint32_t growMemory(std::uint32_t size);
+    std::uint32_t growMemory(std::size_t size);
     SferaMbcFunctionRecord* findFunction(std::string_view name);
     void readRegions(std::span<const std::uint8_t> definitions, std::uint32_t firstProgram);
     void releaseResources();
@@ -212,7 +216,7 @@ struct SferaMbcProcessRecord {
 struct SferaMbcRuntime {
     std::array<SferaMbcValue, 256> values{};
     std::array<SferaMbcModuleRecord, 4096> modules{};
-    struct OutgoingField { std::uint32_t word; std::uint8_t format; };
+    struct OutgoingField { std::uint32_t word; std::int8_t format; };
     std::array<OutgoingField, 4088> outgoing_fields{};
     uint32_t game_calendar{};
     WorldObject* current_object{};
@@ -222,7 +226,7 @@ struct SferaMbcRuntime {
     float inverse_coordinate_scale{};
     SferaSliceReference32 slice_fallback{};
     SferaSliceReference32 sliceup_fallback{};
-    std::uint32_t dispatch_slot = UINT32_MAX;
+    std::int32_t dispatch_slot = -1;
 
     enum class HaltState { Running, Requested, Dispatched };
     using ResourceKind = SferaMbcProcessRecord::ResourceKind;
@@ -233,7 +237,14 @@ struct SferaMbcRuntime {
     };
     // Script words remain 32-bit; mapped addresses never contain truncated native pointers.
     static constexpr std::uint32_t mappedAddressBegin = 1u << 31;
-    struct MemoryRegion { const std::uint8_t* data; std::size_t size; SferaMbcProcessRecord* process; const void* owner; std::uint64_t lifetime = 0; };
+    struct MemoryRegion {
+        const std::uint8_t* data;
+        std::size_t size;
+        SferaMbcProcessRecord* process;
+        const void* owner;
+        std::uint64_t lifetime = 0;
+        const void* address() const noexcept { return data; }
+    };
     using NativeResource = std::variant<SphereUI::Window*, SferaActiveEffect*, SferaScriptContainer*, std::intptr_t>;
     std::map<std::uint32_t, MemoryRegion> mapped_memory;
     std::unordered_map<std::uint32_t, NativeResource> native_resources;
@@ -278,16 +289,31 @@ struct SferaMbcRuntime {
     }
     void forgetNativeResource(const NativeResource& resource);
 
-    int popInteger();
+    std::int32_t popInteger();
+    std::uint32_t popWord();
     SferaSliceReference32& popSlice();
-    int nextInteger();
+    std::int32_t nextInteger();
+    std::uint32_t nextWord();
     float nextReal();
     SferaSliceReference32& nextSliceReference(std::string_view diagnostic = "popsliceupref(): stack underflow");
     SferaSliceReference32 nextSlice();
     // Legacy address arguments use numeric conversion for scalar values, as nextInteger did.
     SferaSliceReference32 nextAddress();
     void pushInteger(std::uint32_t value);
+    template<class Integer>
+        requires (std::is_integral_v<Integer> && !std::is_same_v<std::remove_cv_t<Integer>, std::uint32_t>)
+    void pushInteger(Integer value) {
+        static_assert(sizeof(Integer) <= sizeof(std::uint32_t), "MBC integer result must fit the 32-bit VM word");
+        if constexpr (std::is_signed_v<Integer>) {
+            std::int32_t signed_value = value;
+            pushInteger(SferaNumeric::word(signed_value));
+        } else {
+            std::uint32_t word = value;
+            pushInteger(word);
+        }
+    }
     void pushReal(float value);
+    void pushReal(double value);
     void pushSlice(const SferaSliceReference32& value, SferaMbcValue::Type type);
     void pushReference(SferaMbcValue::Type type, const SferaSliceReference32& reference, bool load);
     SferaMbcProcessRecord* findProcess(std::uint32_t id);
@@ -309,6 +335,7 @@ struct SferaMbcRuntime {
     template<class T> T readOperand() { T result; std::memcpy(&result, instruction_cursor, sizeof(result)); instruction_cursor += sizeof(result); return result; }
     template<class T> T readMemory(std::uint32_t offset) const { T result; std::memcpy(&result, memoryAt(offset, sizeof(result)), sizeof(result)); return result; }
     template<class T> void writeMemory(std::uint32_t offset, const T& value) { std::memcpy(memoryAt(offset, sizeof(value)), &value, sizeof(value)); }
+    void writeReal(std::uint32_t offset, double value) { writeMemory(offset, SferaNumeric::real32(value)); }
     void reportInvalidInstruction();
     void exportSlice(SferaSliceReference32& destination, const void* data, std::size_t size, const void* owner);
     void initialize();
@@ -344,18 +371,18 @@ struct SferaMbcRuntime {
     std::string first_execution_error;
     int argument_count;
     std::size_t argument_end;
-    uint32_t process_index;
+    std::int32_t process_index = -1;
     const std::uint8_t* current_instruction_address;
     uint32_t active_tag;
     _finddata64i32_t script_find_data;
     static constexpr std::size_t text_capacity = 10000;
     std::string text_buffer;
-    std::size_t call_frame_depth;
+    int call_frame_depth;
     SferaMbcProcessRecord processes[65536];
     uint32_t process_search_cursor;
-    uint32_t instruction_step_count;
+    int instruction_step_count;
     int program_index;
-    std::size_t execution_context_depth;
+    int execution_context_depth;
     const std::uint8_t* bytecode_base;
     SferaMbcExecutionContext execution_context_stack[100];
     std::size_t argument_cursor;
@@ -545,10 +572,10 @@ struct SferaTcpOutgoingHeader {
 };
 
 struct SferaNetworkRuntime {
-    uint32_t statistics_poll_ticks{};
+    int statistics_poll_ticks{};
 
     std::atomic<std::uint32_t> initialization_result{UINT32_MAX};
-    std::uint32_t server_port = 25858u;
+    std::uint16_t server_port = 25858u;
     std::uint32_t connection_slot = UINT32_MAX;
 
     std::uint32_t client_mode = 0; // immutable while workers run
@@ -568,7 +595,7 @@ struct SferaNetworkRuntime {
     void receiveEvents(std::span<const std::uint8_t> payload);
     bool sendPacket(std::uint32_t flags, std::span<const std::uint8_t> payload);
     static int tickDifference(std::uint32_t current, std::uint32_t previous);
-    static void encodePayload(std::uint8_t* data, int length);
+    static void encodePayload(std::uint8_t* data, std::size_t length);
     void updateTcpStatistics();
 };
 
@@ -594,7 +621,7 @@ public:
 
 class SferaClientApplication {
 public:
-    static uint32_t frame_samples;
+    static int frame_samples;
     static std::uint64_t frame_anchor;
     static uint32_t frame_elapsed_ticks;
     static bool main_loop_started;
@@ -621,7 +648,7 @@ public:
     SferaClientApplication& operator=(const SferaClientApplication&) = delete;
     ~SferaClientApplication() noexcept;
     static bool fatal_error_in_progress;
-    static uint32_t server_number;
+    static int server_number;
     static uint32_t desktop_height;
     static bool storage_initialized;
 
@@ -736,7 +763,7 @@ struct SferaEffectManager {
         std::uint64_t updates{}, distance_culled{}, frustum_culled{}, activation_rejected{};
         std::uint64_t daytime_rejected{}, budget_rejected{}, expired{};
         std::uint64_t render_calls{}, submitted_quads{}, alpha_vertices{}, light_activations{};
-        std::array<std::uint64_t, static_cast<std::size_t>(CreateFailure::Count)> failures{};
+        std::array<std::uint64_t, SferaNumeric::enumBits(CreateFailure::Count)> failures{};
     } diagnostics;
 
     void traceFailure(CreateFailure failure, std::uint32_t effect, std::uint32_t source,
@@ -779,7 +806,7 @@ struct SferaEffectManager {
     void appendDefinition(std::shared_ptr<IEffect> effect);
     std::shared_ptr<IEffect> findDefinition(uint32_t effect_id) const;
     std::shared_ptr<IEffect> findDefinition(std::string_view script_name) const;
-    int32_t findDefinitionId(std::string_view script_name) const;
+    std::uint32_t findDefinitionId(std::string_view script_name) const;
     IEffectListener* findListener(uint32_t effect_id) const;
     bool registerListener(std::uint32_t effect_id, IEffectListener& listener);
     void unregisterListener(IEffectListener& listener);

@@ -17,8 +17,7 @@
 #include <utility>
 
 namespace {
-std::uint32_t sfera_sound_decode_callback(CSoundStream* sound_stream, void* state) noexcept {
-    auto* playback = static_cast<SferaSoundPlaybackState*>(state);
+std::uint32_t sfera_sound_decode_callback(CSoundStream* sound_stream, SferaSoundPlaybackState* playback) noexcept {
     if (playback == nullptr) return 0u;
 
     const auto event = playback->nextEvent();
@@ -56,8 +55,7 @@ std::uint32_t sfera_sound_decode_callback(CSoundStream* sound_stream, void* stat
     return 1u;
 }
 
-std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state) noexcept {
-    auto* playback = static_cast<SferaSoundPlaybackState*>(state);
+std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, SferaSoundPlaybackState* playback) noexcept {
     if (playback == nullptr) return 0u;
 
     const auto queued = playback->popEvent();
@@ -91,7 +89,7 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
 }
 
     float sound_elapsed(std::uint64_t start) {
-        return static_cast<std::int64_t>(WorldClock::nowTicks() - start) * 0.0001f;
+        return SferaNumeric::signedWord(WorldClock::nowTicks() - start) * 0.0001f;
     }
     std::uint32_t sound_flag(std::string_view token) {
         if (SferaText::asciiEqual(token, "SF_TYPE_ENVIRONMENT")) return 1u << 0u;
@@ -107,34 +105,33 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
         if (manager == nullptr) return;
         auto& cache = manager->cache;
         const auto now = std::chrono::steady_clock::now();
-        for (std::size_t index = 0u; index < cache.size();) {
-            auto& entry = cache[index];
-            CSound* sound = entry.sound.get();
+        for (auto entry = cache.begin(); entry != cache.end();) {
+            CSound* sound = entry->sound.get();
             if (sound == nullptr) {
-                cache.erase(cache.begin() + static_cast<std::ptrdiff_t>(index));
+                entry = cache.erase(entry);
                 continue;
             }
             const bool playing = sound->IsSoundPlaying() != 0;
             sound->playback_finished = !playing;
             if (playing || !sound->cache_available) {
-                entry.idle_started = false;
-                ++index;
+                entry->idle_started = false;
+                ++entry;
                 continue;
             }
             const int lifetime = sound->cache_lifetime_seconds;
             if (lifetime < 0) {
-                ++index;
+                ++entry;
                 continue;
             }
-            if (!entry.idle_started) {
-                entry.idle_since = now;
-                entry.idle_started = true;
+            if (!entry->idle_started) {
+                entry->idle_since = now;
+                entry->idle_started = true;
             }
-            if (lifetime != 0 && std::chrono::duration_cast<std::chrono::seconds>(now - entry.idle_since).count() < lifetime) {
-                ++index;
+            if (lifetime != 0 && std::chrono::duration_cast<std::chrono::seconds>(now - entry->idle_since).count() < lifetime) {
+                ++entry;
                 continue;
             }
-            cache.erase(cache.begin() + static_cast<std::ptrdiff_t>(index));
+            entry = cache.erase(entry);
         }
     }
     void release_active_sound(CSoundEffect& effect) {
@@ -144,7 +141,7 @@ std::uint32_t sfera_sound_play_callback(CSoundStream* sound_stream, void* state)
         sound->cache_available = true;
         service_semantic_sound_cache();
     }
-    bool play_sound(CSound& sound, int looped, float position) {
+    bool play_sound(CSound& sound, bool looped, float position) {
         sound.SetPlayTimepos(position);
         if (sound.CSound::Play(looped) == 0) return false;
         sound.cache_idle_since = UINT64_MAX;
@@ -293,7 +290,7 @@ std::shared_ptr<const CSoundEffect::Definition> CSoundEffect::loadDefinition(Sfe
             }
             auto& source = data->sources[index];
             source = {};
-            assigned[static_cast<std::size_t>(index)] = true;
+            assigned[index] = true;
             if (!parser.readQuotedString(1u, text)) {
                 parser.clearScanRange();
                 return nullptr;
@@ -413,7 +410,7 @@ void CSoundEffect::start(const SferaVec3F* frame, bool after_start_time) {
     if (sound != nullptr) {
         active_sound = sound;
         sound->cache_available = false;
-        if (!after_start_time) play_sound(*sound, static_cast<int>(definition->flags & (1u << 4u)), 0.0f);
+        if (!after_start_time) play_sound(*sound, (definition->flags & (1u << 4u)) != 0u, 0.0f);
     }
     distance_paused = after_start_time ? 1u : 0u;
     if (after_start_time) transition_started_at = WorldClock::nowTicks();
@@ -600,7 +597,7 @@ void SferaSoundEventList::parseGroup(std::size_t group, std::string_view text) {
             event.type = SoundEventType::stop;
         } else if (!token.empty()) {
             auto digits = token.substr(1u);
-            while (!digits.empty() && std::isspace(static_cast<std::uint8_t>(digits.front()))) {
+            while (!digits.empty() && SferaText::isSpace(digits.front())) {
                 digits.remove_prefix(1u);
             }
             if (!digits.empty() && digits.front() == '+') digits.remove_prefix(1u);
@@ -671,7 +668,7 @@ bool SferaSoundPlaybackState::load(const std::string& filename) {
     source = text;
 
     if (parser.findValue("volume", &track)) {
-        volume_scale = static_cast<int>(std::trunc(parser.readFloat(0u)));
+        volume_scale = std::trunc(parser.readFloat(0u));
     }
 
     auto count_records = [&](std::string_view name) {
@@ -694,7 +691,7 @@ bool SferaSoundPlaybackState::load(const std::string& filename) {
         std::string start, end;
         parser.readString(1u, start);
         parser.readString(2u, end);
-        timings[static_cast<std::size_t>(index - 1)] = {parseTime(start), parseTime(end)};
+        timings[index - 1] = {parseTime(start), parseTime(end)};
     }
     parser.clearScanRange();
 
@@ -712,7 +709,7 @@ bool SferaSoundPlaybackState::load(const std::string& filename) {
         const auto index = parser.readInt(0u);
         if (index <= 0 || std::cmp_greater(index, playlists.size())) return false;
 
-        auto& pattern = playlists[static_cast<std::size_t>(index - 1)];
+        auto& pattern = playlists[index - 1];
         pattern.groups.resize(token_count > 2u ? (token_count - 1u) / 2u + 1u : 1u);
 
         std::size_t group = 0u;
@@ -920,7 +917,7 @@ void CSoundManager::update() {
         if (sound->cache_lifetime_seconds == 0) return true;
         const auto now = WorldClock::nowTicks();
         if (sound->cache_idle_since == UINT64_MAX) sound->cache_idle_since = now;
-        return (now - sound->cache_idle_since) / 10000u >= static_cast<std::uint64_t>(sound->cache_lifetime_seconds);
+        return (now - sound->cache_idle_since) / 10000u >= sound->cache_lifetime_seconds;
     });
     service_semantic_sound_cache();
     if (auto* sound_interface = SI_GetInterface()) sound_interface->UpdateSettings();
@@ -1025,8 +1022,7 @@ void SferaSoundRuntime::shutdown() {
 std::uint32_t SferaSoundRuntime::soundVolume() const {
     const auto* manager = sound_manager.get();
     if (manager == nullptr) return 0u;
-    return static_cast<std::uint32_t>(
-        std::clamp(static_cast<int>(std::lround(manager->volume * 100.0f)), 0, 100));
+    return std::clamp(std::lround(manager->volume * 100.0f), 0L, 100L);
 }
 
 int SferaSoundRuntime::musicVolume() const {
@@ -1038,11 +1034,11 @@ bool SferaSoundRuntime::hardwareMixing() const {
 }
 
 void SferaSoundRuntime::setSoundVolume(std::uint32_t value) {
-    if (sound_manager != nullptr) sound_manager->setVolume(static_cast<int>(std::min(value, 100u)));
+    if (sound_manager != nullptr) sound_manager->setVolume(std::min(value, 100u));
 }
 
 void SferaSoundRuntime::setMusicVolume(std::uint32_t value) {
-    SI_SetStreamVolume(static_cast<int>(std::min(value, 100u)));
+    SI_SetStreamVolume(std::min(value, 100u));
 }
 
 void SferaSoundRuntime::adjustMusicVolume(int delta) {

@@ -136,14 +136,14 @@ struct SferaSoundPlaybackState {
     std::string source;
     bool finished;
     bool stopped;
-    int volume_scale;
+    float volume_scale;
     bool force_stop;
 };
 
 struct SferaSoundRuntime {
     bool volume_refresh_active{};
     float volume_refresh_frames{};
-    uint32_t volume_refresh_direction{};
+    bool volume_refresh_direction{};
 
     std::unique_ptr<SoundEffectRegistry> effect_manager;
     std::unique_ptr<CSoundManager> sound_manager;

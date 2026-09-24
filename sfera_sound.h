@@ -29,7 +29,8 @@ bool sferaDecodeVorbis(const std::uint8_t* data, std::size_t size, SferaVorbisPc
 struct HWND__;
 class CSoundInterface;
 class CSoundStream;
-using SferaSoundStreamCallback = std::uint32_t (*)(CSoundStream* stream, void* state) noexcept;
+struct SferaSoundPlaybackState;
+using SferaSoundStreamCallback = std::uint32_t (*)(CSoundStream* stream, SferaSoundPlaybackState* state) noexcept;
 
 class CSoundListener {
 public:
@@ -93,7 +94,7 @@ public:
     float GetPlayTimepos() const;
     int IsSoundPlaying() const;
     void SetPlayTimepos(float seconds);
-    int Play(int looped);
+    int Play(bool looped);
     int SetVelocity(float x, float y, float z, int deferred);
 
     std::string filename;
@@ -123,10 +124,10 @@ public:
     int PlayEx(float seconds, int looped);
     std::uint32_t decoder_state = 0u;
     SferaSoundStreamCallback decode_callback = nullptr;
-    void* decode_state = nullptr;
+    SferaSoundPlaybackState* decode_state = nullptr;
     std::uint32_t decode_event_position = UINT32_MAX;
     SferaSoundStreamCallback play_callback = nullptr;
-    void* play_state = nullptr;
+    SferaSoundPlaybackState* play_state = nullptr;
     std::uint32_t play_event_position = UINT32_MAX;
     float stream_gain = 1.0f;
 
