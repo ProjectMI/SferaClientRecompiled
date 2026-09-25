@@ -1,4 +1,4 @@
-#include "semantic_static.h"
+﻿#include "semantic_static.h"
 #include "sfera_sound.h"
 
 #include <algorithm>
@@ -782,7 +782,15 @@ void SferaSoundPlaybackState::clear() {
 }
 
 void SferaSoundPlaybackState::update() {
-    if (playing || stream == nullptr || stream->decoder_state != 0u || stopped) return;
+    if (stream == nullptr || stopped) return;
+
+    const int ready_state = stream->ReadyState();
+    if (ready_state < 0) {
+        finished = true;
+        stop();
+        return;
+    }
+    if (ready_state == 0 || playing || stream->decoder_state != 0u) return;
     if (finished || force_stop) {
         stop();
         return;

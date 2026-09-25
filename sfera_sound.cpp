@@ -1,4 +1,4 @@
-#include "sfera_sound.h"
+﻿#include "sfera_sound.h"
 
 #include <windows.h>
 #include <mmsystem.h>
@@ -7,11 +7,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <limits>
 #include <io.h>
+#include <mutex>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -209,8 +213,15 @@ bool copyToBuffer(IDirectSoundBuffer8* buffer, const std::vector<std::uint8_t>& 
     return mapping.close();
 }
 
-bool createBuffer(IDirectSound8* device, const DecodedAudio& audio, bool spatial, ComPtr<IDirectSoundBuffer8>& buffer, ComPtr<IDirectSound3DBuffer8>& spatial_buffer) {
+bool createBuffer(
+    IDirectSound8* device,
+    const DecodedAudio& audio,
+    bool spatial,
+    bool hardware_mixing,
+    ComPtr<IDirectSoundBuffer8>& buffer,
+    ComPtr<IDirectSound3DBuffer8>& spatial_buffer) {
     if (device == nullptr || audio.pcm.empty() || audio.pcm.size() > std::numeric_limits<DWORD>::max()) return false;
+
     DSBUFFERDESC description{};
     description.dwSize = SferaNumeric::lowWord(sizeof(description));
     description.dwBufferBytes = SferaNumeric::lowWord(audio.pcm.size());
@@ -220,11 +231,11 @@ bool createBuffer(IDirectSound8* device, const DecodedAudio& audio, bool spatial
     if (spatial && audio.format.nChannels == 1u) {
         description.dwFlags |= DSBCAPS_CTRL3D | DSBCAPS_MUTE3DATMAXDISTANCE;
     }
-    description.dwFlags |= g_hardware_mixing ? DSBCAPS_LOCHARDWARE : DSBCAPS_LOCSOFTWARE;
+    description.dwFlags |= hardware_mixing ? DSBCAPS_LOCHARDWARE : DSBCAPS_LOCSOFTWARE;
 
     ComPtr<IDirectSoundBuffer> base;
     HRESULT result = device->CreateSoundBuffer(&description, &base, nullptr);
-    if (FAILED(result) && g_hardware_mixing) {
+    if (FAILED(result) && hardware_mixing) {
         description.dwFlags &= ~DSBCAPS_LOCHARDWARE;
         description.dwFlags |= DSBCAPS_LOCSOFTWARE;
         result = device->CreateSoundBuffer(&description, &base, nullptr);
@@ -236,6 +247,90 @@ bool createBuffer(IDirectSound8* device, const DecodedAudio& audio, bool spatial
         queryInterface(base.Get(), IID_IDirectSound3DBuffer, spatial_buffer);
     }
     return true;
+}
+
+enum class StreamDecodeStatus : std::uint8_t { pending, ready, failed };
+
+struct StreamDecodeState {
+    std::mutex mutex;
+    StreamDecodeStatus status = StreamDecodeStatus::pending;
+    DecodedAudio audio;
+    ComPtr<IDirectSoundBuffer8> buffer;
+};
+
+class StreamDecodeWorker {
+public:
+    StreamDecodeWorker() : worker_([this](std::stop_token stop) { run(stop); }) {}
+
+    ~StreamDecodeWorker() {
+        worker_.request_stop();
+        condition_.notify_all();
+    }
+
+    std::shared_ptr<StreamDecodeState> enqueue(
+        std::string filename,
+        ComPtr<IDirectSound8> device,
+        bool hardware_mixing) {
+        auto state = std::make_shared<StreamDecodeState>();
+        {
+            std::lock_guard lock(mutex_);
+            tasks_.push_front({std::move(filename), std::move(device), hardware_mixing, state});
+        }
+        condition_.notify_one();
+        return state;
+    }
+
+private:
+    struct Task {
+        std::string filename;
+        ComPtr<IDirectSound8> device;
+        bool hardware_mixing = false;
+        std::weak_ptr<StreamDecodeState> state;
+    };
+
+    void run(std::stop_token stop) {
+        const HRESULT com_result = ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        for (;;) {
+            Task task;
+            {
+                std::unique_lock lock(mutex_);
+                condition_.wait(lock, stop, [this] { return !tasks_.empty(); });
+                if (stop.stop_requested()) break;
+                task = std::move(tasks_.front());
+                tasks_.pop_front();
+            }
+
+            auto state = task.state.lock();
+            if (state == nullptr) continue;
+
+            DecodedAudio audio;
+            const bool decoded = decodeAudioFile(task.filename, audio);
+            ComPtr<IDirectSoundBuffer8> buffer;
+            ComPtr<IDirectSound3DBuffer8> unused;
+            const bool created = decoded && state.use_count() > 1u &&
+                createBuffer(task.device.Get(), audio, false, task.hardware_mixing, buffer, unused);
+
+            std::lock_guard state_lock(state->mutex);
+            if (created) {
+                state->audio = std::move(audio);
+                state->buffer = std::move(buffer);
+                state->status = StreamDecodeStatus::ready;
+            } else {
+                state->status = StreamDecodeStatus::failed;
+            }
+        }
+        if (SUCCEEDED(com_result)) ::CoUninitialize();
+    }
+
+    std::mutex mutex_;
+    std::condition_variable_any condition_;
+    std::deque<Task> tasks_;
+    std::jthread worker_;
+};
+
+StreamDecodeWorker& streamDecodeWorker() {
+    static StreamDecodeWorker worker;
+    return worker;
 }
 
 std::uint32_t secondsToBytes(const WAVEFORMATEX& format, float seconds, std::size_t total_bytes) {
@@ -285,11 +380,13 @@ struct CSound::Impl {
 struct CSoundStream::Impl {
     DecodedAudio audio;
     ComPtr<IDirectSoundBuffer8> buffer;
+    std::shared_ptr<StreamDecodeState> decode_job;
     float decode_signal = -1.0f;
     float play_signal = -1.0f;
     bool was_playing = false;
     bool looped = false;
     bool registered = true;
+    bool decode_failed = false;
 };
 
 CSoundListener::CSoundListener() : impl_(std::make_unique<Impl>()) {}
@@ -342,7 +439,7 @@ int CSound::LoadSound(const std::string& source_filename, std::uint32_t flags) {
     const bool spatial = (flags & 1u) != 0u;
     ComPtr<IDirectSoundBuffer8> buffer;
     ComPtr<IDirectSound3DBuffer8> spatial_buffer;
-    if (!createBuffer(g_interface->impl_->device.Get(), audio, spatial, buffer, spatial_buffer)) return 0;
+    if (!createBuffer(g_interface->impl_->device.Get(), audio, spatial, g_hardware_mixing, buffer, spatial_buffer)) return 0;
 
     filename = source_filename;
     impl_->audio = std::move(audio);
@@ -463,6 +560,28 @@ int CSoundStream::IsStreamPlaying() const {
     if (!impl_->buffer) return 0;
     DWORD status = 0u;
     return SUCCEEDED(impl_->buffer->GetStatus(&status)) && (status & DSBSTATUS_PLAYING) != 0u ? 1 : 0;
+}
+
+int CSoundStream::ReadyState() {
+    if (impl_->buffer) return 1;
+    if (impl_->decode_failed) return -1;
+
+    auto job = impl_->decode_job;
+    if (job == nullptr) return 0;
+
+    std::lock_guard lock(job->mutex);
+    if (job->status == StreamDecodeStatus::pending) return 0;
+    if (job->status == StreamDecodeStatus::failed || !job->buffer) {
+        impl_->decode_job.reset();
+        impl_->decode_failed = true;
+        return -1;
+    }
+
+    impl_->audio = std::move(job->audio);
+    impl_->buffer = std::move(job->buffer);
+    impl_->decode_job.reset();
+    applyVolume();
+    return 1;
 }
 
 void CSoundStream::applyVolume() {
@@ -598,20 +717,13 @@ void SI_SetStreamVolume(int percent) {
 }
 
 CSoundStream* SI_StreamCreateFile(const std::string& filename, std::uint32_t) {
-    if (g_interface == nullptr || g_interface->impl_->device == nullptr) return nullptr;
-    DecodedAudio audio;
-    if (!decodeAudioFile(filename, audio)) return nullptr;
-
-    ComPtr<IDirectSoundBuffer8> buffer;
-    ComPtr<IDirectSound3DBuffer8> unused;
-    if (!createBuffer(g_interface->impl_->device.Get(), audio, false, buffer, unused)) return nullptr;
+    if (filename.empty() || g_interface == nullptr || g_interface->impl_->device == nullptr) return nullptr;
 
     auto stream = std::shared_ptr<CSoundStream>(new CSoundStream());
-    stream->impl_->audio = std::move(audio);
-    stream->impl_->buffer = std::move(buffer);
+    stream->impl_->decode_job = streamDecodeWorker().enqueue(
+        filename, g_interface->impl_->device, g_hardware_mixing);
     stream->decode_event_position = UINT32_MAX;
     stream->play_event_position = UINT32_MAX;
-    stream->applyVolume();
     g_interface->impl_->streams.push_back(stream);
     return stream.get();
 }

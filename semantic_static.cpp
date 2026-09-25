@@ -599,7 +599,7 @@ void SferaEffectManager::loadDefinitions() {
     std::error_code error;
     const auto enumerate = [&](const fs::path& directory, std::string_view extension, auto&& callback) {
         if (!fs::exists(directory, error)) return;
-        for (const auto& entry : fs::directory_iterator(directory, error)) {
+        for (const auto& entry : std::filesystem::directory_iterator(directory, error)) {
             if (error || !entry.is_regular_file(error)) continue;
             if (SferaText::asciiEqual(entry.path().extension().string(), extension)) callback(entry.path());
         }
@@ -3041,7 +3041,11 @@ bool SferaMbcRuntime::executeBuiltin(Builtin builtin) {
         case Builtin::CompareStrings: case Builtin::CompareStringsInsensitive: case Builtin::CompareStringsCount: case Builtin::CompareStringsCountInsensitive: {
             const auto first = nextAddress();
             const auto second = nextAddress();
-            const bool bounded = builtin == Builtin::CompareStringsCount || builtin == Builtin::CompareStringsCountInsensitive;
+            const bool optionalInsensitiveCount =
+                builtin == Builtin::CompareStringsInsensitive && argument_count >= 3;
+            const bool bounded = optionalInsensitiveCount ||
+                builtin == Builtin::CompareStringsCount ||
+                builtin == Builtin::CompareStringsCountInsensitive;
             const auto count = bounded ? nextWord() : 0u;
             if (execution_failed) break;
             const auto left = bounded ? textIn(first, count) : textIn(first);
@@ -6386,7 +6390,48 @@ void SferaMbcRuntime::systemCommand() {
         case 64: { const auto track = address("PLAY_MUSIC"); if (!execution_failed) g_sfera_sound_runtime.requestTrack(track != 0 && !text(track).empty() ? std::optional<std::string_view>{text(track)} : std::nullopt); return; }
         case 65: g_sfera_world_objects.contours->rebuildServerWall(); return;
         case 66: case 67: { const auto destination = address(operation == 66 ? "GZ_PACK, 1" : "GZ_UNPACK, 1"); const auto source = address(operation == 66 ? "GZ_PACK, 2" : "GZ_UNPACK, 2"); if (!execution_failed) pushInteger(g_sfera_files.transformEnvelope(std::string(text(destination)), std::string(text(source)), operation == 66)); return; }
-        case 68: case 69: nextInteger(); return;
+        case 68: {
+            auto destination = nextSlice();
+            if (execution_failed) return;
+
+            constexpr std::size_t map_width = 80u;
+            constexpr std::size_t map_height = 80u;
+            constexpr std::size_t map_cell_size = 22u;
+            constexpr std::size_t map_size = map_width * map_height * map_cell_size;
+
+            if (destination.base == 0u) {
+                reportError("NULL landscape map destination");
+                return;
+            }
+            if (!destination.contains(map_size)) {
+                destination.diagnoseRange(map_size);
+                if (!destination.contains(map_size)) return;
+            }
+
+            const auto map_data = g_sfera_files.readAll("landscape\\map.bin");
+            if (map_data.size() != map_size) {
+                reportError(std::format(
+                    "Invalid landscape map size for system 68: expected {}, got {}",
+                    map_size, map_data.size()));
+                return;
+            }
+
+            auto output = memoryBytes(destination.base, map_size);
+            for (std::size_t map_x = 0u; map_x < map_width; ++map_x) {
+                for (std::size_t map_z = 0u; map_z < map_height; ++map_z) {
+                    const auto source_index = map_x * map_height + map_z;
+                    const auto destination_index = map_z * map_width + map_x;
+                    const auto source_offset = source_index * map_cell_size;
+                    const auto destination_offset = destination_index * map_cell_size;
+                    std::copy_n(
+                        map_data.begin() + static_cast<std::ptrdiff_t>(source_offset),
+                        map_cell_size,
+                        output.begin() + static_cast<std::ptrdiff_t>(destination_offset));
+                }
+            }
+            return;
+        }
+        case 69: nextInteger(); return;
         case 70: { nextInteger(); const auto x = nextInteger(); const auto y = nextInteger(); if (!execution_failed) { if (x != 0) writeMemory(x, std::uint8_t{}); if (y != 0) writeMemory(y, std::uint8_t{}); } return; }
         case 71: nextInteger(); nextInteger(); return;
         case 72: nextInteger(); nextInteger(); return;

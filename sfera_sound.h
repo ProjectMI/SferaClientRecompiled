@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -121,6 +121,7 @@ public:
     void SetPlaySignal(float seconds);
     void Stop();
     int IsStreamPlaying() const;
+    int ReadyState();
     int PlayEx(float seconds, int looped);
     std::uint32_t decoder_state = 0u;
     SferaSoundStreamCallback decode_callback = nullptr;
