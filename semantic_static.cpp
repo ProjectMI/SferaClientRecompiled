@@ -7010,6 +7010,19 @@ bool SferaClientApplication::initialize() {
     settings.readFloat("LOD_DISTANCE", g_sfera_graphics_runtime.minimum_lod_distance);
     settings.readFloat("MIN_LOD_DIST", g_sfera_graphics_runtime.lod_distance);
     readInteger("POSTEFFECTS", g_sfera_graphics_runtime.post_effects_enabled);
+    {
+        int configured_fov = static_cast<int>(SferaGraphicsRuntime::default_field_of_view);
+        const bool had_fov = settings.readInteger("FOV", configured_fov);
+        const int clamped_fov = std::clamp(
+            configured_fov,
+            static_cast<int>(SferaGraphicsRuntime::minimum_field_of_view),
+            static_cast<int>(SferaGraphicsRuntime::maximum_field_of_view));
+        g_sfera_graphics_runtime.field_of_view_degrees = static_cast<std::uint32_t>(clamped_fov);
+        if (!had_fov || configured_fov != clamped_fov) {
+            settings.writeValue("FOV", std::to_string(clamped_fov), false);
+            settings.save();
+        }
+    }
     if (g_sfera_graphics_runtime.minimum_lod_distance == 0.0f) g_sfera_graphics_runtime.minimum_lod_distance = 23.0f;
     if (g_sfera_graphics_runtime.lod_distance == 0.0f) g_sfera_graphics_runtime.lod_distance = 20.0f;
     const std::array<std::pair<std::string_view, bool*>, 3> landscapes{{{"landscape_hr", &TerrainAssets::high_resolution_assets}, {"landscape_ph", &TerrainAssets::alternate_ph_assets}, {"landscape_rd", &TerrainAssets::alternate_rd_assets}}};
@@ -7384,8 +7397,20 @@ namespace {
         g_sfera_interface.queueEvent({nullptr, 0u, UiMessage::refreshInterface, 0u, 0u});
     }
 
+    constexpr std::uint32_t fov_slider_control_id = 0xF001u;
+    constexpr std::uint32_t fov_label_control_id = 0xF002u;
+    constexpr std::uint32_t fov_decoration_control_id = 0xF010u;
+
     Window* optionChild(Window* window, std::uint32_t index) {
         return window == nullptr ? nullptr : window->controlAt(index);
+    }
+
+    Window* optionControl(Window* window, std::uint32_t control_id) {
+        if (window == nullptr) return nullptr;
+        const auto found = std::find_if(window->children.begin(), window->children.end(), [control_id](const auto& child) {
+            return child != nullptr && child->control_id == control_id;
+        });
+        return found == window->children.end() ? nullptr : found->get();
     }
 
     void optionMessage(Window* window, std::uint32_t index, SphereUI::UiMessage message, std::uint32_t first = 0u, std::uint32_t second = 0u) {
@@ -7651,6 +7676,149 @@ namespace {
         if (!automatic) optionMessage(window, 28u, UiMessage::setScrollValue, SferaNumeric::lowWord(SferaNumeric::truncateInt64(g_sfera_graphics_runtime.fog_distance - 30.0)));
     }
 
+    void updateFovLabel(Window* window) {
+        if (auto* label = optionControl(window, fov_label_control_id))
+            label->setText(std::format("FOV: {}", g_sfera_graphics_runtime.field_of_view_degrees));
+    }
+
+    void addFovControls(Window* window) {
+        if (window == nullptr || optionControl(window, fov_slider_control_id) != nullptr) return;
+
+        auto* scroll_template = optionChild(window, 46u);
+        if (scroll_template == nullptr || scroll_template->asScrollBar() == nullptr) return;
+
+        auto slider = scroll_template->clone();
+        auto* fov_slider = slider->asScrollBar();
+        if (fov_slider == nullptr) return;
+        fov_slider->control_id = fov_slider_control_id;
+        fov_slider->step = 1;
+        fov_slider->page_step = 5;
+        fov_slider->explicit_step = true;
+        fov_slider->notify_changes = true;
+        fov_slider->hidden = false;
+        fov_slider->disabled = false;
+        fov_slider->input_enabled = true;
+
+        const auto makeNavigationButtonVisible = [](ButtonCtrl* button) {
+            if (button == nullptr) return;
+            button->hidden = false;
+            button->disabled = false;
+            button->input_enabled = true;
+            button->visual_state = 0u;
+            if (button->hover_image != nullptr) button->idle_image = button->hover_image;
+            else if (button->idle_image == nullptr) button->idle_image = button->pressed_image;
+            if (button->hover_image == nullptr) button->hover_image = button->idle_image;
+            if (button->pressed_image == nullptr) button->pressed_image = button->hover_image;
+            if (button->disabled_image == nullptr) button->disabled_image = button->idle_image;
+        };
+        makeNavigationButtonVisible(fov_slider->decrease_button.get());
+        makeNavigationButtonVisible(fov_slider->increase_button.get());
+
+        Window* label_template = nullptr;
+        int label_distance = std::numeric_limits<int>::max();
+        const int slider_center_y = scroll_template->y + scroll_template->height / 2;
+        for (const auto& child : window->children) {
+            if (child == nullptr || child->control_kind != UiControlKind::text || child->x >= scroll_template->x) continue;
+            const int child_center_y = child->y + child->height / 2;
+            const int distance = std::abs(child_center_y - slider_center_y);
+            if (distance < label_distance) {
+                label_distance = distance;
+                label_template = child.get();
+            }
+        }
+        if (label_template == nullptr) label_template = optionChild(window, 49u);
+
+        std::unique_ptr<Window> label;
+        if (label_template != nullptr) {
+            label = label_template->clone();
+        } else {
+            auto fallback = std::make_unique<TextCtrl>();
+            fallback->height = 16;
+            fallback->x = std::max(0, fov_slider->x - 90);
+            label = std::move(fallback);
+        }
+        if (label == nullptr) return;
+        label->control_id = fov_label_control_id;
+        label->hidden = false;
+        label->disabled = false;
+        label->input_enabled = false;
+        label->height = std::max(label->height, 16);
+        label->width = std::max(60, fov_slider->x - label->x - 4);
+
+        std::vector<std::unique_ptr<Window>> decorations;
+        const int template_left = scroll_template->x - 12;
+        const int template_right = scroll_template->x + scroll_template->width + 12;
+        std::uint32_t decoration_index = 0u;
+        for (const auto& child : window->children) {
+            if (child == nullptr || child.get() == scroll_template || child.get() == label_template) continue;
+            const bool decorative_kind = child->control_kind == UiControlKind::image ||
+                (child->control_kind == UiControlKind::window && child->resource_reference != nullptr);
+            if (!decorative_kind || child->height > scroll_template->height + 12) continue;
+            const int child_center_y = child->y + child->height / 2;
+            if (std::abs(child_center_y - slider_center_y) > std::max(6, scroll_template->height / 2)) continue;
+            if (child->x + child->width < template_left || child->x > template_right) continue;
+
+            auto decoration = child->clone();
+            if (decoration == nullptr) continue;
+            decoration->control_id = fov_decoration_control_id + decoration_index++;
+            decoration->hidden = false;
+            decoration->disabled = false;
+            decoration->input_enabled = false;
+            decorations.push_back(std::move(decoration));
+        }
+
+        auto* primary_button = optionChild(window, 1u);
+        auto* secondary_button = optionChild(window, 2u);
+        int insertion_y = window->height - 34;
+        if (primary_button != nullptr && secondary_button != nullptr) insertion_y = std::min(primary_button->y, secondary_button->y);
+        else if (primary_button != nullptr) insertion_y = primary_button->y;
+        else if (secondary_button != nullptr) insertion_y = secondary_button->y;
+
+        const int row_height = std::max(label->height, fov_slider->height) + 4;
+        int content_bottom = 0;
+        for (const auto& child : window->children) {
+            if (child == nullptr || child.get() == primary_button || child.get() == secondary_button || child->y >= insertion_y) continue;
+            if (child->control_kind == UiControlKind::image || child->control_kind == UiControlKind::window) continue;
+            content_bottom = std::max(content_bottom, child->y + child->height);
+        }
+        const int available_gap = std::max(0, insertion_y - content_bottom);
+        const int layout_shift = std::max(0, row_height - available_gap);
+        if (layout_shift != 0) {
+            for (auto& child : window->children) {
+                if (child != nullptr && child->y >= insertion_y) {
+                    child->y += layout_shift;
+                    child->initial_y += layout_shift;
+                }
+            }
+            window->height += layout_shift;
+        }
+        const int row_y = insertion_y + layout_shift - row_height;
+
+        label->y = row_y + (row_height - label->height) / 2;
+        label->initial_x = label->x;
+        label->initial_y = label->y;
+        fov_slider->y = row_y + (row_height - fov_slider->height) / 2;
+        fov_slider->initial_y = fov_slider->y;
+        const int decoration_shift_y = fov_slider->y - scroll_template->y;
+        for (auto& decoration : decorations) {
+            decoration->y += decoration_shift_y;
+            decoration->initial_y = decoration->y;
+            window->appendChild(std::move(decoration));
+        }
+        fov_slider->handleMessage(
+            UiMessage::setScrollRange,
+            0u,
+            SferaGraphicsRuntime::maximum_field_of_view - SferaGraphicsRuntime::minimum_field_of_view);
+        fov_slider->handleMessage(
+            UiMessage::setScrollValue,
+            g_sfera_graphics_runtime.field_of_view_degrees - SferaGraphicsRuntime::minimum_field_of_view,
+            0u);
+
+        window->appendChild(std::move(label));
+        window->appendChild(std::move(slider));
+        updateFovLabel(window);
+    }
+
     void setGraphicsOptionsVisible(bool show) {
         auto* window = beginOptionsDialog("gfx_options", WindowEventHandler::graphics_options, show);
         if (window == nullptr) return;
@@ -7663,6 +7831,7 @@ namespace {
             g_sfera_interface.options.saved_fog_distance = graphics.fog_distance;
             g_sfera_interface.options.saved_lod_distance = g_sfera_graphics_runtime.lod_distance;
             g_sfera_interface.options.saved_lods_enabled = graphics.lods_enabled;
+            g_sfera_interface.options.saved_field_of_view = graphics.field_of_view_degrees;
             values[9] = g_sfera_graphics_runtime.auto_fog;
             values[8] = g_sfera_effect_manager.effects_enabled;
             g_sfera_interface.options.graphics_page = g_sfera_graphics_runtime.reflection_quality;
@@ -7705,6 +7874,7 @@ namespace {
             optionSelection(window, 51u, post_supported ? 1u : 0u, values[6]);
             optionText(window, 49u, graphicsBooleanLabel(values[6]));
             std::copy_n(values, 7u, g_sfera_interface.options.saved_graphics);
+            addFovControls(window);
             return;
         }
         setOptionsVisible(true);
@@ -7715,7 +7885,7 @@ namespace {
         const auto mode = g_sfera_graphics_runtime.d3d_runtime->display_modes.at(values[5]);
         const std::pair<std::string_view, std::uint32_t> settings[] = { {
             "XRES", mode.width
-        }, {"YRES", mode.height}, {"DEPTH", mode.depth}, {"GRASS", values[3]}, {"WINDOWED", values[4]}, {"SHAD", values[2]}, {"AUTOFOG", g_sfera_graphics_runtime.auto_fog}, {"FOGDIST", SferaNumeric::word(SferaNumeric::truncateInt(graphics.fog_distance))}, {"REFLQUAL", g_sfera_graphics_runtime.reflection_quality}, {"EFFECTS", g_sfera_effect_manager.effects_enabled}, {"LODS", graphics.lods_enabled}, {"LOD_DISTANCE", SferaNumeric::word(SferaNumeric::truncateInt(g_sfera_graphics_runtime.minimum_lod_distance))}, {"MIN_LOD_DIST", SferaNumeric::word(SferaNumeric::truncateInt(g_sfera_graphics_runtime.lod_distance))}, {"POSTEFFECTS", values[6]}};
+        }, {"YRES", mode.height}, {"DEPTH", mode.depth}, {"GRASS", values[3]}, {"WINDOWED", values[4]}, {"SHAD", values[2]}, {"AUTOFOG", g_sfera_graphics_runtime.auto_fog}, {"FOGDIST", SferaNumeric::word(SferaNumeric::truncateInt(graphics.fog_distance))}, {"REFLQUAL", g_sfera_graphics_runtime.reflection_quality}, {"EFFECTS", g_sfera_effect_manager.effects_enabled}, {"LODS", graphics.lods_enabled}, {"LOD_DISTANCE", SferaNumeric::word(SferaNumeric::truncateInt(g_sfera_graphics_runtime.minimum_lod_distance))}, {"MIN_LOD_DIST", SferaNumeric::word(SferaNumeric::truncateInt(g_sfera_graphics_runtime.lod_distance))}, {"POSTEFFECTS", values[6]}, {"FOV", graphics.field_of_view_degrees}};
         for (const auto& setting : settings) InterfaceConfiguration::writeInteger(setting.first, setting.second);
 
         InterfaceConfiguration::save();
@@ -7859,6 +8029,7 @@ namespace {
                 if (lod != nullptr) lod->setDistances(g_sfera_graphics_runtime.lod_distance, g_sfera_graphics_runtime.minimum_lod_distance);
                 setGraphicsOptionsVisible(false);
             } else if (event.control_id == 2u) {
+                graphics.field_of_view_degrees = g_sfera_interface.options.saved_field_of_view;
                 setGraphicsOptionsVisible(false);
                 graphics.fog_distance = g_sfera_interface.options.saved_fog_distance;
                 g_sfera_graphics_runtime.lod_distance = g_sfera_interface.options.saved_lod_distance;
@@ -7936,7 +8107,17 @@ namespace {
                 break;
             default:
                 break;
-        } else if (event.message != UiMessage::horizontalScroll) return;
+        } else if (event.message != UiMessage::horizontalScroll && event.message != UiMessage::sliderValueChanged) return;
+        if (event.control_id == fov_slider_control_id) {
+            const auto requested = SferaGraphicsRuntime::minimum_field_of_view + event.first;
+            graphics.field_of_view_degrees = std::clamp(
+                requested,
+                SferaGraphicsRuntime::minimum_field_of_view,
+                SferaGraphicsRuntime::maximum_field_of_view);
+            updateFovLabel(window);
+            return;
+        }
+        if (event.message != UiMessage::horizontalScroll) return;
         if (event.control_id == 28u) graphics.fog_distance = event.first + 30.0;
         else if (event.control_id == 46u) g_sfera_graphics_runtime.lod_distance = event.first + 12.0;
     }

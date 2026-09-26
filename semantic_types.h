@@ -362,8 +362,9 @@ struct SferaVec4F {
 namespace SferaMath {
     inline double planarSquared(double first, double second) { return first * first + second * second; }
     SferaVec3F anglesFromBasis(SferaVec3F forward, SferaVec3F up);
-    inline float fittedFieldOfView(double width, double height) {
-        constexpr double half_angle = 0.6f;
+    inline float fittedFieldOfView(double width, double height, double reference_degrees = 68.75493541569878) {
+        constexpr double degrees_to_half_radians = 0.008726646259971648;
+        const double half_angle = reference_degrees * degrees_to_half_radians;
         const float tangent = std::tan(half_angle);
         const float aspect = height / width;
         const float adjusted = tangent / (aspect / 0.75);

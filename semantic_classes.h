@@ -1301,6 +1301,7 @@ struct OptionsSession {
     bool saved_lods_enabled{};
     float saved_lod_distance{};
     float saved_fog_distance{};
+    std::uint32_t saved_field_of_view{};
     uint32_t saved_music_volume{};
     std::array<std::string, 7> labels{};
     uint32_t saved_graphics[7]{};
@@ -1835,8 +1836,13 @@ struct WaterMaterial {
 };
 
 struct SferaGraphicsRuntime {
+    static constexpr std::uint32_t minimum_field_of_view = 45u;
+    static constexpr std::uint32_t maximum_field_of_view = 110u;
+    static constexpr std::uint32_t default_field_of_view = 69u;
+
     bool auto_fog{};
     uint32_t reflection_quality{};
+    std::uint32_t field_of_view_degrees = default_field_of_view;
     float minimum_lod_distance{};
     float lod_distance{};
     uint32_t grass_depth{};

@@ -44,12 +44,30 @@
 #include <ws2tcpip.h>
 namespace {
 
+    bool character_selection_active() {
+        const auto& runtime = g_sfera_mbc_runtime;
+        int process_index = runtime.process_chain_first;
+        std::size_t visited = 0;
+        while (process_index >= 0 && visited++ < std::size(runtime.processes)) {
+            if (static_cast<std::size_t>(process_index) >= std::size(runtime.processes)) break;
+            const auto& process = runtime.processes[process_index];
+            if (process.chain_prev_index < 0) break;
+            const auto active = std::find_if(process.programs.begin(), process.programs.end(), [](const auto& program) {
+                return program.state > 0 && program.name == "SelChar";
+            });
+            if (active != process.programs.end()) return true;
+            if (process_index == runtime.process_chain_last) break;
+            const int next = process.chain_next_index;
+            if (next < 0 || next == process_index) break;
+            process_index = next;
+        }
+        return false;
+    }
 
-
-
-
-
-
+    float scene_field_of_view(double width, double height) {
+        if (character_selection_active()) return SferaMath::fittedFieldOfView(width, height);
+        return SferaMath::fittedFieldOfView(width, height, g_sfera_graphics_runtime.field_of_view_degrees);
+    }
 
     bool simple_parser_whitespace(std::string_view text, std::size_t index = 0) {
         // Preserve the original signed code-unit comparison used by this grammar.
@@ -7376,7 +7394,9 @@ void TerrainRenderer::drawWater() {
     auto& device = *g_sfera_graphics_runtime.d3d_runtime;
     const auto identity = SferaMatrix4x4F::identity();
     device.setTransform(D3DTS_WORLD, identity);
-    const float fieldOfView = SferaMath::fittedFieldOfView(g_sfera_graphics_runtime.display_width, g_sfera_graphics_runtime.display_height);
+    const float fieldOfView = scene_field_of_view(
+        g_sfera_graphics_runtime.display_width,
+        g_sfera_graphics_runtime.display_height);
     const float halfAngle = fieldOfView * 0.5;
     const double radians = halfAngle;
     const float projectionTangent = std::tan(radians);
@@ -9102,7 +9122,9 @@ void SceneRenderer::setupEnvironment(std::uint32_t mode, bool useDefault, float 
     else {
         if (g_sfera_graphics_runtime.display_width <= 0 || g_sfera_graphics_runtime.display_height <= 0)
             WorldDiagnostics::fail("Invalid display size for camera projection");
-        fieldOfView = SferaMath::fittedFieldOfView(g_sfera_graphics_runtime.display_width, g_sfera_graphics_runtime.display_height);
+        fieldOfView = scene_field_of_view(
+            g_sfera_graphics_runtime.display_width,
+            g_sfera_graphics_runtime.display_height);
     }
     const float nearPlane = mode == 2u ? 997.0f : 0.10000000149011612f;
     float farPlane;
