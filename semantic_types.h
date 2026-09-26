@@ -30,7 +30,8 @@ struct SferaColor {
     static constexpr SferaColor rgba(std::uint32_t red, std::uint32_t green, std::uint32_t blue, std::uint32_t alpha = 255u) {
         const std::array components{red, green, blue, alpha};
         SferaColor result{};
-        for (std::size_t index = 0; index < components.size(); ++index) result.channels[index] = components[index] & 255u;
+        for (std::size_t index = 0; index < components.size(); ++index)
+            result.channels[index] = static_cast<std::uint8_t>(components[index]);
         return result;
     }
     static constexpr SferaColor fromArgb(std::uint32_t value) { return rgba(value >> 16u, value >> 8u, value, value >> 24u); }
@@ -42,9 +43,14 @@ struct SferaColor {
     constexpr SferaColor withAlpha(std::uint32_t value) const { return rgba(red(), green(), blue(), value); }
     constexpr SferaColor scaledAlpha(std::uint32_t factor, std::uint32_t divisor = 255u) const { return withAlpha(alpha() * factor / divisor); }
     constexpr SferaColor scaledRgb(std::uint32_t factor, std::uint32_t divisor) const { return rgba(red() * factor / divisor, green() * factor / divisor, blue() * factor / divisor, alpha()); }
-    constexpr std::uint16_t rgb565() const { return ((red() >> 3u) << 11u) | ((green() >> 2u) << 5u) | (blue() >> 3u); }
+    constexpr std::uint16_t rgb565() const {
+        return static_cast<std::uint16_t>(((red() >> 3u) << 11u) | ((green() >> 2u) << 5u) | (blue() >> 3u));
+    }
     static constexpr SferaColor fromArgb4444(std::uint16_t value) { return rgba(((value >> 8u) & 15u) * 17u, ((value >> 4u) & 15u) * 17u, (value & 15u) * 17u, (value >> 12u) * 17u); }
-    constexpr std::uint16_t argb4444() const { return ((alpha() >> 4u) << 12u) | ((red() >> 4u) << 8u) | ((green() >> 4u) << 4u) | (blue() >> 4u); }
+    constexpr std::uint16_t argb4444() const {
+        return static_cast<std::uint16_t>(((alpha() >> 4u) << 12u) | ((red() >> 4u) << 8u)
+            | ((green() >> 4u) << 4u) | (blue() >> 4u));
+    }
 };
 
 struct SferaScreenVertex {
@@ -85,7 +91,7 @@ namespace SferaNumeric {
         Unsigned bits{};
         if constexpr (std::is_signed_v<Integer>) std::memcpy(&bits, &value, sizeof(bits));
         else bits = value;
-        return bits & UINT32_MAX;
+        return static_cast<std::uint32_t>(bits);
     }
 
     template<class Integer>
@@ -112,11 +118,12 @@ namespace SferaNumeric {
     }
 
     inline std::uint16_t lowHalf(std::uint32_t value) noexcept {
-        return value & 0xffffu;
+        return static_cast<std::uint16_t>(value);
     }
 
-    inline std::uint8_t lowByte(std::uint32_t value) noexcept {
-        return value & 0xffu;
+    template<class Integer> requires (std::is_integral_v<Integer> && !std::is_same_v<std::remove_cv_t<Integer>, bool>)
+    constexpr std::uint8_t lowByte(Integer value) noexcept {
+        return static_cast<std::uint8_t>(value);
     }
 
     inline std::uint32_t magnitude(std::int32_t value) noexcept {
@@ -147,13 +154,13 @@ namespace SferaNumeric {
         constexpr double maximum_exclusive = std::numeric_limits<int>::max();
         if (!std::isfinite(value) || value < minimum || value >= maximum_exclusive + 1.0)
             return std::numeric_limits<int>::min();
-        return std::trunc(value);
+        return static_cast<int>(value);
     }
 
     inline std::int64_t truncateInt64(double value) noexcept {
         if (!std::isfinite(value) || value < -9223372036854775808.0 || value >= 9223372036854775808.0)
             return std::numeric_limits<std::int64_t>::min();
-        return std::trunc(value);
+        return static_cast<std::int64_t>(value);
     }
 
     inline std::uint32_t truncatedWord(double value) noexcept {
@@ -164,7 +171,12 @@ namespace SferaNumeric {
         if (std::isnan(value)) return std::numeric_limits<float>::quiet_NaN();
         if (value > std::numeric_limits<float>::max()) return std::numeric_limits<float>::infinity();
         if (value < -std::numeric_limits<float>::max()) return -std::numeric_limits<float>::infinity();
-        return value;
+        return static_cast<float>(value);
+    }
+
+    template<class Integer> requires (std::is_integral_v<Integer> && !std::is_same_v<std::remove_cv_t<Integer>, bool>)
+    inline float real32(Integer value) noexcept {
+        return static_cast<float>(value);
     }
 }
 
@@ -201,9 +213,8 @@ namespace SferaBinary {
         // gcount() alone cannot describe that partial write on every exception path.
         std::memcpy(input.data(), destination.data(), destination.size());
         const auto commit = [&] { std::memcpy(destination.data(), input.data(), input.size()); };
-        const std::streamsize read_size = input.size();
         try {
-            stream.read(input.data(), read_size);
+            stream.read(input.data(), static_cast<std::streamsize>(input.size()));
         } catch (...) {
             commit();
             throw;
@@ -221,13 +232,8 @@ namespace SferaBinary {
             if constexpr (std::is_same_v<Byte, std::byte>) value |= std::to_integer<unsigned int>(bytes[index - 1]);
             else value |= bytes[index - 1];
         }
-        if constexpr (std::is_signed_v<T>) {
-            if (value > std::numeric_limits<T>::max()) {
-                const T complement = std::numeric_limits<Unsigned>::max() - value;
-                return -1 - complement;
-            }
-        }
-        return value;
+        if constexpr (std::is_signed_v<T>) return std::bit_cast<T>(value);
+        else return value;
     }
     inline float floatFromBits(std::uint32_t bits) noexcept {
         float value{};
@@ -270,9 +276,9 @@ namespace SferaBinary {
             const auto field = bytes_.first(std::min(bytes_.size(), capacity));
             const auto end = std::find(field.begin(), field.end(), std::uint8_t{});
             if (end == field.end()) throw ReadError("Unterminated binary string");
-            const std::size_t count = end - field.begin();
+            const std::size_t count = static_cast<std::size_t>(end - field.begin());
             const auto value = take(count + 1);
-            return std::string(value.begin(), value.begin() + count);
+            return std::string(value.begin(), value.end() - 1);
         }
         template<class T> T read() {
             if constexpr (std::is_same_v<T, float>) return floatFromBits(read<std::uint32_t>());
@@ -300,9 +306,9 @@ struct SferaVec3F {
     }
     template<class Accumulator = double, class Root = double, bool YFirst = false>
     float length() const {
-        const float squared = dot<Accumulator, YFirst>(*this);
+        const float squared = SferaNumeric::real32(dot<Accumulator, YFirst>(*this));
         const Root radicand = squared;
-        return std::sqrt(radicand);
+        return SferaNumeric::real32(std::sqrt(radicand));
     }
     // A zero threshold, precision and divide-vs-reciprocal are observable in old effects.
     template<class Accumulator = double, class Root = double, bool Divide = false, bool PropagateNaN = false>
@@ -317,9 +323,9 @@ struct SferaVec3F {
     template<class Accumulator = double> SferaVec3F cross(const SferaVec3F& other) const {
         const std::array<Accumulator, 3> components{x, y, z};
         SferaVec3F result;
-        result.x = components[1] * other.z - components[2] * other.y;
-        result.y = components[2] * other.x - components[0] * other.z;
-        result.z = components[0] * other.y - components[1] * other.x;
+        result.x = SferaNumeric::real32(components[1] * other.z - components[2] * other.y);
+        result.y = SferaNumeric::real32(components[2] * other.x - components[0] * other.z);
+        result.z = SferaNumeric::real32(components[0] * other.y - components[1] * other.x);
         return result;
     }
     float component(std::size_t axis) const;
@@ -365,16 +371,16 @@ namespace SferaMath {
     inline float fittedFieldOfView(double width, double height, double reference_degrees = 68.75493541569878) {
         constexpr double degrees_to_half_radians = 0.008726646259971648;
         const double half_angle = reference_degrees * degrees_to_half_radians;
-        const float tangent = std::tan(half_angle);
-        const float aspect = height / width;
-        const float adjusted = tangent / (aspect / 0.75);
+        const float tangent = SferaNumeric::real32(std::tan(half_angle));
+        const float aspect = SferaNumeric::real32(height / width);
+        const float adjusted = SferaNumeric::real32(tangent / (aspect / 0.75));
         const double slope = adjusted;
-        const float angle = std::atan(slope);
+        const float angle = SferaNumeric::real32(std::atan(slope));
         const double rounded_angle = angle;
-        return rounded_angle + angle;
+        return SferaNumeric::real32(rounded_angle + angle);
     }
     inline float interpolate(float first, double second, float fraction) {
-        return (second - first) * fraction + first;
+        return SferaNumeric::real32((second - first) * fraction + first);
     }
     struct RotationTerms {
         double sine;
@@ -382,7 +388,8 @@ namespace SferaMath {
     };
     inline RotationTerms rotationTerms(double angle) {
         // Rotation formulas historically use single-rounded trigonometric values.
-        const float sine = std::sin(angle), cosine = std::cos(angle);
+        const float sine = SferaNumeric::real32(std::sin(angle));
+        const float cosine = SferaNumeric::real32(std::cos(angle));
         return {sine, cosine};
     }
     inline SferaVec3F interpolate(const SferaVec3F& a, const SferaVec3F& b, float fraction) {
@@ -417,7 +424,8 @@ struct SferaMatrix4x4F {
         const std::size_t first = axis == Axis::x ? 1u : axis == Axis::y ? 2u : 0u;
         const std::size_t second = (first + 1u) % 3u;
         const Trigonometry radians = angle;
-        const float sine = std::sin(radians), cosine = std::cos(radians);
+        const float sine = SferaNumeric::real32(std::sin(radians));
+        const float cosine = SferaNumeric::real32(std::cos(radians));
         result.m[first][first] = result.m[second][second] = cosine;
         result.m[first][second] = -sine;
         result.m[second][first] = sine;
@@ -433,7 +441,7 @@ struct SferaMatrix4x4F {
     template<class Accumulator = double> SferaVec3F transformPoint(const SferaVec3F& point) const {
         SferaVec3F result{};
         for (std::size_t row = 0; row < 3; ++row) {
-            result.setComponent(row, projectComponent<Accumulator>(row, point));
+            result.setComponent(row, SferaNumeric::real32(projectComponent<Accumulator>(row, point)));
         }
         return result;
     }
@@ -446,7 +454,7 @@ struct SferaMatrix4x4F {
                 const Accumulator element = m[row][axis];
                 value += element * other.m[axis][column];
             }
-            result.m[row][column] = value;
+            result.m[row][column] = SferaNumeric::real32(value);
         }
         return result;
     }
@@ -529,7 +537,7 @@ private:
 namespace SferaText {
     template<class Mapping> void transformBytes(std::string& text, Mapping mapping) {
         for (auto& byte : std::as_writable_bytes(std::span(text))) {
-            const std::uint8_t mapped = mapping(std::to_integer<std::uint8_t>(byte));
+            const std::uint8_t mapped = SferaNumeric::lowByte(mapping(std::to_integer<std::uint8_t>(byte)));
             std::memcpy(&byte, &mapped, sizeof(mapped));
         }
     }
@@ -586,8 +594,7 @@ namespace SferaText {
         const auto field = bytes.first(std::min(bytes.size(), limit));
         const auto end = std::find(field.begin(), field.end(), std::uint8_t{});
         if (end == field.end() && limit > bytes.size()) throw std::out_of_range("Unterminated text buffer");
-        const std::size_t length = end - field.begin();
-        return length;
+        return static_cast<std::size_t>(end - field.begin());
     }
     inline std::string prefix(std::span<const std::uint8_t> bytes, std::size_t limit) {
         return fromBytes(bytes.first(length(bytes, limit)));
@@ -632,7 +639,7 @@ namespace SferaText {
         std::size_t writePadded(std::string_view source, std::size_t count) const {
             if (count >= size()) throw std::out_of_range("Padded text destination is too small");
             const auto copied = limited(count + 1).write(source);
-            std::fill(bytes_.begin() + copied, bytes_.begin() + count + 1, std::uint8_t{});
+            std::ranges::fill(bytes_.subspan(copied, count + 1 - copied), std::uint8_t{});
             return copied;
         }
     private:

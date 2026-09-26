@@ -83,7 +83,7 @@ std::vector<std::uint8_t> SferaZStream32::decompressUiConfig(std::span<const std
             bits.align();
             const auto length = bits.read(16u), complement = bits.read(16u);
             if ((length ^ complement) != 65535u) throw std::runtime_error("Invalid UI stored block length");
-            for (unsigned index = 0u; index < length; ++index) append(bits.read(8u));
+            for (unsigned index = 0u; index < length; ++index) append(static_cast<std::uint8_t>(bits.read(8u)));
             continue;
         }
         if (kind == 3u) throw std::runtime_error("Invalid UI deflate block");
@@ -96,13 +96,13 @@ std::vector<std::uint8_t> SferaZStream32::decompressUiConfig(std::span<const std
             const auto literals = bits.read(5u) + 257u, distances = bits.read(5u) + 1u, codes = bits.read(4u) + 4u;
             if (literals > 286u) throw std::runtime_error("Invalid UI literal alphabet");
             std::array<std::uint8_t, 19> code_lengths{};
-            for (unsigned index = 0u; index < codes; ++index) code_lengths[codeLengthOrder[index]] = bits.read(3u);
+            for (unsigned index = 0u; index < codes; ++index) code_lengths[codeLengthOrder[index]] = static_cast<std::uint8_t>(bits.read(3u));
             UiDeflateAlphabet alphabet{code_lengths, true};
             std::vector<std::uint8_t> lengths;
             lengths.reserve(literals + distances);
             while (lengths.size() < literals + distances) {
                 const auto code = alphabet.decode(bits);
-                if (code < 16u) lengths.push_back(code);
+                if (code < 16u) lengths.push_back(static_cast<std::uint8_t>(code));
                 else {
                     if (code == 16u && lengths.empty()) throw std::runtime_error("UI Huffman repeat without predecessor");
                     const auto count = code == 16u ? bits.read(2u) + 3u : code == 17u ? bits.read(3u) + 3u : bits.read(7u) + 11u;
@@ -121,7 +121,7 @@ std::vector<std::uint8_t> SferaZStream32::decompressUiConfig(std::span<const std
             const auto symbol = literals.decode(bits);
             if (symbol == 256u) break;
             if (symbol < 256u) {
-                append(symbol);
+                append(static_cast<std::uint8_t>(symbol));
                 continue;
             }
             if (symbol > 285u) throw std::runtime_error("Invalid UI length symbol");
@@ -197,7 +197,7 @@ SferaCtData32 SferaDeflateState32::treeEntry(SferaCtData32* tree, uint32_t symbo
 void SferaDeflateState32::putShortLe(uint16_t value) {
     uint8_t* pending_bytes = this->pending_buf.data();
     pending_bytes[this->pending++] = value & 255u;
-    pending_bytes[this->pending++] = (value >> 8u) & 255u;
+    pending_bytes[this->pending++] = static_cast<std::uint8_t>((value >> 8u) & 255u);
 }
 
 void SferaDeflateState32::sendBits(uint32_t value, uint32_t length) {
@@ -331,7 +331,7 @@ void SferaDeflateState32::generateBitLengths(SferaTreeDesc32* descriptor) {
         const uint32_t symbol = this->heap[heap_index];
         uint32_t bits = tree[tree[symbol].length].length + 1u;
         if (bits > max_length) { bits = max_length; ++overflow; }
-        tree[symbol].length = bits;
+        tree[symbol].length = static_cast<std::uint16_t>(bits);
         if (symbol >= descriptor->symbol_count) { continue; }
         ++this->bit_length_counts[bits];
         const uint32_t extra = treeExtraBits(kind, symbol);
@@ -354,7 +354,7 @@ void SferaDeflateState32::generateBitLengths(SferaTreeDesc32* descriptor) {
         while (remaining != 0u) {
             const uint32_t symbol = this->heap[--heap_index];
             if (symbol >= descriptor->symbol_count) { continue; }
-            if (tree[symbol].length != bits) { this->optimal_length += (bits - tree[symbol].length) * tree[symbol].code; tree[symbol].length = bits; }
+            if (tree[symbol].length != bits) { this->optimal_length += (bits - tree[symbol].length) * tree[symbol].code; tree[symbol].length = static_cast<std::uint16_t>(bits); }
             --remaining;
         }
     }
@@ -419,8 +419,8 @@ void SferaDeflateState32::buildTree(SferaTreeDesc32* descriptor) {
         this->heap[--this->heap_max] = second;
         tree[node].code = (tree[first].code + tree[second].code) & 65535u;
         this->depth[node] = (std::max(this->depth[first], this->depth[second]) + 1u) & 255u;
-        tree[first].length = node;
-        tree[second].length = node;
+        tree[first].length = static_cast<std::uint16_t>(node);
+        tree[second].length = static_cast<std::uint16_t>(node);
         this->heap[1] = node++;
         pqDownHeap(tree, 1u);
     } while (this->heap_length >= 2);
@@ -442,7 +442,7 @@ void SferaDeflateState32::scanTree(SferaCtData32* tree, uint32_t symbol_count) {
         next_length = tree[symbol + 1].length;
         ++count;
         if (count < maximum_count && current_length == next_length) { continue; }
-        if (count < minimum_count) { this->bit_length_tree[current_length].code += count; }
+        if (count < minimum_count) { this->bit_length_tree[current_length].code += static_cast<std::uint16_t>(count); }
         else if (current_length != 0) { if (current_length != previous_length) { ++this->bit_length_tree[current_length].code; } ++this->bit_length_tree[16].code; }
         else if (count <= 10u) { ++this->bit_length_tree[17].code; }
         else { ++this->bit_length_tree[18].code; }
@@ -573,8 +573,8 @@ bool SferaDeflateState32::tally(uint32_t distance, uint32_t literal_or_length) {
     return this->last_literal == this->literal_buffer_size - 1u;
 }
 
-uint32_t SferaDeflateState32::insertString(uint8_t* window, uint16_t* previous, uint16_t* heads) {
-    this->ins_h = ((this->ins_h << this->hash_shift) ^ window[this->strstart + 2u]) & this->hash_mask;
+uint32_t SferaDeflateState32::insertString(uint8_t* window_bytes, uint16_t* previous, uint16_t* heads) {
+    this->ins_h = ((this->ins_h << this->hash_shift) ^ window_bytes[this->strstart + 2u]) & this->hash_mask;
     const uint16_t hash_head = heads[this->ins_h];
     previous[this->strstart & this->w_mask] = hash_head;
     heads[this->ins_h] = this->strstart & 65535u;
@@ -583,7 +583,7 @@ uint32_t SferaDeflateState32::insertString(uint8_t* window, uint16_t* previous, 
 
 std::optional<SferaDeflateState32::BlockState> SferaDeflateState32::flushCurrentBlock(bool end_of_file) {
     const uint8_t* buffer = block_start >= 0 ? window.data() + block_start : nullptr;
-    const uint32_t stored_length = strstart - block_start;
+    const uint32_t stored_length = static_cast<std::uint32_t>(strstart - block_start);
     flushBlock(buffer, stored_length, end_of_file ? 1u : 0u);
     block_start = strstart;
     strm->deflateFlushPending();
@@ -673,7 +673,7 @@ SferaDeflateState32::BlockState SferaDeflateState32::deflateStored(int32_t flush
         }
         this->strstart += this->lookahead;
         this->lookahead = 0u;
-        const uint32_t max_start = this->block_start + max_block_size;
+        const uint32_t max_start = static_cast<std::uint32_t>(this->block_start + max_block_size);
         if (this->strstart == 0u || this->strstart >= max_start) {
             this->lookahead = this->strstart - max_start;
             this->strstart = max_start;
@@ -690,7 +690,7 @@ SferaDeflateState32::BlockState SferaDeflateState32::deflateStored(int32_t flush
 }
 
 SferaDeflateState32::BlockState SferaDeflateState32::deflateFast(int32_t flush) {
-    uint8_t* window = this->window.data();
+    uint8_t* window_bytes = this->window.data();
     uint16_t* previous = this->prev.data();
     uint16_t* heads = this->head.data();
     for (;;) {
@@ -700,7 +700,7 @@ SferaDeflateState32::BlockState SferaDeflateState32::deflateFast(int32_t flush) 
             if (this->lookahead == 0u) { break; }
         }
         uint32_t hash_head = 0u;
-        if (this->lookahead >= 3u) { hash_head = insertString(window, previous, heads); }
+        if (this->lookahead >= 3u) { hash_head = insertString(window_bytes, previous, heads); }
         if (hash_head != 0u && this->strstart - hash_head <= this->w_size - 262u && this->strategy != 2) { this->match_length = deflateLongestMatch(hash_head); }
         bool flush_block = false;
         if (this->match_length >= 3u) {
@@ -708,18 +708,18 @@ SferaDeflateState32::BlockState SferaDeflateState32::deflateFast(int32_t flush) 
             this->lookahead -= this->match_length;
             if (this->match_length <= this->max_lazy_match && this->lookahead >= 3u) {
                 --this->match_length;
-                do { ++this->strstart; hash_head = insertString(window, previous, heads); } while (--this->match_length != 0u);
+                do { ++this->strstart; hash_head = insertString(window_bytes, previous, heads); } while (--this->match_length != 0u);
                 ++this->strstart;
             }
             else {
                 this->strstart += this->match_length;
                 this->match_length = 0u;
-                this->ins_h = window[this->strstart];
-                this->ins_h = ((this->ins_h << this->hash_shift) ^ window[this->strstart + 1u]) & this->hash_mask;
+                this->ins_h = window_bytes[this->strstart];
+                this->ins_h = ((this->ins_h << this->hash_shift) ^ window_bytes[this->strstart + 1u]) & this->hash_mask;
             }
         }
         else {
-            flush_block = tally(0u, window[this->strstart]);
+            flush_block = tally(0u, window_bytes[this->strstart]);
             --this->lookahead;
             ++this->strstart;
         }
@@ -730,7 +730,7 @@ SferaDeflateState32::BlockState SferaDeflateState32::deflateFast(int32_t flush) 
 }
 
 SferaDeflateState32::BlockState SferaDeflateState32::deflateSlow(int32_t flush) {
-    uint8_t* window = this->window.data();
+    uint8_t* window_bytes = this->window.data();
     uint16_t* previous = this->prev.data();
     uint16_t* heads = this->head.data();
     for (;;) {
@@ -740,7 +740,7 @@ SferaDeflateState32::BlockState SferaDeflateState32::deflateSlow(int32_t flush) 
             if (this->lookahead == 0u) { break; }
         }
         uint32_t hash_head = 0u;
-        if (this->lookahead >= 3u) { hash_head = insertString(window, previous, heads); }
+        if (this->lookahead >= 3u) { hash_head = insertString(window_bytes, previous, heads); }
         this->prev_length = this->match_length;
         this->prev_match = this->match_start;
         this->match_length = 2u;
@@ -753,14 +753,14 @@ SferaDeflateState32::BlockState SferaDeflateState32::deflateSlow(int32_t flush) 
             const bool flush_block = tally(this->strstart - 1u - this->prev_match, this->prev_length - 3u);
             this->lookahead -= this->prev_length - 1u;
             this->prev_length -= 2u;
-            do { if (++this->strstart <= max_insert) { hash_head = insertString(window, previous, heads); } } while (--this->prev_length != 0u);
+            do { if (++this->strstart <= max_insert) { hash_head = insertString(window_bytes, previous, heads); } } while (--this->prev_length != 0u);
             this->match_available = 0;
             this->match_length = 2u;
             ++this->strstart;
             if (flush_block) { const auto result = flushCurrentBlock(false); if (result) return *result; }
         }
         else if (this->match_available != 0) {
-            const bool flush_block = tally(0u, window[this->strstart - 1u]);
+            const bool flush_block = tally(0u, window_bytes[this->strstart - 1u]);
             if (flush_block) { flushCurrentBlock(false); }
             ++this->strstart;
             --this->lookahead;
@@ -768,7 +768,7 @@ SferaDeflateState32::BlockState SferaDeflateState32::deflateSlow(int32_t flush) 
         }
         else { this->match_available = 1; ++this->strstart; --this->lookahead; }
     }
-    if (this->match_available != 0) { tally(0u, window[this->strstart - 1u]); this->match_available = 0; }
+    if (this->match_available != 0) { tally(0u, window_bytes[this->strstart - 1u]); this->match_available = 0; }
     const bool finishing = flush == 4;
     return flushCurrentBlock(finishing).value_or(finishing ? BlockState::Complete : BlockState::BlockDone);
 }
@@ -839,7 +839,7 @@ uint32_t SferaZStream32::deflateReadBuf(uint8_t* destination, uint32_t size) {
 }
 
 uint32_t SferaDeflateState32::deflateLongestMatch(uint32_t current_match) {
-    uint8_t* window = this->window.data();
+    uint8_t* window_bytes = this->window.data();
     uint16_t* previous = this->prev.data();
     uint32_t chain_left = this->max_chain_length;
     uint32_t best_length = this->prev_length;
@@ -852,9 +852,9 @@ uint32_t SferaDeflateState32::deflateLongestMatch(uint32_t current_match) {
     if (best_length >= compare_limit || chain_left == 0u) { return best_length < this->lookahead ? best_length : this->lookahead; }
     while (true) {
         if (current_match >= this->strstart) { break; }
-        if (window[current_match] == window[this->strstart] && window[current_match + 1u] == window[this->strstart + 1u] && window[current_match + best_length] == window[this->strstart + best_length]) {
+        if (window_bytes[current_match] == window_bytes[this->strstart] && window_bytes[current_match + 1u] == window_bytes[this->strstart + 1u] && window_bytes[current_match + best_length] == window_bytes[this->strstart + best_length]) {
             uint32_t length = 2u;
-            while (length < compare_limit && window[current_match + length] == window[this->strstart + length]) { ++length; }
+            while (length < compare_limit && window_bytes[current_match + length] == window_bytes[this->strstart + length]) { ++length; }
             if (length > best_length) {
                 this->match_start = current_match;
                 best_length = length;
@@ -870,29 +870,29 @@ uint32_t SferaDeflateState32::deflateLongestMatch(uint32_t current_match) {
 }
 
 void SferaDeflateState32::deflateFillWindow() {
-    uint8_t* window = this->window.data();
+    uint8_t* window_bytes = this->window.data();
     uint16_t* heads = this->head.data();
     uint16_t* previous = this->prev.data();
-    const uint32_t window_size = this->w_size;
+    const uint32_t window_half_size = this->w_size;
     while (true) {
         uint32_t more = this->window_size - this->lookahead - this->strstart;
-        if (more == 0u && this->strstart == 0u && this->lookahead == 0u) { more = window_size; }
+        if (more == 0u && this->strstart == 0u && this->lookahead == 0u) { more = window_half_size; }
         else if (more == UINT32_MAX) { --more; }
-        else if (this->strstart >= window_size + (window_size - 262u)) {
-            std::memcpy(window, window + window_size, window_size);
-            this->match_start -= window_size;
-            this->strstart -= window_size;
-            this->block_start -= window_size;
-            for (uint32_t index = 0u; index != this->hash_size; ++index) { const uint32_t value = heads[index]; heads[index] = value >= window_size ? value - window_size : 0u; }
-            for (uint32_t index = 0u; index != window_size; ++index) { const uint32_t value = previous[index]; previous[index] = value >= window_size ? value - window_size : 0u; }
-            more += window_size;
+        else if (this->strstart >= window_half_size + (window_half_size - 262u)) {
+            std::memcpy(window_bytes, window_bytes + window_half_size, window_half_size);
+            this->match_start -= window_half_size;
+            this->strstart -= window_half_size;
+            this->block_start -= window_half_size;
+            for (uint32_t index = 0u; index != this->hash_size; ++index) { const uint32_t value = heads[index]; heads[index] = static_cast<std::uint16_t>(value >= window_half_size ? value - window_half_size : 0u); }
+            for (uint32_t index = 0u; index != window_half_size; ++index) { const uint32_t value = previous[index]; previous[index] = static_cast<std::uint16_t>(value >= window_half_size ? value - window_half_size : 0u); }
+            more += window_half_size;
         }
         if (this->strm->avail_in == 0u) { return; }
         uint8_t* destination = this->window.data() + this->strstart + this->lookahead;
         this->lookahead += strm->deflateReadBuf(destination, more);
         if (this->lookahead >= 3u) {
-            this->ins_h = window[this->strstart];
-            this->ins_h = ((this->ins_h << this->hash_shift) ^ window[this->strstart + 1u]) & this->hash_mask;
+            this->ins_h = window_bytes[this->strstart];
+            this->ins_h = ((this->ins_h << this->hash_shift) ^ window_bytes[this->strstart + 1u]) & this->hash_mask;
         }
         if (this->lookahead >= 262u || this->strm->avail_in == 0u) { return; }
     }
@@ -916,7 +916,7 @@ int SferaZStream32::compress(std::uint8_t* output, std::uint32_t& outputSize, st
     try {
         SferaZStream32 stream;
         stream.next_in = input.data();
-        stream.avail_in = input.size();
+        stream.avail_in = static_cast<std::uint32_t>(input.size());
         stream.next_out = output;
         stream.avail_out = outputSize;
         SferaDeflateState32 state(stream, level);
@@ -959,7 +959,7 @@ bool SferaInflateHuft32::build(std::span<const std::uint8_t> lengths, bool codeL
     if (unused != 0 && (codeLengths || maximum_length != 1)) return false;
     std::array<std::uint16_t, 16> offsets{};
     for (std::size_t bits = 1; bits + 1 < offsets.size(); ++bits) offsets[bits + 1] = offsets[bits] + counts[bits];
-    for (std::size_t symbol = 0; symbol < lengths.size(); ++symbol) {
+    for (std::uint16_t symbol = 0; symbol < lengths.size(); ++symbol) {
         if (lengths[symbol] != 0) symbols[offsets[lengths[symbol]]++] = symbol;
     }
     return true;
@@ -1004,7 +1004,7 @@ int SferaZStream32::inflate() {
             for (std::uint32_t i = 0; i < length; ++i) {
                 std::uint32_t value;
                 if (avail_out == 0 || !readBits(8, value)) return -5;
-                *next_out++ = value;
+                *next_out++ = static_cast<std::uint8_t>(value);
                 --avail_out;
                 ++total_out;
             }
@@ -1017,7 +1017,7 @@ int SferaZStream32::inflate() {
         SferaInflateHuft32 literalTree, distanceTree;
         if (blockType == 1) {
             for (std::uint32_t symbol = 0; symbol < literalCount; ++symbol) lengths[symbol] = SferaDeflateState32::fixedLiteralLength(symbol);
-            std::fill(lengths.begin() + literalCount, lengths.end(), 5);
+            std::fill(lengths.begin() + literalCount, lengths.end(), std::uint8_t{5});
         } else {
             std::uint32_t codeCount;
             if (!readBits(5, literalCount) || !readBits(5, distanceCount) || !readBits(4, codeCount)) return -5;
@@ -1029,7 +1029,7 @@ int SferaZStream32::inflate() {
             for (std::uint32_t i = 0; i < codeCount; ++i) {
                 std::uint32_t length;
                 if (!readBits(3, length)) return -5;
-                codeLengths[codeLengthOrder[i]] = length;
+                codeLengths[codeLengthOrder[i]] = static_cast<std::uint8_t>(length);
             }
             SferaInflateHuft32 codeTree;
             if (!codeTree.build(codeLengths, true)) return -3;
@@ -1038,7 +1038,7 @@ int SferaZStream32::inflate() {
             while (index < count) {
                 const int symbol = codeTree.decode(*this);
                 if (symbol < 0) return symbol;
-                if (symbol < 16) { lengths[index++] = symbol; continue; }
+                if (symbol < 16) { lengths[index++] = static_cast<std::uint8_t>(symbol); continue; }
                 if (symbol > 18 || (symbol == 16 && index == 0)) return -3;
                 const auto extraBits = SferaDeflateState32::treeExtraBits(SferaZlibTreeKind::BitLength, symbol);
                 std::uint32_t repetitions;
@@ -1057,7 +1057,7 @@ int SferaZStream32::inflate() {
             if (symbol == 256) break;
             if (symbol < 256) {
                 if (avail_out == 0) return -5;
-                *next_out++ = symbol;
+                *next_out++ = static_cast<std::uint8_t>(symbol);
                 --avail_out;
                 ++total_out;
                 continue;
@@ -1100,7 +1100,7 @@ int SferaZStream32::decompress(std::uint8_t* output, std::uint32_t& outputSize, 
     if (output == nullptr || input.size() > std::numeric_limits<std::uint32_t>::max()) return -2;
     SferaZStream32 stream;
     stream.next_in = input.data();
-    stream.avail_in = input.size();
+    stream.avail_in = static_cast<std::uint32_t>(input.size());
     stream.next_out = output;
     stream.avail_out = outputSize;
     const auto status = stream.inflate();

@@ -136,8 +136,8 @@ bool decodeVorbis(const std::vector<std::uint8_t>& bytes, DecodedAudio& output) 
     output.format.nChannels = decoded.channels;
     output.format.nSamplesPerSec = decoded.sample_rate;
     output.format.wBitsPerSample = 16u;
-    output.format.nBlockAlign = block_align;
-    output.format.nAvgBytesPerSec = bytes_per_second;
+    output.format.nBlockAlign = static_cast<WORD>(block_align);
+    output.format.nAvgBytesPerSec = static_cast<DWORD>(bytes_per_second);
     output.format.cbSize = 0u;
     const std::size_t output_size = pcm_size;
     output.pcm.resize(output_size);
@@ -342,13 +342,11 @@ std::uint32_t secondsToBytes(const WAVEFORMATEX& format, float seconds, std::siz
 
     const std::size_t aligned_size = total_bytes - total_bytes % block_align;
     const std::size_t last_block = aligned_size >= block_align ? aligned_size - block_align : 0u;
-    const double precise_seconds = seconds;
-    const double last_block_position = last_block;
-    const double raw = precise_seconds * format.nAvgBytesPerSec;
-    const auto bounded = SferaNumeric::truncateInt64(std::min(raw, last_block_position));
+    const double raw = seconds * 1.0 * format.nAvgBytesPerSec;
+    const auto bounded = SferaNumeric::truncateInt64(std::min(raw, static_cast<double>(last_block)));
     std::size_t value = bounded;
     value -= value % block_align;
-    return std::min<std::size_t>(value, std::numeric_limits<std::uint32_t>::max());
+    return static_cast<std::uint32_t>(std::min<std::size_t>(value, std::numeric_limits<std::uint32_t>::max()));
 }
 
 
@@ -447,7 +445,9 @@ int CSound::LoadSound(const std::string& source_filename, std::uint32_t flags) {
     impl_->spatial = std::move(spatial_buffer);
     impl_->spatial_requested = spatial;
     impl_->requested_position = 0.0f;
-    duration_seconds = impl_->audio.format.nAvgBytesPerSec == 0u ? 0.0f : impl_->audio.pcm.size() * 1.0 / impl_->audio.format.nAvgBytesPerSec;
+    duration_seconds = impl_->audio.format.nAvgBytesPerSec == 0u
+        ? 0.0f
+        : static_cast<float>(impl_->audio.pcm.size() * 1.0 / impl_->audio.format.nAvgBytesPerSec);
     SetVolume(impl_->volume);
     playback_finished = true;
     return 1;
@@ -497,7 +497,7 @@ float CSound::GetPlayTimepos() const {
     DWORD play = 0u;
     DWORD write = 0u;
     if (FAILED(impl_->buffer->GetCurrentPosition(&play, &write))) return impl_->requested_position;
-    return play * 1.0 / impl_->audio.format.nAvgBytesPerSec;
+    return static_cast<float>(play * 1.0 / impl_->audio.format.nAvgBytesPerSec);
 }
 
 int CSound::IsSoundPlaying() const {
@@ -618,9 +618,9 @@ void CSoundStream::update() {
     if (playing_now && FAILED(impl_->buffer->GetCurrentPosition(&play_cursor, &write_cursor))) return;
     if (!playing_now && !impl_->was_playing) return;
 
-    const float current_time = playing_now
+    const float current_time = static_cast<float>(playing_now
         ? play_cursor * 1.0 / impl_->audio.format.nAvgBytesPerSec
-        : impl_->audio.pcm.size() * 1.0 / impl_->audio.format.nAvgBytesPerSec;
+        : impl_->audio.pcm.size() * 1.0 / impl_->audio.format.nAvgBytesPerSec);
 
     const bool fire_decode = decode_callback != nullptr && decode_event_position != UINT32_MAX && current_time >= impl_->decode_signal;
     const bool fire_play = play_callback != nullptr && play_event_position != UINT32_MAX && current_time >= impl_->play_signal;

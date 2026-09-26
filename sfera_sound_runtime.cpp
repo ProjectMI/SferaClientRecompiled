@@ -649,7 +649,7 @@ float SferaSoundPlaybackState::parseTime(std::string_view text) {
 
     const auto minutes = std::atoi(std::string(token.substr(0u, prefix_size)).c_str());
     const auto seconds = std::atof(std::string(token.substr(prefix_size + 1u)).c_str());
-    return (minutes * 60.0 + seconds);
+    return static_cast<float>(minutes * 60.0 + seconds);
 }
 
 bool SferaSoundPlaybackState::load(const std::string& filename) {

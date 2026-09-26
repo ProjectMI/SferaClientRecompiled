@@ -12,7 +12,7 @@ struct SferaDeflateState32;
 struct SferaInflateHuft32;
 struct SferaZStream32 {
     static constexpr std::uint32_t preset_dictionary_flag = 1u << 5u;
-    static constexpr std::size_t envelope_header_size = 8;
+    static constexpr std::uint32_t envelope_header_size = 8u;
     static constexpr std::size_t envelope_length_mask_index = 6;
     static constexpr std::array<std::size_t, 3> envelope_encoded_positions{1, 9, 12};
     static bool hasEnvelope(std::span<const std::uint8_t> input);

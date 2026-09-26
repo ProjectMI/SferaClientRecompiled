@@ -187,7 +187,7 @@ struct SferaMbcProcessRecord {
     std::vector<ScriptProgramDiagnostic> programs;
     std::vector<SferaMbcFunctionRecord> functions;
     const std::uint8_t* codeData() const noexcept { return bytecode ? bytecode->data() : nullptr; }
-    std::uint32_t codeSize() const noexcept { return bytecode ? bytecode->size() : 0; }
+    std::uint32_t codeSize() const noexcept { return bytecode ? SferaNumeric::lowWord(bytecode->size()) : 0; }
     int32_t chain_prev_index = -1;
     int32_t chain_next_index = -1;
     uint16_t program_map_a[4];
