@@ -1,0 +1,205 @@
+#pragma once
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <string_view>
+#include <vector>
+
+struct SferaCtData32;
+struct SferaDeflateConfig;
+struct SferaDeflateState32;
+struct SferaInflateHuft32;
+struct SferaTreeDesc32;
+struct SferaZStream32;
+
+struct SferaZStream32
+{
+  private:
+    static void appendUiByte(std::vector<std::uint8_t> &output, std::size_t limit, std::uint8_t value);
+
+  public:
+    static constexpr std::uint32_t preset_dictionary_flag = 1u << 5u;
+    static constexpr std::uint32_t envelope_header_size = 8u;
+    static constexpr std::size_t envelope_length_mask_index = 6;
+    static constexpr std::array<std::size_t, 3> envelope_encoded_positions{1, 9, 12};
+    static bool hasEnvelope(std::span<const std::uint8_t> input);
+    static int compress(std::uint8_t *output, std::uint32_t &outputSize, std::span<const std::uint8_t> input, int level = 1);
+    static int decompress(std::uint8_t *output, std::uint32_t &outputSize, std::span<const std::uint8_t> input);
+    static int compressEnvelope(std::uint8_t *output, std::uint32_t &outputSize, std::span<const std::uint8_t> input);
+    static int decompressEnvelope(std::uint8_t *output, std::uint32_t &outputSize, std::span<std::uint8_t> input);
+    static std::vector<std::uint8_t> decompressUiConfig(std::span<const std::uint8_t> input, std::size_t limit);
+    bool readBits(std::uint32_t count, std::uint32_t &value);
+    int inflate();
+    const std::uint8_t *next_in = nullptr;
+    std::uint32_t avail_in = 0;
+    std::uint32_t total_in = 0;
+    std::uint8_t *next_out = nullptr;
+    std::uint32_t avail_out = 0;
+    std::uint32_t total_out = 0;
+    std::optional<std::string_view> msg;
+    SferaDeflateState32 *state = nullptr;
+    int data_type = 0;
+    std::uint32_t adler = 1;
+    std::uint32_t input_bits = 0;
+    std::uint32_t input_bit_count = 0;
+    int deflateReset();
+    int deflate(int32_t flush);
+    static uint32_t adler32(uint32_t adler, const uint8_t *buffer, uint32_t length);
+    void deflateFlushPending();
+    uint32_t deflateReadBuf(uint8_t *destination, uint32_t size);
+};
+struct SferaDeflateConfig
+{
+    std::uint16_t good_length;
+    std::uint16_t max_lazy;
+    std::uint16_t nice_length;
+    std::uint16_t max_chain;
+};
+struct SferaCtData32
+{
+    std::uint16_t code;
+    std::uint16_t length;
+};
+enum class SferaZlibTreeKind
+{
+    Literal,
+    Distance,
+    BitLength
+};
+struct SferaTreeDesc32
+{
+    SferaCtData32 *dynamic_tree;
+    std::uint32_t symbol_count;
+    SferaZlibTreeKind kind;
+};
+enum class SferaDeflatePhase
+{
+    Header,
+    Blocks,
+    Complete
+};
+enum class SferaDeflateBlockState
+{
+    NeedOutput,
+    BlockDone,
+    FinalNeedOutput,
+    Complete
+};
+struct SferaDeflateState32
+{
+    static constexpr std::uint32_t fixed_literal_start = 48;
+    static constexpr std::uint32_t fixed_high_start = 400;
+    static constexpr std::uint32_t fixed_tail_start = 192;
+    explicit SferaDeflateState32(SferaZStream32 &stream, int compressionLevel);
+    SferaZStream32 *strm = nullptr;
+    SferaDeflatePhase phase = SferaDeflatePhase::Header;
+    std::vector<std::uint8_t> pending_buf;
+    std::uint32_t pending_buf_size = 0;
+    std::uint32_t pending_offset = 0;
+    std::uint32_t pending = 0;
+    int noheader = 0;
+    std::uint8_t data_type = 0;
+    std::uint8_t method = 8;
+    int last_flush = 0;
+    std::uint32_t w_size = 32768;
+    std::uint32_t w_bits = 15;
+    std::uint32_t w_mask = 32767;
+    std::vector<std::uint8_t> window;
+    std::uint32_t window_size = 65536;
+    std::vector<std::uint16_t> prev;
+    std::vector<std::uint16_t> head;
+    std::uint32_t ins_h = 0;
+    std::uint32_t hash_size = 32768;
+    std::uint32_t hash_bits = 15;
+    std::uint32_t hash_mask = 32767;
+    std::uint32_t hash_shift = 5;
+    // Sliding the window can move the block origin before index zero.
+    std::int64_t block_start = 0;
+    std::uint32_t match_length = 0;
+    std::uint32_t prev_match = 0;
+    int match_available = 0;
+    std::uint32_t strstart = 0;
+    std::uint32_t match_start = 0;
+    std::uint32_t lookahead = 0;
+    std::uint32_t prev_length = 0;
+    std::uint32_t max_chain_length = 0;
+    std::uint32_t max_lazy_match = 0;
+    int level = 1;
+    int strategy = 0;
+    std::uint32_t good_match = 0;
+    std::uint32_t nice_match = 0;
+    SferaCtData32 dynamic_literal_tree[573]{};
+    SferaCtData32 dynamic_distance_tree[61]{};
+    SferaCtData32 bit_length_tree[39]{};
+    SferaTreeDesc32 literal_descriptor{};
+    SferaTreeDesc32 distance_descriptor{};
+    SferaTreeDesc32 bit_length_descriptor{};
+    std::uint16_t bit_length_counts[16]{};
+    std::uint32_t heap[573]{};
+    std::uint32_t heap_length = 0;
+    std::uint32_t heap_max = 0;
+    std::uint8_t depth[573]{};
+    std::vector<std::uint8_t> literal_buffer;
+    std::uint32_t literal_buffer_size = 16384;
+    std::uint32_t last_literal = 0;
+    std::vector<std::uint16_t> distance_buffer;
+    std::uint32_t optimal_length = 0;
+    std::uint32_t static_length = 0;
+    std::uint32_t matches = 0;
+    int last_eob_length = 0;
+    std::uint16_t bit_buffer = 0;
+    std::uint32_t valid_bits = 0;
+    static SferaDeflateConfig deflateConfig(int32_t level);
+    static uint16_t reverseBits(uint32_t value, uint32_t bit_count);
+    static uint8_t fixedLiteralLength(uint32_t symbol);
+    static uint16_t fixedLiteralCode(uint32_t symbol);
+    static uint16_t fixedDistanceCode(uint32_t symbol);
+    static SferaCtData32 treeEntry(SferaCtData32 *tree, uint32_t symbol, bool distance_tree);
+    void putShortLe(uint16_t value);
+    void sendBits(uint32_t value, uint32_t length);
+    void sendTreeCode(SferaCtData32 *tree, uint32_t symbol, bool distance_tree);
+    void bitFlush();
+    void bitWindup();
+    void copyStoredBlock(const uint8_t *buffer, uint32_t length, uint32_t write_header);
+    void writeStoredBlock(const uint8_t *buffer, uint32_t length, uint32_t end_of_file);
+    void alignStaticBlock();
+    void setDataType();
+    static uint32_t treeElementCount(SferaZlibTreeKind kind);
+    static uint32_t treeMaxLength(SferaZlibTreeKind kind);
+    static uint32_t treeExtraBits(SferaZlibTreeKind kind, uint32_t symbol);
+    static uint32_t staticSymbolLength(SferaZlibTreeKind kind, uint32_t symbol);
+    bool heapLess(const SferaCtData32 *tree, uint32_t left, uint32_t right);
+    void pqDownHeap(SferaCtData32 *tree, uint32_t heap_index);
+    static void generateCodes(SferaCtData32 *tree, uint32_t symbol_count, const uint16_t *bit_counts);
+    void generateBitLengths(SferaTreeDesc32 *descriptor);
+    void initBlock();
+    void treeInit();
+    void buildTree(SferaTreeDesc32 *descriptor);
+    void scanTree(SferaCtData32 *tree, uint32_t symbol_count);
+    void sendTree(SferaCtData32 *tree, uint32_t symbol_count);
+    uint32_t buildBitLengthTree();
+    void sendAllTrees(uint32_t literal_codes, uint32_t distance_codes, uint32_t bit_length_codes);
+    void flushBlock(const uint8_t *buffer, uint32_t stored_length, uint32_t end_of_file);
+    void compressBlock(SferaCtData32 *literal_tree, SferaCtData32 *distance_tree);
+    bool tally(uint32_t distance, uint32_t literal_or_length);
+    uint32_t insertString(uint8_t *window, uint16_t *previous, uint16_t *heads);
+    std::optional<SferaDeflateBlockState> flushCurrentBlock(bool end_of_file);
+    SferaDeflateBlockState deflateStored(int32_t flush);
+    SferaDeflateBlockState deflateFast(int32_t flush);
+    SferaDeflateBlockState deflateSlow(int32_t flush);
+    void deflatePutShortMsb(uint32_t value);
+    void deflateLmInit();
+    uint32_t deflateLongestMatch(uint32_t current_match);
+    void deflateFillWindow();
+};
+struct SferaInflateHuft32
+{
+    std::array<std::uint16_t, 16> counts{};
+    std::array<std::uint16_t, 288> symbols{};
+    std::uint8_t maximum_length = 0;
+    bool build(std::span<const std::uint8_t> lengths, bool codeLengths = false);
+    int decode(SferaZStream32 &stream) const;
+};

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -56,6 +56,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
     <TargetName>sphereclient_patched</TargetName>
+    <UseSferaPrecompiledHeaders Condition="'$(UseSferaPrecompiledHeaders)' == ''">true</UseSferaPrecompiledHeaders>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(ProjectDir)bin\Debug\</OutDir>
@@ -96,8 +97,11 @@
       <PreprocessorDefinitions>WIN32;UNICODE;_UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;DIRECTINPUT_VERSION=0x0800;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)libs\public;$(ProjectDir)engine\public;$(ProjectDir)core\public;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>platform/Precompiled.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)SferaPlatform.pch</PrecompiledHeaderOutputFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -111,7 +115,6 @@
       <StackReserveSize>8388608</StackReserveSize>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;advapi32.lib;shell32.lib;ole32.lib;comctl32.lib;ws2_32.lib;winmm.lib;dinput8.lib;dsound.lib;dxguid.lib;d3d9.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -161,28 +164,6 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="semantic_static.cpp" />
-    <ClCompile Include="semantic_classes.cpp" />
-    <ClCompile Include="zlib.cpp" />
-    <ClCompile Include="semantic_window.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="sfera_sound.cpp" />
-    <ClCompile Include="sfera_sound_runtime.cpp" />
-    <ClCompile Include="sfera_vorbis.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="semantic_static.h" />
-    <ClInclude Include="semantic_classes.h" />
-    <ClInclude Include="zlib.h" />
-    <ClInclude Include="semantic_window.h" />
-    <ClInclude Include="sfera_sound.h" />
-    <ClInclude Include="sfera_sound_runtime.h" />
-    <ClInclude Include="semantic_types.h" />
-  </ItemGroup>
-  <!-- The supplied project omitted this existing dependency. Keep the source pinned,
-       verify its Git blob identity, and cache it with build inputs rather than vendoring
-       another project file. Offline builds: /p:SferaVorbisSource=C:\path\stb_vorbis.c. -->
   <UsingTask TaskName="PrepareSferaVorbis" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
       <Destination ParameterType="System.String" Required="true" />
@@ -194,9 +175,9 @@
       <Using Namespace="System.Net" />
       <Using Namespace="System.Text" />
       <Using Namespace="System.Security.Cryptography" />
-      <Code Type="Fragment" Language="cs"><![CDATA[
+      <Code Type="Fragment" Language="cs">
         const string expected = "3e5c2504c08f76b9d04e4adfbce80818631e835e";
-        Func<byte[], bool> verified = bytes => {
+        Func&lt;byte[], bool&gt; verified = bytes =&gt; {
             if (bytes == null) return false;
             byte[] prefix = Encoding.ASCII.GetBytes("blob " + bytes.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\0");
             byte[] blob = new byte[prefix.Length + bytes.Length];
@@ -223,12 +204,458 @@
             Log.LogError("Vorbis source is unavailable: " + error.Message + ". Supply the pinned file with /p:SferaVorbisSource=... for an offline build.");
         }
         return !Log.HasLoggedErrors;
-      ]]></Code>
+      </Code>
     </Task>
   </UsingTask>
   <Target Name="RestoreSferaVorbis" BeforeTargets="ClCompile" Condition="'$(DesignTimeBuild)' != 'true'">
     <PrepareSferaVorbis Destination="$(IntDir)stb_vorbis.c" LocalSource="$(SferaVorbisSource)" />
-    <ItemGroup><FileWrites Include="$(IntDir)stb_vorbis.c" /></ItemGroup>
+    <ItemGroup>
+      <FileWrites Include="$(IntDir)stb_vorbis.c" />
+    </ItemGroup>
   </Target>
+  <ItemGroup>
+    <ClCompile Include="core\private\application\ClientApplication.cpp">
+      <ObjectFileName>$(IntDir)core_private_application_ClientApplication.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\application\ClientServices.cpp">
+      <ObjectFileName>$(IntDir)core_private_application_ClientServices.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\application\Main.cpp">
+      <ObjectFileName>$(IntDir)core_private_application_Main.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\audio\GameAudio.cpp">
+      <ObjectFileName>$(IntDir)core_private_audio_GameAudio.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\chat\Chat.cpp">
+      <ObjectFileName>$(IntDir)core_private_chat_Chat.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\diagnostics\ClientDiagnostics.cpp">
+      <ObjectFileName>$(IntDir)core_private_diagnostics_ClientDiagnostics.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\effects\EffectManager.cpp">
+      <ObjectFileName>$(IntDir)core_private_effects_EffectManager.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\gameplay\ActorMotion.cpp">
+      <ObjectFileName>$(IntDir)core_private_gameplay_ActorMotion.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\network\Network.cpp">
+      <ObjectFileName>$(IntDir)core_private_network_Network.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\players\PlayerLists.cpp">
+      <ObjectFileName>$(IntDir)core_private_players_PlayerLists.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\render\GameRendering.cpp">
+      <ObjectFileName>$(IntDir)core_private_render_GameRendering.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\Configuration.cpp">
+      <ObjectFileName>$(IntDir)core_private_resources_Configuration.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\EffectLoader.cpp">
+      <ObjectFileName>$(IntDir)core_private_resources_EffectLoader.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\EnvironmentResources.cpp">
+      <ObjectFileName>$(IntDir)core_private_resources_EnvironmentResources.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\FileResources.cpp">
+      <ObjectFileName>$(IntDir)core_private_resources_FileResources.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\ModelResources.cpp">
+      <ObjectFileName>$(IntDir)core_private_resources_ModelResources.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\TerrainResources.cpp">
+      <ObjectFileName>$(IntDir)core_private_resources_TerrainResources.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\TextureRepository.cpp">
+      <ObjectFileName>$(IntDir)core_private_resources_TextureRepository.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcBuiltins.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_MbcBuiltins.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcExecution.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_MbcExecution.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcInterface.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_MbcInterface.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcLoader.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_MbcLoader.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcMemory.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_MbcMemory.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcSystemCommands.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_MbcSystemCommands.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcText.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_MbcText.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\script\ScriptContainer.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_ScriptContainer.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\ui\GameInterface.cpp">
+      <ObjectFileName>$(IntDir)core_private_ui_GameInterface.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\ui\Options.cpp">
+      <ObjectFileName>$(IntDir)core_private_ui_Options.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\ui\ScriptInterface.cpp">
+      <ObjectFileName>$(IntDir)core_private_ui_ScriptInterface.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\ui\UiAssets.cpp">
+      <ObjectFileName>$(IntDir)core_private_ui_UiAssets.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\ui\WidgetResources.cpp">
+      <ObjectFileName>$(IntDir)core_private_ui_WidgetResources.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\world\ServerGeometry.cpp">
+      <ObjectFileName>$(IntDir)core_private_world_ServerGeometry.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\world\WorldEnvironment.cpp">
+      <ObjectFileName>$(IntDir)core_private_world_WorldEnvironment.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\world\WorldObjects.cpp">
+      <ObjectFileName>$(IntDir)core_private_world_WorldObjects.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\animation\Animation.cpp">
+      <ObjectFileName>$(IntDir)engine_private_animation_Animation.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\camera\Camera.cpp">
+      <ObjectFileName>$(IntDir)engine_private_camera_Camera.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\collision\Collision.cpp">
+      <ObjectFileName>$(IntDir)engine_private_collision_Collision.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\config\ConfigDocument.cpp">
+      <ObjectFileName>$(IntDir)engine_private_config_ConfigDocument.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\config\SimpleParser.cpp">
+      <ObjectFileName>$(IntDir)engine_private_config_SimpleParser.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\diagnostics\Diagnostics.cpp">
+      <ObjectFileName>$(IntDir)engine_private_diagnostics_Diagnostics.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\effects\Effects.cpp">
+      <ObjectFileName>$(IntDir)engine_private_effects_Effects.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\environment\Environment.cpp">
+      <ObjectFileName>$(IntDir)engine_private_environment_Environment.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\graphics\d3d9\Device.cpp">
+      <ObjectFileName>$(IntDir)engine_private_graphics_d3d9_Device.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\input\Input.cpp">
+      <ObjectFileName>$(IntDir)engine_private_input_Input.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\lighting\LightRuntime.cpp">
+      <ObjectFileName>$(IntDir)engine_private_lighting_LightRuntime.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\platform\Platform.cpp">
+      <ObjectFileName>$(IntDir)engine_private_platform_Platform.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\platform\Precompiled.cpp">
+      <ObjectFileName>$(IntDir)engine_private_platform_Precompiled.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Create</PrecompiledHeader>
+      <ExcludedFromBuild Condition="'$(UseSferaPrecompiledHeaders)' != 'true'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="engine\private\render\CharacterRenderer.cpp">
+      <ObjectFileName>$(IntDir)engine_private_render_CharacterRenderer.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\render\Model.cpp">
+      <ObjectFileName>$(IntDir)engine_private_render_Model.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\render\SceneRenderer.cpp">
+      <ObjectFileName>$(IntDir)engine_private_render_SceneRenderer.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\render\Textures.cpp">
+      <ObjectFileName>$(IntDir)engine_private_render_Textures.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\shadows\Shadows.cpp">
+      <ObjectFileName>$(IntDir)engine_private_shadows_Shadows.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\spatial\SpatialIndex.cpp">
+      <ObjectFileName>$(IntDir)engine_private_spatial_SpatialIndex.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\terrain\Terrain.cpp">
+      <ObjectFileName>$(IntDir)engine_private_terrain_Terrain.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\text\Fonts.cpp">
+      <ObjectFileName>$(IntDir)engine_private_text_Fonts.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\text\HyperText.cpp">
+      <ObjectFileName>$(IntDir)engine_private_text_HyperText.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\Canvas.cpp">
+      <ObjectFileName>$(IntDir)engine_private_ui_Canvas.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\Rendering.cpp">
+      <ObjectFileName>$(IntDir)engine_private_ui_Rendering.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\Window.cpp">
+      <ObjectFileName>$(IntDir)engine_private_ui_Window.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\widgets\Controls.cpp">
+      <ObjectFileName>$(IntDir)engine_private_ui_widgets_Controls.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\widgets\Lists.cpp">
+      <ObjectFileName>$(IntDir)engine_private_ui_widgets_Lists.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\widgets\TextEditors.cpp">
+      <ObjectFileName>$(IntDir)engine_private_ui_widgets_TextEditors.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\vegetation\Vegetation.cpp">
+      <ObjectFileName>$(IntDir)engine_private_vegetation_Vegetation.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="libs\private\audio\Sound.cpp">
+      <ObjectFileName>$(IntDir)libs_private_audio_Sound.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="libs\private\audio\VorbisDecoder.cpp">
+      <ObjectFileName>$(IntDir)libs_private_audio_VorbisDecoder.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="libs\private\compression\Zlib.cpp">
+      <ObjectFileName>$(IntDir)libs_private_compression_Zlib.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="libs\private\geometry\Geometry.cpp">
+      <ObjectFileName>$(IntDir)libs_private_geometry_Geometry.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="libs\private\math\Math.cpp">
+      <ObjectFileName>$(IntDir)libs_private_math_Math.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="libs\private\text\Text.cpp">
+      <ObjectFileName>$(IntDir)libs_private_text_Text.obj</ObjectFileName>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="core\public\application\ClientApplication.h" />
+    <ClInclude Include="core\public\audio\GameAudio.h" />
+    <ClInclude Include="core\public\audio\SoundEffects.h" />
+    <ClInclude Include="core\public\chat\ChatFilter.h" />
+    <ClInclude Include="core\public\config\InterfaceConfiguration.h" />
+    <ClInclude Include="core\public\diagnostics\ClientDiagnostics.h" />
+    <ClInclude Include="core\public\effects\ActiveEffect.h" />
+    <ClInclude Include="core\public\effects\EffectManager.h" />
+    <ClInclude Include="core\public\effects\NatureManager.h" />
+    <ClInclude Include="core\public\gameplay\ActorMotion.h" />
+    <ClInclude Include="core\public\network\Network.h" />
+    <ClInclude Include="core\public\network\WorldReplication.h" />
+    <ClInclude Include="core\public\players\PlayerLists.h" />
+    <ClInclude Include="core\public\render\GameRendering.h" />
+    <ClInclude Include="core\public\resources\EffectLoader.h" />
+    <ClInclude Include="core\public\resources\FileResources.h" />
+    <ClInclude Include="core\public\resources\ModelResources.h" />
+    <ClInclude Include="core\public\resources\TerrainResources.h" />
+    <ClInclude Include="core\public\resources\TextureRepository.h" />
+    <ClInclude Include="core\public\script\ConfigText.h" />
+    <ClInclude Include="core\public\script\MbcBitStream.h" />
+    <ClInclude Include="core\public\script\MbcCommands.h" />
+    <ClInclude Include="core\public\script\MbcProcess.h" />
+    <ClInclude Include="core\public\script\MbcRuntime.h" />
+    <ClInclude Include="core\public\script\MbcUiMessageCodec.h" />
+    <ClInclude Include="core\public\script\MbcValue.h" />
+    <ClInclude Include="core\public\script\ScriptContainer.h" />
+    <ClInclude Include="core\public\ui\GameInterfaceManager.h" />
+    <ClInclude Include="core\public\ui\ScriptInterface.h" />
+    <ClInclude Include="core\public\ui\WidgetResources.h" />
+    <ClInclude Include="core\public\world\GameCalendar.h" />
+    <ClInclude Include="core\public\world\ServerGeometry.h" />
+    <ClInclude Include="core\public\world\WorldObjects.h" />
+    <ClInclude Include="engine\public\animation\Animation.h" />
+    <ClInclude Include="engine\public\audio\EffectVoice.h" />
+    <ClInclude Include="engine\public\camera\Camera.h" />
+    <ClInclude Include="engine\public\collision\Collision.h" />
+    <ClInclude Include="engine\public\config\ConfigDocument.h" />
+    <ClInclude Include="engine\public\config\SimpleParser.h" />
+    <ClInclude Include="engine\public\diagnostics\Diagnostics.h" />
+    <ClInclude Include="engine\public\effects\Effect.h" />
+    <ClInclude Include="engine\public\effects\EffectRendering.h" />
+    <ClInclude Include="engine\public\effects\ParticleEffects.h" />
+    <ClInclude Include="engine\public\effects\ScriptedEffects.h" />
+    <ClInclude Include="engine\public\environment\Environment.h" />
+    <ClInclude Include="engine\public\graphics\DisplayMode.h" />
+    <ClInclude Include="engine\public\graphics\d3d9\Device.h" />
+    <ClInclude Include="engine\public\input\Cursors.h" />
+    <ClInclude Include="engine\public\input\DirectInputDevices.h" />
+    <ClInclude Include="engine\public\input\MouseInput.h" />
+    <ClInclude Include="engine\public\lighting\LightRuntime.h" />
+    <ClInclude Include="engine\public\platform\FileMapping.h" />
+    <ClInclude Include="engine\public\platform\Precompiled.h" />
+    <ClInclude Include="engine\public\platform\WindowsSocket.h" />
+    <ClInclude Include="engine\public\platform\windows\ApplicationHost.h" />
+    <ClInclude Include="engine\public\platform\windows\Clipboard.h" />
+    <ClInclude Include="engine\public\render\CharacterRenderer.h" />
+    <ClInclude Include="engine\public\render\GraphicsRuntime.h" />
+    <ClInclude Include="engine\public\render\Material.h" />
+    <ClInclude Include="engine\public\render\Model.h" />
+    <ClInclude Include="engine\public\render\SceneRenderer.h" />
+    <ClInclude Include="engine\public\render\TextureAccess.h" />
+    <ClInclude Include="engine\public\render\Textures.h" />
+    <ClInclude Include="engine\public\render\VertexFormats.h" />
+    <ClInclude Include="engine\public\runtime\Clock.h" />
+    <ClInclude Include="engine\public\scene\SceneAccess.h" />
+    <ClInclude Include="engine\public\scene\SceneObject.h" />
+    <ClInclude Include="engine\public\shadows\Shadows.h" />
+    <ClInclude Include="engine\public\spatial\Bounds.h" />
+    <ClInclude Include="engine\public\spatial\SpatialIndex.h" />
+    <ClInclude Include="engine\public\terrain\Terrain.h" />
+    <ClInclude Include="engine\public\terrain\TerrainData.h" />
+    <ClInclude Include="engine\public\text\Fonts.h" />
+    <ClInclude Include="engine\public\text\HyperText.h" />
+    <ClInclude Include="engine\public\ui\Canvas.h" />
+    <ClInclude Include="engine\public\ui\Rendering.h" />
+    <ClInclude Include="engine\public\ui\Sprite.h" />
+    <ClInclude Include="engine\public\ui\UiHost.h" />
+    <ClInclude Include="engine\public\ui\UiRuntime.h" />
+    <ClInclude Include="engine\public\ui\UiTypes.h" />
+    <ClInclude Include="engine\public\ui\WidgetSupport.h" />
+    <ClInclude Include="engine\public\ui\Window.h" />
+    <ClInclude Include="engine\public\ui\widgets\Controls.h" />
+    <ClInclude Include="engine\public\ui\widgets\Lists.h" />
+    <ClInclude Include="engine\public\ui\widgets\Popups.h" />
+    <ClInclude Include="engine\public\ui\widgets\TextEditors.h" />
+    <ClInclude Include="engine\public\vegetation\Vegetation.h" />
+    <ClInclude Include="engine\public\vegetation\VegetationGeometry.h" />
+    <ClInclude Include="libs\public\algorithms\StableSort.h" />
+    <ClInclude Include="libs\public\audio\AudioDecoder.h" />
+    <ClInclude Include="libs\public\audio\DirectSoundBackend.h" />
+    <ClInclude Include="libs\public\audio\Sound.h" />
+    <ClInclude Include="libs\public\binary\Binary.h" />
+    <ClInclude Include="libs\public\compression\UiDeflate.h" />
+    <ClInclude Include="libs\public\compression\Zlib.h" />
+    <ClInclude Include="libs\public\geometry\Geometry.h" />
+    <ClInclude Include="libs\public\image\PcxHeader.h" />
+    <ClInclude Include="libs\public\lifetime\Restore.h" />
+    <ClInclude Include="libs\public\math\Color.h" />
+    <ClInclude Include="libs\public\math\MathFunctions.h" />
+    <ClInclude Include="libs\public\math\Matrix.h" />
+    <ClInclude Include="libs\public\math\Vector.h" />
+    <ClInclude Include="libs\public\numeric\Numeric.h" />
+    <ClInclude Include="libs\public\platform\WindowsCom.h" />
+    <ClInclude Include="libs\public\text\Parsing.h" />
+    <ClInclude Include="libs\public\text\Text.h" />
+    <ClInclude Include="libs\public\text\TextBuffer.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

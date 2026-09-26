@@ -1,33 +1,825 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
     <Filter Include="core">
-      <UniqueIdentifier>{24bf44e0-41a2-4b07-b9a9-c2a28aa80c8a}</UniqueIdentifier>
+      <UniqueIdentifier>{9F968A3C-1E42-5737-8C85-3A42B896926A}</UniqueIdentifier>
     </Filter>
-    <Filter Include="semantic">
-      <UniqueIdentifier>{5fe1d1c2-bc4c-41bf-b8e8-159b946abb23}</UniqueIdentifier>
+    <Filter Include="core\private">
+      <UniqueIdentifier>{A935CAC0-5A7D-54EA-B7BD-995FB8ED5FFE}</UniqueIdentifier>
     </Filter>
-    <Filter Include="sound">
-      <UniqueIdentifier>{A2CB33E6-16B3-4C91-9DD4-F81732D81F0F}</UniqueIdentifier>
+    <Filter Include="core\private\application">
+      <UniqueIdentifier>{99B06F64-2130-56C7-A80A-F01E29120AC0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\audio">
+      <UniqueIdentifier>{2AA4FE92-97D7-5B74-8E40-B3A01735F1F8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\chat">
+      <UniqueIdentifier>{0264AD23-C28E-5D5E-B018-C3DB82D09A49}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\diagnostics">
+      <UniqueIdentifier>{3512787B-78D9-58CD-94EA-6882E83A5DD5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\effects">
+      <UniqueIdentifier>{32DA8B1F-05B6-5469-8BC9-00C513CE6E66}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\gameplay">
+      <UniqueIdentifier>{47FAE40B-5BAD-5D31-AB81-7B56DA19D0F8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\network">
+      <UniqueIdentifier>{A139A624-BF3C-5123-9A35-682A0F7CF837}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\players">
+      <UniqueIdentifier>{F4DC3F2B-0AB5-55BB-93FD-F5DADD6B1D05}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\render">
+      <UniqueIdentifier>{CD148EB2-C732-5548-970B-7A8C70DC7EDB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\resources">
+      <UniqueIdentifier>{750925F0-966A-5EA0-BDF9-D43F66DFCF2B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\script">
+      <UniqueIdentifier>{7D6CF78A-D1F5-57DC-A7A8-051D29C0BC14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\ui">
+      <UniqueIdentifier>{5289CC42-86B5-507A-A6B2-A133D302D3A9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\world">
+      <UniqueIdentifier>{6E819F3B-4CFB-5A07-BA8F-F6B058EEB40D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public">
+      <UniqueIdentifier>{6C53DE8B-AB25-5365-A81A-DEA3DF5B00AD}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\application">
+      <UniqueIdentifier>{50376B11-EC08-5808-AC29-4EEB92DF8C3A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\audio">
+      <UniqueIdentifier>{BFE5E856-510F-5DE5-BCC0-A1FF74242A43}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\chat">
+      <UniqueIdentifier>{79F9A911-570A-5089-87A6-A7247AF825C3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\config">
+      <UniqueIdentifier>{3DC2C061-2D34-5DE1-8DC7-D80F92051D56}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\diagnostics">
+      <UniqueIdentifier>{F4943D85-8988-5C74-B6B3-EC49132D52C6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\effects">
+      <UniqueIdentifier>{A39EDFC0-06BD-59A9-8AED-6EA1F8FFC480}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\gameplay">
+      <UniqueIdentifier>{00B1AD8A-BBA6-5AAE-AEAF-2DF8F27EE5E5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\network">
+      <UniqueIdentifier>{EC984611-3A7D-5FBD-9EE6-9EBB84F26191}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\players">
+      <UniqueIdentifier>{54B149C9-8F00-545A-BA44-31D0E6B49801}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\render">
+      <UniqueIdentifier>{DDB04F1F-A9DE-5554-9168-B43DB02436B9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\resources">
+      <UniqueIdentifier>{4CCFD81B-628B-57A3-BDEF-3EBD2C49CCDA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\script">
+      <UniqueIdentifier>{894DD33F-8FF0-59BC-A80E-8FAFF9480A41}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\ui">
+      <UniqueIdentifier>{BC2E467D-2A00-5AA1-821F-7C42F6A098C0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\public\world">
+      <UniqueIdentifier>{FF9AD06A-E855-55E4-8D05-8EA7619BF3BB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine">
+      <UniqueIdentifier>{14F5B394-30F1-5BF6-83C6-B879C1086A23}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private">
+      <UniqueIdentifier>{23D1823D-A6A4-5A5A-B48D-1E851703C236}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\animation">
+      <UniqueIdentifier>{8E065DA9-FCAF-5270-9ABB-071044445E13}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\camera">
+      <UniqueIdentifier>{4EF2987A-02AC-506D-B045-58C3827EE356}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\collision">
+      <UniqueIdentifier>{78A829A8-7344-546B-9E2A-F9AB5F192C5C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\config">
+      <UniqueIdentifier>{4F571BFA-D048-52ED-BAFE-6B122B32E8F3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\diagnostics">
+      <UniqueIdentifier>{1D4B3452-0F5A-5573-93AB-7AF2FBA9D73C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\effects">
+      <UniqueIdentifier>{C71FA6A2-28CD-598A-BC0B-A29967A3AB36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\environment">
+      <UniqueIdentifier>{83D558F6-F494-5559-A2FD-883C68B6B13B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\graphics">
+      <UniqueIdentifier>{584CFD5E-F4D6-5F12-A427-E18221B4992F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\graphics\d3d9">
+      <UniqueIdentifier>{875F1366-C889-522F-AF6D-E75148C1A629}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\input">
+      <UniqueIdentifier>{7CBDEB0C-7BD7-5104-95A0-3E74B6D216EA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\lighting">
+      <UniqueIdentifier>{E409743B-E693-592E-A895-4C2312A82544}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\platform">
+      <UniqueIdentifier>{0D59EF4A-C154-58ED-8F9B-29AF482498AA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\render">
+      <UniqueIdentifier>{1F182F1E-F48B-589C-9693-9CE28E1CCECC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\shadows">
+      <UniqueIdentifier>{7D7A7453-9C44-57FF-932E-4EF137761C54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\spatial">
+      <UniqueIdentifier>{12E01F72-BDFE-5C30-BCBC-B9CA0E69E3FB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\terrain">
+      <UniqueIdentifier>{EC997267-1FBF-50F9-A558-203CB6A1BBDF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\text">
+      <UniqueIdentifier>{53D237AF-96EC-5FBF-9458-5BFFCE21F794}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\ui">
+      <UniqueIdentifier>{D2D78383-5A2E-5283-B06E-2F3EA4CE2E62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\ui\widgets">
+      <UniqueIdentifier>{7749B277-AD7B-53E2-9EA7-814A28A684FE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\private\vegetation">
+      <UniqueIdentifier>{0754D692-06EA-5259-BDAD-E814C42C5F23}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public">
+      <UniqueIdentifier>{06B4FF45-D585-52AE-AFC0-3D2699A13B7A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\animation">
+      <UniqueIdentifier>{E247EEC7-2285-5D49-9EA1-CC9B71163C0A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\audio">
+      <UniqueIdentifier>{DE898017-DEB2-5CF4-94D5-67B6925C6438}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\camera">
+      <UniqueIdentifier>{46B80183-CA64-596F-A512-90D3EBA61304}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\collision">
+      <UniqueIdentifier>{DDEA5DEF-A7CE-54D2-AEDA-605DB4D26D34}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\config">
+      <UniqueIdentifier>{79B0441C-6DB8-52EB-826B-8FBE65ED18B0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\diagnostics">
+      <UniqueIdentifier>{9688162D-CD56-5343-97A1-50A5B8316579}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\effects">
+      <UniqueIdentifier>{A2B6368E-19FF-50DA-854B-72A6609CCC8A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\environment">
+      <UniqueIdentifier>{DE0C2082-85D3-5F49-907D-A75922B904A0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\graphics">
+      <UniqueIdentifier>{95F3098F-AEF7-5E8A-B1D0-60766BD67101}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\graphics\d3d9">
+      <UniqueIdentifier>{F00B5DDC-DD6A-58F1-8078-5A320BD5FA84}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\input">
+      <UniqueIdentifier>{EEAFA95B-DD5A-5C1E-B421-32D069090F76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\lighting">
+      <UniqueIdentifier>{7909AD8C-EAC9-5F90-8CA4-20812F88216E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\platform">
+      <UniqueIdentifier>{3206770E-7D13-5EF5-8F90-BB29F54E43A8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\platform\windows">
+      <UniqueIdentifier>{AC90B8BD-F971-5D25-B1A2-0EEF799B8C7B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\render">
+      <UniqueIdentifier>{3414F1B1-5F99-5773-A67B-8EC5A155B6DF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\runtime">
+      <UniqueIdentifier>{13809F4D-3A91-568C-B3BD-8B9D18A8176E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\scene">
+      <UniqueIdentifier>{286D24CC-DDEA-58F4-A0C4-3D8DC7B9E3C6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\shadows">
+      <UniqueIdentifier>{A7B17599-6820-526B-BCE2-4C42283F0860}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\spatial">
+      <UniqueIdentifier>{A57E5629-C876-5726-AEA9-EAF38E5025F9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\terrain">
+      <UniqueIdentifier>{9D7921E2-7E98-50D2-A0AE-A2C7BCBEA3A9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\text">
+      <UniqueIdentifier>{58A45EE3-CBBA-52D4-8411-7583597E99E9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\ui">
+      <UniqueIdentifier>{157E8826-4E66-5328-BC68-6418BBFC27CA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\ui\widgets">
+      <UniqueIdentifier>{219A6B27-BC63-5100-B183-9F932014A937}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\public\vegetation">
+      <UniqueIdentifier>{60DCDDFB-F55E-5739-8E8E-A5B960660F62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs">
+      <UniqueIdentifier>{B59DA882-EE95-5C4F-A953-A077083936D5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\private">
+      <UniqueIdentifier>{15F2AAD9-6C31-5858-A33F-8A11A28C5C8C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\private\audio">
+      <UniqueIdentifier>{0D69EA46-553A-5DAD-B97C-D51AD947CCCB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\private\compression">
+      <UniqueIdentifier>{318F3542-36B8-54CE-A8AD-4679660CB6E9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\private\geometry">
+      <UniqueIdentifier>{B0FB215C-24F2-583B-B99E-682AA98D0D21}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\private\math">
+      <UniqueIdentifier>{733187C3-B822-5C0B-B0E0-35BA8988F96A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\private\text">
+      <UniqueIdentifier>{4F5CBB15-D433-57FE-9063-EFA086DD37BF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public">
+      <UniqueIdentifier>{5F40AEFA-7FDC-5BE7-9488-382F813246A6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\algorithms">
+      <UniqueIdentifier>{B97B8605-1C5F-5F91-9706-86413D246530}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\audio">
+      <UniqueIdentifier>{1B8BA765-7001-5F18-9BF7-BA887C8753F6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\binary">
+      <UniqueIdentifier>{02C0CC3F-EF8D-5F4C-B1CE-F922533A215B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\compression">
+      <UniqueIdentifier>{3B8387CC-8652-5D95-A27E-A63B9ABB0780}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\geometry">
+      <UniqueIdentifier>{2E584124-1848-51FA-867E-E1B224211838}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\image">
+      <UniqueIdentifier>{A31E12CD-A8A9-5857-8F9A-452EE88E663A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\lifetime">
+      <UniqueIdentifier>{C1D3025C-68DA-5C78-A89E-75722B7E012F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\math">
+      <UniqueIdentifier>{129A9911-5264-5932-AC13-AAA789686B2A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\numeric">
+      <UniqueIdentifier>{070579D0-DBDE-5938-93D5-416C67D39700}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\platform">
+      <UniqueIdentifier>{D8C1B7E1-234F-5716-B312-979238E96F19}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\public\text">
+      <UniqueIdentifier>{89571E6A-7DB3-52F7-9BB0-C221796A20C5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp"><Filter>core</Filter></ClCompile>
-    <ClCompile Include="zlib.cpp"><Filter>core</Filter></ClCompile>
-    <ClCompile Include="semantic_classes.cpp"><Filter>semantic</Filter></ClCompile>
-    <ClCompile Include="semantic_static.cpp"><Filter>semantic</Filter></ClCompile>
-    <ClCompile Include="semantic_window.cpp"><Filter>semantic</Filter></ClCompile>
-    <ClCompile Include="sfera_sound.cpp"><Filter>sound</Filter></ClCompile>
-    <ClCompile Include="sfera_sound_runtime.cpp"><Filter>sound</Filter></ClCompile>
-    <ClCompile Include="sfera_vorbis.cpp"><Filter>sound</Filter></ClCompile>
+    <ClCompile Include="core\private\application\ClientApplication.cpp">
+      <Filter>core\private\application</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\application\ClientServices.cpp">
+      <Filter>core\private\application</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\application\Main.cpp">
+      <Filter>core\private\application</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\audio\GameAudio.cpp">
+      <Filter>core\private\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\chat\Chat.cpp">
+      <Filter>core\private\chat</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\diagnostics\ClientDiagnostics.cpp">
+      <Filter>core\private\diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\effects\EffectManager.cpp">
+      <Filter>core\private\effects</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\gameplay\ActorMotion.cpp">
+      <Filter>core\private\gameplay</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\network\Network.cpp">
+      <Filter>core\private\network</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\players\PlayerLists.cpp">
+      <Filter>core\private\players</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\render\GameRendering.cpp">
+      <Filter>core\private\render</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\Configuration.cpp">
+      <Filter>core\private\resources</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\EffectLoader.cpp">
+      <Filter>core\private\resources</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\EnvironmentResources.cpp">
+      <Filter>core\private\resources</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\FileResources.cpp">
+      <Filter>core\private\resources</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\ModelResources.cpp">
+      <Filter>core\private\resources</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\TerrainResources.cpp">
+      <Filter>core\private\resources</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\resources\TextureRepository.cpp">
+      <Filter>core\private\resources</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcBuiltins.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcExecution.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcInterface.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcLoader.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcMemory.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcSystemCommands.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcText.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\ScriptContainer.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\ui\GameInterface.cpp">
+      <Filter>core\private\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\ui\Options.cpp">
+      <Filter>core\private\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\ui\ScriptInterface.cpp">
+      <Filter>core\private\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\ui\UiAssets.cpp">
+      <Filter>core\private\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\ui\WidgetResources.cpp">
+      <Filter>core\private\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\world\ServerGeometry.cpp">
+      <Filter>core\private\world</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\world\WorldEnvironment.cpp">
+      <Filter>core\private\world</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\world\WorldObjects.cpp">
+      <Filter>core\private\world</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\animation\Animation.cpp">
+      <Filter>engine\private\animation</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\camera\Camera.cpp">
+      <Filter>engine\private\camera</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\collision\Collision.cpp">
+      <Filter>engine\private\collision</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\config\ConfigDocument.cpp">
+      <Filter>engine\private\config</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\config\SimpleParser.cpp">
+      <Filter>engine\private\config</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\diagnostics\Diagnostics.cpp">
+      <Filter>engine\private\diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\effects\Effects.cpp">
+      <Filter>engine\private\effects</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\environment\Environment.cpp">
+      <Filter>engine\private\environment</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\graphics\d3d9\Device.cpp">
+      <Filter>engine\private\graphics\d3d9</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\input\Input.cpp">
+      <Filter>engine\private\input</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\lighting\LightRuntime.cpp">
+      <Filter>engine\private\lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\platform\Platform.cpp">
+      <Filter>engine\private\platform</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\platform\Precompiled.cpp">
+      <Filter>engine\private\platform</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\render\CharacterRenderer.cpp">
+      <Filter>engine\private\render</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\render\Model.cpp">
+      <Filter>engine\private\render</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\render\SceneRenderer.cpp">
+      <Filter>engine\private\render</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\render\Textures.cpp">
+      <Filter>engine\private\render</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\shadows\Shadows.cpp">
+      <Filter>engine\private\shadows</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\spatial\SpatialIndex.cpp">
+      <Filter>engine\private\spatial</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\terrain\Terrain.cpp">
+      <Filter>engine\private\terrain</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\text\Fonts.cpp">
+      <Filter>engine\private\text</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\text\HyperText.cpp">
+      <Filter>engine\private\text</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\Canvas.cpp">
+      <Filter>engine\private\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\Rendering.cpp">
+      <Filter>engine\private\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\Window.cpp">
+      <Filter>engine\private\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\widgets\Controls.cpp">
+      <Filter>engine\private\ui\widgets</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\widgets\Lists.cpp">
+      <Filter>engine\private\ui\widgets</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\widgets\TextEditors.cpp">
+      <Filter>engine\private\ui\widgets</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\vegetation\Vegetation.cpp">
+      <Filter>engine\private\vegetation</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\private\audio\Sound.cpp">
+      <Filter>libs\private\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\private\audio\VorbisDecoder.cpp">
+      <Filter>libs\private\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\private\compression\Zlib.cpp">
+      <Filter>libs\private\compression</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\private\geometry\Geometry.cpp">
+      <Filter>libs\private\geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\private\math\Math.cpp">
+      <Filter>libs\private\math</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\private\text\Text.cpp">
+      <Filter>libs\private\text</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="zlib.h"><Filter>core</Filter></ClInclude>
-    <ClInclude Include="semantic_classes.h"><Filter>semantic</Filter></ClInclude>
-    <ClInclude Include="semantic_static.h"><Filter>semantic</Filter></ClInclude>
-    <ClInclude Include="semantic_window.h"><Filter>semantic</Filter></ClInclude>
-    <ClInclude Include="sfera_sound.h"><Filter>sound</Filter></ClInclude>
-    <ClInclude Include="sfera_sound_runtime.h"><Filter>sound</Filter></ClInclude>
-    <ClInclude Include="semantic_types.h"><Filter>core</Filter></ClInclude>
+    <ClInclude Include="core\public\application\ClientApplication.h">
+      <Filter>core\public\application</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\audio\GameAudio.h">
+      <Filter>core\public\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\audio\SoundEffects.h">
+      <Filter>core\public\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\chat\ChatFilter.h">
+      <Filter>core\public\chat</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\config\InterfaceConfiguration.h">
+      <Filter>core\public\config</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\diagnostics\ClientDiagnostics.h">
+      <Filter>core\public\diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\effects\ActiveEffect.h">
+      <Filter>core\public\effects</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\effects\EffectManager.h">
+      <Filter>core\public\effects</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\effects\NatureManager.h">
+      <Filter>core\public\effects</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\gameplay\ActorMotion.h">
+      <Filter>core\public\gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\network\Network.h">
+      <Filter>core\public\network</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\network\WorldReplication.h">
+      <Filter>core\public\network</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\players\PlayerLists.h">
+      <Filter>core\public\players</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\render\GameRendering.h">
+      <Filter>core\public\render</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\resources\EffectLoader.h">
+      <Filter>core\public\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\resources\FileResources.h">
+      <Filter>core\public\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\resources\ModelResources.h">
+      <Filter>core\public\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\resources\TerrainResources.h">
+      <Filter>core\public\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\resources\TextureRepository.h">
+      <Filter>core\public\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\ConfigText.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\MbcBitStream.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\MbcCommands.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\MbcProcess.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\MbcRuntime.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\MbcUiMessageCodec.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\MbcValue.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\ScriptContainer.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\ui\GameInterfaceManager.h">
+      <Filter>core\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\ui\ScriptInterface.h">
+      <Filter>core\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\ui\WidgetResources.h">
+      <Filter>core\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\world\GameCalendar.h">
+      <Filter>core\public\world</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\world\ServerGeometry.h">
+      <Filter>core\public\world</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\world\WorldObjects.h">
+      <Filter>core\public\world</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\animation\Animation.h">
+      <Filter>engine\public\animation</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\audio\EffectVoice.h">
+      <Filter>engine\public\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\camera\Camera.h">
+      <Filter>engine\public\camera</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\collision\Collision.h">
+      <Filter>engine\public\collision</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\config\ConfigDocument.h">
+      <Filter>engine\public\config</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\config\SimpleParser.h">
+      <Filter>engine\public\config</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\diagnostics\Diagnostics.h">
+      <Filter>engine\public\diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\effects\Effect.h">
+      <Filter>engine\public\effects</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\effects\EffectRendering.h">
+      <Filter>engine\public\effects</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\effects\ParticleEffects.h">
+      <Filter>engine\public\effects</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\effects\ScriptedEffects.h">
+      <Filter>engine\public\effects</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\environment\Environment.h">
+      <Filter>engine\public\environment</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\graphics\DisplayMode.h">
+      <Filter>engine\public\graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\graphics\d3d9\Device.h">
+      <Filter>engine\public\graphics\d3d9</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\input\Cursors.h">
+      <Filter>engine\public\input</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\input\DirectInputDevices.h">
+      <Filter>engine\public\input</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\input\MouseInput.h">
+      <Filter>engine\public\input</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\lighting\LightRuntime.h">
+      <Filter>engine\public\lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\platform\FileMapping.h">
+      <Filter>engine\public\platform</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\platform\Precompiled.h">
+      <Filter>engine\public\platform</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\platform\WindowsSocket.h">
+      <Filter>engine\public\platform</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\platform\windows\ApplicationHost.h">
+      <Filter>engine\public\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\platform\windows\Clipboard.h">
+      <Filter>engine\public\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\render\CharacterRenderer.h">
+      <Filter>engine\public\render</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\render\GraphicsRuntime.h">
+      <Filter>engine\public\render</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\render\Material.h">
+      <Filter>engine\public\render</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\render\Model.h">
+      <Filter>engine\public\render</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\render\SceneRenderer.h">
+      <Filter>engine\public\render</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\render\TextureAccess.h">
+      <Filter>engine\public\render</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\render\Textures.h">
+      <Filter>engine\public\render</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\render\VertexFormats.h">
+      <Filter>engine\public\render</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\runtime\Clock.h">
+      <Filter>engine\public\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\scene\SceneAccess.h">
+      <Filter>engine\public\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\scene\SceneObject.h">
+      <Filter>engine\public\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\shadows\Shadows.h">
+      <Filter>engine\public\shadows</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\spatial\Bounds.h">
+      <Filter>engine\public\spatial</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\spatial\SpatialIndex.h">
+      <Filter>engine\public\spatial</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\terrain\Terrain.h">
+      <Filter>engine\public\terrain</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\terrain\TerrainData.h">
+      <Filter>engine\public\terrain</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\text\Fonts.h">
+      <Filter>engine\public\text</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\text\HyperText.h">
+      <Filter>engine\public\text</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\Canvas.h">
+      <Filter>engine\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\Rendering.h">
+      <Filter>engine\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\Sprite.h">
+      <Filter>engine\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\UiHost.h">
+      <Filter>engine\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\UiRuntime.h">
+      <Filter>engine\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\UiTypes.h">
+      <Filter>engine\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\WidgetSupport.h">
+      <Filter>engine\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\Window.h">
+      <Filter>engine\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\widgets\Controls.h">
+      <Filter>engine\public\ui\widgets</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\widgets\Lists.h">
+      <Filter>engine\public\ui\widgets</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\widgets\Popups.h">
+      <Filter>engine\public\ui\widgets</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\widgets\TextEditors.h">
+      <Filter>engine\public\ui\widgets</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\vegetation\Vegetation.h">
+      <Filter>engine\public\vegetation</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\vegetation\VegetationGeometry.h">
+      <Filter>engine\public\vegetation</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\algorithms\StableSort.h">
+      <Filter>libs\public\algorithms</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\audio\AudioDecoder.h">
+      <Filter>libs\public\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\audio\DirectSoundBackend.h">
+      <Filter>libs\public\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\audio\Sound.h">
+      <Filter>libs\public\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\binary\Binary.h">
+      <Filter>libs\public\binary</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\compression\UiDeflate.h">
+      <Filter>libs\public\compression</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\compression\Zlib.h">
+      <Filter>libs\public\compression</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\geometry\Geometry.h">
+      <Filter>libs\public\geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\image\PcxHeader.h">
+      <Filter>libs\public\image</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\lifetime\Restore.h">
+      <Filter>libs\public\lifetime</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\math\Color.h">
+      <Filter>libs\public\math</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\math\MathFunctions.h">
+      <Filter>libs\public\math</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\math\Matrix.h">
+      <Filter>libs\public\math</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\math\Vector.h">
+      <Filter>libs\public\math</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\numeric\Numeric.h">
+      <Filter>libs\public\numeric</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\platform\WindowsCom.h">
+      <Filter>libs\public\platform</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\text\Parsing.h">
+      <Filter>libs\public\text</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\text\Text.h">
+      <Filter>libs\public\text</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\public\text\TextBuffer.h">
+      <Filter>libs\public\text</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
