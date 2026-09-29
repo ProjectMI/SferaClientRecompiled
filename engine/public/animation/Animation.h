@@ -138,6 +138,7 @@ class SphereRenderModelPose
     static int *secondaryFrame(std::uint32_t handle);
     static int *secondaryAnimation(std::uint32_t handle);
     static SferaVec3F *neckPosition(SferaVec3F &output);
+    static SferaVec3F modelNeckPosition(SphereRenderModel &model, const ExtendedWorldObject &object);
 
   private:
     static SphereRenderModelKeyframe keyframe(const SphereRenderModel &model, const SphereRenderBoneAnimation &animation, std::size_t frame);

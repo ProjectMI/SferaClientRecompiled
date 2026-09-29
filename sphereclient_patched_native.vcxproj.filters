@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version='1.0' encoding='utf-8'?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
     <Filter Include="core">
@@ -39,6 +39,9 @@
     </Filter>
     <Filter Include="core\private\script">
       <UniqueIdentifier>{7D6CF78A-D1F5-57DC-A7A8-051D29C0BC14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\private\script\aot">
+      <UniqueIdentifier>{A43F306E-7854-5196-9760-D0ABC55BC61E}</UniqueIdentifier>
     </Filter>
     <Filter Include="core\private\ui">
       <UniqueIdentifier>{5289CC42-86B5-507A-A6B2-A133D302D3A9}</UniqueIdentifier>
@@ -315,6 +318,9 @@
     <ClCompile Include="core\private\gameplay\ActorMotion.cpp">
       <Filter>core\private\gameplay</Filter>
     </ClCompile>
+    <ClCompile Include="core\private\network\ScriptEvents.cpp">
+      <Filter>core\private\network</Filter>
+    </ClCompile>
     <ClCompile Include="core\private\network\Network.cpp">
       <Filter>core\private\network</Filter>
     </ClCompile>
@@ -345,7 +351,13 @@
     <ClCompile Include="core\private\resources\TextureRepository.cpp">
       <Filter>core\private\resources</Filter>
     </ClCompile>
+    <ClCompile Include="core\private\script\AotExecution.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
     <ClCompile Include="core\private\script\MbcBuiltins.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcObjectVectors.cpp">
       <Filter>core\private\script</Filter>
     </ClCompile>
     <ClCompile Include="core\private\script\MbcExecution.cpp">
@@ -465,9 +477,6 @@
     <ClCompile Include="engine\private\ui\Rendering.cpp">
       <Filter>engine\private\ui</Filter>
     </ClCompile>
-    <ClCompile Include="engine\private\ui\Window.cpp">
-      <Filter>engine\private\ui</Filter>
-    </ClCompile>
     <ClCompile Include="engine\private\ui\widgets\Controls.cpp">
       <Filter>engine\private\ui\widgets</Filter>
     </ClCompile>
@@ -476,6 +485,9 @@
     </ClCompile>
     <ClCompile Include="engine\private\ui\widgets\TextEditors.cpp">
       <Filter>engine\private\ui\widgets</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\Window.cpp">
+      <Filter>engine\private\ui</Filter>
     </ClCompile>
     <ClCompile Include="engine\private\vegetation\Vegetation.cpp">
       <Filter>engine\private\vegetation</Filter>
@@ -497,6 +509,183 @@
     </ClCompile>
     <ClCompile Include="libs\private\text\Text.cpp">
       <Filter>libs\private\text</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\private\text\TextCompare.cpp">
+      <Filter>libs\private\text</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeAccess.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeCall.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeReceive.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcBitStream.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeContext.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeHostMemory.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeMemory.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeMappings.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeProcess.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeStorage.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeValues.cpp">
+      <Filter>core\private\script</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeCatalog.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions0.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions1.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions10.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions11.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions12.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions13.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions14.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions15.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions16.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions17.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions18.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions19.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions2.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions20.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions21.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions22.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions23.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions24.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions25.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions26.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions27.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions28.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions29.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions3.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions30.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions31.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions4.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions5.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions6.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions7.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions8.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions9.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeHost.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeData0.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeData1.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeData2.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeData3.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings0.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings1.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings2.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings3.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings4.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings5.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings6.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings7.cpp">
+      <Filter>core\private\script\aot</Filter>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeImports.cpp">
+      <Filter>core\private\script\aot</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -556,6 +745,12 @@
     </ClInclude>
     <ClInclude Include="core\public\resources\TextureRepository.h">
       <Filter>core\public\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\AotExecution.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeModule.h">
+      <Filter>core\public\script</Filter>
     </ClInclude>
     <ClInclude Include="core\public\script\ConfigText.h">
       <Filter>core\public\script</Filter>
@@ -635,11 +830,11 @@
     <ClInclude Include="engine\public\environment\Environment.h">
       <Filter>engine\public\environment</Filter>
     </ClInclude>
-    <ClInclude Include="engine\public\graphics\DisplayMode.h">
-      <Filter>engine\public\graphics</Filter>
-    </ClInclude>
     <ClInclude Include="engine\public\graphics\d3d9\Device.h">
       <Filter>engine\public\graphics\d3d9</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\graphics\DisplayMode.h">
+      <Filter>engine\public\graphics</Filter>
     </ClInclude>
     <ClInclude Include="engine\public\input\Cursors.h">
       <Filter>engine\public\input</Filter>
@@ -659,14 +854,14 @@
     <ClInclude Include="engine\public\platform\Precompiled.h">
       <Filter>engine\public\platform</Filter>
     </ClInclude>
-    <ClInclude Include="engine\public\platform\WindowsSocket.h">
-      <Filter>engine\public\platform</Filter>
-    </ClInclude>
     <ClInclude Include="engine\public\platform\windows\ApplicationHost.h">
       <Filter>engine\public\platform\windows</Filter>
     </ClInclude>
     <ClInclude Include="engine\public\platform\windows\Clipboard.h">
       <Filter>engine\public\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\platform\WindowsSocket.h">
+      <Filter>engine\public\platform</Filter>
     </ClInclude>
     <ClInclude Include="engine\public\render\CharacterRenderer.h">
       <Filter>engine\public\render</Filter>
@@ -740,12 +935,6 @@
     <ClInclude Include="engine\public\ui\UiTypes.h">
       <Filter>engine\public\ui</Filter>
     </ClInclude>
-    <ClInclude Include="engine\public\ui\WidgetSupport.h">
-      <Filter>engine\public\ui</Filter>
-    </ClInclude>
-    <ClInclude Include="engine\public\ui\Window.h">
-      <Filter>engine\public\ui</Filter>
-    </ClInclude>
     <ClInclude Include="engine\public\ui\widgets\Controls.h">
       <Filter>engine\public\ui\widgets</Filter>
     </ClInclude>
@@ -757,6 +946,12 @@
     </ClInclude>
     <ClInclude Include="engine\public\ui\widgets\TextEditors.h">
       <Filter>engine\public\ui\widgets</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\WidgetSupport.h">
+      <Filter>engine\public\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\public\ui\Window.h">
+      <Filter>engine\public\ui</Filter>
     </ClInclude>
     <ClInclude Include="engine\public\vegetation\Vegetation.h">
       <Filter>engine\public\vegetation</Filter>
@@ -820,6 +1015,39 @@
     </ClInclude>
     <ClInclude Include="libs\public\text\TextBuffer.h">
       <Filter>libs\public\text</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeCall.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeContext.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeExpressions.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeFunctions.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeDeclarations.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeImports.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeStorage.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeMappings.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeTask.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeFields.h">
+      <Filter>core\public\script</Filter>
+    </ClInclude>
+    <ClInclude Include="core\public\script\NativeEntries.h">
+      <Filter>core\public\script</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

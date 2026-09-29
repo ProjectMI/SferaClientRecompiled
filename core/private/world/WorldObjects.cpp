@@ -799,18 +799,7 @@ SferaVec3F *SphereRenderModelPose::neckPosition(SferaVec3F &output)
     auto *model = g_sfera_world_objects.model(*object);
     if (model == nullptr)
         WorldDiagnostics::fail("CalcCharacterNeck: missing model");
-    SphereRenderModelPose::active_model = model;
-    SphereRenderModelPose::primary_frame = frameOffset(*model, object->animation, object->frame, false);
-    SphereRenderModelPose::secondary_enabled = object->interpolation > 0.00001f ? 1u : 0u;
-    if (SphereRenderModelPose::secondary_enabled)
-    {
-        SphereRenderModelPose::blend = object->interpolation;
-        SphereRenderModelPose::secondary_frame = frameOffset(*model, object->animation_secondary, object->frame_secondary, true);
-    }
-    SphereRenderModelPose::current_frame = SferaMatrix4x4F::fromEuler(object->position, object->rotation);
-    updateBone(SphereRenderModelPose::current_frame, model->root_bone);
-    const auto &position = SphereRenderModelPose::attachment_102_position;
-    output = {position.x, position.y, position.z};
+    output = modelNeckPosition(*model, *object);
     return &output;
 }
 

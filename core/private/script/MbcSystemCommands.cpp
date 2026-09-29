@@ -373,7 +373,7 @@ void SferaMbcRuntime::executeSystemEnvironment(std::int32_t operation)
     case 7:
     {
         float fraction = 0;
-        if (argument_count > 1)
+        if (native_call->count > 1)
         {
             const float numerator = SferaNumeric::real32(nextInteger());
             const auto denominator = nextInteger();
@@ -524,9 +524,9 @@ void SferaMbcRuntime::executeSystemInterface(std::int32_t operation)
             return;
         }
         control->objectHandle = object;
-        if (argument_count >= 4)
+        if (native_call->count >= 4)
             control->height_factor = nextReal();
-        if (argument_count == 5)
+        if (native_call->count == 5)
             nextInteger();
         return;
     }
@@ -725,7 +725,7 @@ void SferaMbcRuntime::executeSystemResources(std::int32_t operation)
         return;
     }
     case 73:
-        if (argument_count > 1)
+        if (native_call->count > 1)
         {
             nextInteger();
             pushInteger(SferaClientApplication::resources_loaded);
@@ -752,7 +752,7 @@ void SferaMbcRuntime::executeSystemResources(std::int32_t operation)
         return;
     }
     case 92:
-        reloadQuickFiles();
+        // Legacy request to reload MBC: executable code is compiled into the client.
         return;
     case 113:
     {
@@ -860,7 +860,7 @@ void SferaMbcRuntime::executeSystemRuntime(std::int32_t operation)
         return;
     case 43:
     {
-        auto *process = argument_count == 3 ? findProcess(nextInteger()) : active_process;
+        auto *process = native_call->count == 3 ? findProcess(nextInteger()) : active_process;
         const auto index = nextInteger();
         if (execution_failed)
             return;
@@ -905,22 +905,25 @@ void SferaMbcRuntime::executeSystemRuntime(std::int32_t operation)
         const auto first = nextInteger();
         const auto pattern = nextText();
         const auto output = nextSlice();
-        if (execution_failed || processIndex < 0 || std::cmp_greater_equal(processIndex, std::size(processes)) || processes[processIndex].functions.empty() || first < 0)
+        if (execution_failed || processIndex < 0 || std::cmp_greater_equal(processIndex, std::size(processes)) || processes[processIndex].native_bindings.empty() || first < 0)
         {
             pushInteger(UINT32_MAX);
             return;
         }
         const auto &process = processes[processIndex];
-        for (std::uint32_t index = first; index < process.functions.size(); ++index)
-        {
-            const auto &name = process.functions[index].name;
-            if (!SferaText::matchesWildcard(name, pattern))
-                continue;
-            if (output.base != 0)
-                copyText(output, name);
-            pushInteger(index + 1);
-            return;
-        }
+        std::uint32_t index = 0;
+        for (const auto &binding : process.native_bindings)
+            for (const auto symbol : binding.module->function_names)
+            {
+                const auto current = index++;
+                const auto name = SferaNativeCatalog::symbolName(symbol);
+                if (current < static_cast<std::uint32_t>(first) || !SferaText::matchesWildcard(name, pattern))
+                    continue;
+                if (output.base != 0)
+                    copyText(output, name);
+                pushInteger(current + 1);
+                return;
+            }
         if (output.base != 0)
             copyText(output, {});
         pushInteger(UINT32_MAX);
@@ -1075,7 +1078,7 @@ void SferaMbcRuntime::executeSystemWorld(std::int32_t operation)
     case 0:
     {
         const auto handle = nextInteger();
-        const auto destination = argument_count == 3 ? systemCommandAddress("G_GROUND") : 0;
+        const auto destination = native_call->count == 3 ? systemCommandAddress("G_GROUND") : 0;
         if (execution_failed)
             return;
         std::uint32_t surface = 0;
@@ -1242,7 +1245,7 @@ void SferaMbcRuntime::executeSystemWorld(std::int32_t operation)
         if (execution_failed)
             return;
         auto variant = nextInteger();
-        if (argument_count != 3)
+        if (native_call->count != 3)
         {
             const auto second = nextInteger();
             const auto third = nextInteger();

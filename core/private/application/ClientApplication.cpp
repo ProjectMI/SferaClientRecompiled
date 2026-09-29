@@ -555,7 +555,7 @@ void SferaClientApplication::initializeStorage()
 auto SferaClientApplication::containsClientResources(const std::filesystem::path &directory)
 {
     std::error_code error;
-    return std::filesystem::is_regular_file(directory / L"mbc" / L"_main.mbc", error);
+    return std::filesystem::is_regular_file(directory / L"models" / L"materls.mtr", error);
 }
 
 void SferaClientApplication::configureResourceDirectory()
@@ -571,7 +571,7 @@ void SferaClientApplication::configureResourceDirectory()
         configured.resize(length);
         root = std::filesystem::absolute(std::filesystem::path(configured));
         if (!containsClientResources(root))
-            throw std::runtime_error("SFERA_CLIENT_ROOT does not contain mbc\\_main.mbc");
+            throw std::runtime_error("SFERA_CLIENT_ROOT does not contain models\\materls.mtr");
     }
     else
     {
@@ -609,7 +609,7 @@ void SferaClientApplication::configureResourceDirectory()
                 break;
         }
         if (root.empty())
-            throw std::runtime_error("Unable to locate mbc\\_main.mbc. Set SFERA_CLIENT_ROOT to the client resource directory.");
+            throw std::runtime_error("Unable to locate models\\materls.mtr. Set SFERA_CLIENT_ROOT to the client resource directory.");
     }
     if (!::SetCurrentDirectoryW(root.c_str()))
         throw std::system_error(SferaNumeric::signedWord(::GetLastError()), std::system_category(), "SetCurrentDirectoryW");

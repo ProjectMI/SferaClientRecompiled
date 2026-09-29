@@ -2,12 +2,14 @@
 #include <cstddef>
 #include <optional>
 #include <vector>
+#include <utility>
 
 #include "animation/Animation.h"
 #include "diagnostics/Diagnostics.h"
 #include "math/Matrix.h"
 #include "math/Vector.h"
 #include "render/Model.h"
+#include "scene/SceneObject.h"
 
 SferaMatrix4x4F SphereRenderCharacterSkeleton::characterPoseMatrix(const SphereRenderCharacterPose &pose)
 {
@@ -109,6 +111,29 @@ void SphereRenderModelPose::updateBone(const SferaMatrix4x4F &parent, std::size_
     }
     for (std::size_t child = 0u; child < bone.child_count; ++child)
         updateBone(transform, model->child_bones[bone.first_child + child]);
+}
+
+SferaVec3F SphereRenderModelPose::modelNeckPosition(SphereRenderModel &model, const ExtendedWorldObject &object)
+{
+    active_model = &model;
+    primary_frame = secondary_frame = 0;
+    secondary_enabled = false;
+    blend = 0.0f;
+    current_frame = SferaMatrix4x4F::fromEuler(object.position, object.rotation);
+    // Static placeholders (including EMPTY) have no animated neck. Initialize
+    // the result per object so it cannot retain another model's attachment.
+    attachment_102_position = object.position;
+    if (model.animation_lengths.empty())
+        return attachment_102_position;
+    primary_frame = frameOffset(model, object.animation, object.frame, false);
+    secondary_enabled = object.interpolation > 0.00001f;
+    if (secondary_enabled)
+    {
+        blend = object.interpolation;
+        secondary_frame = frameOffset(model, object.animation_secondary, object.frame_secondary, true);
+    }
+    updateBone(current_frame, model.root_bone);
+    return attachment_102_position;
 }
 
 std::size_t SphereRenderModelPose::frameOffset(const SphereRenderModel &model, int animation, int frame, bool secondary)

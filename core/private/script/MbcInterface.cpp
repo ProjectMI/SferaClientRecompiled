@@ -202,7 +202,7 @@ void SferaMbcRuntime::windowCommand()
     case SferaMbcRuntimeWindowOperation::SystemCursorVisible:
     {
         auto *cursor = CCursorManager::instance().activeCursor();
-        if (argument_count > 1)
+        if (native_call->count > 1)
         {
             if (!windowCommandRead(arguments, 1))
                 return;
@@ -218,14 +218,14 @@ void SferaMbcRuntime::windowCommand()
         CCursorManager::instance().activeCursor()->setCursorKind(arguments[0]);
         break;
     case SferaMbcRuntimeWindowOperation::CursorKind:
-        if (!windowCommandRead(arguments, argument_count > 2 ? 3 : 1))
+        if (!windowCommandRead(arguments, native_call->count > 2 ? 3 : 1))
             return;
-        g_sfera_interface.setCursorKind(arguments[0], argument_count > 2 ? arguments[1] : 8, argument_count > 2 ? arguments[2] : -8);
+        g_sfera_interface.setCursorKind(arguments[0], native_call->count > 2 ? arguments[1] : 8, native_call->count > 2 ? arguments[2] : -8);
         break;
     case SferaMbcRuntimeWindowOperation::CursorImage:
     {
-        const bool positioned = argument_count > 3;
-        const bool imageMode = argument_count == 3 || argument_count == 5;
+        const bool positioned = native_call->count > 3;
+        const bool imageMode = native_call->count == 3 || native_call->count == 5;
         if (!windowCommandRead(arguments, 1 + (positioned ? 2 : 0) + (imageMode ? 1 : 0)))
             return;
         const auto mode = imageMode ? arguments[positioned ? 3 : 1] : -1;
@@ -244,15 +244,15 @@ void SferaMbcRuntime::windowCommand()
         break;
     }
     case SferaMbcRuntimeWindowOperation::CursorText:
-        if (!windowCommandRead(arguments, argument_count > 3 ? 4 : 2))
+        if (!windowCommandRead(arguments, native_call->count > 3 ? 4 : 2))
             return;
         if (auto *cursor = g_sfera_interface.cursor.get())
             cursor->setText(arguments[0], windowCommandInputText(arguments[1]),
-                            argument_count > 3  ? arguments[2]
+                            native_call->count > 3  ? arguments[2]
                             : arguments[0] == 0 ? 6
                             : arguments[0] == 1 ? 16
                                                 : 0,
-                            argument_count > 3  ? arguments[3]
+                            native_call->count > 3  ? arguments[3]
                             : arguments[0] == 0 ? 40
                             : arguments[0] == 1 ? 6
                                                 : 0,
@@ -276,7 +276,7 @@ void SferaMbcRuntime::windowCommand()
     }
     case SferaMbcRuntimeWindowOperation::PollEvent:
     {
-        const auto count = argument_count == 6 ? 5u : argument_count >= 5 ? 4u : 3u;
+        const auto count = native_call->count == 6 ? 5u : native_call->count >= 5 ? 4u : 3u;
         if (!windowCommandRead(arguments, count))
             return;
         for (std::uint32_t index = 1; index < count; ++index)
@@ -290,7 +290,7 @@ void SferaMbcRuntime::windowCommand()
         }
         writeMemory(arguments[1], event.control_id);
         writeMemory(arguments[2], event.message);
-        if (argument_count == 5)
+        if (native_call->count == 5)
         {
             if (event.message == SphereUIUiMessage::listItemEvent)
             {
@@ -301,7 +301,7 @@ void SferaMbcRuntime::windowCommand()
             else
                 writeMemory(arguments[3], UINT32_MAX);
         }
-        else if (argument_count == 6)
+        else if (native_call->count == 6)
         {
             writeMemory(arguments[3], event.first);
             writeMemory(arguments[4], event.second);
@@ -444,7 +444,7 @@ void SferaMbcRuntime::windowCommand()
             pushInteger(0);
             return;
         }
-        if (argument_count > 1)
+        if (native_call->count > 1)
             pushInteger(g_sfera_interface.findWindow("options") != nullptr ? 1 : UINT32_MAX);
         else
         {
@@ -466,7 +466,7 @@ void SferaMbcRuntime::windowCommand()
         break;
     case SferaMbcRuntimeWindowOperation::LegacyPollDialogEvent:
     {
-        const auto count = argument_count == 6 ? 5u : argument_count >= 5 ? 4u : 3u;
+        const auto count = native_call->count == 6 ? 5u : native_call->count >= 5 ? 4u : 3u;
         if (!windowCommandRead(arguments, count))
             return;
         for (std::size_t index = 1; index < count; ++index)
@@ -500,7 +500,7 @@ void SferaMbcRuntime::windowCommand()
         pushInteger(0);
         break;
     case SferaMbcRuntimeWindowOperation::Shutdown:
-        if (argument_count > 1)
+        if (native_call->count > 1)
         {
             if (!windowCommandRead(arguments, 1))
                 return;

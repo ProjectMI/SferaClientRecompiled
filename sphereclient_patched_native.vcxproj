@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version='1.0' encoding='utf-8'?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -254,6 +254,9 @@
       <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
       <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="core\private\network\ScriptEvents.cpp">
+      <ObjectFileName>$(IntDir)core_private_network_ScriptEvents.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="core\private\network\Network.cpp">
       <ObjectFileName>$(IntDir)core_private_network_Network.obj</ObjectFileName>
       <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
@@ -304,8 +307,18 @@
       <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
       <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="core\private\script\AotExecution.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_AotExecution.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="core\private\script\MbcBuiltins.cpp">
       <ObjectFileName>$(IntDir)core_private_script_MbcBuiltins.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcObjectVectors.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_MbcObjectVectors.obj</ObjectFileName>
       <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
       <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
@@ -504,11 +517,6 @@
       <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
       <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="engine\private\ui\Window.cpp">
-      <ObjectFileName>$(IntDir)engine_private_ui_Window.obj</ObjectFileName>
-      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
-      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-    </ClCompile>
     <ClCompile Include="engine\private\ui\widgets\Controls.cpp">
       <ObjectFileName>$(IntDir)engine_private_ui_widgets_Controls.obj</ObjectFileName>
       <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
@@ -521,6 +529,11 @@
     </ClCompile>
     <ClCompile Include="engine\private\ui\widgets\TextEditors.cpp">
       <ObjectFileName>$(IntDir)engine_private_ui_widgets_TextEditors.obj</ObjectFileName>
+      <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
+      <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="engine\private\ui\Window.cpp">
+      <ObjectFileName>$(IntDir)engine_private_ui_Window.obj</ObjectFileName>
       <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
       <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
@@ -547,6 +560,299 @@
     <ClCompile Include="libs\private\text\Text.cpp">
       <ObjectFileName>$(IntDir)libs_private_text_Text.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="libs\private\text\TextCompare.cpp">
+      <ObjectFileName>$(IntDir)libs_private_text_TextCompare.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeAccess.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_NativeAccess.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeCall.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_NativeCall.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeReceive.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_NativeReceive.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\MbcBitStream.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_MbcBitStream.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeContext.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_NativeContext.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeHostMemory.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_NativeHostMemory.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeMemory.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_NativeMemory.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeMappings.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_NativeMappings.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeProcess.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_NativeProcess.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeStorage.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_NativeStorage.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\NativeValues.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_NativeValues.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeCatalog.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeCatalog.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions0.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions0.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions1.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions1.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions10.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions10.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions11.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions11.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions12.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions12.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions13.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions13.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions14.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions14.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions15.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions15.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions16.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions16.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions17.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions17.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions18.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions18.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions19.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions19.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions2.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions2.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions20.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions20.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions21.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions21.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions22.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions22.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions23.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions23.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions24.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions24.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions25.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions25.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions26.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions26.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions27.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions27.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions28.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions28.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions29.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions29.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions3.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions3.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions30.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions30.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions31.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions31.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions4.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions4.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions5.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions5.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions6.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions6.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions7.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions7.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions8.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions8.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeFunctions9.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeFunctions9.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeHost.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeHost.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeData0.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeData0.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeData1.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeData1.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeData2.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeData2.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeData3.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeData3.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings0.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeBindings0.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings1.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeBindings1.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings2.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeBindings2.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings3.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeBindings3.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings4.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeBindings4.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings5.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeBindings5.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings6.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeBindings6.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeBindings7.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeBindings7.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="core\private\script\aot\NativeImports.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_aot_NativeImports.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="core\public\application\ClientApplication.h" />
@@ -568,6 +874,8 @@
     <ClInclude Include="core\public\resources\ModelResources.h" />
     <ClInclude Include="core\public\resources\TerrainResources.h" />
     <ClInclude Include="core\public\resources\TextureRepository.h" />
+    <ClInclude Include="core\public\script\AotExecution.h" />
+    <ClInclude Include="core\public\script\NativeModule.h" />
     <ClInclude Include="core\public\script\ConfigText.h" />
     <ClInclude Include="core\public\script\MbcBitStream.h" />
     <ClInclude Include="core\public\script\MbcCommands.h" />
@@ -594,17 +902,17 @@
     <ClInclude Include="engine\public\effects\ParticleEffects.h" />
     <ClInclude Include="engine\public\effects\ScriptedEffects.h" />
     <ClInclude Include="engine\public\environment\Environment.h" />
-    <ClInclude Include="engine\public\graphics\DisplayMode.h" />
     <ClInclude Include="engine\public\graphics\d3d9\Device.h" />
+    <ClInclude Include="engine\public\graphics\DisplayMode.h" />
     <ClInclude Include="engine\public\input\Cursors.h" />
     <ClInclude Include="engine\public\input\DirectInputDevices.h" />
     <ClInclude Include="engine\public\input\MouseInput.h" />
     <ClInclude Include="engine\public\lighting\LightRuntime.h" />
     <ClInclude Include="engine\public\platform\FileMapping.h" />
     <ClInclude Include="engine\public\platform\Precompiled.h" />
-    <ClInclude Include="engine\public\platform\WindowsSocket.h" />
     <ClInclude Include="engine\public\platform\windows\ApplicationHost.h" />
     <ClInclude Include="engine\public\platform\windows\Clipboard.h" />
+    <ClInclude Include="engine\public\platform\WindowsSocket.h" />
     <ClInclude Include="engine\public\render\CharacterRenderer.h" />
     <ClInclude Include="engine\public\render\GraphicsRuntime.h" />
     <ClInclude Include="engine\public\render\Material.h" />
@@ -629,12 +937,12 @@
     <ClInclude Include="engine\public\ui\UiHost.h" />
     <ClInclude Include="engine\public\ui\UiRuntime.h" />
     <ClInclude Include="engine\public\ui\UiTypes.h" />
-    <ClInclude Include="engine\public\ui\WidgetSupport.h" />
-    <ClInclude Include="engine\public\ui\Window.h" />
     <ClInclude Include="engine\public\ui\widgets\Controls.h" />
     <ClInclude Include="engine\public\ui\widgets\Lists.h" />
     <ClInclude Include="engine\public\ui\widgets\Popups.h" />
     <ClInclude Include="engine\public\ui\widgets\TextEditors.h" />
+    <ClInclude Include="engine\public\ui\WidgetSupport.h" />
+    <ClInclude Include="engine\public\ui\Window.h" />
     <ClInclude Include="engine\public\vegetation\Vegetation.h" />
     <ClInclude Include="engine\public\vegetation\VegetationGeometry.h" />
     <ClInclude Include="libs\public\algorithms\StableSort.h" />
@@ -656,6 +964,17 @@
     <ClInclude Include="libs\public\text\Parsing.h" />
     <ClInclude Include="libs\public\text\Text.h" />
     <ClInclude Include="libs\public\text\TextBuffer.h" />
+    <ClInclude Include="core\public\script\NativeCall.h" />
+    <ClInclude Include="core\public\script\NativeContext.h" />
+    <ClInclude Include="core\public\script\NativeExpressions.h" />
+    <ClInclude Include="core\public\script\NativeFunctions.h" />
+    <ClInclude Include="core\public\script\NativeDeclarations.h" />
+    <ClInclude Include="core\public\script\NativeImports.h" />
+    <ClInclude Include="core\public\script\NativeStorage.h" />
+    <ClInclude Include="core\public\script\NativeMappings.h" />
+    <ClInclude Include="core\public\script\NativeTask.h" />
+    <ClInclude Include="core\public\script\NativeFields.h" />
+    <ClInclude Include="core\public\script\NativeEntries.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

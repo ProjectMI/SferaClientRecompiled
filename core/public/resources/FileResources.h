@@ -85,27 +85,3 @@ struct SferaFileReportingScope
     bool previous;
     ~SferaFileReportingScope();
 };
-
-class QuickFile;
-struct QuickFileEntry;
-
-struct QuickFileEntry
-{
-    std::vector<std::uint8_t> bytes;
-    std::size_t module_id;
-};
-
-class QuickFile
-{
-  public:
-    static constexpr std::size_t file_capacity = 400;
-    QuickFile *initialize(const std::string &directory);
-    void release();
-    int load(const std::string &filename, std::size_t size);
-    const QuickFileEntry *find(std::string_view filename) const;
-
-  private:
-    static constexpr std::size_t maximum_filename_length = 32;
-    std::vector<QuickFileEntry> files;
-    std::unordered_map<std::string, std::size_t> index;
-};
