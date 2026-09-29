@@ -176,7 +176,7 @@ struct SferaNetworkRuntime
     void enqueueMessage(std::span<const std::uint8_t> payload) noexcept;
     void receiveMessages();
     void receiveMessage(std::span<const std::uint8_t> message);
-    static void receiveEvents(std::span<const std::uint8_t> payload);
+    void receiveEvents(std::span<const std::uint8_t> payload);
     bool sendPacket(std::uint32_t flags, std::span<const std::uint8_t> payload);
     static int tickDifference(std::uint32_t current, std::uint32_t previous);
     static void encodePayload(std::uint8_t *data, std::size_t length);

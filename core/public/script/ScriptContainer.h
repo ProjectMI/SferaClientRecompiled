@@ -141,6 +141,8 @@ struct SferaScriptContainer
 
   private:
     static auto findStoredEntry(auto &state, const auto &key);
+    bool ownsMappedData(const void *data, const std::pair<const std::uint32_t, SferaMbcRuntimeMemoryRegion> &entry) const;
+    bool mappedAddressInRange(const void *begin, const void *end, const std::pair<const std::uint32_t, SferaMbcRuntimeMemoryRegion> &entry) const;
     auto executeContent(SferaMbcRuntime &runtime, SferaScriptContainerCommand command, auto &state);
     template <std::size_t Index> void executeVariant(SferaMbcRuntime &runtime, SferaScriptContainerCommand command);
     template <std::size_t... Indices> static constexpr auto executionDispatch(std::index_sequence<Indices...>);

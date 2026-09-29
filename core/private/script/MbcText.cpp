@@ -32,12 +32,12 @@
 
 void SferaMbcRuntime::writeScriptLog()
 {
-    if (native_call->cursor >= native_call->arguments.size())
+    if (argument_cursor >= argument_end)
     {
         reportError("Too few parameters");
         return;
     }
-    const auto type = native_call->arguments[native_call->cursor].type;
+    const auto type = g_sfera_mbc_runtime.values[argument_cursor].type;
     const bool textValue = (type & 15u) != 0;
     const bool realValue = !textValue && type == SferaMbcValueTypeReal;
     const auto integer = realValue ? 0 : nextInteger();
@@ -47,7 +47,7 @@ void SferaMbcRuntime::writeScriptLog()
         return;
     if (textValue)
         (void)textAt(integer);
-    if (native_call->count == 2)
+    if (argument_count == 2)
         nextInteger();
 }
 
@@ -114,18 +114,18 @@ auto SferaMbcRuntime::formatArgumentsCharacterAt(std::string_view pattern, std::
 std::string SferaMbcRuntime::formatArguments(std::string_view pattern, std::size_t limit)
 {
     std::vector<std::variant<int, double, SferaSliceReference32>> arguments;
-    while (native_call->count > 0)
+    while (argument_count > 0)
     {
-        if (native_call->cursor >= native_call->arguments.size())
+        if (argument_cursor >= argument_end)
         {
             reportError("Too few parameters");
             break;
         }
-        const auto &argument = native_call->arguments[native_call->cursor];
+        const auto &argument = g_sfera_mbc_runtime.values[argument_cursor];
         if (argument.isPointer())
         {
             arguments.emplace_back(argument.value);
-            ++native_call->cursor;
+            ++argument_cursor;
         }
         else if (argument.type == SferaMbcValueTypeByte || argument.type == SferaMbcValueTypeInteger)
             arguments.emplace_back(nextInteger());
@@ -134,9 +134,9 @@ std::string SferaMbcRuntime::formatArguments(std::string_view pattern, std::size
             const double value = nextReal();
             arguments.emplace_back(value);
         }
-        --native_call->count;
+        --argument_count;
     }
-    if (!native_call->arguments.empty()) native_call->result = native_call->arguments.front();
+    ++value_stack_size;
     if (execution_failed)
         return {};
     std::string result;
@@ -329,7 +329,7 @@ std::string SferaMbcRuntime::formatArguments(std::string_view pattern, std::size
 void SferaMbcRuntime::formatText(bool bounded)
 {
     const std::uint32_t required = bounded ? 3 : 2;
-    if (std::cmp_less(native_call->count, required))
+    if (std::cmp_less(argument_count, required))
     {
         reportError(bounded ? "Wrong number of parameters: ffsnprintf" : "Wrong number of parameters: ffsprintf");
         return;
@@ -339,7 +339,7 @@ void SferaMbcRuntime::formatText(bool bounded)
     const auto pattern = nextAddress();
     if (execution_failed)
         return;
-    native_call->count -= required;
+    argument_count -= required;
     std::optional<SferaTextBuffer> output;
     std::size_t limit = 0;
     if (capacity != 0)
@@ -360,16 +360,16 @@ void SferaMbcRuntime::formatText(bool bounded)
 
 void SferaMbcRuntime::writeFormattedLog(bool named)
 {
-    if (native_call->count >= 1 && native_call->cursor < native_call->arguments.size())
+    if (argument_count >= 1 && argument_cursor < argument_end)
     {
-        const auto type = native_call->arguments[native_call->cursor].type;
+        const auto type = g_sfera_mbc_runtime.values[argument_cursor].type;
         if (type == SferaMbcValueTypeByte || type == SferaMbcValueTypeInteger)
         {
             nextInteger();
-            --native_call->count;
+            --argument_count;
         }
     }
-    if (native_call->count < (named ? 2 : 1))
+    if (argument_count < (named ? 2 : 1))
     {
         reportError(named ? "Invalid parameter list: ffflogf()" : "Invalid parameter list: fflogf()");
         return;
@@ -377,12 +377,12 @@ void SferaMbcRuntime::writeFormattedLog(bool named)
     if (named)
     {
         const auto filename = nextInteger();
-        --native_call->count;
+        --argument_count;
         if (!execution_failed)
             (void)textAt(filename);
     }
     const auto patternOffset = nextInteger();
-    --native_call->count;
+    --argument_count;
     const auto pattern = textAt(patternOffset);
     if (execution_failed)
         return;
@@ -683,7 +683,7 @@ void SferaMbcRuntime::scanText()
 {
     const auto source = nextAddress();
     const auto format = nextAddress();
-    const auto type = native_call->cursor < native_call->arguments.size() ? native_call->arguments[native_call->cursor].type : SferaMbcValueTypeByte;
+    const auto type = argument_cursor < argument_end ? g_sfera_mbc_runtime.values[argument_cursor].type : SferaMbcValueTypeByte;
 
     std::array<std::variant<std::monostate, std::int8_t, std::uint8_t, std::int16_t, std::uint16_t, int, std::uint32_t, std::int64_t, std::uint64_t, float, double>, 4> numbers{};
     std::array<void *, 4> destinations{};
@@ -693,14 +693,14 @@ void SferaMbcRuntime::scanText()
     completed.fill(-1);
     std::array<std::size_t, 4> characterCounts{};
     std::array<std::variant<std::monostate, std::string, std::wstring>, 4> textOutputs{};
-    const auto count = std::min(native_call->count > 2 ? native_call->count - 2 : 1u, 4u);
+    const auto count = std::min(argument_count > 2 ? argument_count - 2 : 1u, 4u);
     for (std::uint32_t index = 0; index < count; ++index)
     {
         references[index] = nextAddress();
     }
     if (execution_failed)
         return;
-    if (native_call->count < 3 || native_call->count > 6 || (native_call->count == 3 && type != SferaMbcValueTypeIntegerPointer && type != SferaMbcValueTypeRealPointer && type != SferaMbcValueTypeBytePointer))
+    if (argument_count < 3 || argument_count > 6 || (argument_count == 3 && type != SferaMbcValueTypeIntegerPointer && type != SferaMbcValueTypeRealPointer && type != SferaMbcValueTypeBytePointer))
     {
         pushInteger(source.base);
         return;
@@ -896,6 +896,206 @@ void SferaMbcRuntime::scanText()
         scanTextStoreVariant<true>(textOutputs[index], references[index], characterCounts[index]);
     }
     pushInteger(result);
+}
+
+unsigned SferaMbcFieldHelper::mbc_field_minimum_bits(std::int8_t format)
+{
+    const auto value = std::abs(+format);
+    if (value <= 32)
+        return value;
+    if (value == 'g')
+        return 6u;
+    if (value >= 'i' && value <= 'k')
+        return 12u;
+    if (value == 'l')
+        return 8u;
+    return 0u;
+}
+
+std::uint32_t SferaMbcFieldHelper::mbc_array_count(std::uint32_t encodedCount, std::int8_t countFormat, std::int8_t elementFormat, std::size_t remainingBits)
+{
+    if (countFormat != 'f')
+        return encodedCount;
+    // Some short server regions carry 0x40 even when 64 additional elements cannot be present.
+    // Keep the full count when it fits; clear only that bit when the full count is impossible.
+    const auto elementBits = SferaMbcFieldHelper::mbc_field_minimum_bits(elementFormat);
+    if (elementBits == 0u || encodedCount <= remainingBits / elementBits)
+        return encodedCount;
+    const auto compactCount = encodedCount & 0x3Fu;
+    return compactCount <= remainingBits / elementBits ? compactCount : encodedCount;
+}
+
+std::uint32_t SferaMbcBitStream::read(unsigned width)
+{
+    if (!valid_ || width > 32 || position_ > data_.size() * 8 || width > data_.size() * 8 - position_)
+    {
+        valid_ = false;
+        return 0;
+    }
+    std::uint32_t value = 0;
+    for (unsigned bit = 0; bit < width; ++bit, ++position_)
+        value |= ((data_[position_ / 8] >> (position_ % 8)) & 1u) << bit;
+    return value;
+}
+
+void SferaMbcBitStream::write(std::uint32_t value, unsigned width)
+{
+    if (!valid_ || output_ == nullptr || width > 32 || position_ > data_.size() * 8 || width > data_.size() * 8 - position_)
+    {
+        valid_ = false;
+        return;
+    }
+    for (unsigned bit = 0; bit < width; ++bit, ++position_)
+    {
+        const std::uint8_t mask = 1u << (position_ % 8);
+        auto &destination = output_[position_ / 8];
+        destination = (destination & ~mask) | (((value >> bit) & 1u) ? mask : 0);
+    }
+}
+
+void SferaMbcBitStream::append(std::span<const std::uint8_t> data, std::size_t bits)
+{
+    if (bits > data.size() * 8 || position_ > data_.size() * 8 || bits > data_.size() * 8 - position_)
+    {
+        valid_ = false;
+        return;
+    }
+    SferaMbcBitStream source(data);
+    while (bits != 0 && valid_)
+    {
+        const unsigned width = SferaNumeric::lowWord(std::min<std::size_t>(bits, 32));
+        write(source.read(width), width);
+        bits -= width;
+    }
+}
+
+std::uint32_t SferaMbcBitStream::encodeCoordinate(int origin, float coordinate)
+{
+    const float reference = SferaNumeric::real32(origin);
+    const double coordinate_value = coordinate;
+    const float magnitude = SferaNumeric::real32(std::fabs(coordinate_value - reference));
+    if (!std::isfinite(magnitude) || magnitude >= 120.0f)
+        return UINT32_MAX;
+    const float inverse = SferaNumeric::real32(1.0 / (magnitude + 40.0));
+    constexpr float minimum_float = 0.0062500000931322575f;
+    const double minimum = minimum_float;
+    const auto normalized = (inverse - minimum) / (g_sfera_mbc_runtime.inverse_coordinate_scale - minimum);
+    return SferaNumeric::truncatedWord(normalized * coordinateMagnitudeMask) | (coordinate < reference ? coordinateSignBit : 0u);
+}
+
+float SferaMbcBitStream::decodeCoordinate(int origin, std::uint32_t code)
+{
+    constexpr float minimum_float = 0.0062500000931322575f;
+    const double minimum = minimum_float;
+    const double encoded_magnitude = code & coordinateMagnitudeMask;
+    const double magnitude_limit = coordinateMagnitudeMask;
+    const float inverse = SferaNumeric::real32((g_sfera_mbc_runtime.inverse_coordinate_scale - minimum) * (encoded_magnitude / magnitude_limit) + minimum);
+    float distance = SferaNumeric::real32(1.0 / inverse - 40.0);
+    if (code & coordinateSignBit)
+        distance = -distance;
+    const double origin_value = origin;
+    return SferaNumeric::real32(origin_value + distance);
+}
+
+std::uint32_t SferaMbcBitStream::readField(std::int8_t format, std::span<const int, 3> origin)
+{
+    if (format <= 32)
+    {
+        const int signed_width = format < 0 ? -format : format;
+        const unsigned width = signed_width;
+        const auto value = read(width);
+        if (format < 0 && width < 32 && width != 0 && (value & (1u << (width - 1))))
+            return value | (UINT32_MAX << width);
+        return value;
+    }
+    if (format == 'g')
+    {
+        const bool negative = read(1) != 0;
+        const auto width = variableIntegerWidths[read(2)];
+        const auto magnitude = read(width);
+        return negative ? 0u - magnitude : magnitude;
+    }
+    if (format >= 'i' && format <= 'k')
+        return SferaBinary::floatBits(decodeCoordinate(origin[format - 'i'], read(12)));
+    if (format == 'l')
+        return SferaBinary::floatBits(read(8) * 0.02454369328916073f);
+    valid_ = false;
+    return 0;
+}
+
+bool SferaMbcBitStream::writeField(std::int8_t format, std::uint32_t value, std::span<const int, 3> origin)
+{
+    if (format <= 32)
+    {
+        const int signed_width = format < 0 ? -format : format;
+        const unsigned width = signed_width;
+        write(value, width);
+    }
+    else if (format == 'g')
+    {
+        const bool negative = SferaNumeric::signedWord(value) < 0;
+        const auto magnitude = negative ? 0u - value : value;
+        const int signedMagnitude = magnitude;
+        const auto selector = signedMagnitude < 8 ? 0u : signedMagnitude < 128 ? 1u : signedMagnitude < 16384 ? 2u : 3u;
+        write(negative, 1);
+        write(selector, 2);
+        write(magnitude, variableIntegerWidths[selector]);
+    }
+    else if (format >= 'i' && format <= 'k')
+    {
+        const auto code = encodeCoordinate(origin[format - 'i'], SferaBinary::floatFromBits(value));
+        if (code == UINT32_MAX)
+            return false;
+        write(code, 12);
+    }
+    else if (format == 'l')
+    {
+        auto angle = SferaBinary::floatFromBits(value);
+        if (!std::isfinite(angle) || angle < -1000.0f || angle > 1000.0f)
+            angle = 0;
+        while (angle < 0)
+            angle = SferaNumeric::real32(angle + 6.2831854820251465);
+        const float scaled = SferaNumeric::real32(angle * 40.7436637878418);
+        write(SferaNumeric::truncatedWord(scaled) & 255u, 8);
+    }
+    return true;
+}
+
+bool SferaMbcBitStream::skipRegion(const SferaMbcRegionRecord &region)
+{
+    if (region.field_count < 0 || std::cmp_greater(region.field_count, std::size(region.formats)))
+        return false;
+    for (int field = 0; field < region.field_count && valid_; ++field)
+    {
+        auto format = std::abs(region.formats[field]);
+        std::uint32_t count = 1;
+        if (format == 'e' || format == 'f')
+        {
+            const std::int8_t countFormat = SferaNumeric::signedByte(SferaNumeric::lowByte(SferaNumeric::word(format)));
+            const auto encodedCount = read(format == 'e' ? 4 : 8);
+            if (!valid_ || ++field >= region.field_count)
+                return false;
+            count = SferaMbcFieldHelper::mbc_array_count(encodedCount, countFormat, region.formats[field], remaining());
+            format = std::abs(region.formats[field]);
+        }
+        for (std::uint32_t element = 0; element < count && valid_; ++element)
+        {
+            if (format <= 32)
+                read(format);
+            else if (format >= 'i' && format <= 'k')
+                read(12);
+            else if (format == 'l')
+                read(8);
+            else if (format == 'g')
+            {
+                read(1);
+                read(variableIntegerWidths[read(2)]);
+            }
+            else
+                return false;
+        }
+    }
+    return valid_;
 }
 
 // Process ownership, transport, platform input and application lifetime.

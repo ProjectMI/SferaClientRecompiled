@@ -7,54 +7,89 @@
 #include <iterator>
 #include <list>
 #include <memory>
-#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "script/NativeModule.h"
+#include "numeric/Numeric.h"
 
 struct ScriptProgramDiagnostic;
+struct SferaMbcExecutionContext;
 struct SferaMbcFunctionRecord;
 
 struct ScriptProgramDiagnostic
 {
-    std::string_view name;
-    SferaNativeEntry entry;
-    SferaNativeEntry stop;
-    SferaNativeEntry selected;
-    std::optional<SferaNativeEntry> pending_start;
-    std::shared_ptr<SferaNativeTask> task;
-    std::int8_t state = -1;
-    std::uint8_t priority = 0;
-    bool executing = false;
-    int caller_program = -1;
-    std::uint16_t previous_program = UINT16_MAX;
-    std::uint16_t next_program = UINT16_MAX;
+    std::string name;
+    std::uint32_t entry_offset;
+    std::uint32_t stop_offset;
+    std::int8_t state;
+    std::uint8_t priority;
+    std::uint32_t return_offsets[20];
+    std::uint8_t callDepth;
 
-    void select(SferaNativeEntry target)
-    {
-        if (executing)
-        {
-            pending_start = target;
-            return;
-        }
-        task.reset();
-        selected = target;
-        pending_start.reset();
-    }
+    std::uint32_t instruction_offset;
+
+    bool executing;
+
+    int caller_program;
+    std::uint16_t previous_program;
+    std::uint16_t next_program;
+};
+
+struct SferaMbcExecutionContext
+{
+    std::int32_t process_index = -1;
+    int program_index = -1;
+    std::uint32_t instruction_offset{};
+    std::uint32_t process_id = UINT32_MAX;
+    std::uint64_t process_lifetime{};
 };
 
 struct SferaMbcFunctionRecord
 {
-    std::string_view name;
-    SferaNativeEntry entry;
+    std::string name;
+    std::uint32_t entry_offset;
     int program_index;
     bool allow_reentry;
 };
 
-// Declaration names refer to immutable native catalogue storage; process names remain owned.
+// Runtime names are owned strings. MBC files still encode names with a 31-byte limit.
+
+struct SferaMbcBytecodeKey;
+struct SferaMbcModuleImage;
+struct SferaMbcModuleRecord;
+
+struct SferaMbcModuleRecord
+{
+    std::string name;
+};
+
+struct SferaMbcModuleImage
+{
+    static constexpr std::size_t functionSlotCount = 80;
+    std::uint32_t module_tag = 0;
+    std::span<const std::uint8_t> bytecode;
+    std::span<const std::uint8_t> memory;
+    std::vector<ScriptProgramDiagnostic> programs;
+    std::vector<SferaMbcFunctionRecord> functions;
+    std::array<std::uint16_t, functionSlotCount> function_map;
+    std::span<const std::uint8_t> region_definitions;
+    std::uint32_t position_memory_offset = 0;
+    std::array<std::vector<std::uint32_t>, 3> relocations;
+    bool read(std::span<const std::uint8_t> data, bool linking);
+};
+
+using SferaMbcModuleIds = std::array<std::uint16_t, 8>;
+struct SferaMbcBytecodeKey
+{
+    SferaMbcModuleIds modules;
+    std::uint32_t memory_size;
+    bool operator<(const SferaMbcBytecodeKey &other) const noexcept
+    {
+        return modules == other.modules ? memory_size < other.memory_size : modules < other.modules;
+    }
+};
 
 struct SferaMbcRegionPacket;
 struct SferaMbcRegionRecord;
@@ -93,15 +128,6 @@ struct SferaMbcRuntimeOutgoingField
 
 struct SferaMbcProcessRecord;
 struct SferaMbcProcessRecordCleanupEntry;
-struct SferaNativeModule;
-
-struct SferaNativeBinding
-{
-    const SferaNativeModule *module;
-    std::shared_ptr<SferaNativeModuleState> storage;
-    std::uint32_t program_base;
-    std::uint32_t binding_index = 0;
-};
 
 enum SferaMbcProcessRecordFlags : std::uint32_t
 {
@@ -129,7 +155,6 @@ struct SferaMbcProcessRecordCleanupEntry
 
 struct SferaMbcProcessRecord
 {
-    static constexpr std::size_t functionSlotCount = 80;
     void registerResource(std::uint32_t handle, SferaMbcProcessRecordResourceKind kind);
     void unregisterResource(std::uint32_t handle, SferaMbcProcessRecordResourceKind kind);
     void linkProgram(std::size_t index);
@@ -137,18 +162,25 @@ struct SferaMbcProcessRecord
     bool activateProgram(std::string_view name);
     void appendCommand(std::string_view command);
     std::uint32_t growMemory(std::size_t size);
-    std::optional<SferaMbcFunctionRecord> findFunction(std::string_view name) const;
-    std::optional<SferaMbcFunctionRecord> findFunction(std::uint32_t slot) const;
-    SferaNativeEntry selectExport(std::uint32_t callerBinding, std::uint32_t symbol, std::span<const std::uint64_t> providers = {}, SferaNativeCallable knownCallable = {}) const;
-    void readRegions(std::span<const SferaNativeRegionDefinition> definitions, std::uint32_t firstProgram);
+    SferaMbcFunctionRecord *findFunction(std::string_view name);
+    void readRegions(std::span<const std::uint8_t> definitions, std::uint32_t firstProgram);
     void releaseResources();
     void queueRegion(std::size_t region, std::uint32_t timestamp, std::span<const int, 3> origin, std::span<const std::uint8_t> payload, std::size_t firstBit, std::size_t bitCount, bool ordered);
     std::string name;
+    SferaMbcModuleIds linked_modules;
     uint32_t module_tag;
-    std::vector<std::shared_ptr<SferaNativeObject>> allocations;
-    unsigned native_depth = 0;
+    std::shared_ptr<const std::vector<std::uint8_t>> bytecode;
+    std::vector<std::uint8_t> memory;
     std::vector<ScriptProgramDiagnostic> programs;
-    std::vector<SferaNativeBinding> native_bindings;
+    std::vector<SferaMbcFunctionRecord> functions;
+    const std::uint8_t *codeData() const noexcept
+    {
+        return bytecode ? bytecode->data() : nullptr;
+    }
+    std::uint32_t codeSize() const noexcept
+    {
+        return bytecode ? SferaNumeric::lowWord(bytecode->size()) : 0;
+    }
     int32_t chain_prev_index = -1;
     int32_t chain_next_index = -1;
     uint16_t program_map_a[4];
@@ -161,11 +193,16 @@ struct SferaMbcProcessRecord
     std::uint64_t lifetime{};
     bool programs_queued;
     bool execution_linked;
+    std::array<std::uint16_t, SferaMbcModuleImage::functionSlotCount> function_map{};
     int32_t execution_prev_index;
     int32_t execution_next_index;
     std::vector<SferaMbcRegionRecord> regions; // Bindings belong to this process, not to the shared module catalogue.
     std::uint32_t region_timestamps[63];
     std::array<std::unique_ptr<std::list<SferaMbcRegionPacket>>, 63> received_regions;
+    uint16_t code_range_ids[8];
+    uint32_t code_range_begin[8];
+    uint32_t code_range_size[8];
+    uint16_t code_range_count;
 
   private:
     static std::uint64_t *resourceLifetime(std::uint32_t handle, SferaMbcProcessRecordResourceKind kind);

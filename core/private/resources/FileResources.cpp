@@ -355,3 +355,75 @@ SferaFileReportingScope::~SferaFileReportingScope()
 {
     owner.setErrorReporting(previous);
 }
+
+QuickFile *QuickFile::initialize(const std::string &directory)
+{
+    release();
+    files.reserve(file_capacity);
+    index.reserve(file_capacity);
+    if (directory.empty())
+        return this;
+    std::error_code error;
+    std::filesystem::directory_iterator cursor(std::filesystem::path(directory), error);
+    const std::filesystem::directory_iterator end;
+    while (!error && cursor != end)
+    {
+        const auto path = cursor->path();
+        if (SferaText::resourceKey(path.extension().string()) == ".mbc" && cursor->is_regular_file(error))
+            load(path.string(), 0);
+        cursor.increment(error);
+    }
+    return this;
+}
+
+void QuickFile::release()
+{
+    index.clear();
+    std::vector<QuickFileEntry>().swap(files);
+}
+
+int QuickFile::load(const std::string &filename, std::size_t size)
+{
+    if (filename.empty())
+        return 2;
+    std::unique_ptr<std::FILE, decltype(&std::fclose)> stream(::_fsopen(filename.c_str(), "rb", _SH_DENYNO), &std::fclose);
+    if (!stream)
+        return 2;
+    if (files.size() >= file_capacity)
+        return -1;
+    if (size == 0)
+    {
+        const auto length = ::_filelengthi64(::_fileno(stream.get()));
+        if (!std::in_range<std::size_t>(length))
+            return 3;
+        size = length;
+    }
+    QuickFileEntry loaded{std::vector<std::uint8_t>(size), files.size() + 1};
+    if (size != 0 && std::fread(loaded.bytes.data(), 1, size, stream.get()) != size)
+        return 3;
+    const std::string_view path(filename);
+    const auto separator = path.find_last_of("/\\");
+    const auto basename = path.substr(separator == std::string_view::npos ? 0 : separator + 1);
+    if (basename.size() > maximum_filename_length)
+        throw std::length_error("QuickFile: module filename is too long");
+    auto key = SferaText::resourceKey(basename);
+    files.push_back(std::move(loaded));
+    try
+    {
+        index.try_emplace(std::move(key), files.size() - 1);
+    }
+    catch (...)
+    {
+        files.pop_back();
+        throw;
+    }
+    return 0;
+}
+
+const QuickFileEntry *QuickFile::find(std::string_view filename) const
+{
+    if (filename.size() > maximum_filename_length)
+        return nullptr;
+    const auto found = index.find(SferaText::resourceKey(filename));
+    return found == index.end() ? nullptr : &files[found->second];
+}

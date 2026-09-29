@@ -21,7 +21,6 @@
 #include "effects/EffectManager.h"
 #include "math/Vector.h"
 #include "numeric/Numeric.h"
-#include "script/NativeModule.h"
 #include "script/MbcRuntime.h"
 #include "ui/Rendering.h"
 #include "world/WorldObjects.h"
@@ -148,15 +147,32 @@ std::uint32_t WorldDiagnostics::inspectInstruction(std::uint16_t &module, std::u
         return 1u;
     }
     const auto &process = vm.processes[vm.process_index];
-    const auto mismatch = vm.active_process != &process ? codeBaseMismatch : 0u;
-    count = 0u; // Native routines have source locations, not executable byte spans.
-    if (vm.source_module == nullptr || vm.native_checkpoint == UINT32_MAX)
+    const auto mismatch = vm.bytecode_base != process.codeData() ? codeBaseMismatch : 0u;
+    const std::less<const std::uint8_t *> before;
+    if (!process.codeData() || !vm.current_instruction_address || before(vm.current_instruction_address, process.codeData()) ||
+        !before(vm.current_instruction_address, process.codeData() + process.codeSize()))
     {
+        count = 0u;
         return mismatch | 3u;
     }
-    module = SferaNumeric::lowHalf(vm.source_module->module_tag);
-    offset = vm.native_checkpoint;
-    return mismatch;
+    const std::uint32_t relative = SferaNumeric::lowWord(vm.current_instruction_address - process.codeData());
+    if (bytes)
+    {
+        count = std::min(count, process.codeSize() - relative);
+        std::copy_n(vm.current_instruction_address, count, bytes);
+    }
+    const auto ranges = std::min<std::size_t>(process.code_range_count, std::size(process.code_range_ids));
+    for (std::size_t index = 0; index < ranges; ++index)
+    {
+        const auto begin = process.code_range_begin[index];
+        if (relative >= begin && relative - begin < process.code_range_size[index])
+        {
+            module = process.code_range_ids[index];
+            offset = relative - begin;
+            return mismatch;
+        }
+    }
+    return mismatch | (process.code_range_count == std::size(process.code_range_ids) ? 2u : 3u);
 }
 
 void WorldDiagnostics::describeScript(bool includeTime)
@@ -181,28 +197,25 @@ void WorldDiagnostics::describeScript(bool includeTime)
     const auto status = inspectInstruction(module, offset, bytes, count);
     if ((status & ~codeBaseMismatch) == 1)
     {
-        output.append("Native execution context unknown. (wrong pos)");
+        output.append("PrcName,CodeOffs: unknown. (wrong pos)");
         return;
     }
     if ((status & ~codeBaseMismatch) == 2)
     {
-        output.append("Native execution context unknown. (modulesNum == MAX_MODULES_IN_PRC)");
+        output.append("PrcName,CodeOffs: unknown. (modulesNum == MAX_MODULES_IN_PRC)");
         return;
     }
     if ((status & ~codeBaseMismatch) == 3)
     {
-        output.append("Native execution context unknown. (Offset not found)");
+        output.append("PrcName,CodeOffs: unknown. (Offset not found)");
         return;
     }
     std::string text;
     if (status & codeBaseMismatch)
-    {
-        text = std::format("Warn!!! process {} differs from the active native execution context. ", vm.process_index);
-    }
+        text = std::format("Warn!!! pos = {}, sBaseCodePtr = {:p}, Prc[pos].baseCodePtr = {:p}. ", vm.process_index, static_cast<const void *>(vm.bytecode_base),
+                           static_cast<const void *>(vm.processes[vm.process_index].codeData()));
     else
-    {
-        text = std::format("module:{}, checkpoint:{}. ", module, offset);
-    }
+        text = std::format("module:{}, code:{}. ", module, offset);
     output.append(text);
     for (std::uint32_t index = 0; index < count; ++index)
     {
@@ -214,15 +227,40 @@ void WorldDiagnostics::describeScript(bool includeTime)
 
 void WorldDiagnostics::appendCallStack(std::string &output)
 {
-    const auto &runtime = g_sfera_mbc_runtime;
-    if (runtime.native_caller_process < std::size(runtime.processes))
+    const auto &vm = g_sfera_mbc_runtime;
+    std::string text;
+    for (auto index = vm.execution_context_depth - 1; index >= 0; --index)
     {
-        const auto &caller = runtime.processes[runtime.native_caller_process];
-        output += "\nNative caller process: ";
-        output += caller.name;
-        output += '\n';
+        const auto &context = vm.execution_context_stack[index];
+        if (context.process_index < 0)
+        {
+            text += "\nCall from C++\n";
+            continue;
+        }
+        if (context.process_index < 0 || std::cmp_greater_equal(context.process_index, std::size(vm.processes)))
+        {
+            text += "\nInvalid call context\n";
+            break;
+        }
+        const auto &process = vm.processes[context.process_index];
+        if (context.process_id != process.process_id)
+        {
+            text += "\nError in prc call stack\n";
+            break;
+        }
+        if (context.process_lifetime != process.lifetime || context.program_index < 0 || context.program_index >= process.programs.size())
+        {
+            text += "\nExpired call context\n";
+            break;
+        }
+        const auto &program = process.programs[context.program_index];
+        text += "\nPrevious prc: ";
+        text += process.name;
+        text += "\nProgram: ";
+        text += program.name;
+        text += '\n';
     }
-    output += "Call/return frames are native C++ frames; coroutine suspension is owned by the selected program.\n";
+    output.append(text);
 }
 
 std::optional<std::string_view> WorldDiagnostics::scriptContext()
@@ -232,8 +270,8 @@ std::optional<std::string_view> WorldDiagnostics::scriptContext()
     auto &vm = g_sfera_mbc_runtime;
     describeScript(true);
     const auto &program = vm.program_table_base[vm.program_index];
-    auto contextMessage = std::format("Script: {}\nProgram: {}\nNative call depth: {}\nNative function: {}\nNative checkpoint: {}\n", vm.processes[vm.process_index].name, program.name, vm.active_process->native_depth,
-                                      vm.source_function, vm.native_checkpoint);
+    auto contextMessage = std::format("MBC-file: {}\nProgram: {}\nCall's depth: {}\nAddress: 0x{:08X}\n", vm.processes[vm.process_index].name, program.name, program.callDepth,
+                                      (vm.current_instruction_address - vm.bytecode_base) + 32u);
     vm.diagnostic_context.append(contextMessage);
     appendCallStack(vm.diagnostic_context);
     return vm.diagnostic_context;

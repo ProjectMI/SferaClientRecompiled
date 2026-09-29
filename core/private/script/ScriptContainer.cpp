@@ -102,6 +102,18 @@ auto SferaScriptContainer::findStoredEntry(auto &state, const auto &key)
         return state.values.find(key);
 }
 
+bool SferaScriptContainer::ownsMappedData(const void *data, const std::pair<const std::uint32_t, SferaMbcRuntimeMemoryRegion> &entry) const
+{
+    return entry.second.owner == this && entry.second.address() == data;
+}
+
+bool SferaScriptContainer::mappedAddressInRange(const void *begin, const void *end, const std::pair<const std::uint32_t, SferaMbcRuntimeMemoryRegion> &entry) const
+{
+    const std::less<const void *> less;
+    const void *address = entry.second.data;
+    return entry.second.owner == this && !less(address, begin) && less(address, end);
+}
+
 template <class C, bool Hashed> SferaScriptContainerContent<C, Hashed>::SferaScriptContainerContent()
 {
     if constexpr (Hashed)
@@ -203,7 +215,7 @@ std::unique_ptr<SferaScriptContainer> SferaScriptContainer::create(SferaScriptCo
 auto SferaScriptContainer::forgetStoredValue(SferaMbcRuntime &runtime, const auto &value)
 {
     if constexpr (std::is_same_v<std::remove_cvref_t<decltype(value)>, std::string> || std::is_same_v<std::remove_cvref_t<decltype(value)>, SferaScriptContainerBinary>)
-        runtime.mapped_memory.forget(this, value.data());
+        std::erase_if(runtime.mapped_memory, std::bind_front(&SferaScriptContainer::ownsMappedData, this, value.data()));
 }
 
 template <class T> auto SferaScriptContainer::readStoredValue(SferaMbcRuntime &runtime) -> T
@@ -266,7 +278,7 @@ auto SferaScriptContainer::eraseElement(SferaMbcRuntime &runtime, auto &state, a
         const void *begin = &*iterator;
         const void *end = values.data() + values.size();
 
-        runtime.mapped_memory.forget(this, begin, end);
+        std::erase_if(runtime.mapped_memory, std::bind_front(&SferaScriptContainer::mappedAddressInRange, this, begin, end));
         values.erase(iterator);
         if (header.iteration_active && state.cursor >= values.size())
             header.iteration_active = false;
