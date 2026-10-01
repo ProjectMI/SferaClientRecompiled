@@ -34,51 +34,59 @@
 SferaMbcRuntime::SferaMbcRuntime() = default;
 SferaMbcRuntime::~SferaMbcRuntime() = default;
 
-std::uint8_t *SferaMbcRuntime::memoryAt(std::uint32_t address, std::size_t size, SferaMbcProcessRecord *process) const
+std::string SferaMbcRuntime::memoryDiagnostic(std::string_view message, std::uint32_t address, std::size_t size) const
 {
-    if (address < mappedAddressBegin)
+    auto result = std::format("{}; address={:#010x}; bytes={}", message, address, size);
+    auto region = mapped_memory.upper_bound(address);
+    if (region != mapped_memory.begin())
     {
-        auto *source = process != nullptr ? process : active_process;
-        if (source == nullptr || source->memory.data() == nullptr || address > source->memory.size() || size > source->memory.size() - address)
-            throw std::out_of_range("Script memory access outside process memory");
-        return source->memory.data() + address;
+        --region;
+        result += std::format("; object={:#010x}; object_bytes={}; offset={}", region->first, region->second.size, address - region->first);
     }
+    if (current.module)
+        result += std::format("; module={}; process={}", current.module->moduleName(), current.module->processId);
+    result += std::format("; function={}", current.function);
+    if (execution)
+        result += std::format("; root={}", execution->rootProgram);
+    if (active_builtin)
+    {
+        result += std::format("; builtin={}; argc={}; args=[", SferaNumeric::enumBits(*active_builtin), engine_arguments.size());
+        for (std::size_t index = 0; index < std::min<std::size_t>(engine_arguments.size(), 8); ++index)
+        {
+            const auto &argument = engine_arguments[index];
+            if (index)
+                result += ", ";
+            result += std::format("{}:{:#010x}/{:#010x}..{:#010x}@{:#010x}", SferaNumeric::enumBits(argument.type),
+                                  argument.value.base, argument.value.begin, argument.value.end, argument.source.base);
+        }
+        result += engine_arguments.size() > 8 ? ", ...]" : "]";
+    }
+    return result;
+}
+
+std::uint8_t *SferaMbcRuntime::memoryAt(std::uint32_t address, std::size_t size, SferaMbcProcessRecord *) const
+{
     auto entry = mapped_memory.upper_bound(address);
     if (entry == mapped_memory.begin())
-        throw std::out_of_range("Unknown script memory address");
+        throw std::out_of_range(memoryDiagnostic("Unknown native script memory reference", address, size));
     --entry;
     const auto &region = entry->second;
     const std::size_t offset = address - entry->first;
     if (offset > region.size || size > region.size - offset)
-        throw std::out_of_range("Script memory access outside mapped region");
-    if (region.process != nullptr)
-    {
-        if (region.process->memory.data() == nullptr || offset > region.process->memory.size() || size > region.process->memory.size() - offset)
-            throw std::out_of_range("Script process memory is no longer available");
-        return region.process->memory.data() + offset;
-    }
+        throw std::out_of_range(memoryDiagnostic("Script memory access outside mapped object", address, size));
     return const_cast<std::uint8_t *>(region.data) + offset;
 }
 
-std::span<std::uint8_t> SferaMbcRuntime::memoryRange(std::uint32_t address, SferaMbcProcessRecord *process) const
+std::span<std::uint8_t> SferaMbcRuntime::memoryRange(std::uint32_t address, SferaMbcProcessRecord *) const
 {
-    if (address < mappedAddressBegin)
-    {
-        const auto *source = process ? process : active_process;
-        if (!source || address > source->memory.size())
-            throw std::out_of_range("Invalid process memory range");
-        return {memoryAt(address, 0, process), source->memory.size() - address};
-    }
     auto entry = mapped_memory.upper_bound(address);
     if (entry == mapped_memory.begin())
-        throw std::out_of_range("Unknown mapped memory range");
+        throw std::out_of_range(memoryDiagnostic("Unknown native memory range", address, 0));
     --entry;
-    const auto offset = (address - entry->first);
-    const auto &region = entry->second;
-    const auto size = region.process ? std::min(region.size, region.process->memory.size()) : region.size;
-    if (offset > size)
-        throw std::out_of_range("Invalid mapped memory range");
-    return {memoryAt(address, size - offset), size - offset};
+    const auto offset = address - entry->first;
+    if (offset > entry->second.size)
+        throw std::out_of_range(memoryDiagnostic("Invalid native memory range", address, 0));
+    return {const_cast<std::uint8_t *>(entry->second.data) + offset, entry->second.size - offset};
 }
 std::span<std::uint8_t> SferaMbcRuntime::memoryBytes(std::uint32_t address, std::size_t count, SferaMbcProcessRecord *process) const
 {
@@ -98,10 +106,10 @@ std::uint64_t SferaMbcRuntime::memoryLifetime(std::uint32_t address) const
         return 0;
     auto entry = mapped_memory.upper_bound(address);
     if (entry == mapped_memory.begin())
-        throw std::out_of_range("Unknown mapped memory lifetime");
+        throw std::out_of_range(memoryDiagnostic("Unknown mapped memory lifetime", address, 0));
     --entry;
     if (address - entry->first >= entry->second.size)
-        throw std::out_of_range("Invalid mapped memory lifetime");
+        throw std::out_of_range(memoryDiagnostic("Invalid mapped memory lifetime", address, 0));
     return entry->second.lifetime;
 }
 std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32 &slice, SferaMbcProcessRecord *process) const
@@ -133,6 +141,11 @@ SferaTextBuffer SferaMbcRuntime::textBuffer(const SferaSliceReference32 &slice, 
 
 std::string SferaMbcRuntime::textIn(const SferaSliceReference32 &slice, SferaMbcProcessRecord *process) const
 {
+    // A default string reference points at the reserved zero prefix of the
+    // original MBC data. Preserve its empty value without mapping writable memory
+    // at address zero or relaxing checks for nonzero invalid references.
+    if (slice.base == 0 && slice.begin == 0 && slice.end == 0)
+        return {};
     // Preserve the MBC string ABI: the declared extent may exclude the NUL or
     // describe an addressed element. The owning memory region is the hard boundary.
     return SferaText::terminated(memoryRange(slice.base, process));
@@ -140,7 +153,7 @@ std::string SferaMbcRuntime::textIn(const SferaSliceReference32 &slice, SferaMbc
 
 std::string SferaMbcRuntime::textIn(const SferaSliceReference32 &slice, std::size_t limit, SferaMbcProcessRecord *process) const
 {
-    if (limit == 0)
+    if (limit == 0 || (slice.base == 0 && slice.begin == 0 && slice.end == 0))
         return {};
     return SferaText::prefix(memoryRange(slice.base, process), limit);
 }
@@ -159,22 +172,56 @@ std::uint32_t SferaMbcRuntime::addMemoryRegion(SferaMbcRuntimeMemoryRegion regio
     region.size = std::max<std::size_t>(region.size, 1);
     if (region.size >= mappedAddressBegin)
         throw std::length_error("Mapped script region too large");
-    std::uint64_t candidate = mappedAddressBegin;
-    for (const auto &[address, existing] : mapped_memory)
+    std::uint64_t candidate = memory_search_start;
+    std::uint64_t firstGap = 0;
+    for (auto next = mapped_memory.lower_bound(SferaNumeric::lowWord(candidate)); next != mapped_memory.end(); ++next)
     {
-        if (candidate + region.size < address)
+        if (candidate + region.size < next->first)
             break;
-        std::uint64_t candidate_address = address;
-        candidate_address += existing.size + 1;
-        candidate = candidate_address;
+        // A smaller future request may still fit here. Do not skip that hole.
+        if (firstGap == 0 && candidate + 1 < next->first)
+            firstGap = candidate;
+        candidate = std::uint64_t(next->first) + next->second.size + 1;
     }
     if (candidate + region.size > UINT32_MAX - 3u)
         throw std::length_error("Script address space exhausted");
-    const std::uint32_t address = SferaNumeric::lowWord(candidate);
+    const auto address = SferaNumeric::lowWord(candidate);
     if (next_memory_lifetime == 0)
         throw std::overflow_error("Memory mapping lifetime exhausted");
     region.lifetime = next_memory_lifetime++;
-    mapped_memory.emplace(address, region);
+    const auto entry = mapped_memory.emplace(address, region).first;
+    const auto native = reinterpret_cast<std::uintptr_t>(region.data);
+    bool indexed = false;
+    try
+    {
+        if (region.data != nullptr)
+        {
+            const auto next = mapped_native_memory.lower_bound(native);
+            bool overlaps = next != mapped_native_memory.end() && next->first - native < region.size;
+            if (!overlaps && next != mapped_native_memory.begin())
+            {
+                const auto previous = std::prev(next);
+                overlaps = native - previous->first < previous->second->second.size;
+            }
+            if (overlaps)
+                overlapping_native_memory.emplace(address, entry);
+            else
+            {
+                mapped_native_memory.emplace_hint(next, native, entry);
+                indexed = true;
+            }
+        }
+        mapped_memory_owners.emplace(region.owner, entry);
+    }
+    catch (...)
+    {
+        if (indexed)
+            mapped_native_memory.erase(native);
+        overlapping_native_memory.erase(address);
+        mapped_memory.erase(entry);
+        throw;
+    }
+    memory_search_start = firstGap != 0 ? firstGap : candidate + region.size + 1;
     return address;
 }
 
@@ -182,58 +229,80 @@ std::uint32_t SferaMbcRuntime::mapMemory(const void *data, std::size_t size, con
 {
     if (data == nullptr)
         return 0;
-    const auto address = reinterpret_cast<std::uintptr_t>(data);
-    if (active_process != nullptr && active_process->memory.data() != nullptr)
+    const auto native = reinterpret_cast<std::uintptr_t>(data);
+    auto match = mapped_memory.end();
+    const auto consider = [&](MemoryRegions::iterator entry)
     {
-        const auto base = reinterpret_cast<std::uintptr_t>(active_process->memory.data());
-        if (address >= base && address - base <= active_process->memory.size() && size <= active_process->memory.size() - (address - base))
-            return SferaNumeric::lowWord(address - base);
-    }
-    for (const auto &[mapped, region] : mapped_memory)
+        const auto base = reinterpret_cast<std::uintptr_t>(entry->second.data);
+        if (native >= base && native - base <= entry->second.size && size <= entry->second.size - (native - base) &&
+            (match == mapped_memory.end() || entry->first < match->first))
+            match = entry;
+    };
+    auto next = mapped_native_memory.upper_bound(native);
+    if (next != mapped_native_memory.begin())
     {
-        const auto *source = region.process != nullptr ? region.process->memory.data() : region.data;
-        const auto base = reinterpret_cast<std::uintptr_t>(source);
-        if (source != nullptr && address >= base && address - base <= region.size && size <= region.size - (address - base))
-            return mapped + SferaNumeric::lowWord(address - base);
+        --next;
+        consider(next->second);
+        // A zero-sized view at an adjacent range's start can also be one-past
+        // its predecessor. Preserve the original first-registration choice.
+        if (size == 0 && next->first == native && next != mapped_native_memory.begin())
+            consider(std::prev(next)->second);
     }
-    return addMemoryRegion({static_cast<const std::uint8_t *>(data), size, nullptr, owner});
+    for (const auto &[address, entry] : overlapping_native_memory)
+    {
+        if (match != mapped_memory.end() && address >= match->first)
+            break;
+        consider(entry);
+    }
+    if (match != mapped_memory.end())
+        return match->first + SferaNumeric::lowWord(native - reinterpret_cast<std::uintptr_t>(match->second.data));
+    return addMemoryRegion({static_cast<const std::uint8_t *>(data), size, owner});
 }
 
-std::uint32_t SferaMbcRuntime::mapProcessMemory(SferaMbcProcessRecord &process)
+SferaSliceReference32 SferaMbcRuntime::rebaseSlice(SferaSliceReference32 slice, SferaMbcProcessRecord &)
 {
-    if (&process == active_process)
-        return 0;
-    for (const auto &[address, region] : mapped_memory)
-        if (region.process == &process && region.size >= process.memory.size())
-            return address;
-    return addMemoryRegion({nullptr, process.memory.size(), &process, &process});
-}
-
-SferaSliceReference32 SferaMbcRuntime::rebaseSlice(SferaSliceReference32 slice, SferaMbcProcessRecord &source)
-{
-    if (slice.base == 0 || slice.base >= mappedAddressBegin || &source == active_process)
-        return slice;
-    if (slice.base > source.memory.size() || (slice.begin != 0 && (slice.begin > source.memory.size() || slice.end >= source.memory.size())))
-        throw std::out_of_range("Invalid cross-process script slice");
-    const auto base = mapProcessMemory(source);
-    slice.base += base;
-    if (slice.begin != 0)
-    {
-        slice.begin += base;
-        slice.end += base;
-    }
+    // References identify mapped native objects and are already process-neutral.
+    if (slice.base != 0)
+        memoryAt(slice.base, 0);
     return slice;
 }
 
-bool SferaMbcRuntime::memoryOwnedBy(const void *owner, const std::pair<const std::uint32_t, SferaMbcRuntimeMemoryRegion> &entry)
+void SferaMbcRuntime::forgetMemory(const void *owner, const void *data, std::size_t size)
 {
-    return entry.second.owner == owner;
+    if (owner == nullptr)
+        return;
+    const auto begin = reinterpret_cast<std::uintptr_t>(data);
+    auto [current, end] = mapped_memory_owners.equal_range(owner);
+    while (current != end)
+    {
+        const auto entry = current->second;
+        const auto native = reinterpret_cast<std::uintptr_t>(entry->second.data);
+        if (data != nullptr && (size == 0 ? native != begin : native < begin || native - begin >= size))
+        {
+            ++current;
+            continue;
+        }
+        const auto previous = entry == mapped_memory.begin() ? mapped_memory.end() : std::prev(entry);
+        const auto gap = previous == mapped_memory.end() ? std::uint64_t(mappedAddressBegin) :
+                         std::uint64_t(previous->first) + previous->second.size + 1;
+        memory_search_start = std::min(memory_search_start, gap);
+        const auto indexed = mapped_native_memory.find(native);
+        if (indexed != mapped_native_memory.end() && indexed->second == entry)
+            mapped_native_memory.erase(indexed);
+        else
+            overlapping_native_memory.erase(entry->first);
+        mapped_memory.erase(entry);
+        current = mapped_memory_owners.erase(current);
+    }
 }
 
-void SferaMbcRuntime::forgetMemory(const void *owner)
+void SferaMbcRuntime::clearMappedMemory() noexcept
 {
-    if (owner != nullptr)
-        std::erase_if(mapped_memory, std::bind_front(&SferaMbcRuntime::memoryOwnedBy, owner));
+    mapped_native_memory.clear();
+    overlapping_native_memory.clear();
+    mapped_memory_owners.clear();
+    mapped_memory.clear();
+    memory_search_start = mappedAddressBegin;
 }
 
 void SferaMbcRuntime::forgetNativeResource(const SferaMbcRuntimeNativeResource &resource)
@@ -349,13 +418,13 @@ auto SferaMbcRuntime::receiveRegionWrongData()
 
 auto SferaMbcRuntime::receiveRegionNextOutput() -> const SferaMbcValue *
 {
-    if (argument_count == 0 || argument_cursor >= argument_end || argument_cursor >= std::size(g_sfera_mbc_runtime.values))
+    if (argument_count == 0 || argument_cursor >= argument_end || argument_cursor >= g_sfera_mbc_runtime.engine_arguments.size())
     {
         receiveRegionWrongCount();
         return nullptr;
     }
     --argument_count;
-    return &g_sfera_mbc_runtime.values[argument_cursor++];
+    return &g_sfera_mbc_runtime.engine_arguments[argument_cursor++];
 }
 
 auto SferaMbcRuntime::receiveRegionStore(const SferaMbcValue &target, std::uint32_t value)
@@ -593,7 +662,7 @@ void SferaMbcRuntime::buildRegion()
         --argument_count;
         if (prefix == -7)
         {
-            const auto stackSize = value_stack_size, cursor = argument_cursor;
+            const auto cursor = argument_cursor;
             nextInteger();
             nextSliceReference();
             nextInteger();
@@ -601,7 +670,6 @@ void SferaMbcRuntime::buildRegion()
             nextInteger();
             if (execution_failed)
                 return;
-            value_stack_size = stackSize;
             argument_cursor = cursor;
         }
     }
@@ -627,7 +695,7 @@ void SferaMbcRuntime::buildRegion()
             reportError("Wrong number of parameters for 'send' function");
             return;
         }
-        const auto value = g_sfera_mbc_runtime.values[argument_cursor++].value.base;
+        const auto value = g_sfera_mbc_runtime.engine_arguments[argument_cursor++].value.base;
         const int width = definition.formats[field];
         if ((width >= -32 && width <= 32) || (width >= 103 && width <= 108))
         {
@@ -649,7 +717,7 @@ void SferaMbcRuntime::buildRegion()
             return;
         }
         const auto elementWidth = std::abs(definition.formats[field]);
-        const auto &array = g_sfera_mbc_runtime.values[argument_cursor];
+        const auto &array = g_sfera_mbc_runtime.engine_arguments[argument_cursor];
         if (elementWidth > 32 || !array.isPointer())
         {
             reportError("Wrong data for 'send' function");

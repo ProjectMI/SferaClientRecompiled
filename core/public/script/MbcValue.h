@@ -15,7 +15,6 @@ struct SferaMbcRuntimeMemoryRegion
 {
     const std::uint8_t *data;
     std::size_t size;
-    SferaMbcProcessRecord *process;
     const void *owner;
     std::uint64_t lifetime = 0;
     const void *address() const noexcept

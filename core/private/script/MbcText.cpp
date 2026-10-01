@@ -37,7 +37,7 @@ void SferaMbcRuntime::writeScriptLog()
         reportError("Too few parameters");
         return;
     }
-    const auto type = g_sfera_mbc_runtime.values[argument_cursor].type;
+    const auto type = g_sfera_mbc_runtime.engine_arguments[argument_cursor].type;
     const bool textValue = (type & 15u) != 0;
     const bool realValue = !textValue && type == SferaMbcValueTypeReal;
     const auto integer = realValue ? 0 : nextInteger();
@@ -121,7 +121,7 @@ std::string SferaMbcRuntime::formatArguments(std::string_view pattern, std::size
             reportError("Too few parameters");
             break;
         }
-        const auto &argument = g_sfera_mbc_runtime.values[argument_cursor];
+        const auto &argument = g_sfera_mbc_runtime.engine_arguments[argument_cursor];
         if (argument.isPointer())
         {
             arguments.emplace_back(argument.value);
@@ -136,7 +136,7 @@ std::string SferaMbcRuntime::formatArguments(std::string_view pattern, std::size
         }
         --argument_count;
     }
-    ++value_stack_size;
+    returnFirstArgument();
     if (execution_failed)
         return {};
     std::string result;
@@ -362,7 +362,7 @@ void SferaMbcRuntime::writeFormattedLog(bool named)
 {
     if (argument_count >= 1 && argument_cursor < argument_end)
     {
-        const auto type = g_sfera_mbc_runtime.values[argument_cursor].type;
+        const auto type = g_sfera_mbc_runtime.engine_arguments[argument_cursor].type;
         if (type == SferaMbcValueTypeByte || type == SferaMbcValueTypeInteger)
         {
             nextInteger();
@@ -683,7 +683,7 @@ void SferaMbcRuntime::scanText()
 {
     const auto source = nextAddress();
     const auto format = nextAddress();
-    const auto type = argument_cursor < argument_end ? g_sfera_mbc_runtime.values[argument_cursor].type : SferaMbcValueTypeByte;
+    const auto type = argument_cursor < argument_end ? g_sfera_mbc_runtime.engine_arguments[argument_cursor].type : SferaMbcValueTypeByte;
 
     std::array<std::variant<std::monostate, std::int8_t, std::uint8_t, std::int16_t, std::uint16_t, int, std::uint32_t, std::int64_t, std::uint64_t, float, double>, 4> numbers{};
     std::array<void *, 4> destinations{};

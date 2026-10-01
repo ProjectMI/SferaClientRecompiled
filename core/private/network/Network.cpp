@@ -704,14 +704,14 @@ void SferaNetworkRuntime::receiveEvents(std::span<const std::uint8_t> payload)
             if (next == 63)
                 continue;
         }
-        if (processId >= std::size(runtime.processes) || moduleTag >= std::size(g_sfera_mbc_runtime.modules))
+        if (processId >= std::size(runtime.processes) || runtime.moduleName(moduleTag).empty())
             return;
         if (process == nullptr)
         {
             process = &runtime.processes[processId];
             if (process->process_id != processId)
             {
-                const auto loaded = runtime.loadProcess(g_sfera_mbc_runtime.modules[moduleTag].name, processId);
+                const auto loaded = runtime.loadProcess(runtime.moduleName(moduleTag), processId);
                 process = runtime.findProcess(loaded);
                 if (process == nullptr)
                     return;
@@ -741,7 +741,7 @@ void SferaNetworkRuntime::receiveEvents(std::span<const std::uint8_t> payload)
                 {
                     if (process->chain_prev_index != -1)
                         runtime.unloadProcess(processId);
-                    if (runtime.loadProcess(g_sfera_mbc_runtime.modules[moduleTag].name, processId) == UINT32_MAX)
+                    if (runtime.loadProcess(runtime.moduleName(moduleTag), processId) == UINT32_MAX)
                         return;
                 }
                 process->flags &= ~4u;

@@ -258,7 +258,7 @@ bool SferaMbcRuntime::executeConfigurationBuiltin(SferaMbcRuntimeBuiltin builtin
                 reportError("Too few parameters");
                 break;
             }
-            const auto type = SferaNumeric::enumBits(g_sfera_mbc_runtime.values[argument_cursor].type);
+            const auto type = SferaNumeric::enumBits(g_sfera_mbc_runtime.engine_arguments[argument_cursor].type);
             std::string value;
             bool quoted = false;
             if (!key.empty() && key.front() == '*')
@@ -310,7 +310,7 @@ bool SferaMbcRuntime::executeConfigurationBuiltin(SferaMbcRuntimeBuiltin builtin
                 reportError("Too few parameters");
                 break;
             }
-            const auto type = g_sfera_mbc_runtime.values[argument_cursor].type;
+            const auto type = g_sfera_mbc_runtime.engine_arguments[argument_cursor].type;
             const auto destination = nextSliceReference();
             const auto capacity = argument_count == 4 ? nextWord() : 10000000u;
             if (execution_failed)
@@ -527,11 +527,6 @@ bool SferaMbcRuntime::executeContainersBuiltin(SferaMbcRuntimeBuiltin builtin)
     return true;
 }
 
-bool SferaMbcRuntime::moduleMatches(std::int32_t address, const SferaMbcModuleRecord &module)
-{
-    return !module.name.empty() && SferaText::compareInsensitive(module.name, textAt(address)) == 0;
-}
-
 bool SferaMbcRuntime::executeControlBuiltin(SferaMbcRuntimeBuiltin builtin)
 {
     switch (builtin)
@@ -599,8 +594,7 @@ bool SferaMbcRuntime::executeControlBuiltin(SferaMbcRuntimeBuiltin builtin)
         break;
     case SferaMbcRuntimeBuiltin::CallFunction:
     case SferaMbcRuntimeBuiltin::CallMainFunction:
-        callFunction(builtin == SferaMbcRuntimeBuiltin::CallMainFunction);
-        break;
+        throw std::logic_error("A native cross-process call must be awaited");
     case SferaMbcRuntimeBuiltin::ThisProcessName:
     case SferaMbcRuntimeBuiltin::ProcessName:
     case SferaMbcRuntimeBuiltin::ModuleName:
@@ -616,8 +610,8 @@ bool SferaMbcRuntime::executeControlBuiltin(SferaMbcRuntimeBuiltin builtin)
             name = active_process->name;
         else if (builtin == SferaMbcRuntimeBuiltin::ProcessName && id < std::size(processes) && processes[id].chain_prev_index >= 0)
             name = processes[id].name;
-        else if (builtin == SferaMbcRuntimeBuiltin::ModuleName && id < std::size(g_sfera_mbc_runtime.modules))
-            name = g_sfera_mbc_runtime.modules[id].name;
+        else if (builtin == SferaMbcRuntimeBuiltin::ModuleName && id < 4096)
+            name = moduleName(id);
         if (name)
             copyText({destination, 0, 0}, *name);
         if (builtin != SferaMbcRuntimeBuiltin::ThisProcessName)
@@ -629,14 +623,12 @@ bool SferaMbcRuntime::executeControlBuiltin(SferaMbcRuntimeBuiltin builtin)
         const auto name = nextInteger();
         if (execution_failed)
             break;
-        const auto &loadedModules = g_sfera_mbc_runtime.modules;
-        const auto found = std::find_if(std::begin(loadedModules), std::end(loadedModules), std::bind_front(&SferaMbcRuntime::moduleMatches, this, name));
-        pushInteger(found == std::end(loadedModules) ? UINT32_MAX : SferaNumeric::lowWord(found - std::begin(loadedModules)));
+        pushInteger(moduleTag(textAt(SferaNumeric::word(name))));
         break;
     }
     case SferaMbcRuntimeBuiltin::FindProcess:
     {
-        const bool byName = g_sfera_mbc_runtime.values[argument_cursor].type == SferaMbcValueTypeBytePointer;
+        const bool byName = g_sfera_mbc_runtime.engine_arguments[argument_cursor].type == SferaMbcValueTypeBytePointer;
         std::string name;
         std::uint32_t module = 0;
         if (byName)
@@ -718,11 +710,11 @@ bool SferaMbcRuntime::executeControlBuiltin(SferaMbcRuntimeBuiltin builtin)
         pushInteger(0);
         break;
     case SferaMbcRuntimeBuiltin::CallerProcess:
-        pushInteger(execution_context_depth > 0 ? execution_context_stack[execution_context_depth - 1].process_id : UINT32_MAX);
+        pushInteger(execution && !execution->calls.empty() ? execution->calls.back().caller.module->processId : UINT32_MAX);
         break;
     case SferaMbcRuntimeBuiltin::DiscardArgument:
     {
-        const auto &argument = g_sfera_mbc_runtime.values[argument_cursor];
+        const auto &argument = g_sfera_mbc_runtime.engine_arguments[argument_cursor];
         if (!argument.isPointer() && argument.type == SferaMbcValueTypeReal)
             nextReal();
         else
@@ -1174,8 +1166,8 @@ bool SferaMbcRuntime::executeMemoryBuiltin(SferaMbcRuntimeBuiltin builtin)
         const auto store = argument_count == 1;
         if (store)
         {
-            if (execution_context_depth != 0 && program_table_base[program_index].callDepth == 0)
-                process = execution_context_stack[execution_context_depth - 1].process_id;
+            if (execution && !execution->calls.empty() && execution->depth == execution->calls.back().depth + 1)
+                process = execution->calls.back().caller.module->processId;
         }
         else
             process = nextInteger();
@@ -1197,7 +1189,7 @@ bool SferaMbcRuntime::executeMemoryBuiltin(SferaMbcRuntimeBuiltin builtin)
         slice = rebaseSlice(slice, *owner);
         if (store)
         {
-            writeMemory(g_sfera_mbc_runtime.values[argument_cursor - 1].source.base, slice);
+            writeMemory(g_sfera_mbc_runtime.engine_arguments[argument_cursor - 1].source.base, slice);
             pushInteger(0);
         }
         else
@@ -1727,7 +1719,7 @@ bool SferaMbcRuntime::executeTextBuiltin(SferaMbcRuntimeBuiltin builtin)
         if (!source.contains())
         {
             source.diagnoseRange(0);
-            ++value_stack_size;
+            returnFirstArgument();
             break;
         }
         if (count < 0)
@@ -1756,7 +1748,7 @@ bool SferaMbcRuntime::executeTextBuiltin(SferaMbcRuntimeBuiltin builtin)
             if (argument_count > 2 && SferaNumeric::signedWord(length) > nextInteger())
             {
                 WorldDiagnostics::warning("Size mismatch: ffstrcat\n");
-                ++value_stack_size;
+                returnFirstArgument();
                 break;
             }
             if (execution_failed)
@@ -1784,7 +1776,7 @@ bool SferaMbcRuntime::executeTextBuiltin(SferaMbcRuntimeBuiltin builtin)
             if (!destination.contains(length))
                 destination.diagnoseRange(length);
         }
-        ++value_stack_size;
+        returnFirstArgument();
         break;
     }
     case SferaMbcRuntimeBuiltin::FindString:
@@ -1811,16 +1803,17 @@ bool SferaMbcRuntime::executeTextBuiltin(SferaMbcRuntimeBuiltin builtin)
         const auto slice = nextSliceReference();
         if (slice.base == 0)
             WorldDiagnostics::warning("ffstrlen(): NULL-pointer dereferencing\n");
+        const bool emptyReference = slice.base == 0 && slice.begin == 0 && slice.end == 0;
         std::uint32_t length = 0;
         if (argument_count > 1)
         {
             const auto limit = nextInteger();
-            if (limit > 0)
+            if (limit > 0 && !emptyReference)
                 length = SferaNumeric::lowWord(SferaText::length(memoryRange(slice.base), limit));
             if (SferaNumeric::signedWord(length) == limit)
                 WorldDiagnostics::warning(std::format("ffstrlen(): end of string was not found in buffer of size {}\n", limit));
         }
-        else
+        else if (!emptyReference)
             length = SferaNumeric::lowWord(SferaText::length(memoryRange(slice.base)));
         pushInteger(length);
         break;
@@ -1952,7 +1945,7 @@ bool SferaMbcRuntime::executeVisualBuiltin(SferaMbcRuntimeBuiltin builtin)
     }
     case SferaMbcRuntimeBuiltin::Text:
     {
-        const auto create = g_sfera_mbc_runtime.values[argument_cursor].type == SferaMbcValueTypeBytePointer;
+        const auto create = g_sfera_mbc_runtime.engine_arguments[argument_cursor].type == SferaMbcValueTypeBytePointer;
         const auto first = nextWord();
         if (!create)
         {
@@ -2389,7 +2382,7 @@ bool SferaMbcRuntime::executeWorldBuiltin(SferaMbcRuntimeBuiltin builtin)
         }
         else
         {
-            if (builtin == SferaMbcRuntimeBuiltin::ObjectBasis && g_sfera_mbc_runtime.values[argument_cursor].type != SferaMbcValueTypeRealPointer)
+            if (builtin == SferaMbcRuntimeBuiltin::ObjectBasis && g_sfera_mbc_runtime.engine_arguments[argument_cursor].type != SferaMbcValueTypeRealPointer)
             {
                 WorldDiagnostics::warning("g_norm: wrong type of parameter (must be float pointer)\n");
                 execution_failed = true;

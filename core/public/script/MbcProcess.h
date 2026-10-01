@@ -13,82 +13,23 @@
 #include <vector>
 
 #include "numeric/Numeric.h"
-
-struct ScriptProgramDiagnostic;
-struct SferaMbcExecutionContext;
-struct SferaMbcFunctionRecord;
+#include "script/MbcNative.h"
 
 struct ScriptProgramDiagnostic
 {
     std::string name;
-    std::uint32_t entry_offset;
-    std::uint32_t stop_offset;
-    std::int8_t state;
-    std::uint8_t priority;
-    std::uint32_t return_offsets[20];
-    std::uint8_t callDepth;
-
-    std::uint32_t instruction_offset;
-
-    bool executing;
-
-    int caller_program;
-    std::uint16_t previous_program;
-    std::uint16_t next_program;
-};
-
-struct SferaMbcExecutionContext
-{
-    std::int32_t process_index = -1;
-    int program_index = -1;
-    std::uint32_t instruction_offset{};
-    std::uint32_t process_id = UINT32_MAX;
-    std::uint64_t process_lifetime{};
-};
-
-struct SferaMbcFunctionRecord
-{
-    std::string name;
-    std::uint32_t entry_offset;
-    int program_index;
-    bool allow_reentry;
-};
-
-// Runtime names are owned strings. MBC files still encode names with a 31-byte limit.
-
-struct SferaMbcBytecodeKey;
-struct SferaMbcModuleImage;
-struct SferaMbcModuleRecord;
-
-struct SferaMbcModuleRecord
-{
-    std::string name;
-};
-
-struct SferaMbcModuleImage
-{
-    static constexpr std::size_t functionSlotCount = 80;
-    std::uint32_t module_tag = 0;
-    std::span<const std::uint8_t> bytecode;
-    std::span<const std::uint8_t> memory;
-    std::vector<ScriptProgramDiagnostic> programs;
-    std::vector<SferaMbcFunctionRecord> functions;
-    std::array<std::uint16_t, functionSlotCount> function_map;
-    std::span<const std::uint8_t> region_definitions;
-    std::uint32_t position_memory_offset = 0;
-    std::array<std::vector<std::uint32_t>, 3> relocations;
-    bool read(std::span<const std::uint8_t> data, bool linking);
-};
-
-using SferaMbcModuleIds = std::array<std::uint16_t, 8>;
-struct SferaMbcBytecodeKey
-{
-    SferaMbcModuleIds modules;
-    std::uint32_t memory_size;
-    bool operator<(const SferaMbcBytecodeKey &other) const noexcept
-    {
-        return modules == other.modules ? memory_size < other.memory_size : modules < other.modules;
-    }
+    std::string_view cleanup;
+    const SphereScripts::Method *body = nullptr;
+    const SphereScripts::Method *cleanupBody = nullptr;
+    std::shared_ptr<SphereScripts::Module> module;
+    std::int8_t state = -1;
+    std::uint8_t priority = 0;
+    bool executing = false;
+    int caller_program = -1;
+    std::uint16_t previous_program = UINT16_MAX;
+    std::uint16_t next_program = UINT16_MAX;
+    std::shared_ptr<SphereScripts::Continuation> continuation;
+    bool cleanup_requested = false;
 };
 
 struct SferaMbcRegionPacket;
@@ -162,25 +103,20 @@ struct SferaMbcProcessRecord
     bool activateProgram(std::string_view name);
     void appendCommand(std::string_view command);
     std::uint32_t growMemory(std::size_t size);
-    SferaMbcFunctionRecord *findFunction(std::string_view name);
-    void readRegions(std::span<const std::uint8_t> definitions, std::uint32_t firstProgram);
+    SphereScripts::Method findFunction(std::string_view name);
+    int findProgram(const SphereScripts::Module &module, std::string_view name) const;
+    void appendModule(std::shared_ptr<SphereScripts::Module> module);
+    void finishProgram(std::size_t index);
+    void readRegions(SphereScripts::Module &module);
+    std::size_t functionCount() const noexcept;
+    std::string_view functionNameAt(std::size_t index) const noexcept;
     void releaseResources();
     void queueRegion(std::size_t region, std::uint32_t timestamp, std::span<const int, 3> origin, std::span<const std::uint8_t> payload, std::size_t firstBit, std::size_t bitCount, bool ordered);
     std::string name;
-    SferaMbcModuleIds linked_modules;
-    uint32_t module_tag;
-    std::shared_ptr<const std::vector<std::uint8_t>> bytecode;
-    std::vector<std::uint8_t> memory;
+    std::uint32_t module_tag{};
+    std::vector<std::shared_ptr<SphereScripts::Module>> modules;
     std::vector<ScriptProgramDiagnostic> programs;
-    std::vector<SferaMbcFunctionRecord> functions;
-    const std::uint8_t *codeData() const noexcept
-    {
-        return bytecode ? bytecode->data() : nullptr;
-    }
-    std::uint32_t codeSize() const noexcept
-    {
-        return bytecode ? SferaNumeric::lowWord(bytecode->size()) : 0;
-    }
+    std::vector<std::uint32_t> owned_buffers;
     int32_t chain_prev_index = -1;
     int32_t chain_next_index = -1;
     uint16_t program_map_a[4];
@@ -193,16 +129,13 @@ struct SferaMbcProcessRecord
     std::uint64_t lifetime{};
     bool programs_queued;
     bool execution_linked;
-    std::array<std::uint16_t, SferaMbcModuleImage::functionSlotCount> function_map{};
+    std::array<const SphereScripts::Method *, 80> function_map{};
+    std::array<bool, 80> function_slot_declared{};
     int32_t execution_prev_index;
     int32_t execution_next_index;
-    std::vector<SferaMbcRegionRecord> regions; // Bindings belong to this process, not to the shared module catalogue.
+    std::vector<SferaMbcRegionRecord> regions; // Region bindings belong to this process.
     std::uint32_t region_timestamps[63];
     std::array<std::unique_ptr<std::list<SferaMbcRegionPacket>>, 63> received_regions;
-    uint16_t code_range_ids[8];
-    uint32_t code_range_begin[8];
-    uint32_t code_range_size[8];
-    uint16_t code_range_count;
 
   private:
     static std::uint64_t *resourceLifetime(std::uint32_t handle, SferaMbcProcessRecordResourceKind kind);

@@ -56,10 +56,8 @@ class WorldDiagnostics
   public:
     static std::string message;
 
-    static constexpr std::uint32_t codeBaseMismatch = 1u << 7u;
     static void appendScriptContext(std::string_view text);
     static void flushScriptContext();
-    static std::uint32_t inspectInstruction(std::uint16_t &module, std::uint32_t &offset, std::uint8_t *bytes, std::uint32_t &count);
     static void describeScript(bool includeTime);
     static void appendCallStack(std::string &output);
     static std::optional<std::string_view> scriptContext();

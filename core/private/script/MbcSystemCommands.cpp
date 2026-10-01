@@ -752,7 +752,7 @@ void SferaMbcRuntime::executeSystemResources(std::int32_t operation)
         return;
     }
     case 92:
-        reloadQuickFiles();
+        // All module definitions are compiled into the client.
         return;
     case 113:
     {
@@ -844,7 +844,8 @@ void SferaMbcRuntime::executeSystemRuntime(std::int32_t operation)
         return;
     }
     case 22:
-        instruction_step_count = 0;
+        if (execution)
+            execution->work = 0;
         return;
     case 24:
         pushInteger(g_sfera_network_runtime.connection_info.round_trip_latency_ms);
@@ -905,15 +906,15 @@ void SferaMbcRuntime::executeSystemRuntime(std::int32_t operation)
         const auto first = nextInteger();
         const auto pattern = nextText();
         const auto output = nextSlice();
-        if (execution_failed || processIndex < 0 || std::cmp_greater_equal(processIndex, std::size(processes)) || processes[processIndex].functions.empty() || first < 0)
+        if (execution_failed || processIndex < 0 || std::cmp_greater_equal(processIndex, std::size(processes)) || processes[processIndex].functionCount() == 0 || first < 0)
         {
             pushInteger(UINT32_MAX);
             return;
         }
         const auto &process = processes[processIndex];
-        for (std::uint32_t index = first; index < process.functions.size(); ++index)
+        for (std::uint32_t index = first; index < process.functionCount(); ++index)
         {
-            const auto &name = process.functions[index].name;
+            const auto name = process.functionNameAt(index);
             if (!SferaText::matchesWildcard(name, pattern))
                 continue;
             if (output.base != 0)

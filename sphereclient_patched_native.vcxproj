@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version='1.0' encoding='utf-8'?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -319,6 +319,11 @@
       <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
       <ForcedIncludeFiles Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">platform/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="core\private\script\GeneratedScripts.cpp">
+      <ObjectFileName>$(IntDir)core_private_script_GeneratedScripts.obj</ObjectFileName>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="core\private\script\MbcLoader.cpp">
       <ObjectFileName>$(IntDir)core_private_script_MbcLoader.obj</ObjectFileName>
       <PrecompiledHeader Condition="'$(UseSferaPrecompiledHeaders)' == 'true'">Use</PrecompiledHeader>
@@ -571,6 +576,8 @@
     <ClInclude Include="core\public\script\ConfigText.h" />
     <ClInclude Include="core\public\script\MbcBitStream.h" />
     <ClInclude Include="core\public\script\MbcCommands.h" />
+    <ClInclude Include="core\public\script\MbcNative.h" />
+    <ClInclude Include="core\public\script\GeneratedScripts.h" />
     <ClInclude Include="core\public\script\MbcProcess.h" />
     <ClInclude Include="core\public\script\MbcRuntime.h" />
     <ClInclude Include="core\public\script\MbcUiMessageCodec.h" />

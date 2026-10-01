@@ -136,49 +136,10 @@ void WorldDiagnostics::flushScriptContext()
     appendScriptContext("\n\n");
 }
 
-std::uint32_t WorldDiagnostics::inspectInstruction(std::uint16_t &module, std::uint32_t &offset, std::uint8_t *bytes, std::uint32_t &count)
-{
-    module = std::numeric_limits<std::int16_t>::max();
-    offset = 0u;
-    const auto &vm = g_sfera_mbc_runtime;
-    if (vm.process_index < 0 || std::cmp_greater_equal(vm.process_index, std::size(vm.processes)))
-    {
-        count = 0u;
-        return 1u;
-    }
-    const auto &process = vm.processes[vm.process_index];
-    const auto mismatch = vm.bytecode_base != process.codeData() ? codeBaseMismatch : 0u;
-    const std::less<const std::uint8_t *> before;
-    if (!process.codeData() || !vm.current_instruction_address || before(vm.current_instruction_address, process.codeData()) ||
-        !before(vm.current_instruction_address, process.codeData() + process.codeSize()))
-    {
-        count = 0u;
-        return mismatch | 3u;
-    }
-    const std::uint32_t relative = SferaNumeric::lowWord(vm.current_instruction_address - process.codeData());
-    if (bytes)
-    {
-        count = std::min(count, process.codeSize() - relative);
-        std::copy_n(vm.current_instruction_address, count, bytes);
-    }
-    const auto ranges = std::min<std::size_t>(process.code_range_count, std::size(process.code_range_ids));
-    for (std::size_t index = 0; index < ranges; ++index)
-    {
-        const auto begin = process.code_range_begin[index];
-        if (relative >= begin && relative - begin < process.code_range_size[index])
-        {
-            module = process.code_range_ids[index];
-            offset = relative - begin;
-            return mismatch;
-        }
-    }
-    return mismatch | (process.code_range_count == std::size(process.code_range_ids) ? 2u : 3u);
-}
-
 void WorldDiagnostics::describeScript(bool includeTime)
 {
-    auto &vm = g_sfera_mbc_runtime;
-    auto &output = vm.diagnostic_context;
+    auto &runtime = g_sfera_mbc_runtime;
+    auto &output = runtime.diagnostic_context;
     output.clear();
     if (includeTime)
     {
@@ -191,90 +152,33 @@ void WorldDiagnostics::describeScript(bool includeTime)
 #endif
         output = std::format("{:02}:{:02}:{:02} ", local.tm_hour, local.tm_min, local.tm_sec);
     }
-    std::uint16_t module;
-    std::uint32_t offset, count = 16;
-    std::uint8_t bytes[16];
-    const auto status = inspectInstruction(module, offset, bytes, count);
-    if ((status & ~codeBaseMismatch) == 1)
-    {
-        output.append("PrcName,CodeOffs: unknown. (wrong pos)");
-        return;
-    }
-    if ((status & ~codeBaseMismatch) == 2)
-    {
-        output.append("PrcName,CodeOffs: unknown. (modulesNum == MAX_MODULES_IN_PRC)");
-        return;
-    }
-    if ((status & ~codeBaseMismatch) == 3)
-    {
-        output.append("PrcName,CodeOffs: unknown. (Offset not found)");
-        return;
-    }
-    std::string text;
-    if (status & codeBaseMismatch)
-        text = std::format("Warn!!! pos = {}, sBaseCodePtr = {:p}, Prc[pos].baseCodePtr = {:p}. ", vm.process_index, static_cast<const void *>(vm.bytecode_base),
-                           static_cast<const void *>(vm.processes[vm.process_index].codeData()));
+    if (const auto *module = runtime.current.module)
+        output += std::format("Native script: {}::{}; process: {}, generation: {}\n", module->moduleName(), runtime.current.function, module->processId, module->lifetime);
     else
-        text = std::format("module:{}, code:{}. ", module, offset);
-    output.append(text);
-    for (std::uint32_t index = 0; index < count; ++index)
-    {
-        text = std::format("{:x} ", bytes[index]);
-        output.append(text);
-    }
-    output.append("\n");
+        output += "Native script context is not active\n";
 }
 
 void WorldDiagnostics::appendCallStack(std::string &output)
 {
-    const auto &vm = g_sfera_mbc_runtime;
-    std::string text;
-    for (auto index = vm.execution_context_depth - 1; index >= 0; --index)
-    {
-        const auto &context = vm.execution_context_stack[index];
-        if (context.process_index < 0)
-        {
-            text += "\nCall from C++\n";
-            continue;
-        }
-        if (context.process_index < 0 || std::cmp_greater_equal(context.process_index, std::size(vm.processes)))
-        {
-            text += "\nInvalid call context\n";
-            break;
-        }
-        const auto &process = vm.processes[context.process_index];
-        if (context.process_id != process.process_id)
-        {
-            text += "\nError in prc call stack\n";
-            break;
-        }
-        if (context.process_lifetime != process.lifetime || context.program_index < 0 || context.program_index >= process.programs.size())
-        {
-            text += "\nExpired call context\n";
-            break;
-        }
-        const auto &program = process.programs[context.program_index];
-        text += "\nPrevious prc: ";
-        text += process.name;
-        text += "\nProgram: ";
-        text += program.name;
-        text += '\n';
-    }
-    output.append(text);
+    const auto *execution = g_sfera_mbc_runtime.execution;
+    if (!execution)
+        return;
+    for (auto call = execution->calls.rbegin(); call != execution->calls.rend(); ++call)
+        if (call->caller.module)
+            output += std::format("Called from {}::{} in process {}\n", call->caller.module->moduleName(), call->caller.function, call->caller.module->processId);
 }
 
 std::optional<std::string_view> WorldDiagnostics::scriptContext()
 {
-    if (g_sfera_mbc_runtime.dispatch_slot < 0)
+    auto &runtime = g_sfera_mbc_runtime;
+    if (!runtime.current.module)
+    {
+        runtime.diagnostic_context.clear();
         return std::nullopt;
-    auto &vm = g_sfera_mbc_runtime;
+    }
     describeScript(true);
-    const auto &program = vm.program_table_base[vm.program_index];
-    auto contextMessage = std::format("MBC-file: {}\nProgram: {}\nCall's depth: {}\nAddress: 0x{:08X}\n", vm.processes[vm.process_index].name, program.name, program.callDepth,
-                                      (vm.current_instruction_address - vm.bytecode_base) + 32u);
-    vm.diagnostic_context.append(contextMessage);
-    appendCallStack(vm.diagnostic_context);
-    return vm.diagnostic_context;
+    appendCallStack(runtime.diagnostic_context);
+    return runtime.diagnostic_context;
 }
 
 bool SferaMbcRuntime::reportError(std::string_view message)

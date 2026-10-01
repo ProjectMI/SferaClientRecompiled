@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version='1.0' encoding='utf-8'?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
     <Filter Include="core">
@@ -821,5 +821,10 @@
     <ClInclude Include="libs\public\text\TextBuffer.h">
       <Filter>libs\public\text</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="core\private\script\GeneratedScripts.cpp" />
+    <ClInclude Include="core\public\script\GeneratedScripts.h" />
+    <ClInclude Include="core\public\script\MbcNative.h" />
   </ItemGroup>
 </Project>
