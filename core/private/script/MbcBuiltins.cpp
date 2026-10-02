@@ -54,10 +54,57 @@ void SferaMbcRuntime::checkEngineFailure() const
         throw std::runtime_error(first_execution_error.empty() ? "Native script engine call failed" : first_execution_error);
 }
 
+namespace
+{
+template <class Predicate>
+std::int32_t nextProcessMatching(const SferaMbcRuntime &runtime, std::optional<std::int32_t> previous, Predicate matches)
+{
+    auto index = runtime.process_chain_first;
+    if (previous)
+    {
+        if (*previous < 0 || std::cmp_greater_equal(*previous, std::size(runtime.processes)))
+            return -1;
+        const auto &item = runtime.processes[*previous];
+        if (item.chain_next_index == *previous)
+            return -1;
+        index = item.chain_next_index;
+    }
+
+    for (std::size_t visited = 0; visited < std::size(runtime.processes) && index >= 0 && std::cmp_less(index, std::size(runtime.processes)); ++visited)
+    {
+        const auto &process = runtime.processes[index];
+        if (process.chain_prev_index == -1)
+            break;
+        if (matches(process))
+            return process.process_id;
+        if (process.chain_next_index == index)
+            break;
+        index = process.chain_next_index;
+    }
+    return -1;
+}
+}
+
 std::int32_t SferaMbcRuntime::processModule(std::uint32_t id) const
 {
     const bool valid = id < std::size(processes) && processes[id].process_id == id && processes[id].chain_prev_index >= 0;
     return SphereScripts::integerBits(valid ? processes[id].module_tag : UINT32_MAX);
+}
+
+std::int32_t SferaMbcRuntime::nextProcessByModule(std::uint32_t module, std::optional<std::int32_t> previous) const
+{
+    return nextProcessMatching(*this, previous, [module](const SferaMbcProcessRecord &process)
+    {
+        return module == 0 || process.module_tag == module;
+    });
+}
+
+std::int32_t SferaMbcRuntime::nextProcessByName(std::string_view name, std::optional<std::int32_t> previous) const
+{
+    return nextProcessMatching(*this, previous, [name](const SferaMbcProcessRecord &process)
+    {
+        return process.name == name;
+    });
 }
 
 std::int32_t SferaMbcRuntime::tickValue() const
@@ -460,67 +507,6 @@ bool SferaMbcRuntime::executeBuiltin(SferaMbcRuntimeBuiltin builtin)
     case SferaMbcRuntimeBuiltin::System:
         systemCommand();
         break;
-    case SferaMbcRuntimeBuiltin::Reserved122:
-        break;
-    case SferaMbcRuntimeBuiltin::FindProcess:
-    {
-        const bool byName = g_sfera_mbc_runtime.engine_arguments[argument_cursor].type == SferaMbcValueTypeBytePointer;
-        std::string name;
-        std::uint32_t module = 0;
-        if (byName)
-        {
-            const auto slice = nextSliceReference();
-            if (slice.base == 0)
-                WorldDiagnostics::warning("NULL-pointer dereferencing: ffprc_id\n");
-            name = textIn(slice);
-        }
-        else
-            module = nextInteger();
-        auto index = process_chain_first;
-        if (argument_count > 1)
-        {
-            const std::uint32_t previous = nextInteger();
-            if (previous >= std::size(processes) || SferaNumeric::word(processes[previous].chain_next_index) == previous)
-            {
-                pushInteger(-1);
-                break;
-            }
-            index = processes[previous].chain_next_index;
-        }
-        if (execution_failed)
-            break;
-        int result = -1;
-        for (std::size_t visited = 0; visited < std::size(processes) && index >= 0 && index < std::size(processes); ++visited)
-        {
-            const auto &process = processes[index];
-            if (process.chain_prev_index == -1)
-                break;
-            if (byName ? name == process.name : module == 0 || process.module_tag == module)
-            {
-                result = process.process_id;
-                break;
-            }
-            if (process.chain_next_index == index)
-                break;
-            index = process.chain_next_index;
-        }
-        pushInteger(result);
-        break;
-    }
-    case SferaMbcRuntimeBuiltin::AllocateMemory:
-    {
-        const auto size = nextInteger();
-        if (execution_failed)
-            break;
-        if (size <= 0)
-            pushInteger(0);
-        else
-        {
-            const auto offset = active_process->growMemory(size);
-            pushSlice({offset, offset, offset + size - 1}, SferaMbcValueTypeBytePointer);
-        }
-        break;
-    }
     case SferaMbcRuntimeBuiltin::AllocateDynamic:
     case SferaMbcRuntimeBuiltin::FreeDynamic:
     {
@@ -571,133 +557,11 @@ bool SferaMbcRuntime::executeBuiltin(SferaMbcRuntimeBuiltin builtin)
         }
         break;
     }
-    case SferaMbcRuntimeBuiltin::CopyProcessMemory:
-    case SferaMbcRuntimeBuiltin::CopyProcessString:
-    {
-        const std::uint32_t destinationProcess = nextInteger();
-        auto &destination = nextSliceReference();
-        if (destination.base == 0)
-        {
-            ::OutputDebugStringA("NULL-pointer dereferencing: ffmempcpy\n");
-            break;
-        }
-        const std::uint32_t sourceProcess = nextInteger();
-        const auto &source = nextSliceReference();
-        const auto count = builtin == SferaMbcRuntimeBuiltin::CopyProcessMemory || argument_count == 5 ? nextInteger() : 0;
-        if (execution_failed)
-            break;
-        auto *target = findProcess(destinationProcess);
-        auto *origin = findProcess(sourceProcess);
-        if (target == nullptr || origin == nullptr)
-        {
-            active_tag = UINT32_MAX;
-            pushInteger(UINT32_MAX);
-            break;
-        }
-        if (builtin == SferaMbcRuntimeBuiltin::CopyProcessMemory)
-        {
-            if (count < 0)
-            {
-                reportError("Negative process copy length");
-                break;
-            }
-            const auto input = memoryBytes(source.base, count, origin);
-            if (!destination.contains(count))
-                destination.diagnoseRange(count);
-            const auto output = memoryBytes(destination.base, count, target);
-            SferaBinary::copy(output, input);
-        }
-        else
-        {
-            const auto text = textIn(source, origin);
-            copyString(textBuffer(destination, target), text, count);
-        }
-        break;
-    }
-    case SferaMbcRuntimeBuiltin::MemoryChecksum:
-    {
-        nextInteger();
-        auto &slice = nextSliceReference();
-        const std::uint32_t size = nextInteger();
-        if (execution_failed)
-            break;
-        if (!slice.contains(size))
-            slice.diagnoseRange(size);
-        pushInteger(0);
-        break;
-    }
-    case SferaMbcRuntimeBuiltin::ReadReal:
-    {
-        auto source = nextSliceReference();
-        auto &destination = nextSliceReference();
-        constexpr std::uint32_t width = sizeof(float);
-        if (execution_failed)
-            break;
-        if (!source.contains(width))
-        {
-            source.diagnoseRange(width);
-            break;
-        }
-        else if (!destination.contains(width))
-        {
-            destination.diagnoseRange(width);
-            break;
-        }
-        else
-        {
-            const auto input = sliceBytes(source, width);
-            const auto output = memoryBytes(destination.base, width);
-            SferaBinary::readPacked(std::as_bytes(input), std::as_writable_bytes(output));
-            source.base += width;
-        }
-        pushSlice(source, SferaMbcValueTypeBytePointer);
-        break;
-    }
-    case SferaMbcRuntimeBuiltin::ReadString:
-    {
-        auto source = nextSliceReference();
-        auto &destination = nextSliceReference();
-        if (!source.contains())
-        {
-            source.diagnoseRange(0);
-            break;
-        }
-        if (execution_failed)
-            break;
-        const auto input = textIn(source);
-        if (input.size() >= UINT32_MAX)
-        {
-            reportError("String exceeds the MBC address range");
-            break;
-        }
-        const std::uint32_t length = SferaNumeric::lowWord(input.size() + 1u);
-        copyText(destination, input);
-        if (!source.contains(length))
-            source.diagnoseRange(length);
-        else
-            source.base += length;
-        pushSlice(source, SferaMbcValueTypeBytePointer);
-        break;
-    }
-    case SferaMbcRuntimeBuiltin::Connect:
-    {
-        const auto host = nextSliceReference().base;
-        nextSliceReference();
-        const auto mode = argument_count > 2 ? nextWord() : 3u;
-        pushInteger(g_sfera_network_runtime.initialize(std::string(textAt(host)), mode));
-        break;
-    }
-    case SferaMbcRuntimeBuiltin::Disconnect:
-        g_sfera_network_runtime.shutdown();
-        break;
     case SferaMbcRuntimeBuiltin::Send:
         buildRegion();
         break;
     case SferaMbcRuntimeBuiltin::Receive:
         receiveRegion();
-        break;
-    case SferaMbcRuntimeBuiltin::NetworkInitialization:
-        pushInteger(g_sfera_network_runtime.initialization_result);
         break;
     case SferaMbcRuntimeBuiltin::PlayerLists:
     {
@@ -914,24 +778,6 @@ bool SferaMbcRuntime::executeBuiltin(SferaMbcRuntimeBuiltin builtin)
     case SferaMbcRuntimeBuiltin::NamedFormattedLog:
         writeFormattedLog(builtin == SferaMbcRuntimeBuiltin::NamedFormattedLog);
         break;
-    case SferaMbcRuntimeBuiltin::FindString:
-    {
-        auto &haystack = nextSliceReference();
-        const auto needle = nextSliceReference();
-        if (execution_failed)
-            break;
-        const auto text = textIn(haystack);
-        const auto match = textIn(needle);
-        const auto found = text.find(match);
-        if (found == std::string_view::npos)
-            pushSlice({}, SferaMbcValueTypeBytePointer);
-        else
-        {
-            haystack.base += SferaNumeric::lowWord(found);
-            pushSlice(haystack, SferaMbcValueTypeBytePointer);
-        }
-        break;
-    }
     case SferaMbcRuntimeBuiltin::Window:
         windowCommand();
         break;
@@ -1191,69 +1037,6 @@ bool SferaMbcRuntime::executeBuiltin(SferaMbcRuntimeBuiltin builtin)
         {
             extended->airborne = true;
             pushInteger(0);
-        }
-        break;
-    }
-    case SferaMbcRuntimeBuiltin::ObjectRotation:
-    {
-        const auto handle = nextInteger();
-        if (handle < 0 || selectWorldObject(handle) == nullptr)
-            break;
-        const auto destination = nextInteger();
-        if (execution_failed)
-            break;
-        const auto value = objectRotation(handle);
-        if (!value)
-            break;
-        if (destination == 0)
-            WorldDiagnostics::warning("NULL-pointer dereferencing: ffg_abg\n");
-        writeMemory(destination, *value);
-        break;
-    }
-    case SferaMbcRuntimeBuiltin::MovementContact:
-    {
-        const auto handle = nextInteger();
-        if (handle < 0)
-        {
-            pushInteger(0);
-            break;
-        }
-        std::uint32_t result = 0, direction = 0, depth = 0;
-        if (argument_count == 5)
-        {
-            result = nextInteger();
-            direction = nextInteger();
-            depth = nextInteger();
-            nextInteger();
-        }
-        if (execution_failed)
-            break;
-        if (argument_count <= 1)
-        {
-            pushInteger(g_sfera_contacts.testMovement(handle, false));
-            break;
-        }
-        auto *object = g_sfera_world_objects.object(handle, "GetObjectPointer");
-        g_sfera_mbc_runtime.current_object = object;
-        if (object == nullptr)
-        {
-            active_tag = UINT32_MAX;
-            break;
-        }
-        auto *extended = SphereRenderCharacterModels::checkedExtended(object);
-        pushInteger(extended->movement_blocked ? 0 : UINT32_MAX);
-        extended->movement_blocked = false;
-        if (argument_count == 5)
-        {
-            const std::uint32_t avoidance_enabled = extended->avoidance_enabled;
-            writeMemory(result, avoidance_enabled);
-            if (extended->avoidance_enabled)
-            {
-                if (direction != 0)
-                    writeMemory(direction, extended->avoidance_direction);
-                if (depth != 0)
-                    writeMemory(depth, extended->avoidance_depth);
-            }
         }
         break;
     }

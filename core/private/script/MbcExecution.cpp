@@ -1,4 +1,4 @@
-#include <windows.h>
+﻿#include <windows.h>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -360,21 +360,6 @@ void SferaMbcProcessRecord::unregisterResource(std::uint32_t handle, SferaMbcPro
         cleanup_entries.erase(found);
 }
 
-std::uint32_t SferaMbcProcessRecord::growMemory(std::size_t size)
-{
-    if (size == 0 || size > 4000000)
-        return UINT32_MAX;
-    auto &runtime = g_sfera_mbc_runtime;
-    const auto address = runtime.allocateDynamic(size);
-    try { owned_buffers.push_back(address); }
-    catch (...)
-    {
-        runtime.releaseDynamic(address);
-        throw;
-    }
-    return address;
-}
-
 SphereScripts::Method SferaMbcProcessRecord::findFunction(std::string_view name)
 {
     for (const auto &module : modules)
@@ -442,7 +427,7 @@ void SferaMbcProcessRecord::releaseResources()
             case SferaMbcProcessRecordResourceKind::dynamicArray:
             {
                 std::uint32_t offset{};
-                const auto *source = g_sfera_mbc_runtime.memoryAt(entry.handle, sizeof(offset), this);
+                const auto *source = g_sfera_mbc_runtime.memoryAt(entry.handle, sizeof(offset));
                 if (source == nullptr)
                     break;
                 std::memcpy(&offset, source, sizeof(offset));
@@ -598,7 +583,7 @@ void SferaMbcRuntime::pushSlice(const SferaSliceReference32 &value, SferaMbcValu
     engine_result = result;
 }
 
-SphereScripts::Address SferaMbcRuntime::mapObject(void *address, std::size_t size, const void *owner)
+SphereScripts::Address SferaMbcRuntime::mapObject(const void *address, std::size_t size, const void *owner)
 {
     const auto base = mapMemory(address, size, owner);
     return {base, base, base + SferaNumeric::lowWord(size) - 1u};

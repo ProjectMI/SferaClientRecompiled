@@ -1,8 +1,11 @@
+#include <charconv>
 #include <iterator>
 #include <cstdio>
 #include <fcntl.h>
 #include <io.h>
 #include "application/ClientApplication.h"
+#include "collision/Collision.h"
+#include "network/Network.h"
 #include "input/DirectInputDevices.h"
 #include "resources/FileResources.h"
 #include "script/GeneratedScripts.h"
@@ -13,6 +16,63 @@
 
 namespace SphereScripts
 {
+
+namespace
+{
+constexpr std::int32_t uniqueRecordSize = 152;
+constexpr std::size_t uniqueTextCapacity = 120;
+
+bool readUniqueDefinition(int descriptor, UniqueDefinition &record)
+{
+    const auto readInteger = [&](std::int32_t &value)
+    {
+        return g_sfera_files.read(descriptor, std::as_writable_bytes(std::span(&value, 1))) == 4;
+    };
+
+    std::int32_t active{};
+    if (!readInteger(record.id) || !readInteger(record.group) || !readInteger(record.initialRemaining) || !readInteger(active))
+        return false;
+
+    std::string text(uniqueTextCapacity, std::string::value_type{});
+    if (g_sfera_files.read(descriptor, std::as_writable_bytes(std::span(text))) != 120)
+        return false;
+    const auto terminator = text.find(std::string::value_type{});
+    record.text.assign(text, 0, terminator == std::string::npos ? text.size() : terminator);
+    record.active = active != 0;
+    return readInteger(record.remaining) && readInteger(record.revision) && readInteger(record.reserved0) && readInteger(record.reserved1);
+}
+
+bool writeUniqueDefinition(int descriptor, const UniqueDefinition &record)
+{
+    const auto writeInteger = [&](std::int32_t value)
+    {
+        return g_sfera_files.write(descriptor, std::as_bytes(std::span(&value, 1))) == 4;
+    };
+
+    if (!writeInteger(record.id) || !writeInteger(record.group) || !writeInteger(record.initialRemaining) || !writeInteger(record.active ? 1 : 0))
+        return false;
+
+    std::string text(uniqueTextCapacity, std::string::value_type{});
+    text.replace(0, std::min(record.text.size(), uniqueTextCapacity - 1), record.text, 0, uniqueTextCapacity - 1);
+    if (g_sfera_files.write(descriptor, std::as_bytes(std::span(text))) != 120)
+        return false;
+    return writeInteger(record.remaining) && writeInteger(record.revision) && writeInteger(record.reserved0) && writeInteger(record.reserved1);
+}
+
+void exportUniqueDefinition(Host &engine, String destination, const UniqueDefinition &record)
+{
+    auto bytes = engine.buffer(pointer(destination), 152);
+    SferaBinary::writeLittleEndian(bytes.data(), record.id);
+    SferaBinary::writeLittleEndian(bytes.data() + 4, record.group);
+    SferaBinary::writeLittleEndian(bytes.data() + 8, record.initialRemaining);
+    SferaBinary::writeLittleEndian(bytes.data() + 12, record.active ? 1 : 0);
+    SferaTextBuffer(bytes.subspan(16, uniqueTextCapacity)).writePadded(record.text, uniqueTextCapacity - 1);
+    SferaBinary::writeLittleEndian(bytes.data() + 136, record.remaining);
+    SferaBinary::writeLittleEndian(bytes.data() + 140, record.revision);
+    SferaBinary::writeLittleEndian(bytes.data() + 144, record.reserved0);
+    SferaBinary::writeLittleEndian(bytes.data() + 148, record.reserved1);
+}
+}
 
 static const std::array<std::uint8_t, 11> initialData1 = initialMember<std::array<std::uint8_t, 11>>("GetSysText");
 static const std::array<std::uint8_t, 2> initialData2 = initialMember<std::array<std::uint8_t, 2>>(" ");
@@ -306,7 +366,6 @@ static const std::array<std::uint8_t, 22> initialData673 = initialMember<std::ar
 static const std::array<std::uint8_t, 5> initialData686 = initialMember<std::array<std::uint8_t, 5>>("item");
 static const std::array<std::uint8_t, 11> initialData688 = initialMember<std::array<std::uint8_t, 11>>("config.cfg");
 static const std::array<std::uint8_t, 15> initialData690 = initialMember<std::array<std::uint8_t, 15>>("CHAT_EDIT_FONT");
-static const std::array<std::uint8_t, 18> initialData691 = initialMember<std::array<std::uint8_t, 18>>("shop_item_ids.txt");
 static const std::array<std::uint8_t, 4> initialData695 = initialMember<std::array<std::uint8_t, 4>>("%d\011");
 static const std::array<std::uint8_t, 4> initialData696 = initialMember<std::array<std::uint8_t, 4>>("%s\011");
 static const std::array<std::int32_t, 20> initialData701 = initialMember<std::array<std::int32_t, 20>>("\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377");
@@ -554,7 +613,6 @@ static const std::array<std::uint8_t, 7> initialData1418 = initialMember<std::ar
 static const std::array<std::uint8_t, 6> initialData1421 = initialMember<std::array<std::uint8_t, 6>>("pw_06");
 static const std::array<std::uint8_t, 13> initialData1428 = initialMember<std::array<std::uint8_t, 13>>("pw_couragef1");
 static const std::array<std::uint8_t, 16> initialData1429 = initialMember<std::array<std::uint8_t, 16>>("\000\000\000\000\347\377\377\377");
-static const std::array<std::uint8_t, 16> initialData1430 = initialMember<std::array<std::uint8_t, 16>>("n\000\000\000\000\000\000\000f\000\000\000y");
 static const std::array<std::uint8_t, 92> initialData1431 = initialMember<std::array<std::uint8_t, 92>>("\000\000\000\000\364\377\377\377\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\003");
 static const std::array<std::uint8_t, 92> initialData1439 = initialMember<std::array<std::uint8_t, 92>>("\000\000\000\000\360\377\377\377");
 static const std::array<std::uint8_t, 2> initialData1442 = initialMember<std::array<std::uint8_t, 2>>("Q");
@@ -626,7 +684,6 @@ static const std::array<std::uint8_t, 92> initialData1566 = initialMember<std::a
 static const std::array<std::uint8_t, 3> initialData1568 = initialMember<std::array<std::uint8_t, 3>>("WS");
 static const std::array<std::uint8_t, 92> initialData1569 = initialMember<std::array<std::uint8_t, 92>>("\000\000\000\000\375\377\377\377\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\002");
 static const std::array<std::uint8_t, 16> initialData1570 = initialMember<std::array<std::uint8_t, 16>>("\326\377\377\377");
-static const std::array<std::uint8_t, 16> initialData1571 = initialMember<std::array<std::uint8_t, 16>>("\000\000\000\000T\001");
 static const std::array<std::uint8_t, 8> initialData1572 = initialMember<std::array<std::uint8_t, 8>>("VERSION");
 static const std::array<std::uint8_t, 92> initialData1574 = initialMember<std::array<std::uint8_t, 92>>("\000\000\000\000\376\377\377\377\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\002");
 
@@ -774,7 +831,6 @@ ScriptState2::ScriptState2() :
     member5686_(-1),
     member5687_(initialData58),
     member5688_(initialData58),
-    member5692_(initialMember<std::array<std::uint8_t, 5>>("GEFF")),
     member5722_(initialData60),
     member5730_(initialMember<std::array<std::uint8_t, 10>>("TestMerge")),
     member5731_(initialMember<std::array<std::uint8_t, 16>>("CanMergeUniques")),
@@ -2039,7 +2095,7 @@ using StateView72 = std::tuple<ScriptState2 &, ScriptState3 &, ScriptState4 &, S
 using StateView73 = std::tuple<ScriptState2 &, ScriptState3 &, ScriptState4 &, ScriptState7 &, ScriptState9 &, ScriptState16 &, String &, std::array<std::uint8_t, 9> &>;
 using StateView74 = std::tuple<ScriptState2 &, ScriptState3 &, ScriptState4 &, ScriptState7 &, ScriptState9 &>;
 using StateView75 = std::tuple<ScriptState2 &, ScriptState3 &, ScriptState4 &, ScriptState7 &, String &, std::array<std::uint8_t, 9> &, ScriptState38 &>;
-using StateView76 = std::tuple<ScriptState2 &, ScriptState3 &, ScriptState4 &, ScriptState7 &, std::array<std::uint8_t, 56> &, String &, std::array<std::uint8_t, 6> &, std::array<std::uint8_t, 16> &>;
+using StateView76 = std::tuple<ScriptState2 &, ScriptState3 &, ScriptState4 &, ScriptState7 &, std::array<std::uint8_t, 56> &, String &, std::string &, MultiObjectActionParameters &>;
 using StateView77 = std::tuple<ScriptState2 &, ScriptState3 &, ScriptState4 &, ScriptState7 &>;
 using StateView78 = std::tuple<ScriptState2 &, ScriptState3 &, ScriptState4 &>;
 using StateView79 = std::tuple<ScriptState2 &, ScriptState3 &, ScriptState5 &, ScriptState1 &, ScriptState10 &>;
@@ -2093,12 +2149,12 @@ using StateView126 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, 
 using StateView127 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, ScriptState11 &>;
 using StateView128 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, ScriptState9 &, ScriptState16 &, std::array<std::uint8_t, 56> &, String &, std::int32_t &, std::int32_t &>;
 using StateView129 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, ScriptState9 &, std::array<std::uint8_t, 16> &>;
-using StateView130 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, ScriptState9 &, std::array<std::uint8_t, 40> &, std::array<std::uint8_t, 6> &>;
+using StateView130 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, ScriptState9 &, std::array<std::uint8_t, 40> &, std::string &>;
 using StateView131 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, ScriptState9 &, std::array<std::uint8_t, 56> &>;
 using StateView132 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, ScriptState9 &, std::array<std::uint8_t, 7> &, ScriptState62 &>;
 using StateView133 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, ScriptState9 &, std::int8_t &, std::int8_t &>;
 using StateView134 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, ScriptState9 &>;
-using StateView135 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, std::array<std::uint8_t, 4> &, IntRef &>;
+using StateView135 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &, std::array<std::uint8_t, 4> &, std::span<const std::int32_t> &>;
 using StateView136 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState3 &>;
 using StateView137 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState8 &, ScriptState3 &, ScriptState49 &>;
 using StateView138 = std::tuple<ScriptState2 &, ScriptState4 &, ScriptState7 &, ScriptState8 &, ScriptState3 &, ScriptState5 &, ScriptState9 &, ScriptState16 &>;
@@ -2908,7 +2964,7 @@ class ScriptHelpers
     static std::int32_t GetQuestTargetPoint(Module &self, ScriptState57 &state57);
     static Task<void> cleanup_TypeMission(Module &self, ScriptState57 &state57);
     template <std::size_t Variant, class State> static Task<void> ContManVariant67(Module &self, State state);
-    static Task<void> LoadMultiVariant15(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, std::array<std::uint8_t, 4> &member14460_, IntRef &member14483_, std::int32_t parameter1, std::int32_t parameter2);
+    static Task<void> LoadMultiVariant15(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, std::array<std::uint8_t, 4> &member14460_, std::span<const std::int32_t> &member14483_, std::int32_t parameter1, std::int32_t parameter2);
     static Task<Value> RcvUserVariant38(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState5 &state5, ScriptState7 &state7, std::array<std::uint8_t, 20> &member14451_, std::array<std::uint8_t, 11> &member14484_, std::int32_t parameter1, String parameter2);
     static std::int32_t UseServerVariant4(Module &self, ScriptState2 &state2, std::int32_t parameter1, std::int32_t parameter2);
     static Task<void> wait4txt(Module &self, ScriptState2 &state2, ScriptState28 &state28);
@@ -2933,7 +2989,7 @@ class ScriptHelpers
     static Task<void> LoadMultiVariant17(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, ScriptState9 &state9, ScriptState16 &state16, ScriptState58 &state58, std::int32_t parameter1, std::int32_t parameter2);
     static Task<void> CheckMob(Module &self, std::int32_t &member14773_, std::int32_t &member14774_);
     static Task<std::int32_t> AddCheckVariant4(Module &self, ScriptState9 &state9, std::int32_t &member14715_, std::int32_t parameter1, std::int32_t parameter2);
-    static Task<void> LoadMultiVariant18(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, std::array<std::uint8_t, 56> &member14775_, String &member14776_, std::array<std::uint8_t, 6> &member14777_, std::array<std::uint8_t, 16> &member14779_, std::int32_t parameter1, std::int32_t parameter2);
+    static Task<void> LoadMultiVariant18(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, std::array<std::uint8_t, 56> &member14775_, String &member14776_, std::string &member14777_, MultiObjectActionParameters &member14779_, std::int32_t parameter1, std::int32_t parameter2);
     static Task<std::int32_t> seekslot(Module &self, ScriptState2 &state2, std::int32_t &member14807_, std::int32_t &member14817_);
     static Task<std::int32_t> UseWithVariant15(Module &self, ScriptState2 &state2, ScriptState5 &state5, ScriptState7 &state7, ScriptState16 &state16, std::int32_t &member14807_, std::int32_t &member14817_, std::int32_t parameter1, std::int32_t parameter2);
     static Task<std::int32_t> UseWithVariant16(Module &self, ScriptState5 &state5, std::int32_t parameter1, std::int32_t parameter2, std::int32_t setting1);
@@ -2945,7 +3001,7 @@ class ScriptHelpers
     static Task<void> damg(Module &self, ScriptState29 &state29);
     static Task<void> MainVariant15(Module &self, ScriptState2 &state2, ScriptState29 &state29);
     static Task<std::int32_t> UseVariant31(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState5 &state5, ScriptState7 &state7, std::int32_t parameter1, std::int32_t parameter2);
-    static Task<void> LoadMultiVariant19(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, ScriptState9 &state9, std::array<std::uint8_t, 40> &member15085_, std::array<std::uint8_t, 6> &member15088_, std::int32_t parameter1, std::int32_t parameter2);
+    static Task<void> LoadMultiVariant19(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, ScriptState9 &state9, std::array<std::uint8_t, 40> &member15085_, std::string &member15088_, std::int32_t parameter1, std::int32_t parameter2);
     static void RcvUserVariant45(Module &self, ScriptState5 &state5, String &member15090_, std::array<std::uint8_t, 96> &member15091_, std::array<std::uint8_t, 96> &member15093_, std::array<std::uint8_t, 96> &member15095_, std::int32_t &member15133_, std::int32_t &member15134_, std::int32_t parameter1, String parameter2);
     static void MallocBuf(Module &self, String &member15090_);
     static std::int32_t UseOwnerVariant39(Module &self, ScriptState4 &state4, std::int32_t &member15086_, std::int32_t parameter1);
@@ -3022,6 +3078,8 @@ class ScriptHelpers
     static Task<std::int32_t> UseWithVariant23(Module &self, ScriptState2 &state2, ScriptState5 &state5, ScriptState9 &state9, ScriptState16 &state16, std::int32_t parameter1, std::int32_t parameter2);
     static Task<std::int32_t> UseWithVariant24(Module &self, ScriptState2 &state2, ScriptState7 &state7, ScriptState9 &state9, std::int32_t parameter1, std::int32_t parameter2, std::int32_t setting1, std::int32_t setting2);
     static String call_gMsg_1(Module &self, std::int32_t argument1);
+    static std::int32_t call_GetMulti_1(Module &self, std::int32_t objectId, std::int32_t variant, MultiObject &output);
+    static std::int32_t call_GEFF_1(Module &self, std::int32_t effectIndex, EffectDefinition &output);
     static Task<std::int32_t> call_CreateObj_1(Module &self, String argument1, std::int32_t argument2);
     static Task<Value> call_LoadMsgGroup_1(Module &self, String argument1);
     static Task<std::int32_t> call_InvOff_1(Module &self);
@@ -3144,7 +3202,7 @@ class ScriptHelpers
     static Task<void> sharedPart37(Module &self, std::int32_t & part1, std::span<std::uint8_t> part2, String & part4, std::int32_t & part5, std::span<std::uint8_t> part8, std::span<std::uint8_t> part12, std::int32_t & part13, String & part14, std::int32_t & part15, std::span<std::uint8_t> part16, std::span<std::uint8_t> part19, std::span<std::uint8_t> part20, std::span<std::uint8_t> part23);
     static void sharedPart38(Module &self, std::span<std::uint8_t> part3, std::int32_t & part20, Address & part21, std::int32_t & part28, String & part36, std::span<std::uint8_t> part37);
     static Task<void> sharedPart39(Module &self, std::int32_t & part1, std::int32_t & part2, std::int32_t & part3, Address & part5, float & part6, Address & part7);
-    static void sharedPart40(Module &self, std::span<std::uint8_t> part1, std::int8_t & part2, std::int32_t & part8, std::int32_t & part9, std::int32_t & part20, std::span<std::uint8_t> part26, String & part27, std::span<std::uint8_t> part30);
+    static void sharedPart40(Module &self, std::span<std::uint8_t> part1, std::int8_t & part2, std::int32_t & part8, std::int32_t & part9, std::int32_t & part20, std::span<std::uint8_t> part26, MultiObject & part27, std::span<std::uint8_t> part30);
     static Task<void> sharedPart41(Module &self, ScriptState2 & part1, ScriptState7 & part2, std::int32_t & part3, std::int32_t & part4, std::int32_t & part9, std::int32_t & part12, std::span<std::uint8_t> part23, String & part25, String & part26, std::span<std::uint8_t> part27, String & part29, String & part38);
     static Task<void> sharedPart42(Module &self, std::int32_t & part1, std::int32_t & part3, ScriptState2 & part4, std::int32_t & part5, std::int32_t & part6, Address & part8, Address & part9, std::span<std::uint8_t> part10, Value & part16, String & part17, std::span<std::uint8_t> part18, std::int32_t & part19);
     static Task<void> sharedPart43(Module &self, std::span<std::uint8_t> part1, std::int32_t & part2, ScriptState2 & part7, ScriptState7 & part8, std::int32_t & part9, std::int32_t & part13, std::span<std::uint8_t> part14, std::int32_t & part19, std::span<std::int8_t> part20, std::int32_t & part25, std::span<std::uint8_t> part26, String & part27, std::span<std::uint8_t> part28, String & part35);
@@ -3164,7 +3222,7 @@ class ScriptHelpers
     static void sharedPart57(Module &self, std::int32_t & part1, std::span<std::uint8_t> part2, std::int32_t part3, std::int32_t part5, std::int32_t part7, std::int32_t part9, std::int32_t part11, std::int32_t part13, std::int32_t part15, std::int32_t part17, std::int32_t part19, std::int32_t part21, std::int32_t part23, std::int32_t part25);
     static Task<void> sharedPart58(Module &self, std::int32_t & part1, std::span<std::uint8_t> part2, std::int32_t & part3, std::int32_t & part4, std::int32_t & part6, std::span<std::uint8_t> part10, std::int32_t & part12);
     static void sharedPart59(Module &self, std::span<std::uint8_t> part3, std::int32_t & part20, Address & part21, std::int32_t & part28, std::int32_t & part36, std::span<std::uint8_t> part38, std::int32_t & part43, String & part45, String & part46);
-    static void sharedPart60(Module &self, std::span<std::uint8_t> part1, String & part4, std::int32_t & part7, std::span<std::uint8_t> part22, std::int32_t part23, std::int32_t part24);
+    static void sharedPart60(Module &self, std::span<std::uint8_t> part1, const MultiObject &part4, std::int32_t &part7, std::span<std::uint8_t> part22, std::span<const std::int32_t> parameters);
     static Task<void> sharedPart61(Module &self, std::int32_t & part1, float & part3, float & part5, std::int32_t & part7, String & part8, std::span<std::uint8_t> part9, std::int32_t & part10, std::span<std::uint8_t> part11, String & part13, String & part22);
     static Task<void> sharedPart62(Module &self, std::span<std::uint8_t> part1, Value & part2, std::span<std::uint8_t> part4, String & part6, std::int32_t & part8, std::span<std::uint8_t> part10);
     static void sharedPart63(Module &self, float & part1, Address & part2, std::span<Address> part7, std::int32_t part8, float & part12, std::int32_t part14, std::int32_t part20, float & part24, std::int32_t part26, std::int32_t part32, float & part36);
@@ -3189,17 +3247,17 @@ class ScriptHelpers
     static Task<void> sharedPart82(Module &self, std::int32_t & part1, Value & part2, std::int32_t & part3, std::span<std::uint8_t> part4, std::int32_t & part5, std::int32_t & part6, std::int32_t & part8, std::span<std::uint8_t> part12, std::span<std::uint8_t> part13, std::span<std::uint8_t> part15, std::span<Address> part20, std::int32_t & part30, Address & part31, std::span<Address> part32, std::int32_t & part47, std::int32_t & part48);
     static void sharedPart83(Module &self, std::int32_t & part1, String & part4, std::span<std::uint8_t> part6, std::span<std::uint8_t> part7, std::span<std::uint8_t> part8, std::span<std::uint8_t> part14, std::int32_t & part15, std::int32_t part16, ScriptState1 & part18, std::int32_t part19, std::span<std::int32_t> part20, std::int32_t part21, std::int32_t part25, std::int32_t & part29);
     static void sharedPart84(Module &self, IntRef & part1, std::int32_t & part2, std::span<std::uint8_t> part3, IntRef & part8, IntRef & part14, std::int32_t & part38);
-    static void sharedPart85(Module &self, std::int32_t & part1, std::int32_t & part3, std::int32_t & part5, std::int32_t & part6, std::span<IntRef> part7, std::int32_t part11, StringRef & part15, StringRef & part16, String & part17, String & part26, IntRef & part28, std::int32_t part32, std::int32_t part37);
+    static void sharedPart85(Module &self, std::int32_t & part1, std::int32_t & part3, std::int32_t & part5, std::int32_t & part6, std::span<IntRef> part7, std::int32_t part11, std::span<String> part16, String & part17, String & part26, IntRef & part28, std::int32_t part32, std::int32_t part37);
     static void sharedPart86(Module &self, float & part1, std::int32_t part2, float & part3, std::int32_t & part4, std::int32_t part7, std::int32_t part10, std::int32_t part11, std::int32_t & part12, float & part13, std::span<std::uint8_t> part15);
     static Task<void> sharedPart87(Module &self, std::int32_t & part1, std::int32_t & part2, std::int32_t & part3, Address & part5, std::span<std::uint8_t> part6, std::int32_t & part22);
     static void sharedPart88(Module &self, std::span<std::uint8_t> part1, float & part5, float & part9, std::int32_t & part16, std::int32_t & part21, std::int32_t & part23, std::int32_t & part43, std::int32_t & part52, Value & part71);
     static void sharedPart89(Module &self, std::int32_t & part1, std::span<std::uint8_t> part2, std::int32_t & part5, std::int32_t & part8, std::int32_t & part16, float & part17, float & part42);
-    static void sharedPart90(Module &self, std::span<std::uint8_t> part1, String & part2, IntRef & part5, std::int32_t & part7, std::int32_t & part8, std::int32_t part9, std::int32_t & part13, std::int32_t part14, std::int32_t & part18, std::int32_t part19, std::int32_t & part23, std::int32_t part24, std::int32_t & part28, std::int32_t part29);
+    static void sharedPart90(Module &self, std::span<std::uint8_t> part1, const MultiObject &part2, std::int32_t &part7, std::int32_t &part8, std::int32_t value8, std::int32_t &part13, std::int32_t value13, std::int32_t &part18, std::int32_t value18, std::int32_t &part23, std::int32_t value23, std::int32_t &part28, std::int32_t value28);
     static Task<void> sharedPart91(Module &self, std::int32_t & part1, std::int32_t & part3, IntRef & part4, std::int32_t & part5, Value & part9, String & part10, String & part13);
     static Task<void> sharedPart92(Module &self, std::int32_t & part1, IntRef & part3, std::int32_t & part10, std::int32_t & part24, std::int32_t & part25, std::int32_t & part26, std::int32_t & part50, std::span<std::uint8_t> part72, std::span<std::uint8_t> part73, std::span<std::uint8_t> part75, Value & part77, std::span<std::uint8_t> part78, std::int32_t & part82, std::int32_t & part92);
     static void sharedPart93(Module &self, std::int32_t & part1, std::span<std::uint8_t> part2, IntRef & part7, IntRef & part13, IntRef & part19, IntRef & part25);
-    static void sharedPart94(Module &self, std::int32_t & part1, IntRef & part2, std::int32_t part3, std::int32_t & part7, std::span<std::uint8_t> part13, String & part21, std::span<std::uint8_t> part25);
-    static void sharedPart95(Module &self, std::int32_t & part1, String & part2, std::int32_t & part12, IntRef & part24, std::int32_t & part26);
+    static void sharedPart94(Module &self, std::int32_t &part1, const MultiObject &part2, std::int32_t selectedValue, std::int32_t &part7, MultiObjectActionParameters &part13, String &part21, std::string &part25);
+    static void sharedPart95(Module &self, std::int32_t &part1, const MultiObject &part2, std::int32_t &part12, std::int32_t &part26);
     static void sharedPart96(Module &self, std::int32_t & part1, std::int32_t & part2, std::int32_t & part3, std::span<std::uint8_t> part4, std::int32_t part9, std::int32_t part10, std::int32_t part13, std::int32_t part14);
     static void sharedPart97(Module &self, std::int32_t & part1, std::span<std::uint8_t> part4);
     static void sharedPart98(Module &self, std::span<std::uint8_t> part1, float & part5, float & part6, std::int32_t & part7, float & part10, float & part11, float & part12, float & part13, float & part14, float & part15, std::int32_t & part16, std::int32_t & part24, float & part32, float & part35, float & part36);
@@ -3222,8 +3280,7 @@ class ScriptHelpers
     static Task<void> sharedPart115(Module &self, std::int32_t & part1, std::int32_t & part3, std::int32_t & part5, std::int32_t & part7, std::span<std::uint8_t> part8, String & part10, ScriptState2 & part11, ScriptState7 & part12, String & part13, String & part14, String & part15, std::int32_t & part16, std::span<std::uint8_t> part18, std::span<std::uint8_t> part19, std::span<std::uint8_t> part20, String & part22, String & part31);
     static Task<void> sharedPart116(Module &self, Value & part1, std::span<std::uint8_t> part2, std::int32_t & part3, std::int32_t part5, std::int32_t part6, String & part7, std::span<std::uint8_t> part8, std::int32_t part11, std::int32_t part12, std::int32_t & part14, std::span<std::int32_t> part17, std::int32_t part19, std::int32_t part20, std::int32_t part27, std::int32_t part28, std::int32_t part33, std::int32_t part34, std::int32_t part37, std::int32_t part38, std::int32_t & part41, std::int32_t part43, std::int32_t part44, std::int32_t & part45, std::span<std::uint8_t> part48, std::span<std::uint8_t> part49, std::int32_t part52, std::int32_t part53, std::span<std::uint8_t> part57, std::int32_t part59, std::int32_t part60, std::int32_t part62, std::int32_t part63);
     static void sharedPart117(MbcStMap &self, float & part1, Address & part2, std::int32_t & part6, std::span<std::uint8_t> part10, std::int32_t & part30, std::int32_t & part39, std::int32_t & part40, std::int32_t part41, std::int32_t part45, std::int32_t part47, std::int32_t & part56, std::int32_t & part57);
-    static void sharedPart118(Module &self, std::span<std::uint8_t> part1, std::int8_t & part2, std::int32_t & part8, std::int32_t & part9, std::span<std::uint8_t> part20, std::span<std::uint8_t> part21, String & part22, std::span<std::uint8_t> part25);
-    static void sharedPart119(Module &self, IntRef & part1, IntRef & part2, std::int32_t & part3, IntRef & part4, IntRef & part5, std::int32_t & part6, std::int32_t & part8);
+    static void sharedPart118(Module &self, std::span<std::uint8_t> part1, std::int8_t & part2, std::int32_t & part8, std::int32_t & part9, std::span<std::uint8_t> part20, std::span<std::uint8_t> part21, MultiObject & part22, std::span<std::uint8_t> part25);
     static Task<void> sharedPart120(Module &self, std::int32_t & part1, std::span<std::uint8_t> part2, std::span<std::uint8_t> part7, std::int32_t & part12, std::int32_t & part14, std::int32_t & part19, std::int32_t & part23);
     static void sharedPart121(Module &self, std::span<std::uint8_t> part1, std::int32_t & part8, std::int32_t & part9);
     static void bindEntries1(Module &self, ScriptState1 &state1, std::uint32_t constant1);
@@ -3836,7 +3893,7 @@ void ScriptHelpers::sharedPart6(Module &self, String & part1, std::int32_t & par
         part11 = part4;
         part19 = part1;
         part20 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, part11, part19, part20, part6);
+        engine.copyString(pointer(part19), pointer(part6));
     }
 }
 
@@ -4875,7 +4932,7 @@ Task<void> ScriptHelpers::sharedPart39(Module &self, std::int32_t & part1, std::
     co_return;
 }
 
-void ScriptHelpers::sharedPart40(Module &self, std::span<std::uint8_t> part1, std::int8_t & part2, std::int32_t & part8, std::int32_t & part9, std::int32_t & part20, std::span<std::uint8_t> part26, String & part27, std::span<std::uint8_t> part30)
+void ScriptHelpers::sharedPart40(Module &self, std::span<std::uint8_t> part1, std::int8_t & part2, std::int32_t & part8, std::int32_t & part9, std::int32_t & part20, std::span<std::uint8_t> part26, MultiObject & part27, std::span<std::uint8_t> part30)
 {
     Host &engine = self.host();
     if (!(std::int32_t(memberView<std::int8_t>(part1, (std::size_t{1} * word(engine.elementIndex(subtract32(std::int32_t(part2), 2), -20, true))))) != 43))
@@ -4885,9 +4942,14 @@ void ScriptHelpers::sharedPart40(Module &self, std::span<std::uint8_t> part1, st
         setMemberView(part1, (std::size_t{1} * word(engine.elementIndex(subtract32(part8, 2), -20, true))), storedValue<std::int8_t>(0));
         part20 = subtract32(std::int32_t(memberView<std::int8_t>(part1, (std::size_t{1} * word(engine.elementIndex(subtract32(std::int32_t(part2), 1), -20, true))))), 48);
     }
-    engine.copyBytes(memberBytes(part26), pointer(shifted(part27, 38)), 2u);
-    engine.copyBytes(memberBytes(part30), pointer(shifted(part27, 40)), 20u);
-    engine.copyBytes(pointer(shifted(storedValue<String>(self.address(part26)), 2)), pointer(shifted(part27, 58)), 2u);
+    std::ranges::fill(part26, std::uint8_t{});
+    const auto primaryCount = std::min<std::size_t>(2, part27.primaryQualifier.size());
+    const auto secondaryCount = std::min<std::size_t>(2, part27.secondaryQualifier.size());
+    if (primaryCount != 0)
+        std::memcpy(part26.data(), part27.primaryQualifier.data(), primaryCount);
+    if (secondaryCount != 0)
+        std::memcpy(part26.data() + 2, part27.secondaryQualifier.data(), secondaryCount);
+    SferaTextBuffer(part30).assign(part27.secondaryResource);
 }
 
 Task<void> ScriptHelpers::sharedPart41(Module &self, ScriptState2 & part1, ScriptState7 & part2, std::int32_t & part3, std::int32_t & part4, std::int32_t & part9, std::int32_t & part12, std::span<std::uint8_t> part23, String & part25, String & part26, std::span<std::uint8_t> part27, String & part29, String & part38)
@@ -5362,13 +5424,25 @@ void ScriptHelpers::sharedPart59(Module &self, std::span<std::uint8_t> part3, st
     }
 }
 
-void ScriptHelpers::sharedPart60(Module &self, std::span<std::uint8_t> part1, String & part4, std::int32_t & part7, std::span<std::uint8_t> part22, std::int32_t part23, std::int32_t part24)
+void ScriptHelpers::sharedPart60(Module &self, std::span<std::uint8_t> part1, const MultiObject &part4, std::int32_t &part7, std::span<std::uint8_t> part22, std::span<const std::int32_t> parameters)
 {
-    Host &engine = self.host();
-    engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(part1)), 56, 4))), pointer(shifted(part4, 248)), 4u);
+    setMemberView(part1, 0, part4.parameters.mergeMode);
+    setMemberView(part1, 4, part4.parameters.primaryScale);
+    for (std::size_t index = 0; index < part4.parameters.fixedValues.size(); ++index)
+        setMemberView(part1, 8 + index * 4, part4.parameters.fixedValues[index]);
+    for (std::size_t index = 0; index < part4.parameters.conditionalScaledValues.size(); ++index)
+        setMemberView(part1, 24 + index * 4, part4.parameters.conditionalScaledValues[index]);
+
+    std::uint32_t modifier = word(part4.modifierCode.value_or(0));
+    if (part4.modifierLevel.has_value())
+        modifier |= word(*part4.modifierLevel) << 8;
+    setMemberView(part1, 56, integerBits(modifier));
+    for (std::size_t index = 0; index < 14; ++index)
+        setMemberView(part1, 60 + index, std::uint8_t(part4.flags[index]));
     part7 = memberView<std::int32_t>(part1, 60);
-    engine.copyBytes(pointer(storedValue<IntRef>(engine.element(pointer(storedValue<IntRef>(engine.field(pointer(self.address(part1)), 60, 28))), 0, 4, -7, false, 0, true))), pointer(shifted(part4, 252)), 14u);
-    engine.copyBytes(memberBytes(part22), pointer(shifted(part4, part23)), word(integer(part24)));
+
+    for (std::size_t index = 0; index < parameters.size(); ++index)
+        setMemberView(part22, index * 4, parameters[index]);
 }
 
 Task<void> ScriptHelpers::sharedPart61(Module &self, std::int32_t & part1, float & part3, float & part5, std::int32_t & part7, String & part8, std::span<std::uint8_t> part9, std::int32_t & part10, std::span<std::uint8_t> part11, String & part13, String & part22)
@@ -6050,7 +6124,7 @@ void ScriptHelpers::sharedPart84(Module &self, IntRef & part1, std::int32_t & pa
     }
 }
 
-void ScriptHelpers::sharedPart85(Module &self, std::int32_t & part1, std::int32_t & part3, std::int32_t & part5, std::int32_t & part6, std::span<IntRef> part7, std::int32_t part11, StringRef & part15, StringRef & part16, String & part17, String & part26, IntRef & part28, std::int32_t part32, std::int32_t part37)
+void ScriptHelpers::sharedPart85(Module &self, std::int32_t & part1, std::int32_t & part3, std::int32_t & part5, std::int32_t & part6, std::span<IntRef> part7, std::int32_t part11, std::span<String> part16, String & part17, String & part26, IntRef & part28, std::int32_t part32, std::int32_t part37)
 {
     Host &engine = self.host();
     if (!(part1 == 0))
@@ -6059,9 +6133,9 @@ void ScriptHelpers::sharedPart85(Module &self, std::int32_t & part1, std::int32_
         {
             part1 = part5;
             part6 = engine.read<std::int32_t>(engine.element(pointer(storedValue<IntRef>(engine.element(pointer(self.address(part7)), part5, 16, 15, true, 240, true))), part11, 4, -4, false, 0, true));
-            part15 = part16;
-            part17 = engine.read<String>(engine.element(pointer(part15), add32(multiply32(part1, 2000), part6), 12, 0, false, 0, false));
-            engine.write(engine.element(pointer(part15), add32(multiply32(part1, 2000), part6), 12, 0, false, 0, false), part26, 12);
+            const auto index = std::size_t{word(add32(multiply32(part1, 2000), part6))};
+            part17 = part16[index];
+            part16[index] = part26;
             part28 = storedValue<IntRef>(engine.element(pointer(self.address(part7)), part5, 16, 15, true, 240, true));
             {
                 const auto previous = engine.read<std::int32_t>(engine.element(pointer(part28), part32, 4, -4, false, 0, true));
@@ -6195,17 +6269,16 @@ void ScriptHelpers::sharedPart89(Module &self, std::int32_t & part1, std::span<s
     setMemberView(part2, 8, memberView<std::int32_t>(part2, 0));
 }
 
-void ScriptHelpers::sharedPart90(Module &self, std::span<std::uint8_t> part1, String & part2, IntRef & part5, std::int32_t & part7, std::int32_t & part8, std::int32_t part9, std::int32_t & part13, std::int32_t part14, std::int32_t & part18, std::int32_t part19, std::int32_t & part23, std::int32_t part24, std::int32_t & part28, std::int32_t part29)
+void ScriptHelpers::sharedPart90(Module &self, std::span<std::uint8_t> part1, const MultiObject &part2, std::int32_t &part7, std::int32_t &part8, std::int32_t value8, std::int32_t &part13, std::int32_t value13, std::int32_t &part18, std::int32_t value18, std::int32_t &part23, std::int32_t value23, std::int32_t &part28, std::int32_t value28)
 {
-    Host &engine = self.host();
-    engine.copyBytes(memberBytes(part1), pointer(shifted(part2, 132)), 56u);
-    part5 = storedValue<IntRef>(shifted(part2, 188));
-    part7 = engine.read<std::int32_t>(engine.indirect(payload(part5)));
-    part8 = engine.read<std::int32_t>(engine.element(pointer(part5), part9, 4, 0, false, 0, false));
-    part13 = engine.read<std::int32_t>(engine.element(pointer(part5), part14, 4, 0, false, 0, false));
-    part18 = engine.read<std::int32_t>(engine.element(pointer(part5), part19, 4, 0, false, 0, false));
-    part23 = engine.read<std::int32_t>(engine.element(pointer(part5), part24, 4, 0, false, 0, false));
-    part28 = engine.read<std::int32_t>(engine.element(pointer(part5), part29, 4, 0, false, 0, false));
+    for (std::size_t index = 0; index < part2.parameters.scaledModifiers.size(); ++index)
+        setMemberView(part1, index * 4, part2.parameters.scaledModifiers[index]);
+    part7 = part2.parameters.percentageModifiers[0];
+    part8 = value8;
+    part13 = value13;
+    part18 = value18;
+    part23 = value23;
+    part28 = value28;
 }
 
 Task<void> ScriptHelpers::sharedPart91(Module &self, std::int32_t & part1, std::int32_t & part3, IntRef & part4, std::int32_t & part5, Value & part9, String & part10, String & part13)
@@ -6323,37 +6396,27 @@ void ScriptHelpers::sharedPart93(Module &self, std::int32_t & part1, std::span<s
     setMemberView(part2, 76, engine.read<std::int32_t>(engine.indirect(payload(part25))));
 }
 
-void ScriptHelpers::sharedPart94(Module &self, std::int32_t & part1, IntRef & part2, std::int32_t part3, std::int32_t & part7, std::span<std::uint8_t> part13, String & part21, std::span<std::uint8_t> part25)
+void ScriptHelpers::sharedPart94(Module &self, std::int32_t &part1, const MultiObject &part2, std::int32_t selectedValue, std::int32_t &part7, MultiObjectActionParameters &part13, String &part21, std::string &part25)
 {
-    Host &engine = self.host();
-    part1 = engine.read<std::int32_t>(engine.element(pointer(part2), part3, 4, 0, false, 0, false));
-    part7 = multiply32(engine.read<std::int32_t>(engine.element(pointer(part2), 7, 4, 0, false, 0, false)), 240);
-    engine.copyBytes(memberBytes(part13), pointer(shifted(part2, 36)), 16u);
-    if (!(memberView<std::int32_t>(part13, 12) == 0))
+    part1 = selectedValue;
+    part7 = multiply32(part2.parameters.durationUnits, 240);
+    part13.interactionArgument = part2.parameters.interactionArgument;
+    part13.auxiliaryArgument = part2.parameters.auxiliaryArgument;
+    part13.effectId = part2.parameters.effectId;
+    part21 = {};
+    if (!part2.textSelector.empty())
     {
-        part21 = storedValue<String>(shifted(storedValue<IntRef>(self.address(part13)), 12));
-        if (std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(part21)))) <= 57)
-        {
-            part21 = storedValue<String>(0);
-        }
-        else
-        {
-            engine.copyBytes(memberBytes(part25), pointer(part21), 4u);
-            part21 = storedValue<String>(self.address(part25));
-        }
+        part25 = part2.textSelector;
+        part21 = self.reference<String>(part25);
     }
 }
 
-void ScriptHelpers::sharedPart95(Module &self, std::int32_t & part1, String & part2, std::int32_t & part12, IntRef & part24, std::int32_t & part26)
+void ScriptHelpers::sharedPart95(Module &self, std::int32_t &part1, const MultiObject &part2, std::int32_t &part12, std::int32_t &part26)
 {
-    Host &engine = self.host();
-    part1 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(part2), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(part2), 242, 1, 0, false, 0, false))) < 48))
-    {
-        part12 = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(part2), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(part2), 243, 1, 0, false, 0, false)))), 48);
-    }
-    part24 = storedValue<IntRef>(shifted(part2, 188));
-    part26 = engine.read<std::int32_t>(engine.indirect(payload(part24)));
+    part1 = std::int32_t(part2.resolvedMode);
+    if (part2.scale >= 0)
+        part12 = part2.scale;
+    part26 = part2.parameters.percentageModifiers[0];
 }
 
 void ScriptHelpers::sharedPart96(Module &self, std::int32_t & part1, std::int32_t & part2, std::int32_t & part3, std::span<std::uint8_t> part4, std::int32_t part9, std::int32_t part10, std::int32_t part13, std::int32_t part14)
@@ -6924,7 +6987,7 @@ void ScriptHelpers::sharedPart117(MbcStMap &self, float & part1, Address & part2
     part57 = integerBits(engine.current.module->processId);
 }
 
-void ScriptHelpers::sharedPart118(Module &self, std::span<std::uint8_t> part1, std::int8_t & part2, std::int32_t & part8, std::int32_t & part9, std::span<std::uint8_t> part20, std::span<std::uint8_t> part21, String & part22, std::span<std::uint8_t> part25)
+void ScriptHelpers::sharedPart118(Module &self, std::span<std::uint8_t> part1, std::int8_t & part2, std::int32_t & part8, std::int32_t & part9, std::span<std::uint8_t> part20, std::span<std::uint8_t> part21, MultiObject & part22, std::span<std::uint8_t> part25)
 {
     Host &engine = self.host();
     if (!(std::int32_t(memberView<std::int8_t>(part1, (std::size_t{1} * word(engine.elementIndex(subtract32(std::int32_t(part2), 2), -20, true))))) != 43))
@@ -6935,42 +6998,14 @@ void ScriptHelpers::sharedPart118(Module &self, std::span<std::uint8_t> part1, s
         part8 = engine.processModule(engine.current.module->processId);
         engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(self.address(part20)), part8);
     }
-    engine.copyBytes(memberBytes(part21), pointer(shifted(part22, 38)), 2u);
-    engine.copyBytes(memberBytes(part25), pointer(shifted(part22, 40)), 20u);
-    engine.copyBytes(pointer(shifted(storedValue<String>(self.address(part21)), 2)), pointer(shifted(part22, 58)), 2u);
-}
-
-void ScriptHelpers::sharedPart119(Module &self, IntRef & part1, IntRef & part2, std::int32_t & part3, IntRef & part4, IntRef & part5, std::int32_t & part6, std::int32_t & part8)
-{
-    Host &engine = self.host();
-    part1 = part2;
-    part3 = engine.read<std::int32_t>(engine.indirect(payload(part1)));
-    engine.write(engine.indirect(payload(part1)), add32(engine.read<std::int32_t>(engine.indirect(payload(part4))), multiply32(engine.read<std::int32_t>(engine.indirect(payload(part5))), part6)), 4);
-    {
-        const auto previous = part8;
-        const auto updated = add32(previous, 1);
-        part8 = storedValue<std::int32_t>(updated);
-        part3 = updated;
-    }
-    {
-        const auto previous = part2;
-        const auto updated = shifted(previous, 4);
-        setMemberView(part2, 0, storedValue<std::int32_t>(updated));
-        part1 = updated;
-    }
-    {
-        const auto previous = part4;
-        const auto updated = shifted(previous, 4);
-        setMemberView(part4, 0, storedValue<std::int32_t>(updated));
-        part1 = updated;
-    }
-    {
-        const auto previous = part5;
-        const auto updated = shifted(previous, 4);
-        setMemberView(part5, 0, storedValue<std::int32_t>(updated));
-        part1 = updated;
-    }
-    engine.checkpoint();
+    std::ranges::fill(part21, std::uint8_t{});
+    const auto primaryCount = std::min<std::size_t>(2, part22.primaryQualifier.size());
+    const auto secondaryCount = std::min<std::size_t>(2, part22.secondaryQualifier.size());
+    if (primaryCount != 0)
+        std::memcpy(part21.data(), part22.primaryQualifier.data(), primaryCount);
+    if (secondaryCount != 0)
+        std::memcpy(part21.data() + 2, part22.secondaryQualifier.data(), secondaryCount);
+    SferaTextBuffer(part25).assign(part22.secondaryResource);
 }
 
 Task<void> ScriptHelpers::sharedPart120(Module &self, std::int32_t & part1, std::span<std::uint8_t> part2, std::span<std::uint8_t> part7, std::int32_t & part12, std::int32_t & part14, std::int32_t & part19, std::int32_t & part23)
@@ -7537,7 +7572,7 @@ std::int32_t ScriptHelpers::GetModel(Module &self, ScriptState2 &state2, std::in
     value1 = state2.member129_;
     value2 = state2.member130_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state2.member68_)));
+    engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state2.member68_))));
     return 0;
 }
 
@@ -7610,7 +7645,7 @@ std::int32_t ScriptHelpers::GetParam(Module &self, ScriptState2 &state2, ScriptS
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(self.address(state4.member99_)), state4.member132_, state2.member134_, 8);
+        engine.copyBytes(pointer(storedValue<AddressRef>(self.address(state4.member99_))), pointer(state2.member134_), word(integer(8)));
         return memberView<std::int32_t>(state4.member99_, 0);
     }
     value1 = state2.member133_;
@@ -7683,7 +7718,7 @@ std::int32_t ScriptHelpers::GetWeight(Module &self, ScriptState2 &state2, Script
         value1 = state2.member147_;
         value2 = state2.member148_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state4.member149_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state4.member149_))));
     }
     return add32(state2.member116_, state2.member76_);
 }
@@ -7788,7 +7823,7 @@ Task<std::int32_t> ScriptHelpers::PopMe(Module &self, ScriptState2 &state2)
     while (true)
     {
         engine.checkpoint();
-        value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state2.member71_);
+        value1 = state2.member71_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state2.member71_)), false));
         if (value1 == 0)
         {
             break;
@@ -7920,7 +7955,7 @@ Task<std::int32_t> ScriptHelpers::GetXYZ(Module &self, ScriptState2 &state2, std
     value2 = state2.member158_;
     value3 = state2.member159_;
     value4 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value2, value3, value4, storedValue<AddressRef>(self.address(state2.member160_)), 12);
+    engine.copyBytes(pointer(value3), pointer(storedValue<AddressRef>(self.address(state2.member160_))), word(integer(12)));
     co_return 0;
 }
 
@@ -7939,7 +7974,7 @@ std::int32_t ScriptHelpers::GetABG(Module &self, ScriptState2 &state2, ScriptSta
     value2 = state3.member162_;
     value3 = integerBits(engine.current.module->processId);
     value4 = engine.field(pointer(self.address(state2.member62_)), 12, 12);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(engine.field(pointer(self.address(state2.member62_)), 12, 12)), 12);
+    engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(engine.field(pointer(self.address(state2.member62_)), 12, 12))), word(integer(12)));
     return 0;
 }
 
@@ -8219,7 +8254,7 @@ Task<std::int32_t> ScriptHelpers::SetXYZ(Module &self, ScriptState2 &state2, std
 
     value1 = integerBits(engine.current.module->processId);
     value2 = engine.field(pointer(self.address(state2.member62_)), 0, 12);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(engine.field(pointer(self.address(state2.member62_)), 0, 12)), state2.member173_, state2.member174_, 12);
+    engine.copyBytes(pointer(storedValue<AddressRef>(engine.field(pointer(self.address(state2.member62_)), 0, 12))), pointer(state2.member174_), word(integer(12)));
     if (!(state2.member71_ < 0))
     {
         engine.setPosition(integer(state2.member71_), SferaVec3F{memberView<float>(state2.member62_, 0), memberView<float>(state2.member62_, 4), memberView<float>(state2.member62_, 8)}, true);
@@ -8237,7 +8272,7 @@ std::int32_t ScriptHelpers::SetXYZRAD(Module &self, ScriptState2 &state2, std::i
     std::int32_t value1;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(self.address(state2.member64_)), state2.member175_, state2.member176_, 16);
+    engine.copyBytes(pointer(storedValue<AddressRef>(self.address(state2.member64_))), pointer(state2.member176_), word(integer(16)));
     return 0;
 }
 
@@ -8252,11 +8287,11 @@ std::int32_t ScriptHelpers::SetABG(Module &self, ScriptState2 &state2, ScriptSta
     float value3;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(self.address(state3.member179_)), state2.member177_, state2.member178_, 12);
+    engine.copyBytes(pointer(storedValue<AddressRef>(self.address(state3.member179_))), pointer(state2.member178_), word(integer(12)));
     if (!(state2.member71_ < 0))
     {
         engine.setRotation(integer(state2.member71_), SferaVec3F{memberView<float>(state3.member179_, 0), memberView<float>(state3.member179_, 4), memberView<float>(state3.member179_, 8)});
-        value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state2.member71_);
+        value1 = state2.member71_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state2.member71_)), false));
         if (value1 == 0)
         {
             goto branch2;
@@ -9379,7 +9414,7 @@ std::int32_t ScriptHelpers::GetPlName(Module &self, ScriptState2 &state2, Script
     value1 = state2.member360_;
     value2 = state2.member361_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state3.member66_)));
+    engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state3.member66_))));
     return 0;
 }
 
@@ -11779,7 +11814,7 @@ void MbcBank::GetBankMoney(std::int32_t parameter1, String parameter2)
     value1 = member680_;
     value2 = member681_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<String>(address(member486_)), 8);
+    engine.copyBytes(pointer(value2), pointer(storedValue<String>(address(member486_))), word(integer(8)));
     return;
 }
 
@@ -14983,9 +15018,8 @@ Task<void> MbcCobj::CycleReceive()
     value3 = engine.field(pointer(address(member945_)), 0, 12);
     if (const auto nativeVector = engine.objectPosition(integer(member942_)))
         setMemberView(member945_, 0, *nativeVector);
-    value3 = engine.field(pointer(address(member945_)), 12, 12);
-    value4 = engine.read<float>(engine.field(pointer(value3), 0, 4));
-    engine.invoke<void>(Builtin::ObjectRotation, member942_, storedValue<FloatRef>(engine.field(pointer(value3), 0, 4)));
+    if (const auto rotation = engine.objectRotation(integer(member942_)))
+        setMemberView(member945_, 12, *rotation);
     value4 = SferaNumeric::real32(double{real(member1022_)});
     member1034_ = SferaNumeric::real32(double(realBits(value4)) / double(realBits(real(member1019_))));
     member1019_ = integer(SferaNumeric::real32(double(realBits(real(member1018_))) * double(realBits(SferaNumeric::real32(double(realBits(real(member1027_))) - double(realBits(member1034_)))))));
@@ -20601,7 +20635,7 @@ Task<std::int32_t> MbcMain::__enumerate_processes()
     value2 = storedValue<Value>(co_await engine.call(*this, true, storedValue<String>(address(member1723_))));
     value1 = integerBits(engine.current.module->processId);
     co_await engine.call(*this, false, value2, 2, value1, storedValue<AddressRef>(address(member1713_)));
-    value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, member1711_, 0);
+    value1 = g_sfera_mbc_runtime.nextProcessByModule(word(integer(member1711_)), 0);
     member1715_ = value1;
     while (true)
     {
@@ -20648,7 +20682,7 @@ Task<std::int32_t> MbcMain::__enumerate_processes()
                 value1 = updated;
             }
         }
-        value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, member1711_, member1715_);
+        value1 = g_sfera_mbc_runtime.nextProcessByModule(word(integer(member1711_)), member1715_);
         member1715_ = value1;
         engine.checkpoint();
         continue;
@@ -21784,11 +21818,8 @@ Task<void> MbcMain::main()
     {
         engine.invoke<void>(Builtin::System, 72, storedValue<String>(address(member2051_)), storedValue<String>(address(member2052_)), 1);
     }
-    value5 = engine.invoke<String>(Builtin::AllocateMemory, 5000);
-    member1947_ = value5;
-    engine.fillBytes(pointer(member1947_), SferaNumeric::lowByte(-1), 5000u);
-    value4 = engine.invoke<Value>(Builtin::AllocateMemory, 108000);
-    member1903_ = storedValue<IntRef>(value4);
+    member1947_.fill(std::int8_t{-1});
+    member1903_.fill(0);
     engine.invoke<void>(Builtin::System, 47, 0);
     engine.invoke<void>(Builtin::Window, 15, 0);
     engine.invoke<void>(Builtin::Window, 16, 0);
@@ -21801,12 +21832,10 @@ Task<void> MbcMain::main()
         engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member2054_)), storedValue<String>(address(member1881_)));
     }
     value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    value4 = engine.invoke<Value>(Builtin::AllocateMemory, add32(value2, 2));
-    member1952_ = storedValue<String>(value4);
-    value5 = member1952_;
+    member1952_.assign(word(add32(value2, 2)), '\0');
     value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(value5)), word(value2));
-    member1865_ = member1952_;
+    g_sfera_config_text_runtime.copyTo(memberBytes(member1952_), word(value2));
+    member1865_ = reference<String>(member1952_);
     while (true)
     {
         engine.checkpoint();
@@ -21919,7 +21948,7 @@ Task<void> MbcMain::main()
             }
             if (!(value2 == 0))
             {
-                engine.setNamedValue(SferaText::terminated(memberBytes(member2059_, 0)), word(subtract32(member1865_, member1952_)), subtract32(member1856_, 4000));
+                engine.setNamedValue(SferaText::terminated(memberBytes(member2059_, 0)), word(subtract32(member1865_, reference<String>(member1952_))), subtract32(member1856_, 4000));
             }
         }
         goto branch58;
@@ -21991,7 +22020,7 @@ Task<void> MbcMain::main()
         }
         if (!(value2 == 0))
         {
-            engine.setNamedValue(SferaText::terminated(memberBytes(member2061_, 0)), word(subtract32(member1865_, member1952_)), integer(member1856_));
+            engine.setNamedValue(SferaText::terminated(memberBytes(member2061_, 0)), word(subtract32(member1865_, reference<String>(member1952_))), integer(member1856_));
             {
                 const auto previous = member1856_;
                 const auto updated = add32(previous, 1);
@@ -22068,7 +22097,7 @@ Task<void> MbcMain::main()
         }
         if (!(value2 == 0))
         {
-            engine.setNamedValue(SferaText::terminated(memberBytes(member2063_, 0)), word(subtract32(member1865_, member1952_)), integer(member1856_));
+            engine.setNamedValue(SferaText::terminated(memberBytes(member2063_, 0)), word(subtract32(member1865_, reference<String>(member1952_))), integer(member1856_));
             {
                 const auto previous = member1856_;
                 const auto updated = add32(previous, 1);
@@ -22145,7 +22174,7 @@ Task<void> MbcMain::main()
         }
         if (!(value2 == 0))
         {
-            engine.setNamedValue(SferaText::terminated(memberBytes(member2065_, 0)), word(subtract32(member1865_, member1952_)), integer(member1856_));
+            engine.setNamedValue(SferaText::terminated(memberBytes(member2065_, 0)), word(subtract32(member1865_, reference<String>(member1952_))), integer(member1856_));
             {
                 const auto previous = member1856_;
                 const auto updated = add32(previous, 1);
@@ -22222,7 +22251,7 @@ Task<void> MbcMain::main()
         }
         if (!(value2 == 0))
         {
-            engine.setNamedValue(SferaText::terminated(memberBytes(member2067_, 0)), word(subtract32(member1865_, member1952_)), integer(member1856_));
+            engine.setNamedValue(SferaText::terminated(memberBytes(member2067_, 0)), word(subtract32(member1865_, reference<String>(member1952_))), integer(member1856_));
             {
                 const auto previous = member1856_;
                 const auto updated = add32(previous, 1);
@@ -22299,7 +22328,7 @@ Task<void> MbcMain::main()
         }
         if (!(value2 == 0))
         {
-            engine.setNamedValue(SferaText::terminated(memberBytes(member2069_, 0)), word(subtract32(member1865_, member1952_)), integer(member1856_));
+            engine.setNamedValue(SferaText::terminated(memberBytes(member2069_, 0)), word(subtract32(member1865_, reference<String>(member1952_))), integer(member1856_));
             {
                 const auto previous = member1856_;
                 const auto updated = add32(previous, 1);
@@ -22361,7 +22390,7 @@ Task<void> MbcMain::main()
             }
             if (!(value2 == 0))
             {
-                engine.setNamedValue(SferaText::terminated(memberBytes(member2070_, 0)), word(subtract32(member1865_, member1952_)), integer(member1856_));
+                engine.setNamedValue(SferaText::terminated(memberBytes(member2070_, 0)), word(subtract32(member1865_, reference<String>(member1952_))), integer(member1856_));
                 {
                     const auto previous = member1856_;
                     const auto updated = add32(previous, 1);
@@ -22380,34 +22409,8 @@ Task<void> MbcMain::main()
         continue;
         break;
     }
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<Value>(address(member1954_)), 360000);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<Value>(address(member1955_)), 360000);
-    member1856_ = 0;
-    while (true)
-    {
-        engine.checkpoint();
-        if (member1856_ >= 30000)
-        {
-            break;
-        }
-        value2 = member1856_;
-        value7 = member1954_;
-        value5 = engine.read<String>(engine.element(pointer(value7), value2, 12, 0, false, 0, false));
-        engine.write(engine.element(pointer(value7), value2, 12, 0, false, 0, false), storedValue<String>(0), 12);
-        value2 = member1856_;
-        value7 = member1955_;
-        value5 = engine.read<String>(engine.element(pointer(value7), value2, 12, 0, false, 0, false));
-        engine.write(engine.element(pointer(value7), value2, 12, 0, false, 0, false), storedValue<String>(0), 12);
-        {
-            const auto previous = member1856_;
-            const auto updated = add32(previous, 1);
-            member1856_ = storedValue<std::int32_t>(updated);
-            value2 = updated;
-        }
-        engine.checkpoint();
-        continue;
-        break;
-    }
+    member1954_.assign(30000, String{});
+    member1955_.assign(30000, String{});
     member1856_ = 0;
     while (true)
     {
@@ -22460,12 +22463,10 @@ Task<void> MbcMain::main()
     else
     {
         value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-        value4 = engine.invoke<Value>(Builtin::AllocateMemory, add32(value2, 2));
-        member1953_ = storedValue<String>(value4);
-        value5 = member1953_;
+        member1953_.assign(word(add32(value2, 2)), '\0');
         value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-        g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(value5)), word(value2));
-        member1865_ = member1953_;
+        g_sfera_config_text_runtime.copyTo(memberBytes(member1953_), word(value2));
+        member1865_ = reference<String>(member1953_);
         while (true)
         {
             engine.checkpoint();
@@ -22603,7 +22604,7 @@ Task<void> MbcMain::main()
                     value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
                     value2 = std::int32_t(value2 != 47);
                 }
-                ScriptHelpers::sharedPart85(*this, value2, member1856_, member1857_, value3, std::span(member1924_), 2, value7, member1954_, value5, member1865_, value6, 2, 2);
+                ScriptHelpers::sharedPart85(*this, value2, member1856_, member1857_, value3, std::span(member1924_), 2, std::span(member1954_), value5, member1865_, value6, 2, 2);
                 goto branch247;
                 break;
             }
@@ -22723,7 +22724,7 @@ Task<void> MbcMain::main()
                     value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
                     value2 = std::int32_t(value2 != 47);
                 }
-                ScriptHelpers::sharedPart85(*this, value2, member1856_, member1857_, value3, std::span(member1926_), 2, value7, member1955_, value5, member1865_, value6, 2, 2);
+                ScriptHelpers::sharedPart85(*this, value2, member1856_, member1857_, value3, std::span(member1926_), 2, std::span(member1955_), value5, member1865_, value6, 2, 2);
                 goto branch290;
                 break;
             }
@@ -22747,12 +22748,10 @@ Task<void> MbcMain::main()
     else
     {
         value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-        value4 = engine.invoke<Value>(Builtin::AllocateMemory, add32(value2, 2));
-        member1963_ = storedValue<String>(value4);
-        value5 = member1963_;
+        member1963_.assign(word(add32(value2, 2)), '\0');
         value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-        g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(value5)), word(value2));
-        member1865_ = member1963_;
+        g_sfera_config_text_runtime.copyTo(memberBytes(member1963_), word(value2));
+        member1865_ = reference<String>(member1963_);
         while (true)
         {
             engine.checkpoint();
@@ -22890,7 +22889,7 @@ Task<void> MbcMain::main()
                     value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
                     value2 = std::int32_t(value2 != 47);
                 }
-                ScriptHelpers::sharedPart85(*this, value2, member1856_, member1857_, value3, std::span(member1924_), 1, value7, member1954_, value5, member1865_, value6, 1, 1);
+                ScriptHelpers::sharedPart85(*this, value2, member1856_, member1857_, value3, std::span(member1924_), 1, std::span(member1954_), value5, member1865_, value6, 1, 1);
                 goto branch270;
                 break;
             }
@@ -23010,7 +23009,7 @@ Task<void> MbcMain::main()
                     value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
                     value2 = std::int32_t(value2 != 47);
                 }
-                ScriptHelpers::sharedPart85(*this, value2, member1856_, member1857_, value3, std::span(member1926_), 1, value7, member1955_, value5, member1865_, value6, 1, 1);
+                ScriptHelpers::sharedPart85(*this, value2, member1856_, member1857_, value3, std::span(member1926_), 1, std::span(member1955_), value5, member1865_, value6, 1, 1);
                 goto branch315;
                 break;
             }
@@ -23029,19 +23028,12 @@ Task<void> MbcMain::main()
     value2 = 0;
     if (!(value2 == 0))
     {
-        value4 = engine.invoke<Value>(Builtin::AllocateMemory, 396000);
-        member1959_ = storedValue<String>(value4);
-        engine.invoke<void>(Builtin::AllocateDynamic, storedValue<Value>(address(member1958_)), 280800);
-        engine.fillBytes(pointer(member1958_), SferaNumeric::lowByte(0), 280800u);
-        engine.invoke<void>(Builtin::AllocateDynamic, storedValue<IntRefRef>(address(member1911_)), 4515000);
-        engine.fillBytes(pointer(member1911_), SferaNumeric::lowByte(0), 4515000u);
+        member1911_.assign(1128750, 0);
     }
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member1956_)), 2520000);
-    engine.fillBytes(pointer(member1956_), SferaNumeric::lowByte(0), 2520000u);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member1957_)), 218400);
-    engine.fillBytes(pointer(member1957_), SferaNumeric::lowByte(0), 218400u);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member1967_)), 20000);
-    engine.fillBytes(pointer(member1967_), SferaNumeric::lowByte(0), 20000u);
+    multiObjects_.assign(9000, MultiObject{});
+    multiObjectVariants_.assign(780, MultiObject{});
+    multiObjectVariantCounts_.fill(0);
+    effectDefinitions_.fill(EffectDefinition{});
     member2006_ = -1;
     member2007_ = 0;
     value2 = GetDir_ParamsCrc();
@@ -23073,16 +23065,16 @@ Task<void> MbcMain::main()
         {
             value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
             member1856_ = value2;
-            member1866_ = storedValue<String>(0);
-            engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member1866_)), add32(member1856_, 1));
-            if (!(integerBits(member1866_) == 0))
+            member1866_ = {};
+            member1866_.assign(word(add32(member1856_, 1)), '\0');
+            if (!member1866_.empty())
             {
                 g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(member1866_)), word(member1856_));
                 value2 = member1856_;
-                value5 = member1866_;
+                value5 = reference<String>(member1866_);
                 value3 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value5), value2, 1, 0, false, 0, false)));
                 engine.write(engine.element(pointer(value5), value2, 1, 0, false, 0, false), storedValue<std::int8_t>(0), 1);
-                member1865_ = member1866_;
+                member1865_ = reference<String>(member1866_);
                 while (true)
                 {
                     engine.checkpoint();
@@ -23102,486 +23094,182 @@ Task<void> MbcMain::main()
                     }
                     if (value2 == 0)
                     {
-                        if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(shifted(member1956_, multiply32(1, multiply32(member1858_, 280))))))) == 0))
-                        {
-                        }
                         helper99_1();
+                        auto currentToken = [&]()
+                        {
+                            const std::string remaining = engine.stringValue(pointer(member1865_));
+                            const auto tokenEnd = remaining.find_first_of(" \t\r\n");
+                            return remaining.substr(0, tokenEnd);
+                        };
+                        const auto modeFromToken = [](std::string_view token, std::size_t position)
+                        {
+                            if (position >= token.size())
+                            {
+                                return MultiObjectMode::None;
+                            }
+                            switch (token[position])
+                            {
+                            case 69:
+                                return MultiObjectMode::E;
+                            case 82:
+                                return MultiObjectMode::R;
+                            case 83:
+                                return MultiObjectMode::S;
+                            case 78:
+                                return MultiObjectMode::N;
+                            case 85:
+                                return MultiObjectMode::U;
+                            default:
+                                return MultiObjectMode::None;
+                            }
+                        };
+                        auto parseResource = [&](std::string &resource, std::string &qualifier)
+                        {
+                            const std::string token = currentToken();
+                            if (token.size() >= 4 && token.front() == '@')
+                            {
+                                qualifier = token.substr(1, 2);
+                                resource = token.substr(4);
+                            }
+                            else
+                            {
+                                qualifier.clear();
+                                resource = token;
+                            }
+                            helper99_1();
+                        };
+                        MultiObject *record = nullptr;
                         if (member1863_ == 0)
                         {
-                            member1867_ = shifted(member1956_, multiply32(1, multiply32(280, member1858_)));
-                            member1868_ = member1867_;
-                            if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1868_)))) == 0))
-                            {
-                                (void)SferaText::terminated(memberBytes(member2096_));
-                                (void)(member1858_);
-                                (void)SferaText::terminated(memberBytes(member2097_));
-                            }
-                            SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2098_)), {engine.buffer(pointer(member1867_))});
-                            member1867_ = shifted(member1867_, 20);
+                            record = &multiObjects_[std::size_t{word(member1858_)}];
+                            *record = MultiObject{};
+                            record->script = currentToken();
                             helper99_1();
-                            branch322: ;
-                            if (std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 64)
-                            {
-                                SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2100_)), {engine.buffer(pointer(member1867_))});
-                                member1867_ = shifted(member1867_, 20);
-                                helper99_1();
-                            }
-                            else
-                            {
-                                engine.copyBytes(pointer(shifted(member1867_, 18)), pointer(shifted(member1865_, 1)), 2u);
-                                SferaText::scan(engine.stringValue(pointer(shifted(member1865_, 4))), SferaText::terminated(memberBytes(member2099_)), {engine.buffer(pointer(member1867_))});
-                                member1867_ = shifted(member1867_, 20);
-                                helper99_1();
-                            }
-                            if (std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 64)
-                            {
-                                SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2102_)), {engine.buffer(pointer(member1867_))});
-                                member1867_ = shifted(member1867_, 20);
-                                helper99_1();
-                            }
-                            else
-                            {
-                                engine.copyBytes(pointer(shifted(member1867_, 18)), pointer(shifted(member1865_, 1)), 2u);
-                                SferaText::scan(engine.stringValue(pointer(shifted(member1865_, 4))), SferaText::terminated(memberBytes(member2101_)), {engine.buffer(pointer(member1867_))});
-                                member1867_ = shifted(member1867_, 20);
-                                helper99_1();
-                            }
-                            member1864_ = storedValue<IntRef>(member1867_);
-                            member1856_ = 0;
-                            while (true)
-                            {
-                                engine.checkpoint();
-                                if (member1856_ >= 44)
-                                {
-                                    break;
-                                }
-                                member1857_ = 0;
-                                SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2103_)), {memberBytes(member1857_)});
-                                value6 = member1864_;
-                                value2 = engine.read<std::int32_t>(engine.indirect(payload(value6)));
-                                engine.write(engine.indirect(payload(value6)), member1857_, 4);
-                                {
-                                    const auto previous = member1864_;
-                                    const auto updated = shifted(previous, 4);
-                                    setMemberView(member1864_, 0, storedValue<std::int32_t>(updated));
-                                    value6 = updated;
-                                }
-                                helper99_1();
-                                {
-                                    const auto previous = member1856_;
-                                    const auto updated = add32(previous, 1);
-                                    member1856_ = storedValue<std::int32_t>(updated);
-                                    value2 = updated;
-                                }
-                                engine.checkpoint();
-                                continue;
-                                break;
-                            }
-                            value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                            if (value2 < 48)
-                            {
-                                value2 = std::int32_t(value2 >= 48);
-                            }
-                            else
-                            {
-                                value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                value2 = std::int32_t(value2 <= 57);
-                            }
-                            if (value2 == 0)
-                            {
-                                member1867_ = storedValue<String>(member1864_);
-                                SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2105_)), {engine.buffer(pointer(member1867_))});
-                                {
-                                    const auto previous = member1864_;
-                                    const auto updated = shifted(previous, 4);
-                                    setMemberView(member1864_, 0, storedValue<std::int32_t>(updated));
-                                    value6 = updated;
-                                }
-                                helper99_1();
-                            }
-                            else
-                            {
-                                member1857_ = 0;
-                                SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2104_)), {memberBytes(member1857_)});
-                                value6 = member1864_;
-                                value2 = engine.read<std::int32_t>(engine.indirect(payload(value6)));
-                                engine.write(engine.indirect(payload(value6)), member1857_, 4);
-                                {
-                                    const auto previous = member1864_;
-                                    const auto updated = shifted(previous, 4);
-                                    setMemberView(member1864_, 0, storedValue<std::int32_t>(updated));
-                                    value6 = updated;
-                                }
-                                helper99_1();
-                            }
-                            member1862_ = engine.read<std::int32_t>(engine.element(pointer(member1864_), -13, 4, 0, false, 0, false));
-                            member1867_ = storedValue<String>(member1864_);
-                            value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                            if (value2 > 32)
-                            {
-                                value2 = std::int32_t(value2 > 32);
-                            }
-                            else
-                            {
-                                value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                value2 = std::int32_t(value2 < 0);
-                            }
-                            if (!(value2 == 0))
-                            {
-                                value2 = member1858_;
-                                if (value2 < 1000)
-                                {
-                                    value2 = std::int32_t(value2 >= 1000);
-                                }
-                                else
-                                {
-                                    value2 = member1858_;
-                                    value2 = std::int32_t(value2 < 1500);
-                                }
-                                if (value2 == 0)
-                                {
-                                    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                    if (value2 == 84)
-                                    {
-                                        value2 = std::int32_t(value2 == 84);
-                                    }
-                                    else
-                                    {
-                                        value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                        value2 = std::int32_t(value2 == 68);
-                                    }
-                                    if (value2 == 0)
-                                    {
-                                        value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                        if (value2 == 85)
-                                        {
-                                            if (!(value2 != 85))
-                                            {
-                                                branch384: ;
-                                                engine.copyBytes(pointer(member1867_), pointer(member1865_), 4u);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            value2 = member1863_;
-                                            if (!(value2 == 0))
-                                            {
-                                                goto branch384;
-                                            }
-                                        }
-                                        branch383: ;
-                                        helper99_1();
-                                    }
-                                    else
-                                    {
-                                        engine.copyBytes(pointer(member1867_), pointer(member1865_), 4u);
-                                        value2 = 0;
-                                        if (value2 == 0)
-                                        {
-                                            goto branch383;
-                                        }
-                                        if (std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 84)
-                                        {
-                                            member1859_ = 0;
-                                        }
-                                        else
-                                        {
-                                            member1859_ = 1;
-                                        }
-                                        {
-                                            const auto previous = member1865_;
-                                            const auto updated = shifted(previous, 1);
-                                            setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-                                            value5 = updated;
-                                        }
-                                        if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 69))
-                                        {
-                                            member1857_ = 1;
-                                            goto branch400;
-                                        }
-                                        if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 82))
-                                        {
-                                            member1857_ = 2;
-                                            goto branch400;
-                                        }
-                                        if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 83))
-                                        {
-                                            member1857_ = 3;
-                                            goto branch400;
-                                        }
-                                        if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 78))
-                                        {
-                                            goto branch383;
-                                        }
-                                        member1857_ = 0;
-                                        branch400: ;
-                                        {
-                                            const auto previous = member1865_;
-                                            const auto updated = shifted(previous, 1);
-                                            setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-                                            value5 = updated;
-                                        }
-                                        if (member1862_ <= 2)
-                                        {
-                                            value5 = member1959_;
-                                            value2 = member1898_[13];
-                                            member1869_ = shifted(value5, multiply32(1, multiply32(40, value2)));
-                                            engine.invoke<void>(Builtin::FormatText, shifted(value5, multiply32(1, multiply32(40, value2))), storedValue<String>(address(member2108_)), member1858_, member1868_);
-                                        }
-                                        else
-                                        {
-                                            value5 = member1959_;
-                                            value2 = member1898_[13];
-                                            member1869_ = shifted(value5, multiply32(1, multiply32(40, value2)));
-                                            engine.invoke<void>(Builtin::FormatText, shifted(value5, multiply32(1, multiply32(40, value2))), storedValue<String>(address(member2107_)), member1858_, member1868_);
-                                        }
-                                        member1860_ = 0;
-                                        SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2109_)), {memberBytes(member1860_)});
-                                        if (std::int32_t(engine.read<std::int8_t>(engine.element(pointer(member1865_), 2, 1, 0, false, 0, false))) != 62)
-                                        {
-                                            member1861_ = member1860_;
-                                        }
-                                        else
-                                        {
-                                            {
-                                                const auto previous = member1865_;
-                                                const auto updated = shifted(previous, 1);
-                                                setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-                                                value5 = updated;
-                                            }
-                                            member1861_ = 14;
-                                        }
-                                        
-                                        while (true)
-                                        {
-                                            engine.checkpoint();
-                                            if (member1860_ > member1861_)
-                                            {
-                                                break;
-                                            }
-                                            if (member1859_ == 0)
-                                            {
-                                                if (engine.read<std::int32_t>(engine.element(pointer(storedValue<IntRef>(engine.element(pointer(address(member1926_)), member1860_, 16, 15, true, 240, true))), member1857_, 4, -4, false, 0, true)) >= memberView<std::int32_t>(member1932_, (std::size_t{4} * word(engine.elementIndex(member1857_, -4, true)))))
-                                                {
-                                                    engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member2111_)), member1858_, member1868_, member1857_, member1857_);
-                                                }
-                                                else
-                                                {
-                                                    value2 = member1860_;
-                                                    value3 = engine.read<std::int32_t>(engine.element(pointer(storedValue<IntRef>(engine.element(pointer(address(member1926_)), member1860_, 16, 15, true, 240, true))), member1857_, 4, -4, false, 0, true));
-                                                    value7 = member1955_;
-                                                    value5 = engine.read<String>(engine.element(pointer(value7), add32(multiply32(value2, 2000), value3), 12, 0, false, 0, false));
-                                                    engine.write(engine.element(pointer(value7), add32(multiply32(value2, 2000), value3), 12, 0, false, 0, false), member1869_, 12);
-                                                    value2 = member1857_;
-                                                    value6 = storedValue<IntRef>(engine.element(pointer(address(member1926_)), member1860_, 16, 15, true, 240, true));
-                                                    {
-                                                        const auto previous = engine.read<std::int32_t>(engine.element(pointer(value6), value2, 4, -4, false, 0, true));
-                                                        const auto updated = add32(previous, 1);
-                                                        engine.write(engine.element(pointer(value6), value2, 4, -4, false, 0, true), storedValue<std::int32_t>(updated), 4);
-                                                        value2 = updated;
-                                                    }
-                                                    {
-                                                        const auto previous = member1898_[13];
-                                                        const auto updated = add32(previous, 1);
-                                                        member1898_[13] = storedValue<std::int32_t>(updated);
-                                                        value2 = updated;
-                                                    }
-                                                }
-                                            }
-                                            else
-                                            {
-                                                if (engine.read<std::int32_t>(engine.element(pointer(storedValue<IntRef>(engine.element(pointer(address(member1924_)), member1860_, 16, 15, true, 240, true))), member1857_, 4, -4, false, 0, true)) >= memberView<std::int32_t>(member1932_, (std::size_t{4} * word(engine.elementIndex(member1857_, -4, true)))))
-                                                {
-                                                    engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member2110_)), member1858_, member1868_, member1857_, member1857_);
-                                                }
-                                                else
-                                                {
-                                                    value2 = member1860_;
-                                                    value3 = engine.read<std::int32_t>(engine.element(pointer(storedValue<IntRef>(engine.element(pointer(address(member1924_)), member1860_, 16, 15, true, 240, true))), member1857_, 4, -4, false, 0, true));
-                                                    value7 = member1954_;
-                                                    value5 = engine.read<String>(engine.element(pointer(value7), add32(multiply32(value2, 2000), value3), 12, 0, false, 0, false));
-                                                    engine.write(engine.element(pointer(value7), add32(multiply32(value2, 2000), value3), 12, 0, false, 0, false), member1869_, 12);
-                                                    value2 = member1857_;
-                                                    value6 = storedValue<IntRef>(engine.element(pointer(address(member1924_)), member1860_, 16, 15, true, 240, true));
-                                                    {
-                                                        const auto previous = engine.read<std::int32_t>(engine.element(pointer(value6), value2, 4, -4, false, 0, true));
-                                                        const auto updated = add32(previous, 1);
-                                                        engine.write(engine.element(pointer(value6), value2, 4, -4, false, 0, true), storedValue<std::int32_t>(updated), 4);
-                                                        value2 = updated;
-                                                    }
-                                                    {
-                                                        const auto previous = member1898_[13];
-                                                        const auto updated = add32(previous, 1);
-                                                        member1898_[13] = storedValue<std::int32_t>(updated);
-                                                        value2 = updated;
-                                                    }
-                                                }
-                                            }
-                                            {
-                                                const auto previous = member1860_;
-                                                const auto updated = add32(previous, 1);
-                                                member1860_ = storedValue<std::int32_t>(updated);
-                                                value2 = updated;
-                                            }
-                                            engine.checkpoint();
-                                            continue;
-                                            break;
-                                        }
-                                        {
-                                            const auto previous = member1860_;
-                                            const auto updated = subtract32(previous, 1);
-                                            member1860_ = storedValue<std::int32_t>(updated);
-                                            value2 = updated;
-                                        }
-                                        value2 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(member1865_), 2, 1, 0, false, 0, false)));
-                                        member1857_ = value2;
-                                        if (value2 <= 32)
-                                        {
-                                            goto branch383;
-                                        }
-                                        member1857_ = subtract32(member1857_, 97);
-                                        value2 = member1857_;
-                                        if (value2 < 0)
-                                        {
-                                            value2 = std::int32_t(value2 >= 0);
-                                        }
-                                        else
-                                        {
-                                            value2 = member1857_;
-                                            value2 = std::int32_t(value2 < 26);
-                                        }
-                                        if (value2 == 0)
-                                        {
-                                            goto branch383;
-                                        }
-                                        if (engine.read<std::int32_t>(engine.element(pointer(storedValue<IntRef>(engine.element(pointer(address(member1928_)), member1860_, 104, 15, true, 1560, true))), member1857_, 4, -26, false, 0, true)) >= 60)
-                                        {
-                                            goto branch383;
-                                        }
-                                        value2 = member1860_;
-                                        value3 = member1857_;
-                                        value8 = engine.read<std::int32_t>(engine.element(pointer(storedValue<IntRef>(engine.element(pointer(address(member1928_)), member1860_, 104, 15, true, 1560, true))), member1857_, 4, -26, false, 0, true));
-                                        value7 = member1958_;
-                                        value5 = engine.read<String>(engine.element(pointer(value7), add32(add32(multiply32(multiply32(value2, 60), 26), multiply32(value3, 60)), value8), 12, 0, false, 0, false));
-                                        engine.write(engine.element(pointer(value7), add32(add32(multiply32(multiply32(value2, 60), 26), multiply32(value3, 60)), value8), 12, 0, false, 0, false), member1869_, 12);
-                                        value2 = member1857_;
-                                        value6 = storedValue<IntRef>(engine.element(pointer(address(member1928_)), member1860_, 104, 15, true, 1560, true));
-                                        {
-                                            const auto previous = engine.read<std::int32_t>(engine.element(pointer(value6), value2, 4, -26, false, 0, true));
-                                            const auto updated = add32(previous, 1);
-                                            engine.write(engine.element(pointer(value6), value2, 4, -26, false, 0, true), storedValue<std::int32_t>(updated), 4);
-                                            value2 = updated;
-                                        }
-                                        helper99_1();
-                                    }
-                                }
-                                else
-                                {
-                                    SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2106_)), {engine.buffer(pointer(member1867_))});
-                                    helper99_1();
-                                }
-                            }
-                            member1867_ = storedValue<String>(shifted(member1864_, 4));
-                            member1857_ = 0;
-                            member1860_ = 0;
-                            while (true)
-                            {
-                                engine.checkpoint();
-                                value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                if (value2 > 32)
-                                {
-                                    value2 = std::int32_t(value2 > 32);
-                                }
-                                else
-                                {
-                                    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                    value2 = std::int32_t(value2 < 0);
-                                }
-                                if (value2 == 0)
-                                {
-                                    goto branch361;
-                                }
-                                if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 45))
-                                {
-                                    member1860_ = 1;
-                                    goto branch374;
-                                }
-                                if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 43))
-                                {
-                                    goto branch373;
-                                }
-                                if (member1860_ == 0)
-                                {
-                                    value2 = member1857_;
-                                    value5 = member1867_;
-                                    value3 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value5), value2, 1, 0, false, 0, false)));
-                                    engine.write(engine.element(pointer(value5), value2, 1, 0, false, 0, false), storedValue<std::int8_t>(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))))), 1);
-                                    {
-                                        const auto previous = member1857_;
-                                        const auto updated = add32(previous, 1);
-                                        member1857_ = storedValue<std::int32_t>(updated);
-                                        value2 = updated;
-                                    }
-                                }
-                                else
-                                {
-                                    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                    if (value2 > 90)
-                                    {
-                                        value2 = std::int32_t(value2 <= 90);
-                                    }
-                                    else
-                                    {
-                                        value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                        value2 = std::int32_t(value2 >= 65);
-                                    }
-                                    if (!(value2 == 0))
-                                    {
-                                        value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                        value5 = member1867_;
-                                        value3 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value5), add32(8, subtract32(value2, 65)), 1, 0, false, 0, false)));
-                                        engine.write(engine.element(pointer(value5), add32(8, subtract32(value2, 65)), 1, 0, false, 0, false), storedValue<std::int8_t>(1), 1);
-                                    }
-                                }
-                                branch374: ;
-                                {
-                                    const auto previous = member1865_;
-                                    const auto updated = shifted(previous, 1);
-                                    setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-                                    value5 = updated;
-                                }
-                                engine.checkpoint();
-                                continue;
-                                goto branch361;
-                            }
                         }
                         else
                         {
-                            member1856_ = subtract32(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))), 65);
-                            value2 = member1856_;
-                            if (value2 < 0)
+                            const std::string groupToken = currentToken();
+                            if (!groupToken.empty())
                             {
-                                value2 = std::int32_t(value2 < 0);
-                            }
-                            else
-                            {
-                                value2 = member1856_;
-                                value2 = std::int32_t(value2 >= 26);
-                            }
-                            if (value2 == 0)
-                            {
-                                member1867_ = shifted(member1957_, multiply32(1, multiply32(280, add32(member1858_, multiply32(member1856_, 30)))));
-                                member1868_ = member1867_;
-                                member1867_ = shifted(member1867_, 20);
-                                helper99_1();
-                                value2 = member1856_;
+                                const auto group = std::int32_t(groupToken.front()) - 'A';
+                                if (group >= 0 && group < 26)
                                 {
-                                    const auto previous = std::int32_t(memberView<std::int8_t>(member1961_, (std::size_t{1} * word(engine.elementIndex(value2, -26, true)))));
-                                    const auto updated = add32(previous, 1);
-                                    setMemberView(member1961_, (std::size_t{1} * word(engine.elementIndex(value2, -26, true))), storedValue<std::int8_t>(updated));
-                                    value2 = updated;
+                                    record = &multiObjectVariants_[std::size_t{word(add32(member1858_, multiply32(group, 30)))}];
+                                    *record = MultiObject{};
+                                    helper99_1();
+                                    ++multiObjectVariantCounts_.begin()[group];
                                 }
-                                goto branch322;
+                            }
+                        }
+                        if (record != nullptr)
+                        {
+                            parseResource(record->primaryResource, record->primaryQualifier);
+                            parseResource(record->secondaryResource, record->secondaryQualifier);
+                            const auto parseParameter = [&](std::int32_t &parameter)
+                            {
+                                parameter = 0;
+                                const std::string token = currentToken();
+                                SferaText::readNumber<int>(token, parameter);
+                                helper99_1();
+                            };
+                            parseParameter(record->parameters.mergeMode);
+                            parseParameter(record->parameters.primaryScale);
+                            for (auto &parameter : record->parameters.fixedValues)
+                                parseParameter(parameter);
+                            for (auto &parameter : record->parameters.conditionalScaledValues)
+                                parseParameter(parameter);
+                            for (auto &parameter : record->parameters.coreValues)
+                                parseParameter(parameter);
+                            for (auto &parameter : record->parameters.scaledModifiers)
+                                parseParameter(parameter);
+                            for (auto &parameter : record->parameters.percentageModifiers)
+                                parseParameter(parameter);
+                            parseParameter(record->parameters.additiveModifier);
+                            for (auto &parameter : record->parameters.percentageAdjustments)
+                                parseParameter(parameter);
+                            for (auto &parameter : record->parameters.overrides)
+                                parseParameter(parameter);
+                            parseParameter(record->parameters.durationUnits);
+                            parseParameter(record->parameters.runtimeValue);
+                            parseParameter(record->parameters.interactionArgument);
+                            parseParameter(record->parameters.auxiliaryArgument);
+                            parseParameter(record->parameters.effectId);
+                            const std::string selector = currentToken();
+                            if (!selector.empty())
+                            {
+                                if (selector.front() >= '0' && selector.front() <= '9')
+                                {
+                                    std::int32_t numeric{};
+                                    if (SferaText::readNumber<int>(selector, numeric))
+                                    {
+                                        record->numericSelector = numeric;
+                                    }
+                                }
+                                else
+                                {
+                                    record->textSelector = selector;
+                                }
+                                helper99_1();
+                            }
+                            const std::string modeToken = currentToken();
+                            if (!modeToken.empty())
+                            {
+                                record->variantMode = modeFromToken(modeToken, 0);
+                                record->resolvedMode = modeFromToken(modeToken, 1);
+                                if (modeToken.size() > 2)
+                                {
+                                    std::int32_t scale{};
+                                    if (SferaText::readNumber<int>(std::string_view(modeToken).substr(2), scale))
+                                    {
+                                        record->scale = scale;
+                                    }
+                                }
+                                helper99_1();
+                            }
+                            std::string tail = engine.stringValue(pointer(member1865_));
+                            const auto lineEnd = tail.find_first_of("\r\n");
+                            tail.resize(std::min(tail.size(), lineEnd));
+                            bool readingFlags = false;
+                            for (std::size_t index = 0; index < tail.size(); ++index)
+                            {
+                                if (tail[index] == '-')
+                                {
+                                    readingFlags = true;
+                                    continue;
+                                }
+                                if (tail[index] == '+')
+                                {
+                                    if (index + 1 < tail.size())
+                                    {
+                                        record->modifierCode = tail[index + 1];
+                                    }
+                                    if (index + 2 < tail.size())
+                                    {
+                                        if (tail[index + 2] >= '0' && tail[index + 2] <= '5')
+                                        {
+                                            record->modifierLevel = tail[index + 2] - '0';
+                                        }
+                                    }
+                                    break;
+                                }
+                                if (readingFlags)
+                                {
+                                    if (tail[index] >= 'A' && tail[index] <= 'Z')
+                                    {
+                                        record->flags.begin()[tail[index] - 'A'] = true;
+                                    }
+                                }
+                                else
+                                {
+                                    record->attributes.append(tail, index, 1);
+                                }
+                            }
+                            if (!record->attributes.empty())
+                            {
+                                if (record->attributes.front() >= 'A' && record->attributes.front() <= 'Z')
+                                {
+                                    record->group = record->attributes.front() - 'A';
+                                }
                             }
                         }
                     }
@@ -23627,7 +23315,7 @@ Task<void> MbcMain::main()
                     continue;
                 }
             }
-            engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(address(member1866_)));
+            member1866_ = {};
         }
         {
             g_sfera_mbc_runtime.checkEngineFailure();
@@ -23650,16 +23338,16 @@ Task<void> MbcMain::main()
     {
         value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
         member1856_ = value2;
-        member1866_ = storedValue<String>(0);
-        engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member1866_)), add32(member1856_, 1));
-        if (!(integerBits(member1866_) == 0))
+        member1866_ = {};
+        member1866_.assign(word(add32(member1856_, 1)), '\0');
+        if (!member1866_.empty())
         {
             g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(member1866_)), word(member1856_));
             value2 = member1856_;
-            value5 = member1866_;
+            value5 = reference<String>(member1866_);
             value3 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value5), value2, 1, 0, false, 0, false)));
             engine.write(engine.element(pointer(value5), value2, 1, 0, false, 0, false), storedValue<std::int8_t>(0), 1);
-            member1865_ = member1866_;
+            member1865_ = reference<String>(member1866_);
             while (true)
             {
                 engine.checkpoint();
@@ -23680,53 +23368,21 @@ Task<void> MbcMain::main()
                 if (value2 == 0)
                 {
                     helper99_1();
-                    member1867_ = shifted(member1967_, multiply32(1, multiply32(40, member1858_)));
-                    member1864_ = storedValue<IntRef>(member1867_);
-                    member1856_ = 0;
-                    while (true)
+                    auto &effect = effectDefinitions_[std::size_t{word(member1858_)}];
+                    const auto parseEffectValue = [&](std::int32_t &value)
                     {
-                        engine.checkpoint();
-                        if (member1856_ >= 5)
-                        {
-                            break;
-                        }
-                        member1857_ = 0;
-                        SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2114_)), {memberBytes(member1857_)});
-                        value6 = member1864_;
-                        value2 = engine.read<std::int32_t>(engine.indirect(payload(value6)));
-                        engine.write(engine.indirect(payload(value6)), member1857_, 4);
-                        {
-                            const auto previous = member1864_;
-                            const auto updated = shifted(previous, 4);
-                            setMemberView(member1864_, 0, storedValue<std::int32_t>(updated));
-                            value6 = updated;
-                        }
+                        value = 0;
+                        SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2114_)), {memberBytes(value)});
                         helper99_1();
-                        {
-                            const auto previous = member1856_;
-                            const auto updated = add32(previous, 1);
-                            member1856_ = storedValue<std::int32_t>(updated);
-                            value2 = updated;
-                        }
-                        engine.checkpoint();
-                        continue;
-                        break;
-                    }
-                    member1867_ = storedValue<String>(member1864_);
-                    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                    if (value2 > 32)
-                    {
-                        value2 = std::int32_t(value2 > 32);
-                    }
-                    else
-                    {
-                        value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                        value2 = std::int32_t(value2 < 0);
-                    }
-                    if (!(value2 == 0))
-                    {
-                        SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2115_)), {engine.buffer(pointer(member1867_))});
-                    }
+                    };
+                    parseEffectValue(effect.projectileEffectId);
+                    parseEffectValue(effect.sourceEffectId);
+                    parseEffectValue(effect.impactEffectId);
+                    parseEffectValue(effect.targetEffectId);
+                    parseEffectValue(effect.travelDurationPercent);
+                    const std::string remaining = engine.stringValue(pointer(member1865_));
+                    const auto nameEnd = remaining.find_first_of(" \t\r\n");
+                    effect.projectileResource = remaining.substr(0, nameEnd);
                 }
                 while (true)
                 {
@@ -23769,7 +23425,7 @@ Task<void> MbcMain::main()
                 continue;
             }
         }
-        engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(address(member1866_)));
+        member1866_ = {};
     }
     value2 = (g_sfera_config_text_runtime.load(SferaText::terminated(memberBytes(member2118_))) ? 0 : -1);
     if (value2 != 0)
@@ -23778,108 +23434,28 @@ Task<void> MbcMain::main()
     }
     else
     {
-        engine.invoke<void>(Builtin::AllocateDynamic, storedValue<Value>(address(member1968_)), 13200);
-        engine.fillBytes(pointer(member1968_), SferaNumeric::lowByte(0), 13200u);
-        value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-        engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member1969_)), add32(value2, 2));
-        value5 = member1969_;
-        value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-        engine.fillBytes(pointer(value5), SferaNumeric::lowByte(0), word(integer(add32(value2, 2))));
-        value5 = member1969_;
-        value2 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-        g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(value5)), word(value2));
-        member1865_ = member1969_;
-        while (true)
+        indexedConfigurations_.assign(1100, std::string{});
+        const std::string source = g_sfera_config_text_runtime.text();
+        std::size_t marker = source.find("\n#");
+        while (marker != std::string::npos)
         {
-            engine.checkpoint();
-            if (std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) == 0)
-            {
+            const auto headerBegin = marker + 2;
+            const auto headerEnd = source.find('\n', headerBegin);
+            if (headerEnd == std::string::npos)
                 break;
-            }
-            if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 10))
+
+            std::int32_t index = -1;
+            if (SferaText::readNumber<int>(std::string_view(source).substr(headerBegin, headerEnd - headerBegin), index) &&
+                index >= 0 && std::cmp_less(index, indexedConfigurations_.size()))
             {
-                {
-                    const auto previous = member1865_;
-                    const auto updated = shifted(previous, 1);
-                    setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-                    value5 = updated;
-                }
-                if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 35))
-                {
-                    value5 = member1865_;
-                    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(value5))));
-                    engine.write(engine.indirect(payload(value5)), storedValue<std::int8_t>(0), 1);
-                    {
-                        const auto previous = member1865_;
-                        const auto updated = shifted(previous, 1);
-                        setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-                        value5 = updated;
-                    }
-                    member1857_ = -1;
-                    SferaText::scan(engine.stringValue(pointer(member1865_)), SferaText::terminated(memberBytes(member2119_)), {memberBytes(member1857_)});
-                    value2 = member1857_;
-                    if (value2 < 0)
-                    {
-                        value2 = std::int32_t(value2 >= 0);
-                    }
-                    else
-                    {
-                        value2 = member1857_;
-                        value2 = std::int32_t(value2 < 1100);
-                    }
-                    if (!(value2 == 0))
-                    {
-                        while (true)
-                        {
-                            engine.checkpoint();
-                            value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                            if (value2 == 0)
-                            {
-                                value2 = std::int32_t(value2 != 0);
-                            }
-                            else
-                            {
-                                value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-                                value2 = std::int32_t(value2 != 10);
-                            }
-                            if (value2 == 0)
-                            {
-                                break;
-                            }
-                            {
-                                const auto previous = member1865_;
-                                const auto updated = shifted(previous, 1);
-                                setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-                                value5 = updated;
-                            }
-                            engine.checkpoint();
-                            continue;
-                            break;
-                        }
-                        if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))) != 10))
-                        {
-                            {
-                                const auto previous = member1865_;
-                                const auto updated = shifted(previous, 1);
-                                setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-                                value5 = updated;
-                            }
-                        }
-                        value2 = member1857_;
-                        value7 = member1968_;
-                        value5 = engine.read<String>(engine.element(pointer(value7), value2, 12, 0, false, 0, false));
-                        engine.write(engine.element(pointer(value7), value2, 12, 0, false, 0, false), member1865_, 12);
-                    }
-                }
+                const auto contentBegin = headerEnd + 1;
+                const auto nextMarker = source.find("\n#", contentBegin);
+                const auto contentEnd = nextMarker == std::string::npos ? source.size() : nextMarker + 1;
+                indexedConfigurations_.begin()[index] = source.substr(contentBegin, contentEnd - contentBegin);
             }
-            {
-                const auto previous = member1865_;
-                const auto updated = shifted(previous, 1);
-                setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
+
+            marker = source.find("\n#", headerEnd + 1);
             engine.checkpoint();
-            continue;
         }
     }
     value2 = 0;
@@ -23928,210 +23504,7 @@ Task<void> MbcMain::main()
     branch326: ;
     member1865_ = shifted(member1865_, multiply32(1, member1854_));
     goto branch286;
-    branch361: ;
-    value2 = 0;
-    if (!(value2 == 0))
-    {
-        value2 = member1858_;
-        if (value2 < 1000)
-        {
-            value2 = std::int32_t(value2 >= 1000);
-        }
-        else
-        {
-            value2 = member1858_;
-            value2 = std::int32_t(value2 < 1500);
-        }
-        if (!(value2 == 0))
-        {
-            member1864_ = storedValue<IntRef>(shifted(member1868_, 72));
-            member1856_ = engine.read<std::int32_t>(engine.indirect(payload(member1864_)));
-            while (true)
-            {
-                engine.checkpoint();
-                if (member1856_ > engine.read<std::int32_t>(engine.indirect(payload(shifted(member1864_, 4)))))
-                {
-                    break;
-                }
-                value2 = member1856_;
-                if (value2 < 0)
-                {
-                    value2 = std::int32_t(value2 >= 0);
-                }
-                else
-                {
-                    value2 = member1856_;
-                    value2 = std::int32_t(value2 < 250);
-                }
-                if (!(value2 == 0))
-                {
-                    member1859_ = 0;
-                    while (true)
-                    {
-                        engine.checkpoint();
-                        if (member1859_ >= 4)
-                        {
-                            break;
-                        }
-                        member1857_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(member1868_), add32(240, member1859_), 1, 0, false, 0, false)));
-                        if (!(member1857_ != 80))
-                        {
-                            member1857_ = 0;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 77))
-                        {
-                            member1857_ = 1;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 70))
-                        {
-                            member1857_ = 2;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 68))
-                        {
-                            member1857_ = 3;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 87))
-                        {
-                            member1857_ = 4;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 84))
-                        {
-                            member1857_ = 5;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 72))
-                        {
-                            member1857_ = 6;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 66))
-                        {
-                            member1857_ = 7;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 67))
-                        {
-                            member1857_ = 8;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 73))
-                        {
-                            member1857_ = 9;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 78))
-                        {
-                            member1857_ = 10;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 82))
-                        {
-                            member1857_ = 11;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 76))
-                        {
-                            member1857_ = 12;
-                            goto branch418;
-                        }
-                        if (!(member1857_ != 83))
-                        {
-                            member1857_ = 13;
-                            goto branch418;
-                        }
-                        if (member1857_ != 85)
-                        {
-                            break;
-                        }
-                        member1857_ = 14;
-                        branch418: ;
-                        member1860_ = engine.read<std::int32_t>(engine.element(pointer(member1911_), add32(multiply32(multiply32(member1856_, 15), 300), multiply32(member1857_, 300)), 4, 0, false, 0, false));
-                        if (!(member1860_ >= 300))
-                        {
-                            {
-                                const auto previous = member1860_;
-                                const auto updated = add32(previous, 1);
-                                member1860_ = storedValue<std::int32_t>(updated);
-                                value2 = updated;
-                            }
-                            if (!(add32(multiply32(multiply32(member1856_, 15), 300), multiply32(member1857_, 300)) >= 4515000))
-                            {
-                                value2 = member1856_;
-                                value3 = member1857_;
-                                value6 = member1911_;
-                                value8 = engine.read<std::int32_t>(engine.element(pointer(value6), add32(multiply32(multiply32(value2, 15), 300), multiply32(value3, 300)), 4, 0, false, 0, false));
-                                engine.write(engine.element(pointer(value6), add32(multiply32(multiply32(value2, 15), 300), multiply32(value3, 300)), 4, 0, false, 0, false), member1860_, 4);
-                            }
-                            if (!(add32(add32(multiply32(multiply32(member1856_, 15), 300), multiply32(member1857_, 300)), member1860_) >= 4515000))
-                            {
-                                value2 = member1856_;
-                                value3 = member1857_;
-                                value8 = member1860_;
-                                value6 = member1911_;
-                                value9 = engine.read<std::int32_t>(engine.element(pointer(value6), add32(add32(multiply32(multiply32(value2, 15), 300), multiply32(value3, 300)), value8), 4, 0, false, 0, false));
-                                engine.write(engine.element(pointer(value6), add32(add32(multiply32(multiply32(value2, 15), 300), multiply32(value3, 300)), value8), 4, 0, false, 0, false), member1858_, 4);
-                            }
-                        }
-                        {
-                            const auto previous = member1859_;
-                            const auto updated = add32(previous, 1);
-                            member1859_ = storedValue<std::int32_t>(updated);
-                            value2 = updated;
-                        }
-                        engine.checkpoint();
-                        continue;
-                    }
-                }
-                {
-                    const auto previous = member1856_;
-                    const auto updated = add32(previous, 1);
-                    member1856_ = storedValue<std::int32_t>(updated);
-                    value2 = updated;
-                }
-                engine.checkpoint();
-                continue;
-            }
-        }
-    }
-    goto branch285;
-    branch373: ;
-    {
-        const auto previous = member1865_;
-        const auto updated = shifted(previous, 1);
-        setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-        value5 = updated;
-    }
-    value5 = member1867_;
-    value2 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value5), 4, 1, 0, false, 0, false)));
-    engine.write(engine.element(pointer(value5), 4, 1, 0, false, 0, false), storedValue<std::int8_t>(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))))), 1);
-    {
-        const auto previous = member1865_;
-        const auto updated = shifted(previous, 1);
-        setMemberView(member1865_, 0, storedValue<std::int32_t>(updated));
-        value5 = updated;
-    }
-    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-    if (value2 < 48)
-    {
-        value2 = std::int32_t(value2 >= 48);
-    }
-    else
-    {
-        value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_))));
-        value2 = std::int32_t(value2 <= 53);
-    }
-    if (!(value2 == 0))
-    {
-        value5 = member1867_;
-        value2 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value5), 5, 1, 0, false, 0, false)));
-        engine.write(engine.element(pointer(value5), 5, 1, 0, false, 0, false), storedValue<std::int8_t>(subtract32(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member1865_)))), 48)), 1);
-    }
-    goto branch361;
+
 }
 
 Task<void> MbcMain::MainTotD()
@@ -24741,17 +24114,12 @@ std::int32_t MbcMain::INCB(std::int32_t parameter1)
     {
         return -1;
     }
-    if (!(integerBits(engine.read<String>(engine.element(pointer(member1968_), member2244_, 12, 0, false, 0, false))) != 0))
-    {
+    auto &source = indexedConfigurations_[std::size_t{word(member2244_)}];
+    if (source.empty())
         return -1;
-    }
-    {
-        const auto source = engine.read<String>(engine.element(pointer(member1968_), member2244_, 12, 0, false, 0, false));
-        const auto bytes = engine.buffer(pointer(source));
-        g_sfera_config_text_runtime.useText(bytes);
-        g_sfera_mbc_runtime.configuration_source =
-            std::addressof(std::prev(g_sfera_mbc_runtime.mapped_memory.upper_bound(source.base))->second);
-    }
+
+    g_sfera_config_text_runtime.useText(std::as_writable_bytes(std::span(source)));
+    g_sfera_mbc_runtime.configuration_source = nullptr;
     return 0;
 }
 
@@ -24863,12 +24231,12 @@ std::int32_t MbcMain::GENM(std::int32_t parameter1, std::int32_t parameter2, std
         value1 = member2245_;
         value5 = member2249_;
         value2 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value5, value2, storedValue<String>(address(member2257_)));
+        engine.copyString(pointer(value5), pointer(storedValue<String>(address(member2257_))));
         return 0;
     }
     member2252_ = 14;
     branch11: ;
-    value1 = engine.read<std::int32_t>(engine.element(pointer(member1911_), add32(multiply32(multiply32(member2251_, 15), 300), multiply32(member2252_, 300)), 4, 0, false, 0, false));
+    value1 = member1911_[std::size_t{word(add32(multiply32(multiply32(member2251_, 15), 300), multiply32(member2252_, 300)))}];
     member2253_ = value1;
     if (!(value1 > 0))
     {
@@ -24879,13 +24247,13 @@ std::int32_t MbcMain::GENM(std::int32_t parameter1, std::int32_t parameter2, std
     value3 = member2253_;
     value4 = randomReal();
     value3 = integer(SferaNumeric::real32(double(realBits(real(value3))) * double(realBits(value4))));
-    member2254_ = engine.read<std::int32_t>(engine.element(pointer(member1911_), add32(add32(add32(multiply32(multiply32(value1, 15), 300), multiply32(value2, 300)), value3), 1), 4, 0, false, 0, false));
-    member2255_ = shifted(member1956_, multiply32(1, multiply32(280, member2254_)));
-    engine.invoke<void>(Builtin::FormatText, storedValue<String>(address(member1881_)), storedValue<String>(address(member2258_)), member2254_, member2255_);
+    member2254_ = member1911_[std::size_t{word(add32(add32(add32(multiply32(multiply32(value1, 15), 300), multiply32(value2, 300)), value3), 1))}];
+    const auto script = reference<String>(multiObjects_[std::size_t{word(member2254_)}].script);
+    engine.invoke<void>(Builtin::FormatText, storedValue<String>(address(member1881_)), storedValue<String>(address(member2258_)), member2254_, script);
     value1 = member2245_;
     value5 = member2249_;
     value2 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value5, value2, storedValue<String>(address(member1881_)));
+    engine.copyString(pointer(value5), pointer(storedValue<String>(address(member1881_))));
     return 0;
 }
 
@@ -24905,7 +24273,7 @@ std::int32_t MbcMain::GetSysText(std::int32_t parameter1, std::int32_t parameter
     value2 = member2259_;
     value1 = member2261_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value2, value1, value3, storedValue<String>(address(member1875_)));
+    engine.copyString(pointer(value1), pointer(storedValue<String>(address(member1875_))));
     return 0;
 }
 
@@ -24916,16 +24284,12 @@ std::int32_t MbcMain::GetMBLnam(std::int32_t parameter1, String parameter2, std:
     member2262_ = parameter1;
     member2263_ = parameter2;
     member2264_ = parameter3;
-    std::int32_t value1;
 
     engine.borrowReference(member2263_);
-    value1 = integerBits(engine.current.module->processId);
-    value1 = GetMulti(value1, member2262_, -1, storedValue<String>(address(member2266_)));
-    if (!(std::int32_t(memberView<std::int8_t>(member2266_, 242)) < 48))
-    {
-        member2268_ = subtract32(add32(multiply32(subtract32(std::int32_t(memberView<std::int8_t>(member2266_, 242)), 48), 10), std::int32_t(memberView<std::int8_t>(member2266_, 243))), 48);
-    }
-    engine.copyString(pointer(member2263_), memberBytes(member2266_), integer(member2264_));
+    MultiObject object;
+    GetMulti(member2262_, -1, object);
+    member2268_ = object.scale;
+    SferaTextBuffer(engine.buffer(pointer(member2263_))).writeBounded(object.script, word(member2264_));
     return member2268_;
 }
 
@@ -25032,9 +24396,9 @@ std::int32_t MbcMain::CalcRash(std::int32_t parameter1, String parameter2, IntRe
     std::int32_t value3;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(address(member2309_)), member2301_, member2303_, 52);
+    engine.copyBytes(pointer(storedValue<AddressRef>(address(member2309_))), pointer(member2303_), word(integer(52)));
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member2305_)), member2301_, member2302_, 8);
+    engine.copyString(pointer(storedValue<String>(address(member2305_))), pointer(member2302_), integer(8));
     member2307_ = storedValue<std::int8_t>(std::int32_t(memberView<std::int8_t>(member2305_, 0)));
     member2310_ = 0;
     member2311_ = 1;
@@ -25138,47 +24502,16 @@ std::int32_t MbcMain::CalcRash(std::int32_t parameter1, String parameter2, IntRe
     value1 = member2301_;
     value2 = member2303_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(address(member2309_)), 52);
+    engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(address(member2309_))), word(integer(52)));
     return 0;
 }
 
-std::int32_t MbcMain::GEFF(std::int32_t parameter1, std::int32_t parameter2, AddressRef parameter3, String parameter4)
+std::int32_t MbcMain::GEFF(std::int32_t effectIndex, EffectDefinition &output)
 {
     FunctionScope context(*this, "GEFF");
-    Host &engine = host();
-    member2318_ = parameter1;
-    member2319_ = parameter2;
-    member2320_ = parameter3;
-    member2321_ = parameter4;
-    std::int32_t value1;
-    AddressRef value2;
-    std::int32_t value3;
-    String value4;
-
-    value1 = member2319_;
-    if (value1 < 0)
-    {
-        value1 = std::int32_t(value1 < 0);
-    }
-    else
-    {
-        value1 = member2319_;
-        value1 = std::int32_t(value1 > 500);
-    }
-    if (!(value1 == 0))
-    {
+    if (effectIndex < 0 || std::cmp_greater_equal(effectIndex, effectDefinitions_.size()))
         return -1;
-    }
-    member2323_ = storedValue<IntRef>(shifted(member1967_, multiply32(1, multiply32(member2319_, 40))));
-    member2324_ = storedValue<String>(shifted(member2323_, 20));
-    value1 = member2318_;
-    value2 = member2320_;
-    value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, member2323_, 20);
-    value1 = member2318_;
-    value4 = member2321_;
-    value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value4, value3, member2324_);
+    output = effectDefinitions_.begin()[effectIndex];
     return 0;
 }
 
@@ -25254,615 +24587,261 @@ std::int32_t MbcMain::getMissionFactorSet(std::int32_t parameter1, std::int32_t 
     return engine.read<std::int32_t>(engine.element(pointer(storedValue<IntRef>(engine.element(pointer(address(member1965_)), member2329_, 80, 7, true, 560, true))), member2326_, 4, -20, false, 0, true));
 }
 
-std::int32_t MbcMain::GetMulti(std::int32_t parameter1, std::int32_t parameter2, std::int32_t parameter3, String parameter4)
+std::int32_t MbcMain::GetMulti(std::int32_t objectId, std::int32_t variant, MultiObject &output)
 {
     FunctionScope context(*this, "GetMulti");
-    Host &engine = host();
-    member2330_ = parameter1;
-    member2331_ = parameter2;
-    member2332_ = parameter3;
-    member2333_ = parameter4;
-    std::int32_t value1;
-    String value2;
-    std::int32_t value3;
-    float value4;
-    IntRef value5;
 
-    member2349_ = 0;
-    if (member2332_ != -3)
-    {
-        if (member2332_ != -4)
-        {
-            member2348_ = 0;
-        }
-        else
-        {
-            member2349_ = 1;
-        }
-    }
-    else
-    {
-        member2348_ = 1;
-        member2332_ = -1;
-    }
-    value1 = member2331_;
-    if (value1 < 0)
-    {
-        value1 = std::int32_t(value1 < 0);
-    }
-    else
-    {
-        value1 = member2331_;
-        value1 = std::int32_t(value1 >= 9000);
-    }
-    if (!(value1 == 0))
+    const bool preferSpecialMode = variant == -3;
+    const bool ignoreGroupChance = variant == -4;
+    if (preferSpecialMode)
+        variant = -1;
+
+    if (objectId < 0 || objectId >= std::int32_t(multiObjects_.size()))
     {
         return -1;
     }
-    member2334_ = storedValue<IntRef>(shifted(member1956_, multiply32(1, multiply32(member2331_, 280))));
-    if (member2332_ >= 0)
+
+    const MultiObject &base = multiObjects_.begin()[objectId];
+    output = base;
+    if (variant == -2)
     {
-        if (!(member2332_ < 30))
+        return -2;
+    }
+
+    const std::int32_t group = base.group;
+    if (group < 0 || group >= 26)
+    {
+        return -2;
+    }
+
+    const MultiObject *selected = nullptr;
+    if (variant >= 0)
+    {
+        if (variant >= 30)
         {
-            goto branch18;
+            return -2;
         }
-        member2350_ = storedValue<String>(member2334_);
-        member2345_ = subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(member2350_), 244, 1, 0, false, 0, false))), 65);
-        value1 = member2345_;
-        if (value1 >= 0)
+        selected = &multiObjectVariants_.begin()[group * 30 + variant];
+    }
+    else
+    {
+        const std::int32_t count = std::int32_t(multiObjectVariantCounts_.begin()[group]);
+        if (count <= 0)
         {
-            value1 = std::int32_t(value1 < 0);
+            return -2;
         }
-        else
+        if (!preferSpecialMode && !ignoreGroupChance && randomReal() > multiObjectGroupChances_.begin()[group])
         {
-            value1 = member2345_;
-            value1 = std::int32_t(value1 >= 26);
+            return -2;
         }
-        if (!(value1 == 0))
+
+        std::int32_t attempts = 0;
+        while (true)
         {
-            branch18: ;
-            member2332_ = -2;
-            branch20: ;
-            value1 = member2330_;
-            value2 = member2333_;
-            value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, member2334_, 280);
-            return member2332_;
-        }
-        member2335_ = storedValue<IntRef>(shifted(member1957_, multiply32(1, multiply32(280, add32(multiply32(member2345_, 30), member2332_)))));
-        member2351_ = storedValue<String>(member2335_);
-        member2337_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(member2351_), 240, 1, 0, false, 0, false)));
-        if (member2337_ != 69)
-        {
-            if (member2337_ != 82)
+            const std::int32_t candidateIndex = integer(SferaNumeric::real32(
+                double(realBits(real(count))) * double(realBits(randomReal()))));
+            if (candidateIndex < 0 || candidateIndex >= count)
             {
-                if (member2337_ != 83)
+                return -2;
+            }
+
+            variant = candidateIndex;
+            selected = &multiObjectVariants_.begin()[group * 30 + candidateIndex];
+            std::int32_t rank = 0;
+            if (preferSpecialMode)
+            {
+                switch (selected->variantMode)
                 {
-                    if (member2337_ != 78)
-                    {
-                        member2347_ = 0;
-                    }
-                    else
-                    {
-                        member2347_ = 4;
-                    }
-                }
-                else
-                {
-                    member2347_ = 3;
+                case MultiObjectMode::E:
+                    rank = 2;
+                    break;
+                case MultiObjectMode::R:
+                    rank = 1;
+                    break;
+                case MultiObjectMode::S:
+                    rank = 0;
+                    break;
+                case MultiObjectMode::N:
+                    continue;
+                default:
+                    rank = 3;
+                    break;
                 }
             }
             else
             {
-                member2347_ = 2;
-            }
-        }
-        else
-        {
-            member2347_ = 1;
-        }
-        branch29: ;
-        member2337_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(member2350_), 241, 1, 0, false, 0, false)));
-        if (member2337_ != 69)
-        {
-            if (member2337_ != 82)
-            {
-                if (member2337_ != 83)
+                switch (selected->variantMode)
                 {
-                    if (!(member2337_ != 78))
-                    {
-                        member2347_ = 4;
-                    }
-                }
-                else
-                {
-                    member2347_ = add32(member2347_, 3);
-                }
-            }
-            else
-            {
-                member2347_ = add32(member2347_, 2);
-            }
-        }
-        else
-        {
-            member2347_ = add32(member2347_, 1);
-        }
-        if (!(member2347_ <= 4))
-        {
-            member2347_ = 4;
-        }
-        member2344_ = storedValue<IntRef>(0);
-        engine.invoke<void>(Builtin::AllocateDynamic, storedValue<IntRefRef>(address(member2344_)), 280);
-        if (!(integerBits(member2344_) != 0))
-        {
-            return -1;
-        }
-        member2336_ = member2344_;
-        member2352_ = storedValue<String>(member2336_);
-        member2337_ = 0;
-        SferaText::scan(engine.stringValue(pointer(shifted(member2350_, 242))), SferaText::terminated(memberBytes(member2356_)), {memberBytes(member2337_)});
-        member2343_ = memberView<std::int32_t>(member2341_, (std::size_t{4} * word(engine.elementIndex(member2337_, -15, true))));
-        engine.copyBytes(pointer(member2336_), pointer(member2334_), 280u);
-        value2 = member2352_;
-        value1 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value2), 241, 1, 0, false, 0, false)));
-        engine.write(engine.element(pointer(value2), 241, 1, 0, false, 0, false), storedValue<std::int8_t>(std::int32_t(memberView<std::int8_t>(member2354_, (std::size_t{1} * word(engine.elementIndex(member2347_, -5, true)))))), 1);
-        member2334_ = shifted(member2334_, 60);
-        member2336_ = shifted(member2336_, 60);
-        member2335_ = shifted(member2335_, 60);
-        engine.copyBytes(pointer(shifted(member2352_, 58)), pointer(shifted(member2351_, 58)), 2u);
-        if (engine.read<std::int32_t>(engine.indirect(payload(member2335_))) == 1)
-        {
-            {
-                const auto previous = member2334_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2334_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            {
-                const auto previous = member2336_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2336_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            {
-                const auto previous = member2335_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2335_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            value5 = member2336_;
-            value1 = engine.read<std::int32_t>(engine.indirect(payload(value5)));
-            engine.write(engine.indirect(payload(value5)), add32(engine.read<std::int32_t>(engine.indirect(payload(member2334_))), multiply32(engine.read<std::int32_t>(engine.indirect(payload(member2335_))), member2343_)), 4);
-            member2334_ = shifted(member2334_, 20);
-            member2336_ = shifted(member2336_, 20);
-            member2335_ = shifted(member2335_, 20);
-            member2337_ = 0;
-            while (true)
-            {
-                engine.checkpoint();
-                if (member2337_ >= 8)
-                {
+                case MultiObjectMode::E:
+                    rank = 1;
+                    break;
+                case MultiObjectMode::R:
+                    rank = 2;
+                    break;
+                case MultiObjectMode::S:
+                    rank = 3;
+                    break;
+                case MultiObjectMode::N:
+                    continue;
+                default:
+                    rank = 0;
                     break;
                 }
-                if (!(engine.read<std::int32_t>(engine.indirect(payload(member2334_))) == 0))
-                {
-                    value5 = member2336_;
-                    value1 = engine.read<std::int32_t>(engine.indirect(payload(value5)));
-                    engine.write(engine.indirect(payload(value5)), add32(engine.read<std::int32_t>(engine.indirect(payload(member2334_))), multiply32(engine.read<std::int32_t>(engine.indirect(payload(member2335_))), member2343_)), 4);
-                }
-                {
-                    const auto previous = member2337_;
-                    const auto updated = add32(previous, 1);
-                    member2337_ = storedValue<std::int32_t>(updated);
-                    value1 = updated;
-                }
-                {
-                    const auto previous = member2336_;
-                    const auto updated = shifted(previous, 4);
-                    setMemberView(member2336_, 0, storedValue<std::int32_t>(updated));
-                    value5 = updated;
-                }
-                {
-                    const auto previous = member2334_;
-                    const auto updated = shifted(previous, 4);
-                    setMemberView(member2334_, 0, storedValue<std::int32_t>(updated));
-                    value5 = updated;
-                }
-                {
-                    const auto previous = member2335_;
-                    const auto updated = shifted(previous, 4);
-                    setMemberView(member2335_, 0, storedValue<std::int32_t>(updated));
-                    value5 = updated;
-                }
-                engine.checkpoint();
-                continue;
-                break;
             }
-            member2337_ = 0;
-            while (true)
-            {
-                engine.checkpoint();
-                if (member2337_ >= 3)
-                {
-                    break;
-                }
-                ScriptHelpers::sharedPart119(*this, value5, member2336_, value1, member2334_, member2335_, member2343_, member2337_);
-                continue;
-            }
-        }
-        else
-        {
-            member2337_ = 0;
-            while (true)
-            {
-                engine.checkpoint();
-                if (member2337_ >= 2)
-                {
-                    break;
-                }
-                ScriptHelpers::sharedPart119(*this, value5, member2336_, value1, member2334_, member2335_, member2343_, member2337_);
-                continue;
-                break;
-            }
-            member2334_ = shifted(member2334_, 16);
-            member2336_ = shifted(member2336_, 16);
-            member2335_ = shifted(member2335_, 16);
-            member2337_ = 0;
-            while (true)
-            {
-                engine.checkpoint();
-                if (member2337_ >= 11)
-                {
-                    break;
-                }
-                ScriptHelpers::sharedPart119(*this, value5, member2336_, value1, member2334_, member2335_, member2343_, member2337_);
-                continue;
-            }
-        }
-        value5 = member2336_;
-        value1 = engine.read<std::int32_t>(engine.indirect(payload(value5)));
-        engine.write(engine.indirect(payload(value5)), add32(engine.read<std::int32_t>(engine.indirect(payload(member2334_))), engine.read<std::int32_t>(engine.indirect(payload(member2335_)))), 4);
-        {
-            const auto previous = member2336_;
-            const auto updated = shifted(previous, 4);
-            setMemberView(member2336_, 0, storedValue<std::int32_t>(updated));
-            value5 = updated;
-        }
-        {
-            const auto previous = member2334_;
-            const auto updated = shifted(previous, 4);
-            setMemberView(member2334_, 0, storedValue<std::int32_t>(updated));
-            value5 = updated;
-        }
-        {
-            const auto previous = member2335_;
-            const auto updated = shifted(previous, 4);
-            setMemberView(member2335_, 0, storedValue<std::int32_t>(updated));
-            value5 = updated;
-        }
-        member2337_ = 0;
-        while (true)
-        {
-            engine.checkpoint();
-            if (member2337_ >= 14)
+
+            if (randomReal() <= multiObjectModeChances_.begin()[rank] || ++attempts >= 24)
             {
                 break;
             }
-            if (!(engine.read<std::int32_t>(engine.indirect(payload(member2335_))) == 0))
-            {
-                value5 = member2336_;
-                value1 = engine.read<std::int32_t>(engine.indirect(payload(value5)));
-                engine.write(engine.indirect(payload(value5)), add32(engine.read<std::int32_t>(engine.indirect(payload(member2334_))), multiply32(engine.read<std::int32_t>(engine.indirect(payload(member2335_))), member2343_)), 4);
-            }
-            {
-                const auto previous = member2337_;
-                const auto updated = add32(previous, 1);
-                member2337_ = storedValue<std::int32_t>(updated);
-                value1 = updated;
-            }
-            {
-                const auto previous = member2336_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2336_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            {
-                const auto previous = member2334_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2334_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            {
-                const auto previous = member2335_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2335_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            engine.checkpoint();
-            continue;
-            break;
         }
-        member2337_ = 0;
-        while (true)
-        {
-            engine.checkpoint();
-            if (member2337_ >= 2)
-            {
-                break;
-            }
-            value5 = member2336_;
-            value1 = engine.read<std::int32_t>(engine.indirect(payload(value5)));
-            engine.write(engine.indirect(payload(value5)), add32(engine.read<std::int32_t>(engine.indirect(payload(member2334_))), divide32(multiply32(engine.read<std::int32_t>(engine.indirect(payload(member2334_))), engine.read<std::int32_t>(engine.indirect(payload(member2335_)))), 100)), 4);
-            {
-                const auto previous = member2337_;
-                const auto updated = add32(previous, 1);
-                member2337_ = storedValue<std::int32_t>(updated);
-                value1 = updated;
-            }
-            {
-                const auto previous = member2336_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2336_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            {
-                const auto previous = member2334_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2334_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            {
-                const auto previous = member2335_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2335_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            engine.checkpoint();
-            continue;
-            break;
-        }
-        value5 = member2336_;
-        value1 = engine.read<std::int32_t>(engine.indirect(payload(value5)));
-        engine.write(engine.indirect(payload(value5)), add32(engine.read<std::int32_t>(engine.indirect(payload(member2334_))), engine.read<std::int32_t>(engine.indirect(payload(member2335_)))), 4);
-        {
-            const auto previous = member2336_;
-            const auto updated = shifted(previous, 4);
-            setMemberView(member2336_, 0, storedValue<std::int32_t>(updated));
-            value5 = updated;
-        }
-        {
-            const auto previous = member2334_;
-            const auto updated = shifted(previous, 4);
-            setMemberView(member2334_, 0, storedValue<std::int32_t>(updated));
-            value5 = updated;
-        }
-        {
-            const auto previous = member2335_;
-            const auto updated = shifted(previous, 4);
-            setMemberView(member2335_, 0, storedValue<std::int32_t>(updated));
-            value5 = updated;
-        }
-        member2337_ = 0;
-        while (true)
-        {
-            engine.checkpoint();
-            if (member2337_ >= 2)
-            {
-                break;
-            }
-            value5 = member2336_;
-            value1 = engine.read<std::int32_t>(engine.indirect(payload(value5)));
-            engine.write(engine.indirect(payload(value5)), add32(engine.read<std::int32_t>(engine.indirect(payload(member2334_))), divide32(multiply32(engine.read<std::int32_t>(engine.indirect(payload(member2334_))), engine.read<std::int32_t>(engine.indirect(payload(member2335_)))), 100)), 4);
-            {
-                const auto previous = member2337_;
-                const auto updated = add32(previous, 1);
-                member2337_ = storedValue<std::int32_t>(updated);
-                value1 = updated;
-            }
-            {
-                const auto previous = member2336_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2336_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            {
-                const auto previous = member2334_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2334_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            {
-                const auto previous = member2335_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2335_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            engine.checkpoint();
-            continue;
-            break;
-        }
-        member2337_ = 0;
-        while (true)
-        {
-            engine.checkpoint();
-            if (member2337_ >= 8)
-            {
-                break;
-            }
-            if (!(engine.read<std::int32_t>(engine.indirect(payload(member2335_))) == 0))
-            {
-                value5 = member2336_;
-                value1 = engine.read<std::int32_t>(engine.indirect(payload(value5)));
-                engine.write(engine.indirect(payload(value5)), engine.read<std::int32_t>(engine.indirect(payload(member2335_))), 4);
-            }
-            {
-                const auto previous = member2337_;
-                const auto updated = add32(previous, 1);
-                member2337_ = storedValue<std::int32_t>(updated);
-                value1 = updated;
-            }
-            {
-                const auto previous = member2336_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2336_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            {
-                const auto previous = member2334_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2334_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            {
-                const auto previous = member2335_;
-                const auto updated = shifted(previous, 4);
-                setMemberView(member2335_, 0, storedValue<std::int32_t>(updated));
-                value5 = updated;
-            }
-            engine.checkpoint();
-            continue;
-            break;
-        }
-        value1 = member2330_;
-        value2 = member2333_;
-        value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, member2344_, 280);
-        engine.invoke<void>(Builtin::FreeDynamic, storedValue<IntRefRef>(address(member2344_)));
-        return member2332_;
     }
-    if (!(member2332_ != -2))
+
+    if (selected == nullptr)
     {
-        member2350_ = storedValue<String>(member2334_);
-        goto branch20;
+        return -2;
     }
-    member2350_ = storedValue<String>(member2334_);
-    value1 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(member2350_), 244, 1, 0, false, 0, false)));
-    member2345_ = subtract32(value1, 65);
-    if (!(subtract32(value1, 65) >= 0))
+
+    auto modeRank = [](MultiObjectMode mode)
     {
-        goto branch18;
-    }
-    if (!(member2345_ < 26))
-    {
-        goto branch18;
-    }
-    member2346_ = std::int32_t(memberView<std::int8_t>(member1961_, (std::size_t{1} * word(engine.elementIndex(member2345_, -26, true)))));
-    value1 = member2348_;
-    if (!(value1 != 0))
-    {
-        value1 = member2349_;
-        if (value1 == 0)
+        switch (mode)
         {
-            goto branch30;
+        case MultiObjectMode::E:
+            return 1;
+        case MultiObjectMode::R:
+            return 2;
+        case MultiObjectMode::S:
+            return 3;
+        case MultiObjectMode::N:
+            return 4;
+        default:
+            return 0;
         }
-        goto branch36;
-    }
-    if (!(value1 == 0))
+    };
+    auto modeFromRank = [](std::int32_t rank)
     {
-        goto branch36;
-    }
-    branch30: ;
-    value4 = randomReal();
-    if (!(!(value4 > memberView<float>(member1985_, (std::size_t{4} * word(engine.elementIndex(member2345_, -26, true)))))))
-    {
-        goto branch18;
-    }
-    if (!(member2346_ != 0))
-    {
-        goto branch18;
-    }
-    branch36: ;
-    member2339_ = 0;
-    while (true)
-    {
-        engine.checkpoint();
-        if (member2339_ >= 24)
+        switch (rank)
         {
-            goto branch29;
+        case 1:
+            return MultiObjectMode::E;
+        case 2:
+            return MultiObjectMode::R;
+        case 3:
+            return MultiObjectMode::S;
+        case 4:
+            return MultiObjectMode::N;
+        default:
+            return MultiObjectMode::U;
         }
-        value1 = member2346_;
-        value4 = randomReal();
-        member2332_ = integer(SferaNumeric::real32(double(realBits(real(value1))) * double(realBits(value4))));
-        if (!(integer(SferaNumeric::real32(double(realBits(real(value1))) * double(realBits(value4)))) < member2346_))
+    };
+
+    std::int32_t resolvedRank = modeRank(selected->variantMode);
+    if (base.resolvedMode == MultiObjectMode::N)
+    {
+        resolvedRank = 4;
+    }
+    else
+    {
+        resolvedRank = std::min(4, resolvedRank + modeRank(base.resolvedMode));
+    }
+    output.resolvedMode = modeFromRank(resolvedRank);
+    output.secondaryQualifier = selected->secondaryQualifier;
+
+    if (base.scale < 15 || base.scale >= 15 + std::int32_t(multiObjectScales_.size()))
+    {
+        return -2;
+    }
+    const std::int32_t scale = multiObjectScales_.begin()[base.scale - 15];
+    const auto scaled = [&](std::int32_t &result, std::int32_t baseValue, std::int32_t variantValue)
+    {
+        result = add32(baseValue, multiply32(variantValue, scale));
+    };
+    const auto percent = [&](std::int32_t &result, std::int32_t baseValue, std::int32_t variantValue)
+    {
+        result = add32(baseValue, divide32(multiply32(baseValue, variantValue), 100));
+    };
+
+    if (selected->parameters.mergeMode == 1)
+    {
+        scaled(output.parameters.primaryScale, base.parameters.primaryScale, selected->parameters.primaryScale);
+        for (std::size_t index = 0; index < output.parameters.conditionalScaledValues.size(); ++index)
         {
-            goto branch18;
-        }
-        member2335_ = storedValue<IntRef>(shifted(member1957_, multiply32(1, multiply32(280, add32(multiply32(member2345_, 30), member2332_)))));
-        member2351_ = storedValue<String>(member2335_);
-        member2337_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(member2351_), 240, 1, 0, false, 0, false)));
-        if (!(member2348_ == 0))
-        {
-            if (!(member2337_ != 69))
+            if (base.parameters.conditionalScaledValues[index] != 0)
             {
-                member2347_ = 2;
-                goto branch68;
+                scaled(output.parameters.conditionalScaledValues[index], base.parameters.conditionalScaledValues[index],
+                    selected->parameters.conditionalScaledValues[index]);
             }
-            if (!(member2337_ != 82))
-            {
-                member2347_ = 1;
-                goto branch68;
-            }
-            if (!(member2337_ != 83))
-            {
-                member2347_ = 0;
-                goto branch68;
-            }
-            if (member2337_ != 78)
-            {
-                member2347_ = 3;
-                goto branch68;
-            }
-            {
-                const auto previous = member2339_;
-                const auto updated = subtract32(previous, 1);
-                member2339_ = storedValue<std::int32_t>(updated);
-                value1 = updated;
-            }
-            goto branch77;
         }
-        if (!(member2337_ != 69))
+        for (std::size_t index = 0; index + 1 < output.parameters.coreValues.size(); ++index)
         {
-            member2347_ = 1;
-            goto branch68;
+            scaled(output.parameters.coreValues[index], base.parameters.coreValues[index],
+                selected->parameters.coreValues[index]);
         }
-        if (!(member2337_ != 82))
-        {
-            member2347_ = 2;
-            goto branch68;
-        }
-        if (!(member2337_ != 83))
-        {
-            member2347_ = 3;
-            goto branch68;
-        }
-        if (!(member2337_ != 78))
-        {
-            {
-                const auto previous = member2339_;
-                const auto updated = subtract32(previous, 1);
-                member2339_ = storedValue<std::int32_t>(updated);
-                value1 = updated;
-            }
-            goto branch77;
-        }
-        member2347_ = 0;
-        branch68: ;
-        value4 = randomReal();
-        if (!(!(value4 <= memberView<float>(member1983_, (std::size_t{4} * word(engine.elementIndex(member2347_, -10, true)))))))
-        {
-            goto branch29;
-        }
-        branch77: ;
-        {
-            const auto previous = member2339_;
-            const auto updated = add32(previous, 1);
-            member2339_ = storedValue<std::int32_t>(updated);
-            value1 = updated;
-        }
-        engine.checkpoint();
-        continue;
     }
+    else
+    {
+        scaled(output.parameters.mergeMode, base.parameters.mergeMode, selected->parameters.mergeMode);
+        scaled(output.parameters.primaryScale, base.parameters.primaryScale, selected->parameters.primaryScale);
+        for (std::size_t index = 0; index < output.parameters.conditionalScaledValues.size(); ++index)
+        {
+            scaled(output.parameters.conditionalScaledValues[index], base.parameters.conditionalScaledValues[index],
+                selected->parameters.conditionalScaledValues[index]);
+        }
+        for (std::size_t index = 0; index + 1 < output.parameters.coreValues.size(); ++index)
+        {
+            scaled(output.parameters.coreValues[index], base.parameters.coreValues[index],
+                selected->parameters.coreValues[index]);
+        }
+    }
+
+    output.parameters.coreValues.back() = add32(base.parameters.coreValues.back(), selected->parameters.coreValues.back());
+    for (std::size_t index = 0; index < output.parameters.scaledModifiers.size(); ++index)
+    {
+        if (selected->parameters.scaledModifiers[index] != 0)
+        {
+            scaled(output.parameters.scaledModifiers[index], base.parameters.scaledModifiers[index], selected->parameters.scaledModifiers[index]);
+        }
+    }
+    for (std::size_t index = 0; index < output.parameters.percentageModifiers.size(); ++index)
+    {
+        percent(output.parameters.percentageModifiers[index], base.parameters.percentageModifiers[index],
+            selected->parameters.percentageModifiers[index]);
+    }
+    output.parameters.additiveModifier = add32(base.parameters.additiveModifier, selected->parameters.additiveModifier);
+    for (std::size_t index = 0; index < output.parameters.percentageAdjustments.size(); ++index)
+    {
+        percent(output.parameters.percentageAdjustments[index], base.parameters.percentageAdjustments[index],
+            selected->parameters.percentageAdjustments[index]);
+    }
+    for (std::size_t index = 0; index < output.parameters.overrides.size(); ++index)
+    {
+        if (selected->parameters.overrides[index] != 0)
+        {
+            output.parameters.overrides[index] = selected->parameters.overrides[index];
+        }
+    }
+    if (selected->parameters.durationUnits != 0)
+        output.parameters.durationUnits = selected->parameters.durationUnits;
+    if (selected->parameters.runtimeValue != 0)
+        output.parameters.runtimeValue = selected->parameters.runtimeValue;
+    if (selected->parameters.interactionArgument != 0)
+        output.parameters.interactionArgument = selected->parameters.interactionArgument;
+    if (selected->parameters.auxiliaryArgument != 0)
+        output.parameters.auxiliaryArgument = selected->parameters.auxiliaryArgument;
+    if (selected->parameters.effectId != 0)
+        output.parameters.effectId = selected->parameters.effectId;
+
+    if (selected->numericSelector.has_value() && *selected->numericSelector != 0)
+    {
+        output.numericSelector = selected->numericSelector;
+        output.textSelector.clear();
+    }
+    else if (!selected->textSelector.empty())
+    {
+        output.numericSelector.reset();
+        output.textSelector = selected->textSelector;
+    }
+
+    return variant;
 }
 
 void MbcMain::get_crc(std::int32_t parameter1, IntRef parameter2, IntRef parameter3)
@@ -25879,11 +24858,11 @@ void MbcMain::get_crc(std::int32_t parameter1, IntRef parameter2, IntRef paramet
     value1 = member2357_;
     value2 = member2359_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(address(member1883_)), multiply32(member1885_, 4));
+    engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(address(member1883_))), word(integer(multiply32(member1885_, 4))));
     value1 = member2357_;
     value2 = member2358_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(address(member1885_)), 4);
+    engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(address(member1885_))), word(integer(4)));
     return;
 }
 
@@ -25905,7 +24884,7 @@ std::int32_t MbcMain::get_pathlist(std::int32_t parameter1, std::int32_t paramet
     value3 = integerBits(engine.current.module->processId);
     value4 = memberView<String>(member1877_, (std::size_t{12} * word(engine.elementIndex(member2361_, -40, true))));
     value5 = engine.stringLength(pointer(memberView<String>(member1877_, (std::size_t{12} * word(engine.elementIndex(member2361_, -40, true))))));
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, value4, add32(value5, 1));
+    engine.copyBytes(pointer(value2), pointer(value4), word(integer(add32(value5, 1))));
     return std::int32_t(memberView<std::int8_t>(member1879_, (std::size_t{1} * word(engine.elementIndex(member2361_, -30, true)))));
 }
 
@@ -25974,7 +24953,7 @@ std::int32_t MbcMain::UpdateSST(std::int32_t parameter1, std::int32_t parameter2
     value1 = member2363_;
     value2 = member2366_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, memberView<String>(member1945_, (std::size_t{12} * word(engine.elementIndex(member2368_, -500, true)))), 154004);
+    engine.copyBytes(pointer(value2), pointer(memberView<String>(member1945_, (std::size_t{12} * word(engine.elementIndex(member2368_, -500, true))))), word(integer(154004)));
     return 0;
     branch10: ;
     if (!(std::int32_t(!truth(member1898_[16])) == 0))
@@ -25982,7 +24961,7 @@ std::int32_t MbcMain::UpdateSST(std::int32_t parameter1, std::int32_t parameter2
         return -1;
     }
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, memberView<String>(member1945_, (std::size_t{12} * word(engine.elementIndex(member2368_, -500, true)))), member2363_, member2366_, 154004);
+    engine.copyBytes(pointer(memberView<String>(member1945_, (std::size_t{12} * word(engine.elementIndex(member2368_, -500, true))))), pointer(member2366_), word(integer(154004)));
     if (member2364_ >= 100)
     {
         engine.invoke<void>(Builtin::FormatText, storedValue<String>(address(member1881_)), storedValue<String>(address(member2373_)), member2364_);
@@ -26378,37 +25357,7 @@ Task<void> MbcMain::MultiobjCRC()
     std::int32_t value1;
 
     member2409_ = 0;
-    member2407_ = 0;
-    member2411_ = 2520000;
-    value1 = engine.invoke<std::int32_t>(Builtin::MemoryChecksum, member2407_, member1956_, member2411_);
-    member2407_ = value1;
-    member2413_ = add32(member2413_, member2411_);
-    {
-        const auto previous = member2413_;
-        const auto updated = add32(previous, 1);
-        member2413_ = storedValue<std::int32_t>(updated);
-        value1 = updated;
-    }
-    if (!(value1 < 100000))
-    {
-        member2413_ = 0;
-        co_await Suspend{};
-    }
-    member2411_ = 218400;
-    value1 = engine.invoke<std::int32_t>(Builtin::MemoryChecksum, member2407_, member1957_, member2411_);
-    member2407_ = value1;
-    member2413_ = add32(member2413_, member2411_);
-    {
-        const auto previous = member2413_;
-        const auto updated = add32(previous, 1);
-        member2413_ = storedValue<std::int32_t>(updated);
-        value1 = updated;
-    }
-    if (!(value1 < 100000))
-    {
-        member2413_ = 0;
-        co_await Suspend{};
-    }
+    member2407_ = 1;
     member2408_ = 0;
     member2414_ = 0;
     while (true)
@@ -26421,7 +25370,8 @@ Task<void> MbcMain::MultiobjCRC()
         member2416_ = memberView<String>(member1945_, (std::size_t{12} * word(engine.elementIndex(member2414_, -500, true))));
         engine.readPacked<4>(pointer(member2416_), memberBytes(member2411_));
         member2411_ = add32(multiply32(member2411_, 44), 4);
-        value1 = engine.invoke<std::int32_t>(Builtin::MemoryChecksum, member2408_, member2416_, member2411_);
+        (void)engine.buffer(pointer(member2416_), word(integer(member2411_)));
+        value1 = 0;
         member2408_ = value1;
         member2413_ = add32(member2413_, member2411_);
         {
@@ -26528,7 +25478,7 @@ std::int32_t MbcMain::WhatServer(float parameter1, float parameter2, float param
     {
         return -1;
     }
-    value1 = integer(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(member1947_), member2423_, 1, 0, false, 0, false))));
+    value1 = integer(std::int32_t(member1947_[std::size_t{word(member2423_)}]));
     return value1;
 }
 
@@ -27082,536 +26032,250 @@ std::int32_t MbcMain::TimeFromSec(String parameter1, std::int32_t parameter2)
     return 0;
 }
 
-void MbcMain::LoadUnique(std::int32_t parameter1)
+void MbcMain::LoadUnique(std::int32_t descriptor)
 {
     FunctionScope context(*this, "LoadUnique");
     Host &engine = host();
-    member2481_ = parameter1;
-    std::int32_t value1;
-    std::int32_t value2;
-    IntRef value3;
 
-    if (member2481_ >= 0)
+    if (descriptor < 0)
     {
-        member2483_ = member2481_;
-        branch4: ;
-        if (!(integerBits(member1970_) != 0))
-        {
-            engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member1970_)), 456000);
-        }
+        for (std::int32_t attempt = 0; attempt < 50 && descriptor < 0; ++attempt)
         {
             g_sfera_mbc_runtime.checkEngineFailure();
-            auto fileBuffer = pointer(member1970_);
-            const auto fileCount = word(456000);
-            if (!Host::containsBuffer(fileBuffer, fileCount))
-                engine.diagnoseBuffer(fileBuffer, fileCount);
-            g_sfera_files.readSome(member2483_, engine.rawBuffer(fileBuffer, fileCount));
-        }
-        g_sfera_mbc_runtime.checkEngineFailure();
-        g_sfera_files.release(member2483_);
-        engine.fillBytes(memberBytes(member1938_), SferaNumeric::lowByte(0), 800u);
-        member2482_ = 0;
-        member2484_ = storedValue<IntRef>(member1970_);
-        member1912_ = 0;
-        while (true)
-        {
+            descriptor = g_sfera_files.openOwned(SferaText::terminated(memberBytes(member2486_)), _O_RDONLY, engine.current.module->lifetime);
             engine.checkpoint();
-            if (member2482_ >= 3000)
-            {
-                break;
-            }
-            value1 = engine.read<std::int32_t>(engine.element(pointer(member2484_), 34, 4, 0, false, 0, false));
-            if (value1 <= 0)
-            {
-                value1 = std::int32_t(value1 > 0);
-            }
-            else
-            {
-                value1 = engine.read<std::int32_t>(engine.element(pointer(member2484_), 3, 4, 0, false, 0, false));
-                value1 = std::int32_t(value1 == 1);
-            }
-            if (!(value1 == 0))
-            {
-                value1 = member1912_;
-                value1 = std::int32_t(value1 < 50);
-            }
-            if (!(value1 == 0))
-            {
-                value1 = member1912_;
-                value2 = memberView<std::int32_t>(member1914_, (std::size_t{4} * word(engine.elementIndex(value1, -50, true))));
-                setMemberView(member1914_, (std::size_t{4} * word(engine.elementIndex(value1, -50, true))), member2482_);
-                {
-                    const auto previous = member1912_;
-                    const auto updated = add32(previous, 1);
-                    member1912_ = storedValue<std::int32_t>(updated);
-                    value1 = updated;
-                }
-            }
-            member2485_ = engine.read<std::int32_t>(engine.element(pointer(member2484_), 1, 4, 0, false, 0, false));
-            value1 = member2485_;
-            if (value1 < 0)
-            {
-                value1 = std::int32_t(value1 >= 0);
-            }
-            else
-            {
-                value1 = member2485_;
-                value1 = std::int32_t(value1 < 200);
-            }
-            if (!(value1 == 0))
-            {
-                value1 = engine.read<std::int32_t>(engine.element(pointer(member2484_), 0, 4, 0, false, 0, false));
-                value1 = std::int32_t(value1 != 0);
-            }
-            if (!(value1 == 0))
-            {
-                if (!(memberView<std::int32_t>(member1938_, (std::size_t{4} * word(engine.elementIndex(member2485_, -200, true)))) >= 68))
-                {
-                    value1 = memberView<std::int32_t>(member1938_, (std::size_t{4} * word(engine.elementIndex(member2485_, -200, true))));
-                    value3 = storedValue<IntRef>(engine.element(pointer(address(member1940_)), member2485_, 272, 200, true, 54400, true));
-                    value2 = engine.read<std::int32_t>(engine.element(pointer(value3), value1, 4, -68, false, 0, true));
-                    engine.write(engine.element(pointer(value3), value1, 4, -68, false, 0, true), member2482_, 4);
-                    value1 = member2485_;
-                    {
-                        const auto previous = memberView<std::int32_t>(member1938_, (std::size_t{4} * word(engine.elementIndex(value1, -200, true))));
-                        const auto updated = add32(previous, 1);
-                        setMemberView(member1938_, (std::size_t{4} * word(engine.elementIndex(value1, -200, true))), storedValue<std::int32_t>(updated));
-                        value1 = updated;
-                    }
-                }
-            }
-            engine.invoke<void>(Builtin::System, 22);
-            {
-                const auto previous = member2482_;
-                const auto updated = add32(previous, 1);
-                member2482_ = storedValue<std::int32_t>(updated);
-                value1 = updated;
-            }
-            member2484_ = shifted(member2484_, 152);
-            engine.checkpoint();
-            continue;
-            break;
         }
+    }
+    if (descriptor < 0)
         return;
-    }
-    member2482_ = 0;
-    while (true)
+
+    uniqueDefinitions_.assign(3000, UniqueDefinition{});
+    for (std::size_t index = 0; index < uniqueDefinitions_.size(); ++index)
     {
+        UniqueDefinition record;
+        if (!readUniqueDefinition(descriptor, record))
+            break;
+        uniqueDefinitions_[index] = std::move(record);
         engine.checkpoint();
-        if (member2482_ >= 50)
-        {
-            goto branch4;
-        }
-        g_sfera_mbc_runtime.checkEngineFailure();
-        value1 = g_sfera_files.openOwned(SferaText::terminated(memberBytes(member2486_)), _O_RDONLY, engine.current.module->lifetime);
-        member2483_ = value1;
-        if (!(member2483_ < 0))
-        {
-            goto branch4;
-        }
-        if (!(member2482_ != 49))
-        {
-            goto branch14;
-        }
-        {
-            const auto previous = member2482_;
-            const auto updated = add32(previous, 1);
-            member2482_ = storedValue<std::int32_t>(updated);
-            value1 = updated;
-        }
-        engine.checkpoint();
-        continue;
     }
-    branch14: ;
-    return;
+    g_sfera_mbc_runtime.checkEngineFailure();
+    g_sfera_files.release(descriptor);
+
+    availableUniqueDefinitions_.clear();
+    for (auto &group : uniqueDefinitionsByGroup_)
+        group.clear();
+
+    for (std::size_t index = 0; index < uniqueDefinitions_.size(); ++index)
+    {
+        const auto &record = uniqueDefinitions_[index];
+        const auto recordIndex = static_cast<std::int32_t>(index);
+        if (record.remaining > 0 && record.active)
+            availableUniqueDefinitions_.push_back(recordIndex);
+
+        if (record.group >= 0 && std::cmp_less(record.group, uniqueDefinitionsByGroup_.size()) && record.id != 0)
+            uniqueDefinitionsByGroup_.begin()[record.group].push_back(recordIndex);
+        engine.checkpoint();
+    }
 }
 
 String MbcMain::GetUBonus()
 {
     FunctionScope context(*this, "GetUBonus");
     Host &engine = host();
-    float value1;
-    std::int32_t value2;
-    IntRef value3;
 
-    member2488_ = storedValue<String>(0);
-    while (true)
+    while (!availableUniqueDefinitions_.empty())
     {
-        engine.checkpoint();
-        if (!(member1912_ > 0))
+        const auto randomIndex = integer(SferaNumeric::real32(
+            double(realBits(randomReal())) * double(availableUniqueDefinitions_.size())));
+        const auto selection = std::clamp<std::int32_t>(randomIndex, 0,
+            static_cast<std::int32_t>(availableUniqueDefinitions_.size() - 1));
+        const auto position = availableUniqueDefinitions_.begin() + selection;
+        const auto recordIndex = *position;
+        if (recordIndex < 0 || std::cmp_greater_equal(recordIndex, uniqueDefinitions_.size()))
         {
-            goto branch4;
+            availableUniqueDefinitions_.erase(position);
+            continue;
         }
-        value1 = randomReal();
-        member2492_ = integer(SferaNumeric::real32(double(realBits(value1)) * double(realBits(real(member1912_)))));
-        value2 = integerBits(engine.current.module->processId);
-        value2 = UniqueLine(value2, memberView<std::int32_t>(member1914_, (std::size_t{4} * word(engine.elementIndex(member2492_, -50, true)))), -1, -1, -1, -1, argumentValue<String>(0), -1, -1, storedValue<String>(address(member2490_)));
-        if (!(value2 == 0))
+
+        auto &record = uniqueDefinitions_.begin()[recordIndex];
+        if (record.remaining <= 0)
         {
-            goto branch6;
+            availableUniqueDefinitions_.erase(position);
+            continue;
         }
-        member2493_ = storedValue<IntRef>(storedValue<String>(address(member2490_)));
-        if (!(engine.read<std::int32_t>(engine.element(pointer(member2493_), 34, 4, 0, false, 0, false)) <= 0))
-        {
-            goto branch8;
-        }
-        if (!(member2492_ >= subtract32(member1912_, 1)))
-        {
-            engine.copyBytes(pointer(shifted(storedValue<IntRef>(address(member1914_)), multiply32(4, member2492_))), pointer(shifted(shifted(storedValue<IntRef>(address(member1914_)), multiply32(4, member2492_)), 4)), word(integer(multiply32(subtract32(member1912_, member2492_), 4))));
-        }
-        {
-            const auto previous = member1912_;
-            const auto updated = subtract32(previous, 1);
-            member1912_ = storedValue<std::int32_t>(updated);
-            value2 = updated;
-        }
-        engine.checkpoint();
-        continue;
+
+        const auto remaining = record.remaining - 1;
+        if (UniqueLine(integerBits(engine.current.module->processId), recordIndex, -1, -1, -1, -1,
+                       argumentValue<String>(0), remaining, -1, argumentValue<String>(0)) != 0)
+            return {};
+
+        return reference<String>(uniqueDefinitions_.begin()[recordIndex].text);
     }
-    branch4: ;
-    return member2488_;
-    branch6: ;
-    return member2488_;
-    branch8: ;
-    value3 = member2493_;
-    {
-        const auto previous = engine.read<std::int32_t>(engine.element(pointer(value3), 34, 4, 0, false, 0, false));
-        const auto updated = subtract32(previous, 1);
-        engine.write(engine.element(pointer(value3), 34, 4, 0, false, 0, false), storedValue<std::int32_t>(updated), 4);
-        value2 = updated;
-    }
-    value2 = integerBits(engine.current.module->processId);
-    value2 = UniqueLine(value2, memberView<std::int32_t>(member1914_, (std::size_t{4} * word(engine.elementIndex(member2492_, -50, true)))), -1, -1, -1, -1, argumentValue<String>(0), engine.read<std::int32_t>(engine.element(pointer(member2493_), 34, 4, 0, false, 0, false)), -1, argumentValue<String>(0));
-    if (!(value2 != 0))
-    {
-        member2488_ = shifted(storedValue<String>(address(member2490_)), 16);
-    }
-    return member2488_;
+    return {};
 }
 
-std::int32_t MbcMain::UniqueLine(std::int32_t parameter1, std::int32_t parameter2, std::int32_t parameter3, std::int32_t parameter4, std::int32_t parameter5, std::int32_t parameter6, String parameter7, std::int32_t parameter8, std::int32_t parameter9, String parameter10)
+std::int32_t MbcMain::UniqueLine(std::int32_t parameter1, std::int32_t recordIndex, std::int32_t id, std::int32_t group,
+                                     std::int32_t initialRemaining, std::int32_t active, String text,
+                                     std::int32_t remaining, std::int32_t refreshGroup, String output)
 {
     FunctionScope context(*this, "UniqueLine");
     Host &engine = host();
-    member2494_ = parameter1;
-    member2495_ = parameter2;
-    member2496_ = parameter3;
-    member2497_ = parameter4;
-    member2498_ = parameter5;
-    member2499_ = parameter6;
-    member2500_ = parameter7;
-    member2501_ = parameter8;
-    member2502_ = parameter9;
-    member2503_ = parameter10;
-    std::int32_t value1;
-    String value2;
-    std::int32_t value3;
-    IntRef value4;
+    (void)parameter1;
 
-    if (!(member2495_ >= 0))
+    const bool exportOnly = integerBits(output) != 0;
+    if (recordIndex < 0 && (group < 0 || refreshGroup <= 0 || exportOnly))
+        return -1;
+    if (recordIndex >= 3000)
+        return -1;
+
+    int descriptor = -1;
+    for (std::int32_t attempt = 0; attempt < 50 && descriptor < 0; ++attempt)
     {
-        value1 = member2497_;
-        if (value1 < 0)
+        g_sfera_mbc_runtime.checkEngineFailure();
+        descriptor = g_sfera_files.openOwned(SferaText::terminated(memberBytes(exportOnly ? member2515_ : member2516_)),
+                                              exportOnly ? _O_RDONLY : _O_RDWR, engine.current.module->lifetime);
+        engine.checkpoint();
+    }
+    if (descriptor < 0)
+        return -1;
+
+    UniqueDefinition record;
+    std::int32_t selectedIndex = recordIndex;
+    if (recordIndex >= 0)
+    {
+        g_sfera_mbc_runtime.checkEngineFailure();
+        if (::_lseek(descriptor, multiply32(recordIndex, uniqueRecordSize), SEEK_SET) < 0 || !readUniqueDefinition(descriptor, record))
         {
-            value1 = std::int32_t(value1 < 0);
-        }
-        else
-        {
-            value1 = member2502_;
-            value1 = std::int32_t(value1 <= 0);
-        }
-        if (!(value1 != 0))
-        {
-            value2 = member2503_;
-            value1 = std::int32_t(integerBits(value2) != 0);
-        }
-        if (!(value1 == 0))
-        {
+            g_sfera_files.release(descriptor);
             return -1;
         }
-        member2495_ = -2;
-        goto branch2;
-    }
-    branch2: ;
-    if (!(member2495_ < 3000))
-    {
-        return -1;
-    }
-    member2504_ = 0;
-    while (true)
-    {
-        engine.checkpoint();
-        if (member2504_ >= 50)
+        if (exportOnly)
         {
-            goto branch11;
-        }
-        if (integerBits(member2503_) == 0)
-        {
-            g_sfera_mbc_runtime.checkEngineFailure();
-            value1 = g_sfera_files.openOwned(SferaText::terminated(memberBytes(member2516_)), _O_RDWR, engine.current.module->lifetime);
-            member2505_ = value1;
-        }
-        else
-        {
-            g_sfera_mbc_runtime.checkEngineFailure();
-            value1 = g_sfera_files.openOwned(SferaText::terminated(memberBytes(member2515_)), _O_RDONLY, engine.current.module->lifetime);
-            member2505_ = value1;
-        }
-        if (!(member2505_ < 0))
-        {
-            goto branch11;
-        }
-        if (!(member2504_ != 49))
-        {
-            goto branch33;
-        }
-        {
-            const auto previous = member2504_;
-            const auto updated = add32(previous, 1);
-            member2504_ = storedValue<std::int32_t>(updated);
-            value1 = updated;
-        }
-        engine.checkpoint();
-        continue;
-    }
-    branch11: ;
-    if (member2495_ != -2)
-    {
-        g_sfera_mbc_runtime.checkEngineFailure();
-        ::_lseek(member2505_, multiply32(member2495_, 152), SEEK_SET);
-        g_sfera_mbc_runtime.checkEngineFailure();
-        g_sfera_files.readSome(member2505_, SferaBinary::range(memberBytes(member2513_), 0, word(152)));
-        if (!(integerBits(member2503_) == 0))
-        {
-            value1 = member2494_;
-            value2 = member2503_;
-            value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<String>(address(member2513_)), 152);
-            g_sfera_mbc_runtime.checkEngineFailure();
-            g_sfera_files.release(member2505_);
+            exportUniqueDefinition(engine, output, record);
+            g_sfera_files.release(descriptor);
             return 0;
         }
-        member2506_ = storedValue<IntRef>(storedValue<String>(address(member2513_)));
-        member2504_ = 0;
-        if (!(member2496_ <= 0))
-        {
-            value4 = member2506_;
-            value1 = engine.read<std::int32_t>(engine.element(pointer(value4), 0, 4, 0, false, 0, false));
-            engine.write(engine.element(pointer(value4), 0, 4, 0, false, 0, false), member2496_, 4);
-            member2504_ = 1;
-        }
-        if (!(member2497_ < 0))
-        {
-            value4 = member2506_;
-            value1 = engine.read<std::int32_t>(engine.element(pointer(value4), 1, 4, 0, false, 0, false));
-            engine.write(engine.element(pointer(value4), 1, 4, 0, false, 0, false), member2497_, 4);
-            member2504_ = 1;
-        }
-        if (!(member2498_ < 0))
-        {
-            value4 = member2506_;
-            value1 = engine.read<std::int32_t>(engine.element(pointer(value4), 2, 4, 0, false, 0, false));
-            engine.write(engine.element(pointer(value4), 2, 4, 0, false, 0, false), member2498_, 4);
-            member2504_ = 1;
-        }
-        if (!(member2499_ < 0))
-        {
-            value4 = member2506_;
-            value1 = engine.read<std::int32_t>(engine.element(pointer(value4), 3, 4, 0, false, 0, false));
-            engine.write(engine.element(pointer(value4), 3, 4, 0, false, 0, false), member2499_, 4);
-            member2504_ = 1;
-        }
-        if (!(integerBits(member2500_) == 0))
-        {
-            value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, engine.read<std::int32_t>(engine.element(pointer(member2506_), 4, 4, 0, false, 0, false)), member2494_, member2500_);
-            member2504_ = 1;
-        }
-        if (!(member2501_ < 0))
-        {
-            value4 = member2506_;
-            value1 = engine.read<std::int32_t>(engine.element(pointer(value4), 34, 4, 0, false, 0, false));
-            engine.write(engine.element(pointer(value4), 34, 4, 0, false, 0, false), member2501_, 4);
-            member2504_ = 1;
-        }
-        if (member2502_ <= 0)
-        {
-            branch47: ;
-            if (!(member2504_ == 0))
-            {
-                g_sfera_mbc_runtime.checkEngineFailure();
-                ::_lseek(member2505_, multiply32(member2495_, 152), SEEK_SET);
-                g_sfera_mbc_runtime.checkEngineFailure();
-                g_sfera_files.writeSome(member2505_, SferaBinary::range(memberBytes(member2513_), 0, word(152)));
-            }
-            g_sfera_mbc_runtime.checkEngineFailure();
-            g_sfera_files.release(member2505_);
-            return 0;
-        }
-        value4 = member2506_;
-        {
-            const auto previous = engine.read<std::int32_t>(engine.element(pointer(value4), 35, 4, 0, false, 0, false));
-            const auto updated = add32(previous, 1);
-            engine.write(engine.element(pointer(value4), 35, 4, 0, false, 0, false), storedValue<std::int32_t>(updated), 4);
-            value1 = updated;
-        }
-        member2511_ = value1;
-        member2508_ = engine.read<std::int32_t>(engine.element(pointer(member2506_), 1, 4, 0, false, 0, false));
-        branch36: ;
-        value4 = member2506_;
-        value1 = engine.read<std::int32_t>(engine.element(pointer(value4), 34, 4, 0, false, 0, false));
-        engine.write(engine.element(pointer(value4), 34, 4, 0, false, 0, false), engine.read<std::int32_t>(engine.element(pointer(member2506_), 2, 4, 0, false, 0, false)), 4);
-        if (!(member2495_ < 0))
-        {
-            g_sfera_mbc_runtime.checkEngineFailure();
-            ::_lseek(member2505_, multiply32(member2495_, 152), SEEK_SET);
-            g_sfera_mbc_runtime.checkEngineFailure();
-            g_sfera_files.writeSome(member2505_, SferaBinary::range(memberBytes(member2513_), 0, word(152)));
-        }
-        value1 = member2508_;
-        if (value1 < 0)
-        {
-            value1 = std::int32_t(value1 >= 0);
-        }
-        else
-        {
-            value1 = member2508_;
-            value1 = std::int32_t(value1 < 200);
-        }
-        if (value1 == 0)
-        {
-            goto branch47;
-        }
-        member2509_ = memberView<std::int32_t>(member1938_, (std::size_t{4} * word(engine.elementIndex(member2508_, -200, true))));
-        member2504_ = 0;
-        while (true)
-        {
-            engine.checkpoint();
-            if (member2504_ >= member2509_)
-            {
-                break;
-            }
-            member2510_ = engine.read<std::int32_t>(engine.element(pointer(storedValue<IntRef>(engine.element(pointer(address(member1940_)), member2508_, 272, 200, true, 54400, true))), member2504_, 4, -68, false, 0, true));
-            value1 = member2510_;
-            if (value1 < 0)
-            {
-                value1 = std::int32_t(value1 >= 0);
-            }
-            else
-            {
-                value1 = member2510_;
-                value1 = std::int32_t(value1 < 3000);
-            }
-            if (!(value1 == 0))
-            {
-                g_sfera_mbc_runtime.checkEngineFailure();
-                ::_lseek(member2505_, multiply32(member2510_, 152), SEEK_SET);
-                g_sfera_mbc_runtime.checkEngineFailure();
-                g_sfera_files.readSome(member2505_, SferaBinary::range(memberBytes(member2513_), 0, word(152)));
-                value4 = member2506_;
-                value1 = engine.read<std::int32_t>(engine.element(pointer(value4), 34, 4, 0, false, 0, false));
-                engine.write(engine.element(pointer(value4), 34, 4, 0, false, 0, false), engine.read<std::int32_t>(engine.element(pointer(member2506_), 2, 4, 0, false, 0, false)), 4);
-                value4 = member2506_;
-                value1 = engine.read<std::int32_t>(engine.element(pointer(value4), 35, 4, 0, false, 0, false));
-                engine.write(engine.element(pointer(value4), 35, 4, 0, false, 0, false), member2511_, 4);
-                member2507_ = storedValue<IntRef>(shifted(member1970_, multiply32(1, multiply32(member2510_, 152))));
-                value4 = member2507_;
-                value1 = engine.read<std::int32_t>(engine.element(pointer(value4), 35, 4, 0, false, 0, false));
-                engine.write(engine.element(pointer(value4), 35, 4, 0, false, 0, false), member2511_, 4);
-                g_sfera_mbc_runtime.checkEngineFailure();
-                ::_lseek(member2505_, multiply32(member2510_, 152), SEEK_SET);
-                g_sfera_mbc_runtime.checkEngineFailure();
-                g_sfera_files.writeSome(member2505_, SferaBinary::range(memberBytes(member2513_), 0, word(152)));
-            }
-            {
-                const auto previous = member2504_;
-                const auto updated = add32(previous, 1);
-                member2504_ = storedValue<std::int32_t>(updated);
-                value1 = updated;
-            }
-            engine.checkpoint();
-            continue;
-            break;
-        }
-        g_sfera_mbc_runtime.checkEngineFailure();
-        ::_lseek(member2505_, 0, SEEK_SET);
-        LoadUnique(member2505_);
-        return 0;
-    }
-    member2508_ = member2497_;
-    member2507_ = storedValue<IntRef>(shifted(member1970_, 4));
-    member2504_ = 0;
-    while (true)
-    {
-        engine.checkpoint();
-        if (member2504_ >= 3000)
-        {
-            goto branch25;
-        }
-        if (!(engine.read<std::int32_t>(engine.indirect(payload(member2507_))) != member2508_))
-        {
-            goto branch31;
-        }
-        {
-            const auto previous = member2504_;
-            const auto updated = add32(previous, 1);
-            member2504_ = storedValue<std::int32_t>(updated);
-            value1 = updated;
-        }
-        member2507_ = shifted(member2507_, 152);
-        engine.checkpoint();
-        continue;
-    }
-    branch25: ;
-    g_sfera_mbc_runtime.checkEngineFailure();
-    g_sfera_files.release(member2505_);
-    return -1;
-    branch31: ;
-    member2511_ = engine.read<std::int32_t>(engine.element(pointer(member2507_), 34, 4, 0, false, 0, false));
-    {
-        const auto previous = member2511_;
-        const auto updated = add32(previous, 1);
-        member2511_ = storedValue<std::int32_t>(updated);
-        value1 = updated;
-    }
-    member2506_ = storedValue<IntRef>(storedValue<String>(address(member2513_)));
-    goto branch36;
-    branch33: ;
-    return -1;
-}
-
-std::int32_t MbcMain::TestUnique(std::int32_t parameter1, std::int32_t parameter2)
-{
-    FunctionScope context(*this, "TestUnique");
-    Host &engine = host();
-    member2517_ = parameter1;
-    member2518_ = parameter2;
-    std::int32_t value1;
-
-    value1 = member2517_;
-    if (value1 < 0)
-    {
-        value1 = std::int32_t(value1 < 0);
     }
     else
     {
-        value1 = member2517_;
-        value1 = std::int32_t(value1 >= 3000);
+        const auto found = std::find_if(uniqueDefinitions_.begin(), uniqueDefinitions_.end(), [group](const UniqueDefinition &candidate)
+        {
+            return candidate.group == group;
+        });
+        if (found == uniqueDefinitions_.end())
+        {
+            g_sfera_files.release(descriptor);
+            return -1;
+        }
+        selectedIndex = static_cast<std::int32_t>(found - uniqueDefinitions_.begin());
+        record = *found;
     }
-    if (!(value1 == 0))
+
+    bool changed = false;
+    if (recordIndex >= 0)
     {
-        return -1;
+        if (id > 0)
+        {
+            record.id = id;
+            changed = true;
+        }
+        if (group >= 0)
+        {
+            record.group = group;
+            changed = true;
+        }
+        if (initialRemaining >= 0)
+        {
+            record.initialRemaining = initialRemaining;
+            changed = true;
+        }
+        if (active >= 0)
+        {
+            record.active = active != 0;
+            changed = true;
+        }
+        if (integerBits(text) != 0)
+        {
+            record.text = engine.stringValue(pointer(text));
+            changed = true;
+        }
+        if (remaining >= 0)
+        {
+            record.remaining = remaining;
+            changed = true;
+        }
     }
-    member2520_ = storedValue<IntRef>(shifted(member1970_, multiply32(1, multiply32(member2517_, 152))));
-    if (!(member2518_ != -2))
+
+    if (refreshGroup <= 0)
     {
-        return engine.read<std::int32_t>(engine.element(pointer(member2520_), 35, 4, 0, false, 0, false));
+        if (changed)
+        {
+            g_sfera_mbc_runtime.checkEngineFailure();
+            if (::_lseek(descriptor, multiply32(selectedIndex, uniqueRecordSize), SEEK_SET) < 0 || !writeUniqueDefinition(descriptor, record))
+            {
+                g_sfera_files.release(descriptor);
+                return -1;
+            }
+            uniqueDefinitions_.begin()[selectedIndex] = record;
+        }
+        g_sfera_files.release(descriptor);
+        return 0;
     }
-    if (member2518_ != engine.read<std::int32_t>(engine.element(pointer(member2520_), 35, 4, 0, false, 0, false)))
+
+    const auto revision = recordIndex >= 0 ? record.revision + 1 : record.remaining + 1;
+    const auto selectedGroup = record.group;
+    record.remaining = record.initialRemaining;
+    record.revision = revision;
+
+    if (recordIndex >= 0)
     {
-        return -1;
+        g_sfera_mbc_runtime.checkEngineFailure();
+        if (::_lseek(descriptor, multiply32(selectedIndex, uniqueRecordSize), SEEK_SET) < 0 || !writeUniqueDefinition(descriptor, record))
+        {
+            g_sfera_files.release(descriptor);
+            return -1;
+        }
+        uniqueDefinitions_.begin()[selectedIndex] = record;
     }
+
+    if (selectedGroup >= 0 && std::cmp_less(selectedGroup, uniqueDefinitionsByGroup_.size()))
+    {
+        for (const auto relatedIndex : uniqueDefinitionsByGroup_.begin()[selectedGroup])
+        {
+            if (relatedIndex < 0 || std::cmp_greater_equal(relatedIndex, uniqueDefinitions_.size()))
+                continue;
+
+            UniqueDefinition related;
+            g_sfera_mbc_runtime.checkEngineFailure();
+            if (::_lseek(descriptor, multiply32(relatedIndex, uniqueRecordSize), SEEK_SET) < 0 || !readUniqueDefinition(descriptor, related))
+                continue;
+            related.remaining = related.initialRemaining;
+            related.revision = revision;
+            uniqueDefinitions_.begin()[relatedIndex] = related;
+
+            g_sfera_mbc_runtime.checkEngineFailure();
+            if (::_lseek(descriptor, multiply32(relatedIndex, uniqueRecordSize), SEEK_SET) >= 0)
+                writeUniqueDefinition(descriptor, related);
+            engine.checkpoint();
+        }
+    }
+
+    g_sfera_mbc_runtime.checkEngineFailure();
+    ::_lseek(descriptor, 0, SEEK_SET);
+    LoadUnique(descriptor);
     return 0;
+}
+
+std::int32_t MbcMain::TestUnique(std::int32_t recordIndex, std::int32_t revision)
+{
+    FunctionScope context(*this, "TestUnique");
+    if (recordIndex < 0 || std::cmp_greater_equal(recordIndex, uniqueDefinitions_.size()))
+        return -1;
+
+    const auto currentRevision = uniqueDefinitions_.begin()[recordIndex].revision;
+    if (revision == -2)
+        return currentRevision;
+    return revision == currentRevision ? 0 : -1;
 }
 
 Task<void> MbcMain::EError()
@@ -27684,7 +26348,7 @@ Task<std::int32_t> MbcMain::LoadPreset(std::int32_t parameter1, String parameter
     float value5;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member1881_)), member2523_, member2524_);
+    engine.copyString(pointer(storedValue<String>(address(member1881_))), pointer(member2524_));
     value1 = (g_sfera_config_text_runtime.load(SferaText::terminated(memberBytes(member1881_))) ? 0 : -1);
     if (!(value1 == 0))
     {
@@ -27951,7 +26615,7 @@ std::int32_t MbcMain::GetXYZ2(std::int32_t parameter1, AddressRef parameter2)
     value1 = member2547_;
     value2 = member2548_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(address(member2549_)), 12);
+    engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(address(member2549_))), word(integer(12)));
     return 0;
 }
 
@@ -28134,7 +26798,7 @@ Task<void> MbcMain::Client()
             while (true)
             {
                 engine.checkpoint();
-                engine.invoke<void>(Builtin::Disconnect);
+                g_sfera_network_runtime.shutdown();
                 value1 = std::int32_t(memberView<std::int8_t>(member2579_, 0));
                 setMemberView(member2579_, 0, storedValue<std::int8_t>(0));
                 value1 = (g_sfera_config_text_runtime.load(SferaText::terminated(memberBytes(member2604_))) ? 0 : -1);
@@ -28459,7 +27123,7 @@ std::int32_t MbcMain::GETLG(std::int32_t parameter1, String parameter2)
     value1 = member2643_;
     value2 = member2644_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member1974_)));
+    engine.copyString(pointer(value2), pointer(storedValue<String>(address(member1974_))));
     return 0;
 }
 
@@ -28476,7 +27140,7 @@ std::int32_t MbcMain::GETPD(std::int32_t parameter1, String parameter2)
     value1 = member2645_;
     value2 = member2646_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member1976_)));
+    engine.copyString(pointer(value2), pointer(storedValue<String>(address(member1976_))));
     return 0;
 }
 
@@ -29701,11 +28365,11 @@ std::int32_t MbcMain::ChatHdl(std::int32_t parameter1, IntRef parameter2, IntRef
     value1 = member2787_;
     value2 = member2788_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(address(member2721_)), 4);
+    engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(address(member2721_))), word(integer(4)));
     value1 = member2787_;
     value2 = member2789_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(address(member2723_)), 4);
+    engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(address(member2723_))), word(integer(4)));
     return 0;
 }
 
@@ -29824,7 +28488,7 @@ Task<std::int32_t> MbcMain::getPlayerIDByName(String parameter1)
     while (true)
     {
         engine.checkpoint();
-        value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, 2, member2813_);
+        value1 = g_sfera_mbc_runtime.nextProcessByModule(2, member2813_);
         member2813_ = value1;
         if (value1 < 0)
         {
@@ -30621,11 +29285,11 @@ std::int32_t MbcMain::GetRoomCoord(std::int32_t parameter1, std::int32_t paramet
         value1 = member2889_;
         value3 = member2891_;
         value4 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, value3, value4, storedValue<AddressRef>(address(member2893_)), 12);
+        engine.copyBytes(pointer(value3), pointer(storedValue<AddressRef>(address(member2893_))), word(integer(12)));
         return 0;
     }
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(address(member2893_)), member2889_, member2891_, 12);
+    engine.copyBytes(pointer(storedValue<AddressRef>(address(member2893_))), pointer(member2891_), word(integer(12)));
     value2 = memberView<float>(member2893_, 0);
     setMemberView(member2893_, 0, SferaNumeric::real32(double(realBits(memberView<float>(member2893_, 0))) + double(realBits(4000.0f))));
     value2 = memberView<float>(member2893_, 4);
@@ -30672,8 +29336,6 @@ std::int32_t MbcMain::GetRoom(std::int32_t parameter1, std::int32_t parameter2)
     member2897_ = parameter1;
     member2898_ = parameter2;
     std::int32_t value1;
-    IntRef value2;
-    std::int32_t value3;
 
     if (member2897_ >= 0)
     {
@@ -30695,9 +29357,7 @@ std::int32_t MbcMain::GetRoom(std::int32_t parameter1, std::int32_t parameter2)
         if (!(member2898_ != 0))
         {
             value1 = member2897_;
-            value2 = member1903_;
-            value3 = engine.read<std::int32_t>(engine.element(pointer(value2), value1, 4, 0, false, 0, false));
-            engine.write(engine.element(pointer(value2), value1, 4, 0, false, 0, false), 0, 4);
+            member1903_[std::size_t{word(value1)}] = 0;
             return 0;
         }
         if (!(member2898_ <= 0))
@@ -30706,18 +29366,16 @@ std::int32_t MbcMain::GetRoom(std::int32_t parameter1, std::int32_t parameter2)
             if (!(std::int32_t(!truth(value1)) == 0))
             {
                 value1 = member2897_;
-                value2 = member1903_;
-                value3 = engine.read<std::int32_t>(engine.element(pointer(value2), value1, 4, 0, false, 0, false));
-                engine.write(engine.element(pointer(value2), value1, 4, 0, false, 0, false), member2898_, 4);
+                member1903_[std::size_t{word(value1)}] = member2898_;
             }
         }
-        return engine.read<std::int32_t>(engine.element(pointer(member1903_), member2897_, 4, 0, false, 0, false));
+        return member1903_[std::size_t{word(member2897_)}];
     }
     member2900_ = member2899_;
     while (true)
     {
         engine.checkpoint();
-        if (engine.read<std::int32_t>(engine.element(pointer(member1903_), member2899_, 4, 0, false, 0, false)) == 0)
+        if (member1903_[std::size_t{word(member2899_)}] == 0)
         {
             goto branch9;
         }
@@ -30741,9 +29399,7 @@ std::int32_t MbcMain::GetRoom(std::int32_t parameter1, std::int32_t parameter2)
     }
     branch9: ;
     value1 = member2899_;
-    value2 = member1903_;
-    value3 = engine.read<std::int32_t>(engine.element(pointer(value2), value1, 4, 0, false, 0, false));
-    engine.write(engine.element(pointer(value2), value1, 4, 0, false, 0, false), member2898_, 4);
+    member1903_[std::size_t{word(value1)}] = member2898_;
     return add32(member2899_, 5000);
     branch18: ;
     return -1;
@@ -30754,7 +29410,7 @@ std::int32_t MbcMain::ClearRooms()
     FunctionScope context(*this, "ClearRooms");
     Host &engine = host();
 
-    engine.fillBytes(pointer(member1903_), SferaNumeric::lowByte(0), 108000u);
+    member1903_.fill(0);
     return 0;
 }
 
@@ -30795,7 +29451,7 @@ std::int32_t MbcMain::GetSpecial(std::int32_t parameter1, std::int32_t parameter
     value1 = member2901_;
     value2 = member2903_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, shifted(storedValue<FloatRef>(address(member1896_)), multiply32(4, multiply32(member2902_, 7))), 24);
+    engine.copyBytes(pointer(value2), pointer(shifted(storedValue<FloatRef>(address(member1896_)), multiply32(4, multiply32(member2902_, 7)))), word(integer(24)));
     return 0;
 }
 
@@ -30867,11 +29523,11 @@ std::int32_t MbcMain::GetMName(std::int32_t parameter1, std::int32_t parameter2,
         member2914_ = divide32(member2914_, 300);
         value1 = integerBits(engine.namedValue(SferaText::terminated(memberBytes(member2929_, 0)), subtract32(member2914_, multiply32(divide32(member2914_, 300), 300))));
         member2919_ = value1;
-        engine.invoke<void>(Builtin::FormatText, storedValue<String>(address(member1881_)), storedValue<String>(address(member2930_)), shifted(member1952_, multiply32(1, member2917_)), shifted(member1952_, multiply32(1, member2918_)), shifted(member1952_, multiply32(1, member2919_)));
+        engine.invoke<void>(Builtin::FormatText, storedValue<String>(address(member1881_)), storedValue<String>(address(member2930_)), reference<String>(member1952_, word(multiply32(1, member2917_))), reference<String>(member1952_, word(multiply32(1, member2918_))), reference<String>(member1952_, word(multiply32(1, member2919_))));
         value1 = member2913_;
         value2 = member2915_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member1881_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(address(member1881_))));
         branch4: ;
         return 0;
     }
@@ -30884,14 +29540,14 @@ std::int32_t MbcMain::GetMName(std::int32_t parameter1, std::int32_t parameter2,
             value1 = member2913_;
             value2 = member2915_;
             value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member2921_)));
+            engine.copyString(pointer(value2), pointer(storedValue<String>(address(member2921_))));
         }
         else
         {
             value1 = member2913_;
             value2 = member2915_;
             value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, shifted(member1952_, multiply32(1, member2917_)));
+            engine.copyString(pointer(value2), pointer(shifted(member1952_, multiply32(1, member2917_))));
         }
         return 0;
     }
@@ -30911,11 +29567,11 @@ std::int32_t MbcMain::GetMName(std::int32_t parameter1, std::int32_t parameter2,
         value1 = integerBits(engine.namedValue(SferaText::terminated(memberBytes(member2923_, 0)), subtract32(divide32(member2914_, 1000000), 1)));
         member2918_ = value1;
     }
-    engine.invoke<void>(Builtin::FormatText, storedValue<String>(address(member1881_)), storedValue<String>(address(member2926_)), shifted(member1952_, multiply32(1, member2917_)), shifted(member1952_, multiply32(1, member2918_)));
+    engine.invoke<void>(Builtin::FormatText, storedValue<String>(address(member1881_)), storedValue<String>(address(member2926_)), reference<String>(member1952_, word(multiply32(1, member2917_))), reference<String>(member1952_, word(multiply32(1, member2918_))));
     value1 = member2913_;
     value2 = member2915_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member1881_)));
+    engine.copyString(pointer(value2), pointer(storedValue<String>(address(member1881_))));
     goto branch4;
 }
 
@@ -31260,11 +29916,10 @@ std::int32_t MbcMain::LoadIgnoreList()
     std::int32_t value1;
     String value2;
 
-    if (!(integerBits(member1972_) != 0))
+    if (member1972_.empty())
     {
-        engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member1972_)), multiply32(20, member1942_));
+        member1972_.assign(std::size_t(word(member1942_)), std::string{});
     }
-    engine.fillBytes(pointer(member1972_), SferaNumeric::lowByte(0), word(integer(multiply32(20, member1942_))));
     g_sfera_mbc_runtime.checkEngineFailure();
     value1 = g_sfera_files.openOwned(SferaText::terminated(memberBytes(member2971_)), _O_RDWR, engine.current.module->lifetime);
     member2969_ = value1;
@@ -31362,7 +30017,7 @@ std::int32_t MbcMain::LoadIgnoreList()
             engine.checkpoint();
             continue;
         }
-        engine.copyString(pointer(shifted(member1972_, multiply32(1, multiply32(20, member2968_)))), memberBytes(member2965_));
+        member1972_[std::size_t{word(member2968_)}] = SferaText::terminated(memberBytes(member2965_));
         {
             const auto previous = member2968_;
             const auto updated = add32(previous, 1);
@@ -31392,12 +30047,11 @@ std::int32_t MbcMain::IgnoreSender(String parameter1)
     member2973_ = parameter1;
     std::int32_t value1;
     String value2;
-    String value3;
     std::int32_t value4;
 
     engine.borrowReference(member2973_);
     member2977_ = 0;
-    if (!(integerBits(member1972_) != 0))
+    if (member1972_.empty())
     {
         value1 = LoadIgnoreList();
     }
@@ -31410,10 +30064,9 @@ std::int32_t MbcMain::IgnoreSender(String parameter1)
             break;
         }
         value2 = member2973_;
-        value3 = member1972_;
         value1 = member2975_;
         value4 = engine.stringLength(pointer(member2973_));
-        value1 = SferaText::compare(engine.stringValue(pointer(argumentValue<Address>(value2)), word(integer(value4))), engine.stringValue(pointer(argumentValue<Address>(shifted(value3, multiply32(1, multiply32(20, value1))))), word(integer(value4))));
+        value1 = SferaText::compare(engine.stringValue(pointer(argumentValue<Address>(value2)), word(integer(value4))), member1972_[std::size_t{word(value1)}].substr(0, word(integer(value4))));
         if (!(value1 != 0))
         {
             goto branch8;
@@ -31944,7 +30597,7 @@ Task<void> MbcMain::SlowSteps()
         while (true)
         {
             engine.checkpoint();
-            value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, 0, member3055_);
+            value1 = g_sfera_mbc_runtime.nextProcessByModule(0, member3055_);
             member3055_ = value1;
             if (value1 < 0)
             {
@@ -31983,65 +30636,6 @@ Task<void> MbcMain::SlowSteps()
     branch6: ;
     engine.invoke<void>(Builtin::System, 22);
     goto branch1;
-}
-
-std::int32_t MbcMain::getMultiobjRecord(std::int32_t parameter1, StringRef parameter2)
-{
-    FunctionScope context(*this, "getMultiobjRecord");
-    Host &engine = host();
-    member3057_ = parameter1;
-    member3058_ = parameter2;
-    std::int32_t value1;
-    StringRef value2;
-    String value3;
-
-    value1 = member3057_;
-    if (0 > value1)
-    {
-        value1 = std::int32_t(0 <= value1);
-    }
-    else
-    {
-        value1 = member3057_;
-        value1 = std::int32_t(value1 < 9000);
-    }
-    if (value1 == 0)
-    {
-        return -1;
-    }
-    value2 = member3058_;
-    value3 = engine.read<String>(engine.indirect(payload(value2)));
-    engine.write(engine.indirect(payload(value2)), shifted(member1956_, multiply32(1, multiply32(member3057_, 280))), 12);
-    return 0;
-}
-
-std::int32_t MbcMain::getMultiobjGroup(String parameter1)
-{
-    FunctionScope context(*this, "getMultiobjGroup");
-    Host &engine = host();
-    member3059_ = parameter1;
-
-    if (integerBits(member3059_) == 0)
-    {
-        return -1;
-    }
-    member3061_ = subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(member3059_), 244, 1, 0, false, 0, false))), 65);
-    return member3061_;
-}
-
-std::int32_t MbcMain::getMultiobjectScrpt(String parameter1, String parameter2)
-{
-    FunctionScope context(*this, "getMultiobjectScrpt");
-    Host &engine = host();
-    member3062_ = parameter1;
-    member3063_ = parameter2;
-
-    if (integerBits(member3062_) == 0)
-    {
-        return -1;
-    }
-    engine.copyBytes(pointer(member3063_), pointer(member3062_), 20u);
-    return 0;
 }
 
 Task<void> MbcMain::ProgressUpdater()
@@ -32458,229 +31052,140 @@ Value MbcMain::loadChatFonts()
     return storedValue<Value>(value1);
 }
 
-std::int32_t MbcMain::computeLinesNumber(String parameter1)
+std::int32_t MbcMain::computeLinesNumber(std::string_view filename)
 {
     FunctionScope context(*this, "computeLinesNumber");
-    Host &engine = host();
-    member3118_ = parameter1;
-    std::int32_t value1;
-    String value2;
-    std::int32_t value3;
-
-    value1 = (g_sfera_config_text_runtime.load(engine.stringValue(pointer(member3118_))) ? 0 : -1);
-    if (!(value1 != -1))
-    {
+    if (!g_sfera_config_text_runtime.load(std::string(filename)))
         return -1;
-    }
-    value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member3120_)), add32(value1, 1));
-    value2 = member3120_;
-    value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(value2)), word(value1));
-    value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    value2 = member3120_;
-    value3 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value2), value1, 1, 0, false, 0, false)));
-    engine.write(engine.element(pointer(value2), value1, 1, 0, false, 0, false), storedValue<std::int8_t>(0), 1);
-    member3121_ = 0;
-    member3122_ = member3120_;
-    while (true)
+
+    const std::string text = g_sfera_config_text_runtime.text();
+    std::int32_t lineCount = 1;
+    std::size_t cursor = 0;
+    while ((cursor = text.find("\r\n", cursor)) != std::string::npos)
     {
-        engine.checkpoint();
-        if (integerBits(member3122_) == 0)
-        {
-            break;
-        }
-        {
-            const auto previous = member3121_;
-            const auto updated = add32(previous, 1);
-            member3121_ = storedValue<std::int32_t>(updated);
-            value1 = updated;
-        }
-        {
-            const auto tail = SferaText::skipLine(engine.memory(pointer(member3122_)));
-            value2 = tail.empty() ? String{} : referenceCast<String>(engine.mapObject(tail.data(), tail.size(), nullptr));
-        }
-        member3122_ = value2;
-        engine.checkpoint();
-        continue;
-        break;
+        ++lineCount;
+        cursor += 2;
     }
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(address(member3120_)));
-    return member3121_;
+    return lineCount;
 }
 
-std::int32_t MbcMain::loadItemIDsAndPrefixes(String parameter1, AddressRef parameter2, std::int32_t parameter3)
+std::int32_t MbcMain::loadItemIDsAndPrefixes(std::string_view filename, std::vector<ShopItemSelection> &items,
+    std::int32_t maximumCount)
 {
     FunctionScope context(*this, "loadItemIDsAndPrefixes");
     Host &engine = host();
-    member3123_ = parameter1;
-    member3124_ = parameter2;
-    member3125_ = parameter3;
-    std::int32_t value1;
-    String value2;
-    std::int32_t value3;
-    AddressRef value4;
-
-    value1 = (g_sfera_config_text_runtime.load(engine.stringValue(pointer(member3123_))) ? 0 : -1);
-    if (!(value1 != -1))
-    {
+    if (!g_sfera_config_text_runtime.load(std::string(filename)))
         return -1;
-    }
-    value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member3126_)), add32(value1, 1));
-    value2 = member3126_;
-    value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(value2)), word(value1));
-    value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    value2 = member3126_;
-    value3 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value2), value1, 1, 0, false, 0, false)));
-    engine.write(engine.element(pointer(value2), value1, 1, 0, false, 0, false), storedValue<std::int8_t>(0), 1);
-    member3127_ = member3126_;
-    member3128_ = 0;
-    while (true)
+
+    const std::string text = g_sfera_config_text_runtime.text();
+    std::string_view remaining = text;
+    std::int32_t loadedCount = 0;
+    const auto readInteger = [](std::string_view &source, std::int32_t &value)
     {
-        engine.checkpoint();
-        if (member3128_ >= member3125_)
-        {
+        const auto result = std::from_chars(source.data(), source.data() + source.size(), value);
+        if (result.ec != std::errc{} || result.ptr == source.data())
+            return false;
+        source.remove_prefix(result.ptr - source.data());
+        return true;
+    };
+
+    while (loadedCount < maximumCount)
+    {
+        ShopItemSelection item;
+        if (!readInteger(remaining, item.objectId))
             break;
-        }
-        value4 = member3124_;
-        value1 = engine.read<std::int32_t>(engine.field(pointer(value4), 0, 4));
-        {
-            const auto tail = SferaText::readInteger(engine.memory(pointer(member3127_)), engine.buffer(pointer(storedValue<IntRef>(engine.field(pointer(value4), 0, 4)))));
-            value2 = tail.empty() ? String{} : referenceCast<String>(engine.mapObject(tail.data(), tail.size(), nullptr));
-        }
-        member3127_ = value2;
-        if (!(integerBits(member3127_) != 0))
-        {
+
+        const auto separatorSize = remaining.find_first_not_of(" \t");
+        if (separatorSize == 0 || separatorSize == std::string_view::npos)
             break;
-        }
-        {
-            const auto tail = SferaText::skipSpaces(engine.memory(pointer(member3127_)));
-            value2 = tail.empty() ? String{} : referenceCast<String>(engine.mapObject(tail.data(), tail.size(), nullptr));
-        }
-        member3127_ = value2;
-        if (!(integerBits(member3127_) != 0))
-        {
+        remaining.remove_prefix(separatorSize);
+
+        if (!readInteger(remaining, item.variant))
             break;
-        }
-        value4 = member3124_;
-        value1 = engine.read<std::int32_t>(engine.field(pointer(value4), 4, 4));
-        {
-            const auto tail = SferaText::readInteger(engine.memory(pointer(member3127_)), engine.buffer(pointer(storedValue<IntRef>(engine.field(pointer(value4), 4, 4)))));
-            value2 = tail.empty() ? String{} : referenceCast<String>(engine.mapObject(tail.data(), tail.size(), nullptr));
-        }
-        member3127_ = value2;
-        if (!(integerBits(member3127_) != 0))
-        {
+
+        const auto lineEnd = remaining.find_first_not_of(" \t");
+        if (lineEnd == std::string_view::npos)
             break;
-        }
-        {
-            const auto tail = SferaText::skipBlankLine(engine.memory(pointer(member3127_)));
-            value2 = tail.empty() ? String{} : referenceCast<String>(engine.mapObject(tail.data(), tail.size(), nullptr));
-        }
-        member3127_ = value2;
-        if (!(integerBits(member3127_) != 0))
-        {
+        remaining.remove_prefix(lineEnd);
+        if (!remaining.starts_with("\r\n"))
             break;
-        }
-        {
-            const auto previous = member3124_;
-            const auto updated = shifted(previous, 8);
-            setMemberView(member3124_, 0, storedValue<std::int32_t>(updated));
-            value4 = updated;
-        }
+        remaining.remove_prefix(2);
+
+        items.push_back(std::move(item));
+        ++loadedCount;
         engine.invoke<void>(Builtin::System, 22);
-        {
-            const auto previous = member3128_;
-            const auto updated = add32(previous, 1);
-            member3128_ = storedValue<std::int32_t>(updated);
-            value1 = updated;
-        }
         engine.checkpoint();
-        continue;
-        break;
     }
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(address(member3126_)));
-    return member3128_;
+    return loadedCount;
 }
 
 Task<Value> MbcMain::dumpShopItems()
 {
     FunctionScope context(*this, "dumpShopItems");
     Host &engine = host();
-    std::int32_t value1;
-    String value2;
+    const std::string filename = "shop_item_ids.txt";
 
-    value1 = computeLinesNumber(storedValue<String>(address(member3130_)));
-    member3129_ = value1;
-    if (!(member3129_ >= 0))
+    const std::int32_t expectedCount = computeLinesNumber(filename);
+    if (expectedCount < 0)
     {
-        value2 = engine.invoke<String>(Builtin::FormattedLog, storedValue<String>(address(member3131_)), storedValue<String>(address(member3132_)));
-        co_return storedValue<Value>(value2);
+        const auto result = engine.invoke<String>(Builtin::FormattedLog, storedValue<String>(address(member3131_)), reference<String>(filename));
+        co_return storedValue<Value>(result);
     }
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<Value>(address(member3134_)), multiply32(8, member3129_));
-    value1 = loadItemIDsAndPrefixes(storedValue<String>(address(member3135_)), member3134_, member3129_);
-    member3129_ = value1;
-    if (!(member3129_ >= 0))
+
+    std::vector<ShopItemSelection> items;
+    const std::int32_t loadedCount = loadItemIDsAndPrefixes(filename, items, expectedCount);
+    if (loadedCount < 0)
     {
-        value2 = engine.invoke<String>(Builtin::FormattedLog, storedValue<String>(address(member3136_)));
-        co_return storedValue<Value>(value2);
+        const auto result = engine.invoke<String>(Builtin::FormattedLog, storedValue<String>(address(member3136_)));
+        co_return storedValue<Value>(result);
     }
-    engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3140_)), member3129_);
-    member3138_ = 0;
-    while (true)
+
+    engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3140_)), loadedCount);
+    MultiObject object;
+    for (const ShopItemSelection &item : items)
     {
-        engine.checkpoint();
-        if (member3138_ >= member3129_)
+        GetMulti(item.objectId, item.variant, object);
+
+        engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3145_)), item.objectId);
+        const auto script = object.script.empty() ? argumentValue<String>(0) : reference<String>(object.script);
+        const auto primary = object.primaryResource.empty() ? argumentValue<String>(0) : reference<String>(object.primaryResource);
+        const auto secondary = object.secondaryResource.empty() ? argumentValue<String>(0) : reference<String>(object.secondaryResource);
+        engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3146_)), script);
+        engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3147_)), primary);
+        engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3148_)), secondary);
+
+        const auto logParameter = [&](std::int32_t parameter)
         {
-            break;
-        }
-        value1 = integerBits(engine.current.module->processId);
-        co_await engine.call(*this, true, 53, value1, engine.read<std::int32_t>(engine.field(pointer(engine.element(pointer(member3134_), member3138_, 8, 0, false, 0, false)), 0, 4)), engine.read<std::int32_t>(engine.field(pointer(engine.element(pointer(member3134_), member3138_, 8, 0, false, 0, false)), 4, 4)), storedValue<String>(address(member3143_)));
-        engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3145_)), engine.read<std::int32_t>(engine.field(pointer(engine.element(pointer(member3134_), member3138_, 8, 0, false, 0, false)), 0, 4)));
-        member3141_ = storedValue<String>(address(member3143_));
-        engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3146_)), member3141_);
-        member3141_ = shifted(member3141_, 20);
-        engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3147_)), member3141_);
-        member3141_ = shifted(member3141_, 20);
-        engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3148_)), member3141_);
-        member3141_ = shifted(member3141_, 20);
-        member3139_ = 0;
-        while (true)
-        {
-            engine.checkpoint();
-            if (member3139_ >= 44)
-            {
-                break;
-            }
-            value2 = engine.readPacked<4>(pointer(member3141_), memberBytes(member3150_));
-            member3141_ = value2;
-            engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3151_)), member3150_);
-            {
-                const auto previous = member3139_;
-                const auto updated = add32(previous, 1);
-                member3139_ = storedValue<std::int32_t>(updated);
-                value1 = updated;
-            }
-            engine.checkpoint();
-            continue;
-            break;
-        }
+            engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3151_)), parameter);
+        };
+        logParameter(object.parameters.mergeMode);
+        logParameter(object.parameters.primaryScale);
+        for (const auto parameter : object.parameters.fixedValues)
+            logParameter(parameter);
+        for (const auto parameter : object.parameters.conditionalScaledValues)
+            logParameter(parameter);
+        for (const auto parameter : object.parameters.coreValues)
+            logParameter(parameter);
+        
+        for (const auto parameter : object.parameters.scaledModifiers)
+            logParameter(parameter);
+        for (const auto parameter : object.parameters.percentageModifiers)
+            logParameter(parameter);
+        logParameter(object.parameters.additiveModifier);
+        for (const auto parameter : object.parameters.percentageAdjustments)
+            logParameter(parameter);
+        for (const auto parameter : object.parameters.overrides)
+            logParameter(parameter);
+        logParameter(object.parameters.durationUnits);
+        logParameter(object.parameters.runtimeValue);
+        logParameter(object.parameters.interactionArgument);
+        logParameter(object.parameters.auxiliaryArgument);
+        logParameter(object.parameters.effectId);
+
         engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3152_)));
-        engine.invoke<void>(Builtin::System, 22);
-        {
-            const auto previous = member3138_;
-            const auto updated = add32(previous, 1);
-            member3138_ = storedValue<std::int32_t>(updated);
-            value1 = updated;
-        }
         engine.checkpoint();
-        continue;
-        break;
     }
     engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member3153_)));
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<Value>(address(member3134_)));
     co_return Value{};
 }
 
@@ -33391,9 +31896,8 @@ void MbcMain::helper69_1()
         if (!(value1 == 0))
         {
             value1 = member2389_;
-            value4 = member1947_;
-            value5 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value4), value1, 1, 0, false, 0, false)));
-            engine.write(engine.element(pointer(value4), value1, 1, 0, false, 0, false), storedValue<std::int8_t>(member2393_), 1);
+            value5 = std::int32_t(member1947_[std::size_t{word(value1)}]);
+            member1947_[std::size_t{word(value1)}] = storedValue<std::int8_t>(member2393_);
         }
         member2400_ = 1;
     }
@@ -33428,7 +31932,7 @@ Task<void> MbcMain::helper29_1()
     Value value2;
     String value3;
 
-    value1 = engine.invoke<std::int32_t>(Builtin::NetworkInitialization);
+    value1 = g_sfera_network_runtime.initialization_result;
     if (!(value1 != 1))
     {
         member2573_ = 1;
@@ -33456,12 +31960,12 @@ Task<void> MbcMain::helper29_1()
         {
             co_await Suspend{};
         }
-        engine.invoke<void>(Builtin::Connect, storedValue<String>(address(member2579_)), storedValue<String>(address(member2629_)), member2577_);
+        g_sfera_network_runtime.initialize(SferaText::terminated(memberBytes(member2579_)), word(integer(member2577_)));
         member2576_ = 0;
         while (true)
         {
             engine.checkpoint();
-            value1 = engine.invoke<std::int32_t>(Builtin::NetworkInitialization);
+            value1 = g_sfera_network_runtime.initialization_result;
             member2573_ = value1;
             if (value1 != 0)
             {
@@ -34091,7 +32595,7 @@ Value MbcMain::helper12_1()
     value1 = packColor(240, 80, 50);
     value1 = sendSysTxt2ChatByNum(7, value1);
     value1 = StartWinUnhide();
-    engine.invoke<void>(Builtin::Disconnect);
+    g_sfera_network_runtime.shutdown();
     value1 = engine.invoke<std::int32_t>(Builtin::System, 53);
     if (subtract32(value1, member2603_) <= 24)
     {
@@ -34880,10 +33384,8 @@ Task<void> MbcPcontrol::main()
         continue;
         break;
     }
-    value2 = engine.invoke<String>(Builtin::AllocateMemory, 8192);
-    member3252_ = value2;
-    value3 = engine.invoke<Value>(Builtin::AllocateMemory, 120);
-    member3304_ = storedValue<IntRef>(value3);
+    member3252_.clear();
+    member3304_.fill(0);
     g_sfera_mbc_runtime.active_tag = g_sfera_mbc_runtime.linkProcess(SferaText::terminated(memberBytes(member3339_)));
     value4 = ScriptHelpers::call_Getxyz_1(*this, storedValue<AddressRef>(address(member3242_)));
     value4 = ScriptHelpers::call_Getabg_1(*this, storedValue<AddressRef>(address(member3246_)));
@@ -35087,14 +33589,14 @@ std::int32_t MbcPcontrol::GSCHF(std::int32_t parameter1, std::int32_t parameter2
     if (member3412_ != 0)
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(address(member3309_)), member3411_, member3413_, 32);
+        engine.copyBytes(pointer(storedValue<IntRef>(address(member3309_))), pointer(member3413_), word(integer(32)));
     }
     else
     {
         value1 = member3411_;
         value2 = member3413_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(address(member3309_)), 32);
+        engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(address(member3309_))), word(integer(32)));
     }
     return 0;
 }
@@ -36854,7 +35356,7 @@ Task<void> MbcPcontrol::ShowInfo()
         member3615_ = storedValue<std::int32_t>(value3);
         if (!(member3615_ <= 0))
         {
-            value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, storedValue<String>(address(member3618_)));
+            value1 = g_sfera_mbc_runtime.nextProcessByName(SferaText::terminated(memberBytes(member3618_)));
             value3 = storedValue<Value>(co_await engine.call(*this, false, value1, storedValue<String>(address(member3619_))));
             member3611_ = storedValue<std::int32_t>(value3);
             if (!(member3611_ >= 0))
@@ -39106,13 +37608,13 @@ Task<std::int32_t> MbcPcontrol::GetMisXZ(std::int32_t parameter1, FloatRef param
     value5 = integerBits(engine.current.module->processId);
     value6 = engine.field(pointer(address(member3862_)), 0, 12);
     value1 = engine.read<float>(engine.field(pointer(value6), 0, 4));
-    engine.invoke<void>(Builtin::CopyProcessMemory, value2, value4, value5, storedValue<FloatRef>(engine.field(pointer(value6), 0, 4)), 4);
+    engine.copyBytes(pointer(value4), pointer(storedValue<FloatRef>(engine.field(pointer(value6), 0, 4))), word(integer(4)));
     value2 = member3856_;
     value4 = member3858_;
     value5 = integerBits(engine.current.module->processId);
     value6 = engine.field(pointer(address(member3862_)), 0, 12);
     value1 = engine.read<float>(engine.field(pointer(value6), 8, 4));
-    engine.invoke<void>(Builtin::CopyProcessMemory, value2, value4, value5, storedValue<FloatRef>(engine.field(pointer(value6), 8, 4)), 4);
+    engine.copyBytes(pointer(value4), pointer(storedValue<FloatRef>(engine.field(pointer(value6), 8, 4))), word(integer(4)));
     co_return 0;
 }
 
@@ -39545,7 +38047,7 @@ std::int32_t MbcPcontrol::AddToDiary(std::int32_t parameter1, String parameter2,
     value3 = integerBits(engine.current.module->processId);
     value1 = member3901_;
     value4 = engine.stringLength(pointer(member3901_));
-    engine.invoke<void>(Builtin::CopyProcessString, value3, shifted(value1, multiply32(1, value4)), member3897_, member3898_);
+    engine.copyString(pointer(shifted(value1, multiply32(1, value4))), pointer(member3898_));
     if (!(member3867_ == 0))
     {
         engine.sendInterfaceMessage(word(integer(member3867_)), SferaNumeric::enumFromBits<SphereUIUiMessage>(3601u), word(integer(member3901_)), word(integer(member3899_)), 1u);
@@ -39818,7 +38320,7 @@ void MbcPcontrol::SetPopup(std::int32_t parameter1, std::int32_t parameter2, Str
         engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(member3920_)), 2000);
     }
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, shifted(member3920_, multiply32(1, multiply32(member3930_, 100))), member3929_, member3931_);
+    engine.copyString(pointer(shifted(member3920_, multiply32(1, multiply32(member3930_, 100)))), pointer(member3931_));
     return;
 }
 
@@ -39969,7 +38471,7 @@ Value MbcPcontrol::AttachText(std::int32_t parameter1, String parameter2, std::i
 
     member3943_ = member3949_;
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member3941_)), member3947_, member3948_);
+    engine.copyString(pointer(storedValue<String>(address(member3941_))), pointer(member3948_));
     if (std::int32_t(memberView<std::int8_t>(member3941_, 0)) != 0)
     {
         control("attachtext", ProgramAction::Start);
@@ -40729,7 +39231,6 @@ Task<Value> MbcPcontrol::AddPrayer(std::int32_t parameter1)
     std::int32_t value1;
     std::int32_t value2;
     Value value3;
-    IntRef value4;
     String value5;
 
     member4078_ = 0;
@@ -40740,7 +39241,7 @@ Task<Value> MbcPcontrol::AddPrayer(std::int32_t parameter1)
         {
             goto branch3;
         }
-        if (!(engine.read<std::int32_t>(engine.element(pointer(member3304_), member4078_, 4, 0, false, 0, false)) != member4077_))
+        if (!(member3304_[std::size_t{word(member4078_)}] != member4077_))
         {
             goto branch8;
         }
@@ -40766,9 +39267,7 @@ Task<Value> MbcPcontrol::AddPrayer(std::int32_t parameter1)
         co_return Value{};
     }
     value1 = member3305_;
-    value4 = member3304_;
-    value2 = engine.read<std::int32_t>(engine.element(pointer(value4), value1, 4, 0, false, 0, false));
-    engine.write(engine.element(pointer(value4), value1, 4, 0, false, 0, false), member4077_, 4);
+    member3304_[std::size_t{word(value1)}] = member4077_;
     {
         const auto previous = member3305_;
         const auto updated = add32(previous, 1);
@@ -42202,7 +40701,7 @@ std::int32_t MbcPcontrol::SetShowText(std::int32_t parameter1, String parameter2
         {
             member4265_ = storedValue<std::int8_t>(member4285_);
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member4262_)), member4283_, member4284_);
+            engine.copyString(pointer(storedValue<String>(address(member4262_))), pointer(member4284_));
             control("ShowLook", ProgramAction::Start);
         }
     }
@@ -42210,7 +40709,7 @@ std::int32_t MbcPcontrol::SetShowText(std::int32_t parameter1, String parameter2
     {
         member4265_ = storedValue<std::int8_t>(member4285_);
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member4262_)), member4283_, member4284_);
+        engine.copyString(pointer(storedValue<String>(address(member4262_))), pointer(member4284_));
         control("ShowLook", ProgramAction::Start);
     }
     return 0;
@@ -44311,7 +42810,7 @@ Task<std::int32_t> MbcPcontrol::moveObjectAlongLandscape(std::int32_t parameter1
         {
             break;
         }
-        value8 = engine.invoke<std::int32_t>(Builtin::MovementContact, member4565_);
+        value8 = member4565_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(member4565_)), false));
         if (value8 == 0)
         {
             break;
@@ -44340,7 +42839,7 @@ Task<std::int32_t> MbcPcontrol::moveObjectAlongLandscape(std::int32_t parameter1
         {
             break;
         }
-        value8 = engine.invoke<std::int32_t>(Builtin::MovementContact, member4565_);
+        value8 = member4565_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(member4565_)), false));
         if (value8 != 0)
         {
             goto branch14;
@@ -44363,7 +42862,7 @@ Task<std::int32_t> MbcPcontrol::moveObjectAlongLandscape(std::int32_t parameter1
         break;
     }
     branch9: ;
-    value8 = engine.invoke<std::int32_t>(Builtin::MovementContact, member4565_);
+    value8 = member4565_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(member4565_)), false));
     member4573_ = value8;
     if (!(value8 != 0))
     {
@@ -45902,115 +44401,59 @@ Task<void> MbcPcontrol::ShowScroll()
 {
     FunctionScope context(*this, "ShowScroll");
     Host &engine = host();
-    std::int32_t value1;
-    String value2;
-    std::int32_t value3;
 
-    if (!(member4733_ == 0))
+    if (member4733_ != 0)
     {
         engine.closeInterface(word(integer(member4733_)));
     }
-    value1 = engine.invoke<std::int32_t>(Builtin::Window, 20, storedValue<String>(address(member4737_)), 0, 0, 0);
-    member4733_ = value1;
+    member4733_ = engine.invoke<std::int32_t>(Builtin::Window, 20, storedValue<String>(address(member4737_)), 0, 0, 0);
     engine.invoke<void>(Builtin::Window, 23, member4733_, storedValue<String>(address(member4738_)));
-    if (member4736_ != 0)
+
+    if (member4736_ == 0)
     {
-        branch4: ;
-        if (!(member4736_ != 1))
+        if (!g_sfera_config_text_runtime.load(SferaText::terminated(memberBytes(member4723_))))
         {
-            value1 = engine.stringLength(pointer(member3252_));
-            member4735_ = value1;
+            engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member4739_)), storedValue<String>(address(member4723_)));
+            engine.closeInterface(word(integer(member4733_)));
+            member4733_ = 0;
+            co_await Finish{};
         }
-        if (!(member4735_ < 8191))
-        {
-            member4735_ = 8191;
-        }
-        value1 = member4735_;
-        value2 = member3252_;
-        value3 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value2), value1, 1, 0, false, 0, false)));
-        engine.write(engine.element(pointer(value2), value1, 1, 0, false, 0, false), storedValue<std::int8_t>(0), 1);
-        member4731_ = member3252_;
-        member4732_ = shifted(member4731_, multiply32(1, member4735_));
-        if (member4736_ != 1)
-        {
-            member4729_ = storedValue<String>(address(member3248_));
-            while (true)
-            {
-                engine.checkpoint();
-                if (integerBits(member4731_) >= integerBits(member4732_))
-                {
-                    break;
-                }
-                value2 = member4729_;
-                value1 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(value2))));
-                engine.write(engine.indirect(payload(value2)), storedValue<std::int8_t>(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member4731_))))), 1);
-                {
-                    const auto previous = member4731_;
-                    const auto updated = shifted(previous, 1);
-                    setMemberView(member4731_, 0, storedValue<std::int32_t>(updated));
-                    value2 = updated;
-                }
-                if (!(subtract32(member4729_, storedValue<String>(address(member3248_))) <= 3))
-                {
-                    value1 = SferaText::compare(engine.stringValue(pointer(argumentValue<Address>(shifted(member4729_, negate32(3)))), 4u), engine.stringValue(memberBytes(member4740_), 4u));
-                    if (value1 != 0)
-                    {
-                        goto branch20;
-                    }
-                    goto branch17;
-                }
-                branch20: ;
-                {
-                    const auto previous = member4729_;
-                    const auto updated = shifted(previous, 1);
-                    setMemberView(member4729_, 0, storedValue<std::int32_t>(updated));
-                    value2 = updated;
-                }
-                engine.checkpoint();
-                continue;
-            }
-        }
-        else
-        {
-            branch17: ;
-            value1 = engine.interfaceControl(word(integer(member4733_)), 1);
-            member4734_ = value1;
-            engine.sendInterfaceMessage(word(integer(member4734_)), SferaNumeric::enumFromBits<SphereUIUiMessage>(3601u), word(integer(member4731_)), word(integer(member4725_)), 1u);
-            while (true)
-            {
-                engine.checkpoint();
-                value1 = engine.invoke<std::int32_t>(Builtin::Window, 22, member4733_, storedValue<IntRef>(address(member4726_)), storedValue<IntRef>(address(member4727_)));
-                if (!(std::int32_t(!truth(value1)) == 0))
-                {
-                    branch23: ;
-                    co_await Suspend{};
-                    engine.checkpoint();
-                    continue;
-                }
-                if (member4727_ != 100)
-                {
-                    goto branch23;
-                }
-                break;
-            }
-        }
+        member3252_ = g_sfera_config_text_runtime.text();
     }
-    else
+
+    if (member3252_.size() > 8191)
     {
-        value1 = (g_sfera_config_text_runtime.load(SferaText::terminated(memberBytes(member4723_))) ? 0 : -1);
-        if (value1 == 0)
-        {
-            value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-            member4735_ = value1;
-            g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(member3252_)), word(member4735_));
-            goto branch4;
-        }
-        engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member4739_)), storedValue<String>(address(member4723_)));
+        member3252_.resize(8191);
     }
-    if (!(member4733_ == 0))
+    if (member4736_ != 1)
     {
-        engine.closeInterface(word(integer(member4733_)));
+        const std::string marker = SferaText::fromBytes(memberBytes(member4740_).first(4));
+        const auto markerPosition = member3252_.find(marker);
+        if (markerPosition == std::string::npos)
+        {
+            engine.closeInterface(word(integer(member4733_)));
+            member4733_ = 0;
+            co_await Finish{};
+        }
+        member3252_.erase(0, markerPosition + marker.size());
     }
+
+    member4735_ = std::int32_t(member3252_.size());
+    member4734_ = engine.interfaceControl(word(integer(member4733_)), 1);
+    const String scrollText = reference<String>(member3252_);
+    engine.sendInterfaceMessage(word(integer(member4734_)), SferaNumeric::enumFromBits<SphereUIUiMessage>(3601u), word(integer(scrollText)), word(integer(member4725_)), 1u);
+    while (true)
+    {
+        engine.checkpoint();
+        const auto result = engine.invoke<std::int32_t>(Builtin::Window, 22, member4733_, storedValue<IntRef>(address(member4726_)), storedValue<IntRef>(address(member4727_)));
+        if (truth(result) && member4727_ == 100)
+        {
+            break;
+        }
+        co_await Suspend{};
+    }
+
+    engine.closeInterface(word(integer(member4733_)));
     member4733_ = 0;
     co_await Finish{};
 }
@@ -46106,7 +44549,7 @@ std::int32_t MbcPcontrol::TypeScroll(std::int32_t parameter1, String parameter2,
     std::int32_t value1;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member4723_)), member4759_, member4760_);
+    engine.copyString(pointer(storedValue<String>(address(member4723_))), pointer(member4760_));
     member4725_ = member4761_;
     control("ShowMission", ProgramAction::Stop);
     member4736_ = 0;
@@ -46124,7 +44567,7 @@ std::int32_t MbcPcontrol::TypeScrollMem(std::int32_t parameter1, String paramete
     std::int32_t value1;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, member3252_, member4762_, member4763_);
+    member3252_ = engine.stringValue(pointer(member4763_));
     member4725_ = member4764_;
     member4736_ = 1;
     control("ShowMission", ProgramAction::Stop);
@@ -46151,7 +44594,7 @@ std::int32_t MbcPcontrol::TypeMission2(std::int32_t parameter1, String parameter
     std::int32_t value1;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member4748_)), member4765_, member4766_);
+    engine.copyString(pointer(storedValue<String>(address(member4748_))), pointer(member4766_));
     member4746_ = member4767_;
     control("ShowScroll", ProgramAction::Stop);
     control("ShowMission", ProgramAction::Start);
@@ -49032,7 +47475,7 @@ Task<void> MbcPcontrol::helper70_1()
             {
                 break;
             }
-            if (!(engine.read<std::int32_t>(engine.element(pointer(member3304_), member4029_, 4, 0, false, 0, false)) != engine.read<std::int32_t>(engine.element(pointer(member4040_), member4030_, 4, 0, false, 0, false))))
+            if (!(member3304_[std::size_t{word(member4029_)}] != engine.read<std::int32_t>(engine.element(pointer(member4040_), member4030_, 4, 0, false, 0, false))))
             {
                 goto branch33;
             }
@@ -49054,7 +47497,7 @@ Task<void> MbcPcontrol::helper70_1()
         }
         else
         {
-            value1 = engine.read<std::int32_t>(engine.element(pointer(member3304_), member4029_, 4, 0, false, 0, false));
+            value1 = member3304_[std::size_t{word(member4029_)}];
             value2 = integerBits(engine.current.module->processId);
             value3 = storedValue<Value>(co_await engine.call(*this, false, value1, 2, value2, storedValue<AddressRef>(address(member4050_))));
             value1 = std::int32_t(integerBits(value3) != 0);
@@ -49074,7 +47517,7 @@ Task<void> MbcPcontrol::helper70_1()
             value1 = member4045_;
             value7 = member4040_;
             value2 = engine.read<std::int32_t>(engine.element(pointer(value7), value1, 4, 0, false, 0, false));
-            engine.write(engine.element(pointer(value7), value1, 4, 0, false, 0, false), engine.read<std::int32_t>(engine.element(pointer(member3304_), member4029_, 4, 0, false, 0, false)), 4);
+            engine.write(engine.element(pointer(value7), value1, 4, 0, false, 0, false), member3304_[std::size_t{word(member4029_)}], 4);
             value1 = member4045_;
             value7 = member4041_;
             value2 = engine.read<std::int32_t>(engine.element(pointer(value7), value1, 4, 0, false, 0, false));
@@ -49092,7 +47535,9 @@ Task<void> MbcPcontrol::helper70_1()
         }
         else
         {
-            engine.copyBytes(pointer(shifted(member3304_, multiply32(4, member4029_))), pointer(shifted(shifted(member3304_, multiply32(4, member4029_)), 4)), word(integer(subtract32(member3305_, member4029_))));
+            const auto eraseIndex = std::size_t{word(member4029_)};
+            const auto activeCount = std::size_t{word(member3305_)};
+            std::move(member3304_.begin() + eraseIndex + 1, member3304_.begin() + activeCount, member3304_.begin() + eraseIndex);
             {
                 const auto previous = member4029_;
                 const auto updated = subtract32(previous, 1);
@@ -50652,7 +49097,7 @@ Task<void> MbcPcontrol::helper16_1()
     if (!(member4821_ <= 0))
     {
         engine.setPosition(integer(member4821_), SferaVec3F{memberView<float>(member3242_, 0), SferaNumeric::real32(double(realBits(memberView<float>(member3242_, 4))) - double(realBits(real(3)))), memberView<float>(member3242_, 8)}, true);
-        value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, member4821_);
+        value1 = member4821_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(member4821_)), false));
         if (!(value1 != 0))
         {
             member4825_ = storedValue<String>(address(member3248_));
@@ -52355,7 +50800,7 @@ Task<std::int32_t> MbcPlayer::__kill_monsters2(std::int32_t parameter1, String p
     {
         co_return -1;
     }
-    engine.invoke<void>(Builtin::ReadReal, member5428_, storedValue<FloatRef>(address(member5430_)));
+    engine.readPacked<4>(pointer(member5428_), pointer(storedValue<FloatRef>(address(member5430_))));
     value1 = packColor(255, 255, 255);
     co_await engine.call(*this, true, storedValue<String>(address(member5432_)), storedValue<String>(address(member5433_)), value1);
     co_return 0;
@@ -52630,7 +51075,7 @@ std::int32_t MbcPlayer::GetParam(std::int32_t parameter1, std::int32_t parameter
         if (!(value1 == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(address(member5220_)), state2_.member5472_, state2_.member134_, 56);
+            engine.copyBytes(pointer(storedValue<AddressRef>(address(member5220_))), pointer(state2_.member134_), word(integer(56)));
             return memberView<std::int32_t>(member5220_, 0);
         }
         value1 = state2_.member133_;
@@ -52650,7 +51095,7 @@ std::int32_t MbcPlayer::GetParam(std::int32_t parameter1, std::int32_t parameter
             if (!(integerBits(state2_.member134_) == 0))
             {
                 value1 = integerBits(engine.current.module->processId);
-                engine.invoke<void>(Builtin::CopyProcessMemory, value1, member5481_, state2_.member5472_, state2_.member134_, 8);
+                engine.copyBytes(pointer(member5481_), pointer(state2_.member134_), word(integer(8)));
             }
             value1 = memberView<std::int32_t>(member5220_, 96);
             member5482_ = storedValue<IntRef>(engine.field(pointer(address(member5220_)), 96, 4));
@@ -52700,7 +51145,7 @@ std::int32_t MbcPlayer::GetParam(std::int32_t parameter1, std::int32_t parameter
         if (!(value1 == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(address(member5194_)), state2_.member5472_, state2_.member134_, 4);
+            engine.copyBytes(pointer(storedValue<IntRef>(address(member5194_))), pointer(state2_.member134_), word(integer(4)));
             return 0;
         }
         value1 = state2_.member133_;
@@ -52756,7 +51201,7 @@ std::int32_t MbcPlayer::GetParam(std::int32_t parameter1, std::int32_t parameter
         if (!(value1 == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member5236_)), state2_.member5472_, state2_.member134_);
+            engine.copyString(pointer(storedValue<String>(address(member5236_))), pointer(state2_.member134_));
             return member5240_;
         }
         value1 = state2_.member133_;
@@ -52772,7 +51217,7 @@ std::int32_t MbcPlayer::GetParam(std::int32_t parameter1, std::int32_t parameter
         if (!(value1 == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(address(member5240_)), state2_.member5472_, state2_.member134_, 4);
+            engine.copyBytes(pointer(storedValue<IntRef>(address(member5240_))), pointer(state2_.member134_), word(integer(4)));
             return member5240_;
         }
         if (state2_.member133_ != 16)
@@ -52792,7 +51237,7 @@ std::int32_t MbcPlayer::GetParam(std::int32_t parameter1, std::int32_t parameter
                 return memberView<std::int32_t>(member5220_, 156);
             }
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(address(member5227_)), state2_.member5472_, state2_.member134_, 4);
+            engine.copyBytes(pointer(storedValue<IntRef>(address(member5227_))), pointer(state2_.member134_), word(integer(4)));
             return 0;
         }
         value1 = memberView<std::int32_t>(member5220_, 96);
@@ -52837,7 +51282,7 @@ std::int32_t MbcPlayer::GetParam(std::int32_t parameter1, std::int32_t parameter
             value1 = state2_.member5472_;
             value2 = state2_.member134_;
             value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(address(member5220_)), 56);
+            engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(address(member5220_))), word(integer(56)));
         }
         return memberView<std::int32_t>(member5220_, 0);
     }
@@ -52975,7 +51420,7 @@ std::int32_t MbcPlayer::GetParam(std::int32_t parameter1, std::int32_t parameter
             value1 = state2_.member5472_;
             value2 = state2_.member134_;
             value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member5236_)));
+            engine.copyString(pointer(value2), pointer(storedValue<String>(address(member5236_))));
         }
         return member5240_;
     }
@@ -52986,7 +51431,7 @@ std::int32_t MbcPlayer::GetParam(std::int32_t parameter1, std::int32_t parameter
             value1 = state2_.member5472_;
             value2 = state2_.member134_;
             value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(address(member5240_)), 4);
+            engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(address(member5240_))), word(integer(4)));
         }
         return member5240_;
     }
@@ -53070,7 +51515,7 @@ std::int32_t ScriptHelpers::GetWeightVariant2(Module &self, ScriptState2 &state2
         value1 = state2.member147_;
         value2 = state2.member148_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state2.member5484_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state2.member5484_))));
     }
     return add32(state2.member116_, state2.member76_);
 }
@@ -53103,7 +51548,7 @@ std::int32_t MbcPlayer::GetABG(std::int32_t parameter1, AddressRef parameter2)
         value2 = member5487_;
         value3 = integerBits(engine.current.module->processId);
         value4 = engine.field(pointer(address(state2_.member62_)), 12, 12);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(engine.field(pointer(address(state2_.member62_)), 12, 12)), 12);
+        engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(engine.field(pointer(address(state2_.member62_)), 12, 12))), word(integer(12)));
         return 0;
     }
     value1 = integer(memberView<float>(member5110_, 0));
@@ -53342,9 +51787,8 @@ Task<void> MbcPlayer::CycleSend()
     value3 = engine.field(pointer(address(state2_.member62_)), 0, 12);
     if (const auto nativeVector = engine.objectPosition(integer(state2_.member71_)))
         setMemberView(state2_.member62_, 0, *nativeVector);
-    value3 = engine.field(pointer(address(state2_.member62_)), 12, 12);
-    value1 = engine.read<float>(engine.field(pointer(value3), 0, 4));
-    engine.invoke<void>(Builtin::ObjectRotation, state2_.member71_, storedValue<FloatRef>(engine.field(pointer(value3), 0, 4)));
+    if (const auto rotation = engine.objectRotation(integer(state2_.member71_)))
+        setMemberView(state2_.member62_, 12, *rotation);
     if (memberView<std::int32_t>(member5220_, 0) > 0)
     {
         branch6: ;
@@ -54624,7 +53068,7 @@ std::int32_t MbcPlayer::GetPlName(std::int32_t parameter1, String parameter2)
     value1 = state2_.member360_;
     value2 = state2_.member361_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member5117_)));
+    engine.copyString(pointer(value2), pointer(storedValue<String>(address(member5117_))));
     return 0;
 }
 
@@ -54851,28 +53295,25 @@ Task<void> ScriptHelpers::FlyFire(Module &self, ScriptState2 &state2)
                 setMemberView(state2.member5682_, 4, storedValue<float>(updated));
                 value4 = updated;
             }
-            if (!(std::int32_t(memberView<std::int8_t>(state2.member5680_, 0)) != 0))
-            {
-                engine.copyString(memberBytes(state2.member5680_), memberBytes(state2.member5687_));
-            }
-            value1 = engine.createObject(SferaText::terminated(memberBytes(state2.member5680_, 0)), word(7));
+            const std::string projectileResource = state2.member5678_.projectileResource.empty()
+                ? SferaText::terminated(memberBytes(state2.member5687_)) : state2.member5678_.projectileResource;
+            value1 = engine.createObject(projectileResource, word(7));
             state2.member5686_ = value1;
             if (state2.member5686_ >= 0)
             {
                 engine.setPosition(integer(state2.member5686_), SferaVec3F{memberView<float>(state2.member5682_, 0), memberView<float>(state2.member5682_, 4), memberView<float>(state2.member5682_, 8)});
-                if (!(memberView<std::int32_t>(state2.member5678_, 4) <= 0))
+                if (!(state2.member5678_.sourceEffectId <= 0))
                 {
-                    engine.invoke<void>(Builtin::Effect, state2.member71_, memberView<std::int32_t>(state2.member5678_, 4), 0);
+                    engine.invoke<void>(Builtin::Effect, state2.member71_, state2.member5678_.sourceEffectId, 0);
                 }
-                if (!(memberView<std::int32_t>(state2.member5678_, 0) <= 0))
+                if (!(state2.member5678_.projectileEffectId <= 0))
                 {
-                    engine.invoke<void>(Builtin::Effect, state2.member5686_, memberView<std::int32_t>(state2.member5678_, 0));
+                    engine.invoke<void>(Builtin::Effect, state2.member5686_, state2.member5678_.projectileEffectId);
                 }
                 value3 = storedValue<Value>(co_await engine.call(self, false, state2.member5674_, 24));
                 state2.member5676_ = storedValue<std::int32_t>(value3);
-                value1 = memberView<std::int32_t>(state2.member5678_, 16);
-                setMemberView(state2.member5678_, 16, divide32(multiply32(memberView<std::int32_t>(state2.member5678_, 16), 192), 100));
-                state2.member5685_ = real(memberView<std::int32_t>(state2.member5678_, 16));
+                value1 = state2.member5678_.travelDurationPercent;
+                state2.member5685_ = real(divide32(multiply32(state2.member5678_.travelDurationPercent, 192), 100));
                 while (true)
                 {
                     engine.checkpoint();
@@ -54887,7 +53328,7 @@ Task<void> ScriptHelpers::FlyFire(Module &self, ScriptState2 &state2)
                     {
                         break;
                     }
-                    value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state2.member5686_);
+                    value1 = state2.member5686_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state2.member5686_)), false));
                     if (!(value1 != state2.member5676_))
                     {
                         break;
@@ -54920,20 +53361,20 @@ Task<void> ScriptHelpers::FlyFire(Module &self, ScriptState2 &state2)
                 }
                 engine.destroyObject(integer(state2.member5686_));
                 state2.member5686_ = -1;
-                if (!(memberView<std::int32_t>(state2.member5678_, 8) <= 0))
+                if (!(state2.member5678_.impactEffectId <= 0))
                 {
                     value1 = engine.createObject(SferaText::terminated(memberBytes(state2.member5688_, 0)), word(7));
                     state2.member5686_ = value1;
                     engine.setPosition(integer(state2.member5686_), SferaVec3F{memberView<float>(state2.member5682_, 0), memberView<float>(state2.member5682_, 4), memberView<float>(state2.member5682_, 8)});
-                    engine.invoke<void>(Builtin::Effect, state2.member5686_, memberView<std::int32_t>(state2.member5678_, 8));
+                    engine.invoke<void>(Builtin::Effect, state2.member5686_, state2.member5678_.impactEffectId);
                 }
-                if (!(memberView<std::int32_t>(state2.member5678_, 12) <= 0))
+                if (!(state2.member5678_.targetEffectId <= 0))
                 {
                     value3 = storedValue<Value>(co_await engine.call(self, false, state2.member5674_, 24));
                     state2.member5676_ = storedValue<std::int32_t>(value3);
                     if (!(state2.member5676_ <= 0))
                     {
-                        engine.invoke<void>(Builtin::Effect, state2.member5676_, memberView<std::int32_t>(state2.member5678_, 12), 0);
+                        engine.invoke<void>(Builtin::Effect, state2.member5676_, state2.member5678_.targetEffectId, 0);
                     }
                 }
                 for (unsigned pause = 0; pause < 384; ++pause)
@@ -54961,8 +53402,7 @@ Task<std::int32_t> ScriptHelpers::FlyWeapon(Module &self, ScriptState2 &state2, 
     state2.member5691_ = parameter3;
     std::int32_t value1;
 
-    value1 = integerBits(engine.current.module->processId);
-    co_await engine.call(self, true, storedValue<String>(self.address(state2.member5692_)), value1, state2.member5691_, storedValue<AddressRef>(self.address(state2.member5678_)), storedValue<String>(self.address(state2.member5680_)));
+    ScriptHelpers::call_GEFF_1(self, state2.member5691_, state2.member5678_);
     value1 = integerBits(engine.current.module->processId);
     state2.member5673_ = value1;
     state2.member5674_ = state2.member5690_;
@@ -57505,7 +55945,7 @@ Task<std::int32_t> MbcPlayer::SetClan(std::int32_t parameter1, String parameter2
     value1 = std::int32_t(memberView<std::int8_t>(state2_.member89_, 0));
     setMemberView(state2_.member89_, 0, storedValue<std::int8_t>(member5971_));
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, shifted(storedValue<String>(address(state2_.member89_)), 1), member5969_, member5970_);
+    engine.copyString(pointer(shifted(storedValue<String>(address(state2_.member89_)), 1)), pointer(member5970_));
     engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member5978_)), storedValue<String>(address(member5973_)), storedValue<String>(address(member5117_)), storedValue<String>(address(member5122_)), member5240_);
     value1 = std::int32_t(memberView<std::int8_t>(member5973_, 0));
     if (value1 != 0)
@@ -57699,7 +56139,7 @@ Task<std::int32_t> MbcPlayer::CalcRequirs(std::int32_t parameter1, IntRef parame
         co_return -1;
     }
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(address(member5988_)), member5985_, member5986_, 92);
+    engine.copyBytes(pointer(storedValue<AddressRef>(address(member5988_))), pointer(member5986_), word(integer(92)));
     branch4: ;
     value1 = 0;
     if (!(value1 != 0))
@@ -58335,7 +56775,7 @@ Task<void> MbcPlayer::PrgMove()
                         goto branch36;
                     }
                     engine.moveWorld(integer(state2_.member71_), SferaVec3F{real(0), real(1), real(0)});
-                    value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state2_.member71_);
+                    value1 = state2_.member71_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state2_.member71_)), false));
                     if (!(value1 == 0))
                     {
                         goto branch35;
@@ -58358,9 +56798,8 @@ Task<void> MbcPlayer::PrgMove()
             value3 = engine.field(pointer(address(state2_.member62_)), 0, 12);
             if (const auto nativeVector = engine.objectPosition(integer(state2_.member71_)))
                 setMemberView(state2_.member62_, 0, *nativeVector);
-            value3 = engine.field(pointer(address(state2_.member62_)), 12, 12);
-            value2 = engine.read<float>(engine.field(pointer(value3), 0, 4));
-            engine.invoke<void>(Builtin::ObjectRotation, state2_.member71_, storedValue<FloatRef>(engine.field(pointer(value3), 0, 4)));
+            if (const auto rotation = engine.objectRotation(integer(state2_.member71_)))
+                setMemberView(state2_.member62_, 12, *rotation);
             co_await engine.call(*this, true, storedValue<String>(address(member6017_)));
             value4 = storedValue<Value>(co_await engine.call(*this, true, 56, memberView<float>(state2_.member62_, 0), memberView<float>(state2_.member62_, 4), memberView<float>(state2_.member62_, 8), 0));
             member5293_ = storedValue<std::int32_t>(value4);
@@ -58520,7 +56959,7 @@ std::int32_t MbcPlayer::SetXYZ2(std::int32_t parameter1, AddressRef parameter2)
 
     value1 = integerBits(engine.current.module->processId);
     value2 = engine.field(pointer(address(state2_.member62_)), 0, 12);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(engine.field(pointer(address(state2_.member62_)), 0, 12)), state2_.member173_, state2_.member174_, 12);
+    engine.copyBytes(pointer(storedValue<AddressRef>(engine.field(pointer(address(state2_.member62_)), 0, 12))), pointer(state2_.member174_), word(integer(12)));
     if (!(state2_.member71_ <= 0))
     {
         engine.setPosition(integer(state2_.member71_), SferaVec3F{memberView<float>(state2_.member62_, 0), memberView<float>(state2_.member62_, 4), memberView<float>(state2_.member62_, 8)}, true);
@@ -58539,7 +56978,7 @@ std::int32_t MbcPlayer::SetABG(std::int32_t parameter1, AddressRef parameter2)
 
     value1 = integerBits(engine.current.module->processId);
     value2 = engine.field(pointer(address(state2_.member62_)), 12, 12);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(engine.field(pointer(address(state2_.member62_)), 12, 12)), state2_.member177_, state2_.member178_, 12);
+    engine.copyBytes(pointer(storedValue<AddressRef>(engine.field(pointer(address(state2_.member62_)), 12, 12))), pointer(state2_.member178_), word(integer(12)));
     if (!(state2_.member71_ <= 0))
     {
         engine.setRotation(integer(state2_.member71_), SferaVec3F{memberView<float>(state2_.member62_, 12), memberView<float>(state2_.member62_, 16), memberView<float>(state2_.member62_, 20)});
@@ -58562,7 +57001,7 @@ void MbcPlayer::GetCamNorm(std::int32_t parameter1, FloatRef parameter2)
     value1 = member6029_;
     value2 = member6030_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<FloatRef>(address(member6032_, 0, 4)), 12);
+    engine.copyBytes(pointer(value2), pointer(storedValue<FloatRef>(address(member6032_, 0, 4))), word(integer(12)));
     return;
 }
 
@@ -58592,7 +57031,7 @@ std::int32_t MbcPlayer::SeekFor(std::int32_t parameter1, String parameter2)
     std::int32_t value1;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<String>(address(state2_.member89_)), member6034_, member6035_, 24);
+    engine.copyBytes(pointer(storedValue<String>(address(state2_.member89_))), pointer(member6035_), word(integer(24)));
     member6036_ = -1;
     member6037_ = 0;
     while (true)
@@ -59821,12 +58260,12 @@ Task<void> MbcPlayer::Reconnect()
         continue;
         break;
     }
-    engine.invoke<void>(Builtin::Disconnect);
+    g_sfera_network_runtime.shutdown();
     member6142_ = 0;
     while (true)
     {
         engine.checkpoint();
-        value2 = engine.invoke<std::int32_t>(Builtin::FindProcess, 0, member6142_);
+        value2 = g_sfera_mbc_runtime.nextProcessByModule(0, member6142_);
         member6142_ = value2;
         if (value2 <= 0)
         {
@@ -59863,12 +58302,12 @@ Task<void> MbcPlayer::Reconnect()
         break;
     }
     engine.invoke<void>(Builtin::System, 61);
-    engine.invoke<void>(Builtin::Connect, member6140_, member6141_);
+    g_sfera_network_runtime.initialize(member6140_, 3);
     member6143_ = 0;
     while (true)
     {
         engine.checkpoint();
-        value2 = engine.invoke<std::int32_t>(Builtin::NetworkInitialization);
+        value2 = g_sfera_network_runtime.initialization_result;
         member6144_ = value2;
         if (value2 != 0)
         {
@@ -60797,8 +59236,8 @@ Task<Value> MbcPlayer::mgrFist(String parameter1, std::int32_t parameter2)
 
     if (!(member6295_ != 11))
     {
-        engine.invoke<void>(Builtin::ReadReal, member6294_, storedValue<FloatRef>(address(member6298_)));
-        engine.invoke<void>(Builtin::ReadReal, shifted(member6294_, 4), storedValue<FloatRef>(address(member6299_)));
+        engine.readPacked<4>(pointer(member6294_), pointer(storedValue<FloatRef>(address(member6298_))));
+        engine.readPacked<4>(pointer(shifted(member6294_, 4)), pointer(storedValue<FloatRef>(address(member6299_))));
         engine.readPacked<3>(pointer(shifted(member6294_, 8)), memberBytes(member6300_));
         value1 = member6300_;
         value2 = integerBits(engine.current.module->processId);
@@ -61052,20 +59491,19 @@ Value MbcPlayer::mgrSetCoord(String parameter1, std::int32_t parameter2)
     {
         value1 = engine.field(pointer(address(member6329_)), 0, 12);
         value2 = engine.read<float>(engine.field(pointer(value1), (4 * repeat52), 4));
-        value3 = engine.invoke<String>(Builtin::ReadReal, member6330_, storedValue<FloatRef>(engine.field(pointer(value1), (4 * repeat52), 4)));
+        value3 = engine.readPacked<4>(pointer(member6330_), pointer(storedValue<FloatRef>(engine.field(pointer(value1), (4 * repeat52), 4))));
         member6330_ = value3;
     }
     if (member6328_ <= 12)
     {
-        value1 = engine.field(pointer(address(member6329_)), 12, 12);
-        value2 = engine.read<float>(engine.field(pointer(value1), 0, 4));
-        engine.invoke<void>(Builtin::ObjectRotation, state2_.member71_, storedValue<FloatRef>(engine.field(pointer(value1), 0, 4)));
+        if (const auto rotation = engine.objectRotation(integer(state2_.member71_)))
+            setMemberView(member6329_, 12, *rotation);
     }
     else
     {
         value1 = engine.field(pointer(address(member6329_)), 12, 12);
         value2 = engine.read<float>(engine.field(pointer(value1), 0, 4));
-        value3 = engine.invoke<String>(Builtin::ReadReal, member6330_, storedValue<FloatRef>(engine.field(pointer(value1), 0, 4)));
+        value3 = engine.readPacked<4>(pointer(member6330_), pointer(storedValue<FloatRef>(engine.field(pointer(value1), 0, 4))));
         member6330_ = value3;
     }
     engine.copyBytes(memberBytes(member6005_), memberBytes(member6329_), 16u);
@@ -62158,8 +60596,7 @@ Value MbcPlayer::mgrCheat(String parameter1)
     g_sfera_config_text_runtime.writeValue(SferaText::terminated(memberBytes(member6450_)), engine.memory(pointer(member6440_)), 64);
     g_sfera_config_text_runtime.readString(SferaText::terminated(memberBytes(member6451_)), memberBytes(state2_.member89_));
     g_sfera_config_text_runtime.save();
-    member6140_ = storedValue<String>(address(state2_.member89_));
-    member6141_ = storedValue<String>(address(member6452_));
+    member6140_ = SferaText::terminated(memberBytes(state2_.member89_));
     control("Reconnect", ProgramAction::Start);
     value2 = storedValue<String>(address(member6452_));
     return storedValue<Value>(value2);
@@ -62478,7 +60915,8 @@ Task<std::int32_t> MbcPlayer::mgrTmntInfo(std::int32_t parameter1, String parame
     member6509_ = value1;
     value1 = engine.readPacked<1>(pointer(member6509_), memberBytes(member6515_));
     member6509_ = value1;
-    value1 = engine.invoke<String>(Builtin::ReadString, member6509_, storedValue<String>(address(member6517_)));
+    value1 = shifted(member6509_, add32(engine.stringLength(pointer(member6509_)), 1));
+    engine.copyString(pointer(storedValue<String>(address(member6517_))), pointer(member6509_));
     member6509_ = value1;
     if (member6514_ == 0)
     {
@@ -62519,7 +60957,8 @@ Task<std::int32_t> MbcPlayer::mgrTmntAction(std::int32_t parameter1, String para
 
     engine.borrowReference(member6524_);
     member6526_ = member6524_;
-    value1 = engine.invoke<String>(Builtin::ReadString, member6526_, storedValue<String>(address(member6533_)));
+    value1 = shifted(member6526_, add32(engine.stringLength(pointer(member6526_)), 1));
+    engine.copyString(pointer(storedValue<String>(address(member6533_))), pointer(member6526_));
     member6526_ = value1;
     value1 = engine.readPacked<1>(pointer(member6526_), memberBytes(member6535_));
     member6526_ = value1;
@@ -63528,28 +61967,28 @@ Task<std::int32_t> MbcPlayer::Sheat(std::int32_t parameter1, std::int32_t parame
                         if (member6654_ != 27)
                         {
                             value1 = integerBits(engine.current.module->processId);
-                            engine.invoke<void>(Builtin::CopyProcessString, value1, shifted(storedValue<String>(address(member5153_)), 1), member6653_, member6656_);
+                            engine.copyString(pointer(shifted(storedValue<String>(address(member5153_)), 1)), pointer(member6656_));
                             value1 = engine.stringLength(pointer(shifted(storedValue<String>(address(member5153_)), 1)));
                             engine.invoke<void>(Builtin::Send, 12, 33, add32(value1, 2), storedValue<String>(address(member5153_)));
                         }
                         else
                         {
                             value1 = integerBits(engine.current.module->processId);
-                            engine.invoke<void>(Builtin::CopyProcessMemory, value1, shifted(storedValue<String>(address(member5153_)), 1), member6653_, member6656_, 20);
+                            engine.copyBytes(pointer(shifted(storedValue<String>(address(member5153_)), 1)), pointer(member6656_), word(integer(20)));
                             engine.invoke<void>(Builtin::Send, 12, 33, 21, storedValue<String>(address(member5153_)));
                         }
                     }
                     else
                     {
                         value1 = integerBits(engine.current.module->processId);
-                        engine.invoke<void>(Builtin::CopyProcessString, value1, shifted(storedValue<String>(address(member5153_)), 1), member6653_, member6656_);
+                        engine.copyString(pointer(shifted(storedValue<String>(address(member5153_)), 1)), pointer(member6656_));
                         co_await engine.call(*this, true, storedValue<String>(address(member6658_)), shifted(storedValue<String>(address(member5153_)), 1));
                     }
                 }
                 else
                 {
                     value1 = integerBits(engine.current.module->processId);
-                    engine.invoke<void>(Builtin::CopyProcessString, value1, shifted(storedValue<String>(address(member5153_)), 1), member6653_, member6656_);
+                    engine.copyString(pointer(shifted(storedValue<String>(address(member5153_)), 1)), pointer(member6656_));
                     co_await engine.call(*this, true, storedValue<String>(address(member6657_)), shifted(storedValue<String>(address(member5153_)), 1));
                 }
             }
@@ -63557,7 +61996,7 @@ Task<std::int32_t> MbcPlayer::Sheat(std::int32_t parameter1, std::int32_t parame
             {
                 engine.writePacked<2>(pointer(shifted(storedValue<String>(address(member5153_)), 1)), word(integer(member6655_)));
                 value1 = integerBits(engine.current.module->processId);
-                engine.invoke<void>(Builtin::CopyProcessString, value1, shifted(storedValue<String>(address(member5153_)), 3), member6653_, member6656_, 21);
+                engine.copyString(pointer(shifted(storedValue<String>(address(member5153_)), 3)), pointer(member6656_), integer(21));
                 value1 = engine.stringLength(pointer(shifted(storedValue<String>(address(member5153_)), 3)));
                 engine.invoke<void>(Builtin::Send, 12, 33, add32(value1, 4), storedValue<String>(address(member5153_)));
             }
@@ -63565,7 +62004,7 @@ Task<std::int32_t> MbcPlayer::Sheat(std::int32_t parameter1, std::int32_t parame
         else
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, shifted(storedValue<String>(address(member5153_)), 1), member6653_, member6656_, 16);
+            engine.copyBytes(pointer(shifted(storedValue<String>(address(member5153_)), 1)), pointer(member6656_), word(integer(16)));
             engine.invoke<void>(Builtin::Send, 12, 33, 17, storedValue<String>(address(member5153_)));
         }
     }
@@ -64395,12 +62834,12 @@ Task<void> MbcPlayer::CheckServer()
         continue;
         break;
     }
-    engine.invoke<void>(Builtin::Disconnect);
+    g_sfera_network_runtime.shutdown();
     member6726_ = 0;
     while (true)
     {
         engine.checkpoint();
-        value2 = engine.invoke<std::int32_t>(Builtin::FindProcess, 0, member6726_);
+        value2 = g_sfera_mbc_runtime.nextProcessByModule(0, member6726_);
         member6726_ = value2;
         if (value2 <= 0)
         {
@@ -64438,12 +62877,12 @@ Task<void> MbcPlayer::CheckServer()
         break;
     }
     engine.invoke<void>(Builtin::System, 61);
-    engine.invoke<void>(Builtin::Connect, storedValue<String>(address(member5128_)), storedValue<String>(address(member6749_)));
+    g_sfera_network_runtime.initialize(SferaText::terminated(memberBytes(member5128_)), 3);
     member6727_ = 0;
     while (true)
     {
         engine.checkpoint();
-        value2 = engine.invoke<std::int32_t>(Builtin::NetworkInitialization);
+        value2 = g_sfera_network_runtime.initialization_result;
         member6728_ = value2;
         if (value2 != 0)
         {
@@ -65576,7 +64015,7 @@ std::int32_t MbcPlayer::Upload(std::int32_t parameter1, String parameter2)
     std::int32_t value1;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member6848_)), member6845_, member6846_, 64);
+    engine.copyString(pointer(storedValue<String>(address(member6848_))), pointer(member6846_), integer(64));
     value1 = ScriptHelpers::call_AskForFile_1(*this, storedValue<String>(address(member6848_)), 0);
     return value1;
 }
@@ -66913,7 +65352,7 @@ std::int32_t MbcPlayer::GetSids(std::int32_t parameter1, AddressRef parameter2)
     value1 = member7021_;
     value2 = member7022_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(address(member5188_)), 8);
+    engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(address(member5188_))), word(integer(8)));
     return 0;
 }
 
@@ -67031,9 +65470,9 @@ std::int32_t MbcPlayer::receiveMarkOnMapXZ(String parameter1)
     String value1;
 
     member7039_ = member7038_;
-    value1 = engine.invoke<String>(Builtin::ReadReal, member7039_, storedValue<FloatRef>(address(member5317_)));
+    value1 = engine.readPacked<4>(pointer(member7039_), pointer(storedValue<FloatRef>(address(member5317_))));
     member7039_ = value1;
-    value1 = engine.invoke<String>(Builtin::ReadReal, member7039_, storedValue<FloatRef>(address(member5318_)));
+    value1 = engine.readPacked<4>(pointer(member7039_), pointer(storedValue<FloatRef>(address(member5318_))));
     member7039_ = value1;
     return 0;
 }
@@ -72433,7 +70872,7 @@ std::int32_t ScriptHelpers::GetAlch(Module &self, ScriptState18 &state18, std::i
     value1 = state18.member7638_;
     value2 = state18.member7639_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state18.member7618_)));
+    SferaTextBuffer(engine.buffer(pointer(value2))).assign(state18.member7618_);
     return 0;
 }
 
@@ -72544,7 +70983,7 @@ std::int32_t ScriptHelpers::GetWeightVariant3(Module &self, ScriptState2 &state2
         value1 = state2.member147_;
         value2 = state2.member148_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state17.member7643_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state17.member7643_))));
     }
     return multiply32(state4.member7608_, state2.member77_);
 }
@@ -73354,13 +71793,13 @@ Task<std::int32_t> ScriptHelpers::GetInfoVariant3(Module &self, ScriptState1 &st
     ScriptHelpers::AddInfo(self, state2, shifted(value1, multiply32(1, value3)));
     state7.member7697_ = 0;
     state5.member7699_ = 722;
-    if (std::int32_t(memberView<std::int8_t>(state18.member7618_, 0)) != 0)
+    if (!state18.member7618_.empty())
     {
         state11.member7743_ = 0;
         state7.member7697_ = 0;
         state5.member7699_ = 255;
         co_await std::move(ScriptHelpers::helper60_1(self, state2, state7)).in(self, "helper60_1");
-        state18.member7702_ = storedValue<String>(self.address(state18.member7618_));
+        state18.member7702_ = self.reference<String>(state18.member7618_);
         value3 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(state18.member7702_))));
         if (value3 > 56)
         {
@@ -73469,20 +71908,15 @@ Task<void> ScriptHelpers::LoadMulti(Module &self, ScriptState2 &state2, ScriptSt
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -73490,12 +71924,12 @@ Task<void> ScriptHelpers::LoadMulti(Module &self, ScriptState2 &state2, ScriptSt
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    ScriptHelpers::sharedPart95(self, state4.member78_, state7.member7779_, state3.member79_, state10.member7780_, state4.member7608_);
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 2, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 4, 4, 0, false, 0, false));
-    engine.copyBytes(memberBytes(state18.member7618_), pointer(shifted(state10.member7780_, 56)), 4u);
+    ScriptHelpers::sharedPart95(self, state4.member78_, state7.member7779_, state3.member79_, state4.member7608_);
+    state2.member82_ = state7.member7779_.parameters.fixedValues[0];
+    state4.member83_ = state7.member7779_.parameters.fixedValues[2];
+    state18.member7618_ = state7.member7779_.attributes.substr(0, 4);
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -73762,7 +72196,7 @@ std::int32_t ScriptHelpers::GetWeightVariant4(Module &self, ScriptState2 &state2
         value1 = state2.member147_;
         value2 = state2.member148_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state8.member7790_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state8.member7790_))));
     }
     return multiply32(state4.member7608_, state2.member77_);
 }
@@ -73801,7 +72235,7 @@ std::int32_t ScriptHelpers::GetParamVariant3(Module &self, ScriptState2 &state2,
         if (!(value1 == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(self.address(state4.member99_)), state4.member132_, state2.member134_, 8);
+            engine.copyBytes(pointer(storedValue<AddressRef>(self.address(state4.member99_))), pointer(state2.member134_), word(integer(8)));
             return memberView<std::int32_t>(state4.member99_, 0);
         }
         value1 = state2.member133_;
@@ -73876,7 +72310,7 @@ std::int32_t ScriptHelpers::GetParamVariant3(Module &self, ScriptState2 &state2,
     value1 = state4.member132_;
     value2 = state2.member134_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(self.address(state7.member7792_)), 92);
+    engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(self.address(state7.member7792_))), word(integer(92)));
     return 0;
 }
 
@@ -74399,20 +72833,15 @@ Task<void> ScriptHelpers::LoadMultiVariant2(Module &self, ScriptState2 &state2, 
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -74420,25 +72849,18 @@ Task<void> ScriptHelpers::LoadMultiVariant2(Module &self, ScriptState2 &state2, 
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state4.member78_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state4.member78_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member79_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member79_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat58 = 0; repeat58 < 14; ++repeat58)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat58), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat58), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat58))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state9.member7793_), 132, 56);
-    state9.member7922_ = storedValue<IntRef>(shifted(state7.member7779_, 188));
-    state4.member7608_ = engine.read<std::int32_t>(engine.indirect(payload(state9.member7922_)));
-    state9.member7795_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7922_), 1, 4, 0, false, 0, false));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7922_), 2, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7922_), 4, 4, 0, false, 0, false));
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state9.member7793_), std::span<const std::int32_t>(state7.member7779_.parameters.scaledModifiers));
+    state4.member7608_ = state7.member7779_.parameters.percentageModifiers[0];
+    state9.member7795_ = state7.member7779_.parameters.percentageModifiers[1];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -74678,20 +73100,16 @@ Task<void> ScriptHelpers::LoadMultiVariant3(Module &self, ScriptState2 &state2, 
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
+    state7.member7779_ = MultiObject{};
+    value1 = integerBits(engine.current.module->processId);
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
+    state7.member7610_ = storedValue<std::int32_t>(value2);
+    if (storedValue<std::int32_t>(value2) == -1)
     {
+        state7.member7779_ = MultiObject{};
         co_return;
     }
-    value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
-    state7.member7610_ = storedValue<std::int32_t>(value2);
-    if (!(storedValue<std::int32_t>(value2) != -1))
-    {
-        goto branch9;
-    }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -74705,35 +73123,32 @@ Task<void> ScriptHelpers::LoadMultiVariant3(Module &self, ScriptState2 &state2, 
         setMemberView(state2.member68_, (std::size_t{1} * word(engine.elementIndex(subtract32(value1, 2), -20, true))), storedValue<std::int8_t>(0));
         state4.member7621_ = subtract32(std::int32_t(memberView<std::int8_t>(state2.member68_, (std::size_t{1} * word(engine.elementIndex(subtract32(std::int32_t(state7.member7781_), 1), -20, true))))), 48);
     }
-    engine.copyBytes(memberBytes(state7.member7612_), pointer(shifted(state7.member7779_, 38)), 2u);
+    std::ranges::fill(state7.member7612_, std::uint8_t{});
+    const auto primaryQualifierCount = std::min<std::size_t>(2, state7.member7779_.primaryQualifier.size());
+    const auto secondaryQualifierCount = std::min<std::size_t>(2, state7.member7779_.secondaryQualifier.size());
+    if (primaryQualifierCount != 0)
+        std::memcpy(state7.member7612_.data(), state7.member7779_.primaryQualifier.data(), primaryQualifierCount);
     if (state7.member7610_ >= 0)
     {
         engine.invoke<void>(Builtin::FormatText, storedValue<String>(self.address(state2.member91_)), storedValue<String>(self.address(member7926_)), state7.member7610_);
     }
     else
     {
-        engine.copyBytes(memberBytes(state2.member91_), pointer(shifted(state7.member7779_, 40)), 20u);
+        SferaTextBuffer(memberBytes(state2.member91_)).assign(state7.member7779_.secondaryResource);
     }
-    engine.copyBytes(pointer(shifted(storedValue<String>(self.address(state7.member7612_)), 2)), pointer(shifted(state7.member7779_, 58)), 2u);
-    state4.member78_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    if (secondaryQualifierCount != 0)
+        std::memcpy(state7.member7612_.data() + 2, state7.member7779_.secondaryQualifier.data(), secondaryQualifierCount);
+    state4.member78_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member79_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member79_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat59 = 0; repeat59 < 14; ++repeat59)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat59), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat59), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat59))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state9.member7793_), 132, 56);
-    state7.member7925_ = storedValue<IntRef>(shifted(state7.member7779_, 188));
-    state4.member7608_ = engine.read<std::int32_t>(engine.indirect(payload(state7.member7925_)));
-    state9.member7795_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 1, 4, 0, false, 0, false));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 2, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 4, 4, 0, false, 0, false));
-    branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state9.member7793_), std::span<const std::int32_t>(state7.member7779_.parameters.scaledModifiers));
+    state4.member7608_ = state7.member7779_.parameters.percentageModifiers[0];
+    state9.member7795_ = state7.member7779_.parameters.percentageModifiers[1];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -74783,20 +73198,15 @@ Task<void> ScriptHelpers::LoadMultiVariant4(Module &self, ScriptState2 &state2, 
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -74804,31 +73214,20 @@ Task<void> ScriptHelpers::LoadMultiVariant4(Module &self, ScriptState2 &state2, 
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state4.member78_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state4.member78_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member79_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member79_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat60 = 0; repeat60 < 14; ++repeat60)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat60), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat60), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat60))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), 56, 4))), pointer(shifted(state7.member7779_, 248)), 4u);
-    value1 = memberView<std::int32_t>(state7.member7792_, 60);
-    engine.copyBytes(pointer(storedValue<IntRef>(engine.element(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), 60, 28))), 0, 4, -7, false, 0, true))), pointer(shifted(state7.member7779_, 252)), 14u);
-    state9.member7934_ = storedValue<IntRef>(shifted(state7.member7779_, 128));
-    member7931_ = storedValue<std::int8_t>(divide32(engine.read<std::int32_t>(engine.indirect(payload(state9.member7934_))), 1000));
-    member7932_ = storedValue<std::int8_t>(remainder32(engine.read<std::int32_t>(engine.indirect(payload(state9.member7934_))), 1000));
-    engine.copyBytes(memberBytes(state9.member7793_), pointer(shifted(state7.member7779_, 132)), 56u);
-    state9.member7934_ = storedValue<IntRef>(shifted(state7.member7779_, 188));
-    state4.member7608_ = engine.read<std::int32_t>(engine.indirect(payload(state9.member7934_)));
-    state9.member7795_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7934_), 1, 4, 0, false, 0, false));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7934_), 2, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7934_), 4, 4, 0, false, 0, false));
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state9.member7793_), std::span<const std::int32_t>(state7.member7779_.parameters.scaledModifiers));
+    member7931_ = storedValue<std::int8_t>(divide32(state7.member7779_.parameters.coreValues.back(), 1000));
+    member7932_ = storedValue<std::int8_t>(remainder32(state7.member7779_.parameters.coreValues.back(), 1000));
+    state4.member7608_ = state7.member7779_.parameters.percentageModifiers[0];
+    state9.member7795_ = state7.member7779_.parameters.percentageModifiers[1];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -75125,7 +73524,7 @@ std::int32_t ScriptHelpers::GetWeightVariant5(Module &self, ScriptState2 &state2
         value1 = state2.member147_;
         value2 = state2.member148_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state4.member149_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state4.member149_))));
     }
     return multiply32(state4.member7608_, state2.member77_);
 }
@@ -75696,7 +74095,7 @@ std::int32_t ScriptHelpers::GetParamVariant4(Module &self, ScriptState2 &state2,
             value1 = state7.member8195_;
             value2 = state2.member134_;
             value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(self.address(state10.member8180_)), 16);
+            engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(self.address(state10.member8180_))), word(integer(16)));
             return 0;
         }
         if (!(state2.member133_ != 1))
@@ -75724,7 +74123,7 @@ std::int32_t ScriptHelpers::GetParamVariant4(Module &self, ScriptState2 &state2,
                 value1 = state7.member8195_;
                 value2 = state2.member134_;
                 value3 = integerBits(engine.current.module->processId);
-                engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(self.address(state3.member8159_)), 56);
+                engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(self.address(state3.member8159_))), word(integer(56)));
             }
             return memberView<std::int32_t>(state3.member8159_, 0);
         }
@@ -75801,7 +74200,7 @@ std::int32_t ScriptHelpers::GetParamVariant4(Module &self, ScriptState2 &state2,
                     value1 = state7.member8195_;
                     value2 = state2.member134_;
                     value3 = integerBits(engine.current.module->processId);
-                    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state10.member8161_)));
+                    engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state10.member8161_))));
                 }
                 return state10.member8164_;
             }
@@ -75818,7 +74217,7 @@ std::int32_t ScriptHelpers::GetParamVariant4(Module &self, ScriptState2 &state2,
                 value1 = state7.member8195_;
                 value2 = state2.member134_;
                 value3 = integerBits(engine.current.module->processId);
-                engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(self.address(state10.member8164_)), 4);
+                engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(self.address(state10.member8164_))), word(integer(4)));
             }
             return state10.member8164_;
         }
@@ -75838,7 +74237,7 @@ std::int32_t ScriptHelpers::GetParamVariant4(Module &self, ScriptState2 &state2,
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(self.address(state3.member8159_)), state7.member8195_, state2.member134_, 56);
+        engine.copyBytes(pointer(storedValue<AddressRef>(self.address(state3.member8159_))), pointer(state2.member134_), word(integer(56)));
         return memberView<std::int32_t>(state3.member8159_, 0);
     }
     value1 = state2.member133_;
@@ -75858,7 +74257,7 @@ std::int32_t ScriptHelpers::GetParamVariant4(Module &self, ScriptState2 &state2,
         if (!(integerBits(state2.member134_) == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, state3.member8202_, state7.member8195_, state2.member134_, 8);
+            engine.copyBytes(pointer(state3.member8202_), pointer(state2.member134_), word(integer(8)));
         }
         value1 = memberView<std::int32_t>(state3.member8159_, 96);
         state10.member8204_ = storedValue<IntRef>(engine.field(pointer(self.address(state3.member8159_)), 96, 4));
@@ -75897,7 +74296,7 @@ std::int32_t ScriptHelpers::GetParamVariant4(Module &self, ScriptState2 &state2,
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(self.address(state3.member8151_)), state7.member8195_, state2.member134_, 4);
+        engine.copyBytes(pointer(storedValue<IntRef>(self.address(state3.member8151_))), pointer(state2.member134_), word(integer(4)));
         return 0;
     }
     value1 = state2.member133_;
@@ -75951,7 +74350,7 @@ std::int32_t ScriptHelpers::GetParamVariant4(Module &self, ScriptState2 &state2,
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(self.address(state10.member8161_)), state7.member8195_, state2.member134_);
+        engine.copyString(pointer(storedValue<String>(self.address(state10.member8161_))), pointer(state2.member134_));
         return state10.member8164_;
     }
     value1 = state2.member133_;
@@ -75967,7 +74366,7 @@ std::int32_t ScriptHelpers::GetParamVariant4(Module &self, ScriptState2 &state2,
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(self.address(state10.member8164_)), state7.member8195_, state2.member134_, 4);
+        engine.copyBytes(pointer(storedValue<IntRef>(self.address(state10.member8164_))), pointer(state2.member134_), word(integer(4)));
         return state10.member8164_;
     }
     if (state2.member133_ != 16)
@@ -75987,7 +74386,7 @@ std::int32_t ScriptHelpers::GetParamVariant4(Module &self, ScriptState2 &state2,
             return memberView<std::int32_t>(state3.member8159_, 156);
         }
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(self.address(state10.member8170_)), state7.member8195_, state2.member134_, 4);
+        engine.copyBytes(pointer(storedValue<IntRef>(self.address(state10.member8170_))), pointer(state2.member134_), word(integer(4)));
         return 0;
     }
     value1 = memberView<std::int32_t>(state3.member8159_, 96);
@@ -76062,7 +74461,7 @@ std::int32_t ScriptHelpers::GetWeightVariant6(Module &self, ScriptState2 &state2
         value1 = state2.member147_;
         value2 = state2.member148_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state2.member5484_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state2.member5484_))));
     }
     return multiply32(state2.member76_, state2.member77_);
 }
@@ -76820,9 +75219,9 @@ Task<void> ScriptHelpers::ClientVariant10(Module &self, ScriptState2 &state2, Sc
     value1 = co_await ScriptHelpers::call_InitChar_1(self, storedValue<IntRef>(self.address(state2.member71_)), storedValue<String>(self.address(state5.member8252_)), setting1);
     if (value1 != 0)
     {
-        if (!(memberView<std::int32_t>(state10.member8193_, 8) <= 0))
+        if (!(state10.member8193_.effectId <= 0))
         {
-            engine.invoke<void>(Builtin::Effect, state2.member71_, memberView<std::int32_t>(state10.member8193_, 8));
+            engine.invoke<void>(Builtin::Effect, state2.member71_, state10.member8193_.effectId);
         }
         value1 = ScriptHelpers::call_SetItemGroup_1(self, state7.member7609_);
         co_await ScriptHelpers::sharedPart62(self, std::span(state2.member89_), value2, std::span(state3.member66_), value3, state7.member7610_, std::span(member8253_));
@@ -76851,20 +75250,15 @@ Task<void> ScriptHelpers::LoadMultiVariant5(Module &self, ScriptState2 &state2, 
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -76872,59 +75266,52 @@ Task<void> ScriptHelpers::LoadMultiVariant5(Module &self, ScriptState2 &state2, 
         co_return;
     }
     ScriptHelpers::sharedPart118(self, std::span(state2.member68_), state7.member7781_, value1, value3, std::span(state10.member8262_), std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state10.member8152_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state10.member8152_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state10.member8153_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state10.member8153_ = state7.member7779_.scale;
     }
-    state10.member7780_ = storedValue<IntRef>(shifted(state7.member7779_, 60));
     value1 = memberView<std::int32_t>(state3.member8159_, 140);
-    setMemberView(state3.member8159_, 140, engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 0, 4, 0, false, 0, false)));
+    setMemberView(state3.member8159_, 140, state7.member7779_.parameters.mergeMode);
     value1 = memberView<std::int32_t>(state3.member8159_, 144);
-    setMemberView(state3.member8159_, 144, engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 1, 4, 0, false, 0, false)));
+    setMemberView(state3.member8159_, 144, state7.member7779_.parameters.primaryScale);
     value1 = memberView<std::int32_t>(state3.member8159_, 56);
     setMemberView(state3.member8159_, 56, memberView<std::int32_t>(state3.member8159_, 140));
     value1 = memberView<std::int32_t>(state3.member8159_, 60);
     setMemberView(state3.member8159_, 60, memberView<std::int32_t>(state3.member8159_, 144));
     value1 = memberView<std::int32_t>(state3.member8159_, 156);
-    setMemberView(state3.member8159_, 156, engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 2, 4, 0, false, 0, false)));
+    setMemberView(state3.member8159_, 156, state7.member7779_.parameters.fixedValues[0]);
     value1 = memberView<std::int32_t>(state3.member8159_, 96);
-    setMemberView(state3.member8159_, 96, engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 5, 4, 0, false, 0, false)));
+    setMemberView(state3.member8159_, 96, state7.member7779_.parameters.fixedValues[3]);
     value1 = memberView<std::int32_t>(state3.member8159_, 4);
     setMemberView(state3.member8159_, 4, memberView<std::int32_t>(state3.member8159_, 96));
     value1 = memberView<std::int32_t>(state3.member8159_, 188);
-    setMemberView(state3.member8159_, 188, engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 6, 4, 0, false, 0, false)));
+    setMemberView(state3.member8159_, 188, state7.member7779_.parameters.conditionalScaledValues[0]);
     value1 = memberView<std::int32_t>(state3.member8159_, 64);
     setMemberView(state3.member8159_, 64, memberView<std::int32_t>(state3.member8159_, 188));
     value1 = memberView<std::int32_t>(state3.member8159_, 192);
-    setMemberView(state3.member8159_, 192, engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 7, 4, 0, false, 0, false)));
+    setMemberView(state3.member8159_, 192, state7.member7779_.parameters.conditionalScaledValues[1]);
     value1 = memberView<std::int32_t>(state3.member8159_, 68);
     setMemberView(state3.member8159_, 68, memberView<std::int32_t>(state3.member8159_, 192));
-    state10.member8171_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 8, 4, 0, false, 0, false));
-    state10.member8172_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 9, 4, 0, false, 0, false));
-    state10.member8173_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 10, 4, 0, false, 0, false));
-    state10.member8174_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 11, 4, 0, false, 0, false));
+    state10.member8171_ = state7.member7779_.parameters.conditionalScaledValues[2];
+    state10.member8172_ = state7.member7779_.parameters.conditionalScaledValues[3];
+    state10.member8173_ = state7.member7779_.parameters.conditionalScaledValues[4];
+    state10.member8174_ = state7.member7779_.parameters.conditionalScaledValues[5];
     value1 = memberView<std::int32_t>(state3.member8159_, 92);
-    setMemberView(state3.member8159_, 92, engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 13, 4, 0, false, 0, false)));
-    engine.copyBytes(memberBytes(state10.member8180_), pointer(shifted(state7.member7779_, 116)), 16u);
-    ScriptHelpers::sharedPart90(self, std::span(state10.member8182_), state7.member7779_, state10.member7780_, state2.member76_, state2.member82_, 2, state7.member8158_, 3, state10.member8154_, 4, state10.member8190_, 5, state10.member8188_, 6);
-    state10.member8191_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 8, 4, 0, false, 0, false));
-    engine.copyBytes(memberBytes(state10.member8193_), pointer(shifted(state10.member7780_, 36)), 16u);
-    if (!(memberView<std::int32_t>(state10.member8193_, 12) == 0))
+    setMemberView(state3.member8159_, 92, state7.member7779_.parameters.conditionalScaledValues[7]);
+    for (std::size_t index = 0; index < state7.member7779_.parameters.coreValues.size(); ++index)
+        setMemberView(state10.member8180_, index * 4, state7.member7779_.parameters.coreValues[index]);
+    ScriptHelpers::sharedPart90(self, std::span(state10.member8182_), state7.member7779_, state2.member76_, state2.member82_, state7.member7779_.parameters.additiveModifier, state7.member8158_, state7.member7779_.parameters.percentageAdjustments[0], state10.member8154_, state7.member7779_.parameters.percentageAdjustments[1], state10.member8190_, state7.member7779_.parameters.overrides[0], state10.member8188_, state7.member7779_.parameters.overrides[1]);
+    state10.member8191_ = state7.member7779_.parameters.runtimeValue;
+    state10.member8193_ = {state7.member7779_.parameters.interactionArgument, state7.member7779_.parameters.auxiliaryArgument, state7.member7779_.parameters.effectId};
+    state10.member8184_ = {};
+    if (!state7.member7779_.textSelector.empty())
     {
-        state10.member8184_ = storedValue<String>(shifted(storedValue<IntRef>(self.address(state10.member8193_)), 12));
-        if (std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(state10.member8184_)))) <= 57)
-        {
-            state10.member8184_ = storedValue<String>(0);
-        }
-        else
-        {
-            engine.copyBytes(memberBytes(state10.member8186_), pointer(state10.member8184_), 4u);
-            state10.member8184_ = storedValue<String>(self.address(state10.member8186_));
-        }
+        state10.member8186_ = state7.member7779_.textSelector;
+        state10.member8184_ = self.reference<String>(state10.member8186_);
     }
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -77702,7 +76089,7 @@ Task<void> ScriptHelpers::EKillVariant3(Module &self, ScriptState2 &state2, Scri
                         co_await Suspend{};
                     }
                     engine.moveWorld(integer(state2.member71_), SferaVec3F{real(0), 0.25f, real(0)});
-                    value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state2.member71_);
+                    value1 = state2.member71_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state2.member71_)), false));
                     if (!(value1 == 0))
                     {
                         goto branch21;
@@ -77742,7 +76129,7 @@ Task<void> ScriptHelpers::EKillVariant3(Module &self, ScriptState2 &state2, Scri
             break;
         }
         engine.moveWorld(integer(state2.member71_), SferaVec3F{real(0), SferaNumeric::real32(-double(realBits(0.0500000007f))), real(0)});
-        value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state2.member71_);
+        value1 = state2.member71_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state2.member71_)), false));
         if (!(value1 != 0))
         {
             break;
@@ -77909,7 +76296,7 @@ std::int32_t ScriptHelpers::GetWeightVariant7(Module &self, ScriptState2 &state2
         value1 = state2.member147_;
         value2 = state2.member148_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state9.member8348_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state9.member8348_))));
     }
     return multiply32(state4.member7608_, state2.member77_);
 }
@@ -78223,20 +76610,15 @@ Task<void> ScriptHelpers::LoadMultiVariant6(Module &self, ScriptState2 &state2, 
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -78244,24 +76626,17 @@ Task<void> ScriptHelpers::LoadMultiVariant6(Module &self, ScriptState2 &state2, 
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state4.member78_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state4.member78_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member79_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member79_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat66 = 0; repeat66 < 14; ++repeat66)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat66), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat66), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat66))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state9.member7793_), 132, 56);
-    state9.member7922_ = storedValue<IntRef>(shifted(state7.member7779_, 188));
-    state4.member7608_ = engine.read<std::int32_t>(engine.indirect(payload(state9.member7922_)));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7922_), 2, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7922_), 4, 4, 0, false, 0, false));
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state9.member7793_), std::span<const std::int32_t>(state7.member7779_.parameters.scaledModifiers));
+    state4.member7608_ = state7.member7779_.parameters.percentageModifiers[0];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -78995,7 +77370,7 @@ Task<std::int32_t> MbcCsChest::GetParam2(std::int32_t parameter1, std::int32_t p
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(address(state4_.member99_)), state4_.member132_, state2_.member134_, 8);
+        engine.copyBytes(pointer(storedValue<AddressRef>(address(state4_.member99_))), pointer(state2_.member134_), word(integer(8)));
         co_return memberView<std::int32_t>(state4_.member99_, 0);
     }
     value1 = state2_.member133_;
@@ -80441,7 +78816,7 @@ std::int32_t ScriptHelpers::GetParamVariant6(Module &self, ScriptState2 &state2,
                 value1 = state2.member5472_;
                 value2 = state2.member134_;
                 value3 = integerBits(engine.current.module->processId);
-                engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(self.address(state3.member8159_)), 56);
+                engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(self.address(state3.member8159_))), word(integer(56)));
             }
             return memberView<std::int32_t>(state3.member8159_, 0);
         }
@@ -80518,7 +78893,7 @@ std::int32_t ScriptHelpers::GetParamVariant6(Module &self, ScriptState2 &state2,
                     value1 = state2.member5472_;
                     value2 = state2.member134_;
                     value3 = integerBits(engine.current.module->processId);
-                    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state3.member8604_)));
+                    engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state3.member8604_))));
                 }
                 return state3.member8178_;
             }
@@ -80535,7 +78910,7 @@ std::int32_t ScriptHelpers::GetParamVariant6(Module &self, ScriptState2 &state2,
                 value1 = state2.member5472_;
                 value2 = state2.member134_;
                 value3 = integerBits(engine.current.module->processId);
-                engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(self.address(state3.member8178_)), 4);
+                engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(self.address(state3.member8178_))), word(integer(4)));
             }
             return state3.member8178_;
         }
@@ -80555,7 +78930,7 @@ std::int32_t ScriptHelpers::GetParamVariant6(Module &self, ScriptState2 &state2,
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(self.address(state3.member8159_)), state2.member5472_, state2.member134_, 56);
+        engine.copyBytes(pointer(storedValue<AddressRef>(self.address(state3.member8159_))), pointer(state2.member134_), word(integer(56)));
         return memberView<std::int32_t>(state3.member8159_, 0);
     }
     value1 = state2.member133_;
@@ -80575,7 +78950,7 @@ std::int32_t ScriptHelpers::GetParamVariant6(Module &self, ScriptState2 &state2,
         if (!(integerBits(state2.member134_) == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, state3.member8626_, state2.member5472_, state2.member134_, 8);
+            engine.copyBytes(pointer(state3.member8626_), pointer(state2.member134_), word(integer(8)));
         }
         value1 = memberView<std::int32_t>(state3.member8159_, 96);
         state3.member8202_ = storedValue<IntRef>(engine.field(pointer(self.address(state3.member8159_)), 96, 4));
@@ -80614,7 +78989,7 @@ std::int32_t ScriptHelpers::GetParamVariant6(Module &self, ScriptState2 &state2,
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(self.address(state3.member8151_)), state2.member5472_, state2.member134_, 4);
+        engine.copyBytes(pointer(storedValue<IntRef>(self.address(state3.member8151_))), pointer(state2.member134_), word(integer(4)));
         return 0;
     }
     value1 = state2.member133_;
@@ -80668,7 +79043,7 @@ std::int32_t ScriptHelpers::GetParamVariant6(Module &self, ScriptState2 &state2,
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(self.address(state3.member8604_)), state2.member5472_, state2.member134_);
+        engine.copyString(pointer(storedValue<String>(self.address(state3.member8604_))), pointer(state2.member134_));
         return state3.member8178_;
     }
     value1 = state2.member133_;
@@ -80684,7 +79059,7 @@ std::int32_t ScriptHelpers::GetParamVariant6(Module &self, ScriptState2 &state2,
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(self.address(state3.member8178_)), state2.member5472_, state2.member134_, 4);
+        engine.copyBytes(pointer(storedValue<IntRef>(self.address(state3.member8178_))), pointer(state2.member134_), word(integer(4)));
         return state3.member8178_;
     }
     if (state2.member133_ != 16)
@@ -80704,7 +79079,7 @@ std::int32_t ScriptHelpers::GetParamVariant6(Module &self, ScriptState2 &state2,
             return memberView<std::int32_t>(state3.member8159_, 156);
         }
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(self.address(state3.member8610_)), state2.member5472_, state2.member134_, 4);
+        engine.copyBytes(pointer(storedValue<IntRef>(self.address(state3.member8610_))), pointer(state2.member134_), word(integer(4)));
         return 0;
     }
     value1 = memberView<std::int32_t>(state3.member8159_, 96);
@@ -82400,7 +80775,6 @@ Task<std::int32_t> MbcCsGate::UseServer2(std::int32_t parameter1, std::int32_t p
     value1 = compareStrings(engine.stringValue(memberBytes(state3_.member8604_)), engine.stringValue(memberBytes(state2_.member89_)));
     if (!(value1 == 0))
     {
-        engine.invoke<void>(Builtin::Reserved122, 0, storedValue<String>(address(state3_.member8604_)), storedValue<String>(address(state2_.member89_)));
         throw std::runtime_error("cs_gate.UseServer: missing operand at 34161 after reserved no-result builtin 122");
     }
     value1 = std::int32_t(value1 != 0);
@@ -82553,7 +80927,7 @@ std::int32_t MbcCsGate::lid2(std::int32_t parameter1, std::int32_t parameter2, S
             return 0;
         }
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(state2_.member89_)), state3_.member8764_, state3_.member8766_);
+        engine.copyString(pointer(storedValue<String>(address(state2_.member89_))), pointer(state3_.member8766_));
         value1 = compareStrings(engine.stringValue(memberBytes(state2_.member89_)), engine.stringValue(memberBytes(state3_.member8604_)));
         if (value1 != 0)
         {
@@ -82562,7 +80936,7 @@ std::int32_t MbcCsGate::lid2(std::int32_t parameter1, std::int32_t parameter2, S
         return 0;
     }
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(state3_.member8604_)), state3_.member8764_, state3_.member8766_);
+    engine.copyString(pointer(storedValue<String>(address(state3_.member8604_))), pointer(state3_.member8766_));
     value1 = std::int32_t(memberView<std::int8_t>(state3_.member87_, 0));
     setMemberView(state3_.member87_, 0, storedValue<std::int8_t>(1));
     value1 = std::int32_t(memberView<std::int8_t>(state3_.member87_, 1));
@@ -83123,7 +81497,7 @@ void MbcCsGuard::GetClanName2(std::int32_t parameter1, String parameter2)
     value1 = member8880_;
     value2 = member8881_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(state10_.member8161_)));
+    engine.copyString(pointer(value2), pointer(storedValue<String>(address(state10_.member8161_))));
     return;
 }
 
@@ -83136,7 +81510,7 @@ void MbcCsGuard::SetClanName(std::int32_t parameter1, String parameter2)
     std::int32_t value1;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(state10_.member8161_)), member8882_, member8883_);
+    engine.copyString(pointer(storedValue<String>(address(state10_.member8161_))), pointer(member8883_));
     return;
 }
 
@@ -84085,7 +82459,7 @@ std::int32_t ScriptHelpers::GCN(Module &self, ScriptState3 &state3, ScriptState4
     value1 = state48.member9030_;
     value2 = state48.member9031_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state3.member8604_)));
+    engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state3.member8604_))));
     return 0;
 }
 
@@ -84223,7 +82597,7 @@ std::int32_t MbcCsTable::NPL(std::int32_t parameter1, std::int32_t parameter2, s
     else
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, shifted(state48_.member9020_, multiply32(1, multiply32(state48_.member9044_, 20))), state48_.member9035_, state48_.member9039_);
+        engine.copyString(pointer(shifted(state48_.member9020_, multiply32(1, multiply32(state48_.member9044_, 20)))), pointer(state48_.member9039_));
     }
     if (integerBits(state48_.member9041_) == 0)
     {
@@ -84235,7 +82609,7 @@ std::int32_t MbcCsTable::NPL(std::int32_t parameter1, std::int32_t parameter2, s
     else
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, shifted(state48_.member9022_, multiply32(1, multiply32(state48_.member9044_, 20))), state48_.member9035_, state48_.member9041_);
+        engine.copyString(pointer(shifted(state48_.member9022_, multiply32(1, multiply32(state48_.member9044_, 20)))), pointer(state48_.member9041_));
     }
     value1 = state48_.member9044_;
     value4 = state48_.member9021_;
@@ -84256,7 +82630,7 @@ std::int32_t MbcCsTable::NPL(std::int32_t parameter1, std::int32_t parameter2, s
                 value1 = state48_.member9035_;
                 value4 = member9042_;
                 value3 = integerBits(engine.current.module->processId);
-                engine.invoke<void>(Builtin::CopyProcessString, value1, value4, value3, storedValue<String>(address(state3_.member8604_)));
+                engine.copyString(pointer(value4), pointer(storedValue<String>(address(state3_.member8604_))));
             }
         }
         else
@@ -90452,7 +88826,7 @@ std::int32_t ScriptHelpers::GetParamVariant7(Module &self, ScriptState2 &state2,
         if (!(value1 == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(self.address(state4.member99_)), state7.member8195_, state2.member134_, 8);
+            engine.copyBytes(pointer(storedValue<AddressRef>(self.address(state4.member99_))), pointer(state2.member134_), word(integer(8)));
             return memberView<std::int32_t>(state4.member99_, 0);
         }
         value1 = state2.member133_;
@@ -90491,7 +88865,7 @@ std::int32_t ScriptHelpers::GetParamVariant7(Module &self, ScriptState2 &state2,
         value1 = state7.member8195_;
         value2 = state2.member134_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(self.address(state49.member9412_)), 16);
+        engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(self.address(state49.member9412_))), word(integer(16)));
         return 0;
     }
     if (state2.member133_ != 1)
@@ -95756,7 +94130,7 @@ std::int32_t MbcCtChest4::SETMON(std::int32_t parameter1, String parameter2)
     std::int32_t value1;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member9840_)), member9843_, member9844_);
+    engine.copyString(pointer(storedValue<String>(address(member9840_))), pointer(member9844_));
     member9842_ = -1;
     return 0;
 }
@@ -97946,7 +96320,7 @@ std::int32_t MbcCtChestPr::GetLetter(std::int32_t parameter1, String parameter2)
     value1 = member10048_;
     value2 = member10049_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<String>(address(member10038_)), 1);
+    engine.copyBytes(pointer(value2), pointer(storedValue<String>(address(member10038_))), word(integer(1)));
     return 0;
 }
 
@@ -100123,7 +98497,7 @@ std::int32_t MbcCtLab::SETMON(std::int32_t parameter1, String parameter2)
 
     member10202_ = member9843_;
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member10206_)), member9843_, member10219_);
+    engine.copyString(pointer(storedValue<String>(address(member10206_))), pointer(member10219_));
     member10204_ = -1;
     return 0;
 }
@@ -100543,21 +98917,21 @@ Task<Value> MbcCtLab::RcvUser3(std::int32_t parameter1, String parameter2)
     }
     if (!(state6_.member9645_ != 12))
     {
-        value1 = engine.invoke<String>(Builtin::ReadReal, state5_.member671_, shifted(storedValue<FloatRef>(address(member10209_)), multiply32(4, state11_.member10201_)));
+        value1 = engine.readPacked<4>(pointer(state5_.member671_), pointer(shifted(storedValue<FloatRef>(address(member10209_)), multiply32(4, state11_.member10201_))));
         state5_.member671_ = value1;
-        value1 = engine.invoke<String>(Builtin::ReadReal, state5_.member671_, shifted(storedValue<FloatRef>(address(member10211_)), multiply32(4, state11_.member10201_)));
+        value1 = engine.readPacked<4>(pointer(state5_.member671_), pointer(shifted(storedValue<FloatRef>(address(member10211_)), multiply32(4, state11_.member10201_))));
         state5_.member671_ = value1;
-        value1 = engine.invoke<String>(Builtin::ReadReal, state5_.member671_, shifted(storedValue<FloatRef>(address(member10213_)), multiply32(4, state11_.member10201_)));
+        value1 = engine.readPacked<4>(pointer(state5_.member671_), pointer(shifted(storedValue<FloatRef>(address(member10213_)), multiply32(4, state11_.member10201_))));
         state5_.member671_ = value1;
         co_return storedValue<Value>(value1);
     }
     if (!(state6_.member9645_ != 13))
     {
-        value1 = engine.invoke<String>(Builtin::ReadReal, state5_.member671_, shifted(storedValue<FloatRef>(address(member10215_)), multiply32(4, state11_.member10201_)));
+        value1 = engine.readPacked<4>(pointer(state5_.member671_), pointer(shifted(storedValue<FloatRef>(address(member10215_)), multiply32(4, state11_.member10201_))));
         state5_.member671_ = value1;
-        value1 = engine.invoke<String>(Builtin::ReadReal, state5_.member671_, shifted(storedValue<FloatRef>(address(member10216_)), multiply32(4, state11_.member10201_)));
+        value1 = engine.readPacked<4>(pointer(state5_.member671_), pointer(shifted(storedValue<FloatRef>(address(member10216_)), multiply32(4, state11_.member10201_))));
         state5_.member671_ = value1;
-        value1 = engine.invoke<String>(Builtin::ReadReal, state5_.member671_, shifted(storedValue<FloatRef>(address(member10217_)), multiply32(4, state11_.member10201_)));
+        value1 = engine.readPacked<4>(pointer(state5_.member671_), pointer(shifted(storedValue<FloatRef>(address(member10217_)), multiply32(4, state11_.member10201_))));
         state5_.member671_ = value1;
         LoadModel(memberView<float>(member10209_, (std::size_t{4} * word(engine.elementIndex(state11_.member10201_, -40, true)))), memberView<float>(member10211_, (std::size_t{4} * word(engine.elementIndex(state11_.member10201_, -40, true)))), memberView<float>(member10213_, (std::size_t{4} * word(engine.elementIndex(state11_.member10201_, -40, true)))), memberView<float>(member10215_, (std::size_t{4} * word(engine.elementIndex(state11_.member10201_, -40, true)))), memberView<float>(member10216_, (std::size_t{4} * word(engine.elementIndex(state11_.member10201_, -40, true)))), memberView<float>(member10217_, (std::size_t{4} * word(engine.elementIndex(state11_.member10201_, -40, true)))));
         {
@@ -100647,7 +99021,7 @@ std::int32_t ScriptHelpers::GetWeightVariant8(Module &self, ScriptState2 &state2
         value1 = state2.member147_;
         value2 = state2.member148_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state8.member7790_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state8.member7790_))));
     }
     return add32(state2.member116_, state2.member76_);
 }
@@ -105451,7 +103825,7 @@ Value ScriptHelpers::RcvUserVariant11(Module &self, ScriptState2 &state2, Script
         {
             value3 = engine.field(pointer(self.address(member10773_)), 0, 12);
             value4 = engine.read<float>(engine.field(pointer(value3), (4 * repeat75), 4));
-            value1 = engine.invoke<String>(Builtin::ReadReal, state5.member671_, storedValue<FloatRef>(engine.field(pointer(value3), (4 * repeat75), 4)));
+            value1 = engine.readPacked<4>(pointer(state5.member671_), pointer(storedValue<FloatRef>(engine.field(pointer(value3), (4 * repeat75), 4))));
             state5.member671_ = value1;
         }
         value1 = value1;
@@ -105462,7 +103836,7 @@ Value ScriptHelpers::RcvUserVariant11(Module &self, ScriptState2 &state2, Script
         state5.member671_ = value1;
         value3 = engine.field(pointer(self.address(member10773_)), 12, 12);
         value4 = engine.read<float>(engine.field(pointer(value3), 0, 4));
-        value1 = engine.invoke<String>(Builtin::ReadReal, state5.member671_, storedValue<FloatRef>(engine.field(pointer(value3), 0, 4)));
+        value1 = engine.readPacked<4>(pointer(state5.member671_), pointer(storedValue<FloatRef>(engine.field(pointer(value3), 0, 4))));
         state5.member671_ = value1;
         value1 = value1;
     }
@@ -105860,7 +104234,7 @@ Task<Value> ScriptHelpers::RcvUserVariant12(Module &self, ScriptState5 &state5, 
         }
         value4 = engine.field(pointer(self.address(member10841_)), 12, 12);
         value5 = engine.read<float>(engine.field(pointer(value4), 0, 4));
-        value1 = engine.invoke<String>(Builtin::ReadReal, state5.member671_, storedValue<FloatRef>(engine.field(pointer(value4), 0, 4)));
+        value1 = engine.readPacked<4>(pointer(state5.member671_), pointer(storedValue<FloatRef>(engine.field(pointer(value4), 0, 4))));
         state5.member671_ = value1;
         value1 = value1;
         branch8: ;
@@ -105870,7 +104244,7 @@ Task<Value> ScriptHelpers::RcvUserVariant12(Module &self, ScriptState5 &state5, 
     {
         value4 = engine.field(pointer(self.address(member10841_)), 0, 12);
         value5 = engine.read<float>(engine.field(pointer(value4), (4 * repeat79), 4));
-        value1 = engine.invoke<String>(Builtin::ReadReal, state5.member671_, storedValue<FloatRef>(engine.field(pointer(value4), (4 * repeat79), 4)));
+        value1 = engine.readPacked<4>(pointer(state5.member671_), pointer(storedValue<FloatRef>(engine.field(pointer(value4), (4 * repeat79), 4))));
         state5.member671_ = value1;
     }
     value1 = value1;
@@ -106492,12 +104866,9 @@ Task<void> MbcEntry::Main()
     value1 = 0;
     if (!(value1 == 0))
     {
-        value2 = engine.invoke<Value>(Builtin::AllocateMemory, 1600);
-        member10921_ = storedValue<IntRef>(value2);
-        value2 = engine.invoke<Value>(Builtin::AllocateMemory, 1600);
-        member10922_ = storedValue<IntRef>(value2);
-        value2 = engine.invoke<Value>(Builtin::AllocateMemory, 1600);
-        member10923_ = storedValue<IntRef>(value2);
+        member10921_.fill(0);
+        member10922_.fill(0);
+        member10923_.fill(0);
     }
     co_await Finish{};
 }
@@ -106508,8 +104879,6 @@ std::int32_t MbcEntry::DelMis(std::int32_t parameter1)
     Host &engine = host();
     member10928_ = parameter1;
     std::int32_t value1;
-    IntRef value2;
-    std::int32_t value3;
 
     member10930_ = 0;
     while (true)
@@ -106519,7 +104888,7 @@ std::int32_t MbcEntry::DelMis(std::int32_t parameter1)
         {
             goto branch3;
         }
-        if (!(engine.read<std::int32_t>(engine.element(pointer(member10921_), member10930_, 4, 0, false, 0, false)) != member10928_))
+        if (!(member10921_[std::size_t{word(member10930_)}] != member10928_))
         {
             goto branch6;
         }
@@ -106536,17 +104905,10 @@ std::int32_t MbcEntry::DelMis(std::int32_t parameter1)
     return -1;
     branch6: ;
     value1 = member10930_;
-    value2 = member10922_;
-    value3 = engine.read<std::int32_t>(engine.element(pointer(value2), value1, 4, 0, false, 0, false));
-    engine.write(engine.element(pointer(value2), value1, 4, 0, false, 0, false), 0, 4);
-    value1 = member10930_;
-    value2 = member10921_;
-    value3 = engine.read<std::int32_t>(engine.element(pointer(value2), value1, 4, 0, false, 0, false));
-    engine.write(engine.element(pointer(value2), value1, 4, 0, false, 0, false), 0, 4);
-    value1 = member10930_;
-    value2 = member10923_;
-    value3 = engine.read<std::int32_t>(engine.element(pointer(value2), value1, 4, 0, false, 0, false));
-    engine.write(engine.element(pointer(value2), value1, 4, 0, false, 0, false), 0, 4);
+    const auto index = std::size_t{word(value1)};
+    member10922_[index] = 0;
+    member10921_[index] = 0;
+    member10923_[index] = 0;
     return 0;
 }
 
@@ -106709,7 +105071,7 @@ Task<void> ScriptHelpers::ServerVariant3(Module &self, ScriptState50 &state50, f
         setMemberView(state50.member10942_, 4, SferaNumeric::real32(double(realBits(memberView<float>(state50.member10942_, 4))) + double(realBits(state50.member10945_))));
         setMemberView(state50.member10942_, 8, SferaNumeric::real32(double(realBits(memberView<float>(state50.member10942_, 8))) + double(realBits(state50.member10946_))));
         co_await Suspend{};
-        value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state50.member10964_);
+        value1 = state50.member10964_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state50.member10964_)), false));
         state50.member10965_ = value1;
         if (!(value1 == 0))
         {
@@ -106794,7 +105156,7 @@ Task<void> MbcFb1::Client()
             {
                 member10979_ = real(0);
             }
-            value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state50_.member10970_);
+            value1 = state50_.member10970_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state50_.member10970_)), false));
             member10974_ = value1;
             if (value1 == 0)
             {
@@ -106940,7 +105302,7 @@ Task<void> MbcFb2::Client()
             {
                 member10989_ = real(0);
             }
-            value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state50_.member10970_);
+            value1 = state50_.member10970_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state50_.member10970_)), false));
             member10987_ = value1;
             if (value1 == 0)
             {
@@ -107711,7 +106073,7 @@ std::int32_t ScriptHelpers::GetParamVariant8(Module &self, ScriptState2 &state2,
         if (!(value1 == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(self.address(state4.member99_)), state7.member8195_, state2.member134_, 8);
+            engine.copyBytes(pointer(storedValue<AddressRef>(self.address(state4.member99_))), pointer(state2.member134_), word(integer(8)));
             return memberView<std::int32_t>(state4.member99_, 0);
         }
         value1 = state2.member133_;
@@ -107750,7 +106112,7 @@ std::int32_t ScriptHelpers::GetParamVariant8(Module &self, ScriptState2 &state2,
         value1 = state7.member8195_;
         value2 = state2.member134_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(self.address(state7.member11129_)), 16);
+        engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(self.address(state7.member11129_))), word(integer(16)));
         return 0;
     }
     if (!(state2.member133_ != 1))
@@ -107804,7 +106166,7 @@ std::int32_t ScriptHelpers::GetParamVariant8(Module &self, ScriptState2 &state2,
     value1 = state7.member8195_;
     value2 = state2.member134_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(self.address(state7.member7792_)), 92);
+    engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(self.address(state7.member7792_))), word(integer(92)));
     return 0;
 }
 
@@ -108441,20 +106803,15 @@ Task<void> ScriptHelpers::LoadMultiVariant7(Module &self, ScriptState2 &state2, 
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -108462,37 +106819,24 @@ Task<void> ScriptHelpers::LoadMultiVariant7(Module &self, ScriptState2 &state2, 
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state3.member108_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state3.member108_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member8177_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member8177_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat82 = 0; repeat82 < 14; ++repeat82)
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), std::span<const std::int32_t>(state7.member7779_.parameters.coreValues));
+    ScriptHelpers::sharedPart90(self, std::span(state9.member11130_), state7.member7779_, state4.member7608_, state9.member7795_, state7.member7779_.parameters.percentageModifiers[1], state2.member82_, state7.member7779_.parameters.additiveModifier, state7.member8158_, state7.member7779_.parameters.percentageAdjustments[0], state4.member83_, state7.member7779_.parameters.percentageAdjustments[1], state9.member11137_, state7.member7779_.parameters.overrides[0]);
+    state9.member11135_ = state7.member7779_.parameters.overrides[1];
+    state9.member11138_ = state7.member7779_.parameters.runtimeValue;
+    state7.member11139_ = {state7.member7779_.parameters.interactionArgument, state7.member7779_.parameters.auxiliaryArgument, state7.member7779_.parameters.effectId};
+    state9.member11132_ = {};
+    if (!state7.member7779_.textSelector.empty())
     {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat82), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat82), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat82))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), 116, 16);
-    ScriptHelpers::sharedPart90(self, std::span(state9.member11130_), state7.member7779_, state7.member7925_, state4.member7608_, state9.member7795_, 1, state2.member82_, 2, state7.member8158_, 3, state4.member83_, 4, state9.member11137_, 5);
-    state9.member11135_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 6, 4, 0, false, 0, false));
-    state9.member11138_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 8, 4, 0, false, 0, false));
-    engine.copyBytes(memberBytes(state7.member11139_), pointer(shifted(state7.member7925_, 36)), 16u);
-    if (!(memberView<std::int32_t>(state7.member11139_, 12) == 0))
-    {
-        state9.member11132_ = storedValue<String>(shifted(storedValue<IntRef>(self.address(state7.member11139_)), 12));
-        if (std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(state9.member11132_)))) <= 57)
-        {
-            state9.member11132_ = storedValue<String>(0);
-        }
-        else
-        {
-            engine.copyBytes(memberBytes(state7.member11133_), pointer(state9.member11132_), 4u);
-            state9.member11132_ = storedValue<String>(self.address(state7.member11133_));
-        }
+        state7.member11133_ = state7.member7779_.textSelector;
+        state9.member11132_ = self.reference<String>(state7.member11133_);
     }
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -108520,7 +106864,7 @@ Task<std::int32_t> ScriptHelpers::UseWithVariant6(Module &self, ScriptState2 &st
     co_await engine.call(self, false, state7.member10781_, storedValue<String>(self.address(state7.member11222_)), setting1);
     value1 = state7.member11219_;
     value2 = integerBits(engine.current.module->processId);
-    co_await engine.call(self, false, value1, 45, value2, state7.member11220_, memberView<std::int32_t>(state7.member11139_, 0));
+    co_await engine.call(self, false, value1, 45, value2, state7.member11220_, state7.member11139_.interactionArgument);
     co_return 0;
 }
 
@@ -109568,7 +107912,7 @@ Task<std::int32_t> MbcFormula::CraftString(std::int32_t parameter1, String param
         value1 = member11345_;
         value2 = member11346_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member11352_)), member11347_);
+        engine.copyString(pointer(value2), pointer(storedValue<String>(address(member11352_))), integer(member11347_));
         co_return 10;
     }
     member11356_ = 0;
@@ -109593,7 +107937,7 @@ Task<std::int32_t> MbcFormula::CraftString(std::int32_t parameter1, String param
     value1 = member11345_;
     value2 = member11346_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member11352_)), member11347_);
+    engine.copyString(pointer(value2), pointer(storedValue<String>(address(member11352_))), integer(member11347_));
     co_return 0;
 }
 
@@ -109617,7 +107961,7 @@ void MbcFormula::getFormulaInfo(std::int32_t parameter1, AddressRef parameter2)
     value1 = member11361_;
     value2 = member11362_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(address(member11269_)), 28);
+    engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(address(member11269_))), word(integer(28)));
     return;
 }
 
@@ -110507,7 +108851,7 @@ std::int32_t MbcGoldpurse::GetInfo2(std::int32_t parameter1, std::int32_t parame
         value1 = state4_.member7819_;
         value2 = state52_.member11461_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(state2_.member89_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(address(state2_.member89_))));
     }
     return 0;
 }
@@ -110546,7 +108890,7 @@ std::int32_t MbcGuild::GetParam(std::int32_t parameter1, std::int32_t parameter2
         if (!(value1 == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(address(state4_.member99_)), state4_.member132_, state2_.member134_, 8);
+            engine.copyBytes(pointer(storedValue<AddressRef>(address(state4_.member99_))), pointer(state2_.member134_), word(integer(8)));
             return memberView<std::int32_t>(state4_.member99_, 0);
         }
         value1 = state2_.member133_;
@@ -110612,7 +108956,7 @@ std::int32_t MbcGuild::GetParam(std::int32_t parameter1, std::int32_t parameter2
             value1 = state4_.member132_;
             value2 = state2_.member134_;
             value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(state2_.member89_)));
+            engine.copyString(pointer(value2), pointer(storedValue<String>(address(state2_.member89_))));
         }
         return state3_.member79_;
     }
@@ -110633,7 +108977,7 @@ std::int32_t MbcGuild::GetParam(std::int32_t parameter1, std::int32_t parameter2
     value1 = state4_.member132_;
     value2 = state2_.member134_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(address(state7_.member7792_)), 92);
+    engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(address(state7_.member7792_))), word(integer(92)));
     return 0;
 }
 
@@ -110714,12 +109058,6 @@ Task<Value> MbcIncubator::LoadGame4()
         goto branch2;
     }
     branch2: ;
-    if (!(integerBits(member11497_) != 0))
-    {
-        value3 = engine.invoke<Value>(Builtin::AllocateMemory, 640);
-        member11497_ = storedValue<String>(value3);
-        engine.fillBytes(pointer(member11497_), SferaNumeric::lowByte(0), 640u);
-    }
     member11516_ = -1;
     member11517_ = -1;
     member11518_ = -1;
@@ -110936,7 +109274,7 @@ Task<Value> MbcIncubator::LoadGame4()
                 value1 = integerBits(engine.current.module->processId);
                 co_await engine.call(*this, true, 57, value1, memberView<std::int32_t>(member11506_, (std::size_t{4} * word(engine.elementIndex(member11546_, -20, true)))), memberView<std::int32_t>(member11506_, (std::size_t{4} * word(engine.elementIndex(member11546_, -20, true)))), std::int32_t(member11556_), storedValue<String>(address(state2_.member89_)));
             }
-            engine.copyString(pointer(shifted(member11497_, multiply32(1, multiply32(32, member11546_)))), memberBytes(state2_.member89_));
+            member11497_[std::size_t{word(member11546_)}] = SferaText::terminated(memberBytes(state2_.member89_));
             {
                 const auto previous = member11546_;
                 const auto updated = add32(previous, 1);
@@ -111110,7 +109448,7 @@ void MbcIncubator::SaveGame2()
             break;
         }
         engine.invoke<void>(Builtin::FormatText, storedValue<String>(address(member11601_)), storedValue<String>(address(member11615_)), member11600_);
-        g_sfera_config_text_runtime.writeValue(SferaText::terminated(memberBytes(member11601_)), engine.stringValue(pointer(shifted(member11497_, multiply32(1, multiply32(32, member11600_))))), true);
+        g_sfera_config_text_runtime.writeValue(SferaText::terminated(memberBytes(member11601_)), member11497_[std::size_t{word(member11600_)}], true);
         engine.copyBytes(memberBytes(member11601_), memberBytes(member11616_), 3u);
         g_sfera_config_text_runtime.writeValue(SferaText::terminated(memberBytes(member11601_)), memberView<std::int32_t>(member11499_, (std::size_t{4} * word(engine.elementIndex(member11600_, -20, true)))));
         engine.copyBytes(memberBytes(member11601_), memberBytes(member11617_), 3u);
@@ -111413,7 +109751,7 @@ Task<std::int32_t> MbcIncubator::lid3(std::int32_t parameter1, std::int32_t para
                 co_return 0;
             }
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(state2_.member89_)), state3_.member8764_, state3_.member8766_);
+            engine.copyString(pointer(storedValue<String>(address(state2_.member89_))), pointer(state3_.member8766_));
             value1 = compareStrings(engine.stringValue(memberBytes(state2_.member89_)), engine.stringValue(memberBytes(member11539_)));
             if (value1 != 0)
             {
@@ -111424,13 +109762,13 @@ Task<std::int32_t> MbcIncubator::lid3(std::int32_t parameter1, std::int32_t para
         if (!(state3_.member8765_ != 2))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(address(member11513_)), state3_.member8764_, state3_.member8766_, 4);
+            engine.copyBytes(pointer(storedValue<IntRef>(address(member11513_))), pointer(state3_.member8766_), word(integer(4)));
             goto branch17;
         }
         if (!(state3_.member8765_ != 3))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(state2_.member89_)), state3_.member8764_, state3_.member8766_);
+            engine.copyString(pointer(storedValue<String>(address(state2_.member89_))), pointer(state3_.member8766_));
             value1 = compareStrings(engine.stringValue(memberBytes(state2_.member89_)), engine.stringValue(memberBytes(member11539_)));
             if (value1 != 0)
             {
@@ -111451,7 +109789,7 @@ Task<std::int32_t> MbcIncubator::lid3(std::int32_t parameter1, std::int32_t para
         co_return 0;
     }
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member11539_)), state3_.member8764_, state3_.member8766_);
+    engine.copyString(pointer(storedValue<String>(address(member11539_))), pointer(state3_.member8766_));
     value1 = engine.processModule(word(integer(state3_.member8764_)));
     if (!(value1 != 80))
     {
@@ -111864,7 +110202,7 @@ Task<std::int32_t> MbcIslandPr::CloseCont(std::int32_t parameter1)
     while (true)
     {
         engine.checkpoint();
-        value2 = engine.invoke<std::int32_t>(Builtin::FindProcess, 0, state41_.member11688_);
+        value2 = g_sfera_mbc_runtime.nextProcessByModule(0, state41_.member11688_);
         state41_.member11688_ = value2;
         if (value2 < 0)
         {
@@ -111986,7 +110324,7 @@ Task<std::int32_t> MbcIslandPr::LoadLab(std::int32_t parameter1)
     {
         co_return -1;
     }
-    if (!(integerBits(state5_.member11648_) == 0))
+    if (!state5_.member11648_.empty())
     {
         co_return -1;
     }
@@ -111997,19 +110335,19 @@ Task<std::int32_t> MbcIslandPr::LoadLab(std::int32_t parameter1)
         engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member11696_)), storedValue<String>(address(state2_.member89_)));
     }
     value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(state5_.member11648_)), add32(value1, 2), 1);
-    value2 = state5_.member11648_;
+    state5_.member11648_.assign(word(add32(value1, 2)), '\0');
+    value2 = reference<String>(state5_.member11648_);
     value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
     g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(value2)), word(value1));
     value1 = integerBits(engine.current.module->processId);
     co_await engine.call(*this, true, 40, value1, state41_.member9281_, storedValue<AddressRef>(address(member11708_)));
-    member11704_ = state5_.member11648_;
+    member11704_ = reference<String>(state5_.member11648_);
     value2 = engine.readPacked<4>(pointer(member11704_), memberBytes(member11698_));
     member11704_ = value2;
     state41_.member11705_ = shifted(member11704_, 20);
     if (!(member11698_ > 1))
     {
-        engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(address(state5_.member11648_)), 1);
+        state5_.member11648_ = {};
         co_return -1;
     }
     engine.copyBytes(memberBytes(member11710_), pointer(state41_.member11705_), 12u);
@@ -112200,7 +110538,7 @@ Task<std::int32_t> MbcIslandPr::LoadLab(std::int32_t parameter1)
         continue;
         break;
     }
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(address(state5_.member11648_)), 1);
+    state5_.member11648_ = {};
     co_return 0;
 }
 
@@ -112765,20 +111103,15 @@ Task<void> ScriptHelpers::LoadMultiVariant8(Module &self, ScriptState2 &state2, 
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -112786,11 +111119,11 @@ Task<void> ScriptHelpers::LoadMultiVariant8(Module &self, ScriptState2 &state2, 
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    ScriptHelpers::sharedPart95(self, state4.member78_, state7.member7779_, state3.member79_, state10.member7780_, state4.member7608_);
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 2, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 4, 4, 0, false, 0, false));
+    ScriptHelpers::sharedPart95(self, state4.member78_, state7.member7779_, state3.member79_, state4.member7608_);
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -112877,7 +111210,7 @@ std::int32_t MbcLabyr::GetEnt(std::int32_t parameter1, AddressRef parameter2)
     value1 = member11821_;
     value2 = member11822_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(address(member11813_)), 16);
+    engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(address(member11813_))), word(integer(16)));
     return 0;
 }
 
@@ -112910,7 +111243,7 @@ std::int32_t MbcLabyr::GCHID(std::int32_t parameter1, std::int32_t parameter2, s
     value2 = member11823_;
     value3 = member11826_;
     value4 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value2, value3, value4, shifted(member11828_, 20), 12);
+    engine.copyBytes(pointer(value3), pointer(shifted(member11828_, 20)), word(integer(12)));
     return 0;
 }
 
@@ -113131,7 +111464,7 @@ Task<std::int32_t> MbcLabyr::LoadLab2()
     {
         co_return -1;
     }
-    if (!(integerBits(state5_.member11648_) == 0))
+    if (!state5_.member11648_.empty())
     {
         co_return -1;
     }
@@ -113147,11 +111480,9 @@ Task<std::int32_t> MbcLabyr::LoadLab2()
         engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member11913_)), storedValue<String>(address(state2_.member89_)));
     }
     value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    value2 = engine.invoke<Value>(Builtin::AllocateMemory, add32(value1, 2));
-    state5_.member11648_ = storedValue<String>(value2);
-    value3 = state5_.member11648_;
+    state5_.member11648_.assign(word(add32(value1, 2)), '\0');
     value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(value3)), word(value1));
+    g_sfera_config_text_runtime.copyTo(memberBytes(state5_.member11648_), word(value1));
     if (add32(memberView<std::int32_t>(member11814_, 28), memberView<std::int32_t>(member11814_, 32)) >= 3)
     {
         if (memberView<std::int32_t>(member11814_, 28) <= memberView<std::int32_t>(member11814_, 32))
@@ -113172,7 +111503,7 @@ Task<std::int32_t> MbcLabyr::LoadLab2()
     {
         engine.invoke<void>(Builtin::FormatText, storedValue<String>(address(member11883_)), storedValue<String>(address(member11914_)), memberView<std::int32_t>(member11814_, 20));
     }
-    member11898_ = state5_.member11648_;
+    member11898_ = reference<String>(state5_.member11648_);
     value3 = engine.readPacked<4>(pointer(member11898_), memberBytes(member11887_));
     member11898_ = value3;
     member11899_ = shifted(member11898_, 20);
@@ -113773,7 +112104,7 @@ Task<std::int32_t> ScriptHelpers::CheckForTrade(Module &self, ScriptState2 &stat
     while (true)
     {
         engine.checkpoint();
-        value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, 2, member11956_);
+        value1 = g_sfera_mbc_runtime.nextProcessByModule(2, member11956_);
         member11956_ = value1;
         if (value1 < 0)
         {
@@ -113820,7 +112151,7 @@ Task<std::int32_t> ScriptHelpers::CheckForTrade(Module &self, ScriptState2 &stat
         co_return 0;
     }
     engine.moveWorld(integer(member11957_), SferaVec3F{real(0), 0.0799999982f, real(0)});
-    value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, member11957_);
+    value1 = member11957_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(member11957_)), false));
     member11958_ = value1;
     if (value1 == 1)
     {
@@ -114578,20 +112909,15 @@ Task<void> ScriptHelpers::LoadMultiVariant9(Module &self, ScriptState2 &state2, 
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -114599,19 +112925,19 @@ Task<void> ScriptHelpers::LoadMultiVariant9(Module &self, ScriptState2 &state2, 
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state4.member78_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state4.member78_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member79_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member79_ = state7.member7779_.scale;
     }
-    engine.copyBytes(memberBytes(member11988_), pointer(shifted(state7.member7779_, 132)), 56u);
-    state9.member7934_ = storedValue<IntRef>(shifted(state7.member7779_, 188));
-    state4.member7608_ = engine.read<std::int32_t>(engine.indirect(payload(state9.member7934_)));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7934_), 2, 4, 0, false, 0, false));
-    state7.member8158_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7934_), 3, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7934_), 4, 4, 0, false, 0, false));
+    for (std::size_t index = 0; index < state7.member7779_.parameters.scaledModifiers.size(); ++index)
+        setMemberView(member11988_, index * 4, state7.member7779_.parameters.scaledModifiers[index]);
+    state4.member7608_ = state7.member7779_.parameters.percentageModifiers[0];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state7.member8158_ = state7.member7779_.parameters.percentageAdjustments[0];
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -115033,7 +113359,7 @@ Task<void> MbcMgEye::ShowHiddens()
         while (true)
         {
             engine.checkpoint();
-            value2 = engine.invoke<std::int32_t>(Builtin::FindProcess, 0, member12086_);
+            value2 = g_sfera_mbc_runtime.nextProcessByModule(0, member12086_);
             member12086_ = value2;
             if (value2 < 0)
             {
@@ -116080,7 +114406,7 @@ std::int32_t ScriptHelpers::GetParamVariant10(Module &self, ScriptState2 &state2
         if (!(value1 == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(self.address(state4.member99_)), state7.member8195_, state2.member134_, 8);
+            engine.copyBytes(pointer(storedValue<AddressRef>(self.address(state4.member99_))), pointer(state2.member134_), word(integer(8)));
             return memberView<std::int32_t>(state4.member99_, 0);
         }
         value1 = state2.member133_;
@@ -116119,7 +114445,7 @@ std::int32_t ScriptHelpers::GetParamVariant10(Module &self, ScriptState2 &state2
         value1 = state7.member8195_;
         value2 = state2.member134_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(self.address(state7.member11129_)), 16);
+        engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(self.address(state7.member11129_))), word(integer(16)));
         return 0;
     }
     if (!(state2.member133_ != 1))
@@ -116164,7 +114490,7 @@ std::int32_t ScriptHelpers::GetParamVariant10(Module &self, ScriptState2 &state2
             value1 = state7.member8195_;
             value2 = state2.member134_;
             value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state2.member89_)));
+            engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state2.member89_))));
         }
         return state3.member8177_;
     }
@@ -116185,7 +114511,7 @@ std::int32_t ScriptHelpers::GetParamVariant10(Module &self, ScriptState2 &state2
     value1 = state7.member8195_;
     value2 = state2.member134_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(self.address(state7.member7792_)), 92);
+    engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(self.address(state7.member7792_))), word(integer(92)));
     return 0;
 }
 
@@ -117084,20 +115410,15 @@ Task<void> ScriptHelpers::LoadMultiVariant10(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -117105,22 +115426,16 @@ Task<void> ScriptHelpers::LoadMultiVariant10(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart118(self, std::span(state2.member68_), state7.member7781_, value1, value3, std::span(state10.member8262_), std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state3.member108_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state3.member108_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member8177_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member8177_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat90 = 0; repeat90 < 14; ++repeat90)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat90), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat90), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat90))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), 116, 16);
-    ScriptHelpers::sharedPart90(self, std::span(state36.member12232_), state7.member7779_, state7.member7925_, state4.member7608_, state2.member82_, 2, state7.member8158_, 3, state4.member83_, 4, state36.member12238_, 5, state36.member12236_, 6);
-    ScriptHelpers::sharedPart94(self, state7.member12239_, state7.member7925_, 8, state7.member12231_, std::span(state7.member11139_), state36.member12233_, std::span(state7.member11133_));
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), std::span<const std::int32_t>(state7.member7779_.parameters.coreValues));
+    ScriptHelpers::sharedPart90(self, std::span(state36.member12232_), state7.member7779_, state4.member7608_, state2.member82_, state7.member7779_.parameters.additiveModifier, state7.member8158_, state7.member7779_.parameters.percentageAdjustments[0], state4.member83_, state7.member7779_.parameters.percentageAdjustments[1], state36.member12238_, state7.member7779_.parameters.overrides[0], state36.member12236_, state7.member7779_.parameters.overrides[1]);
+    ScriptHelpers::sharedPart94(self, state7.member12239_, state7.member7779_, state7.member7779_.parameters.runtimeValue, state7.member12231_, state7.member11139_, state36.member12233_, state7.member11133_);
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -117138,7 +115453,7 @@ Task<std::int32_t> ScriptHelpers::UseWithVariant7(Module &self, ScriptState2 &st
     co_await engine.call(self, false, state7.member10781_, storedValue<String>(self.address(state7.member11222_)), setting1);
     value1 = state7.member11219_;
     value2 = integerBits(engine.current.module->processId);
-    co_await engine.call(self, false, value1, 45, value2, state7.member11220_, memberView<std::int32_t>(state7.member11139_, 0));
+    co_await engine.call(self, false, value1, 45, value2, state7.member11220_, state7.member11139_.interactionArgument);
     ScriptHelpers::MUseWith(self, state36, state7.member11219_, state7.member11220_);
     co_return 0;
 }
@@ -118021,9 +116336,9 @@ Task<void> ScriptHelpers::ClientVariant23(Module &self, ScriptState2 &state2, Sc
     value1 = co_await ScriptHelpers::call_InitChar_1(self, storedValue<IntRef>(self.address(state2.member71_)), storedValue<String>(self.address(state2.member68_)), setting1);
     if (value1 != 0)
     {
-        if (!(memberView<std::int32_t>(state10.member8193_, 8) <= 0))
+        if (!(state10.member8193_.effectId <= 0))
         {
-            engine.invoke<void>(Builtin::Effect, state2.member71_, memberView<std::int32_t>(state10.member8193_, 8));
+            engine.invoke<void>(Builtin::Effect, state2.member71_, state10.member8193_.effectId);
         }
         value1 = ScriptHelpers::call_SetItemGroup_1(self, state7.member7609_);
         co_await ScriptHelpers::sharedPart62(self, std::span(state2.member89_), value2, std::span(state3.member66_), value3, state7.member7610_, std::span(state25.member12451_));
@@ -118389,7 +116704,7 @@ Task<void> ScriptHelpers::checkExit(Module &self, ScriptState2 &state2, Address 
         while (true)
         {
             engine.checkpoint();
-            value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, 476, member12564_);
+            value1 = g_sfera_mbc_runtime.nextProcessByModule(476, member12564_);
             member12564_ = value1;
             if (value1 < 0)
             {
@@ -118729,7 +117044,7 @@ std::int32_t ScriptHelpers::GetParamVariant11(Module &self, ScriptState2 &state2
                 value1 = state2.member5472_;
                 value2 = state2.member134_;
                 value3 = integerBits(engine.current.module->processId);
-                engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<AddressRef>(self.address(state3.member8159_)), 56);
+                engine.copyBytes(pointer(value2), pointer(storedValue<AddressRef>(self.address(state3.member8159_))), word(integer(56)));
             }
             return memberView<std::int32_t>(state3.member8159_, 0);
         }
@@ -118806,7 +117121,7 @@ std::int32_t ScriptHelpers::GetParamVariant11(Module &self, ScriptState2 &state2
                     value1 = state2.member5472_;
                     value2 = state2.member134_;
                     value3 = integerBits(engine.current.module->processId);
-                    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(self.address(state3.member8604_)));
+                    engine.copyString(pointer(value2), pointer(storedValue<String>(self.address(state3.member8604_))));
                 }
                 return state3.member8178_;
             }
@@ -118823,7 +117138,7 @@ std::int32_t ScriptHelpers::GetParamVariant11(Module &self, ScriptState2 &state2
                 value1 = state2.member5472_;
                 value2 = state2.member134_;
                 value3 = integerBits(engine.current.module->processId);
-                engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(self.address(state3.member8178_)), 4);
+                engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(self.address(state3.member8178_))), word(integer(4)));
             }
             return state3.member8178_;
         }
@@ -118843,7 +117158,7 @@ std::int32_t ScriptHelpers::GetParamVariant11(Module &self, ScriptState2 &state2
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(self.address(state3.member8159_)), state2.member5472_, state2.member134_, 56);
+        engine.copyBytes(pointer(storedValue<AddressRef>(self.address(state3.member8159_))), pointer(state2.member134_), word(integer(56)));
         return memberView<std::int32_t>(state3.member8159_, 0);
     }
     value1 = state2.member133_;
@@ -118863,7 +117178,7 @@ std::int32_t ScriptHelpers::GetParamVariant11(Module &self, ScriptState2 &state2
         if (!(integerBits(state2.member134_) == 0))
         {
             value1 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, state3.member8626_, state2.member5472_, state2.member134_, 8);
+            engine.copyBytes(pointer(state3.member8626_), pointer(state2.member134_), word(integer(8)));
         }
         value1 = memberView<std::int32_t>(state3.member8159_, 96);
         state3.member8202_ = storedValue<IntRef>(engine.field(pointer(self.address(state3.member8159_)), 96, 4));
@@ -118902,7 +117217,7 @@ std::int32_t ScriptHelpers::GetParamVariant11(Module &self, ScriptState2 &state2
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(self.address(state3.member8151_)), state2.member5472_, state2.member134_, 4);
+        engine.copyBytes(pointer(storedValue<IntRef>(self.address(state3.member8151_))), pointer(state2.member134_), word(integer(4)));
         return 0;
     }
     value1 = state2.member133_;
@@ -118956,7 +117271,7 @@ std::int32_t ScriptHelpers::GetParamVariant11(Module &self, ScriptState2 &state2
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(self.address(state3.member8604_)), state2.member5472_, state2.member134_);
+        engine.copyString(pointer(storedValue<String>(self.address(state3.member8604_))), pointer(state2.member134_));
         return state3.member8178_;
     }
     value1 = state2.member133_;
@@ -118972,7 +117287,7 @@ std::int32_t ScriptHelpers::GetParamVariant11(Module &self, ScriptState2 &state2
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(self.address(state3.member8178_)), state2.member5472_, state2.member134_, 4);
+        engine.copyBytes(pointer(storedValue<IntRef>(self.address(state3.member8178_))), pointer(state2.member134_), word(integer(4)));
         return state3.member8178_;
     }
     if (state2.member133_ != 16)
@@ -121054,7 +119369,7 @@ void ScriptHelpers::TraderDown(Module &self, ScriptState2 &state2, ScriptState6 
         {
             break;
         }
-        value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state6.member12857_);
+        value1 = state6.member12857_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state6.member12857_)), false));
         if (!(value1 == 0))
         {
             goto branch6;
@@ -121090,7 +119405,7 @@ void ScriptHelpers::TraderDown(Module &self, ScriptState2 &state2, ScriptState6 
         value2 = engine.field(pointer(self.address(state2.member62_)), 0, 12);
         value3 = engine.read<float>(engine.field(pointer(value2), 4, 4));
         engine.write(engine.field(pointer(value2), 4, 4), SferaNumeric::real32(double(realBits(memberView<float>(state2.member62_, 4))) - double(realBits(0.00999999978f))), 4);
-        value1 = engine.invoke<std::int32_t>(Builtin::MovementContact, state6.member12857_);
+        value1 = state6.member12857_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state6.member12857_)), false));
         if (!(value1 != 0))
         {
             break;
@@ -123759,7 +122074,8 @@ Value MbcNpcTournament::RcvUser(std::int32_t parameter1, String parameter2)
     String value1;
 
     state5_.member671_ = state5_.member669_;
-    value1 = engine.invoke<String>(Builtin::ReadString, state5_.member671_, storedValue<String>(address(state2_.member68_)));
+    value1 = shifted(state5_.member671_, add32(engine.stringLength(pointer(state5_.member671_)), 1));
+    engine.copyString(pointer(storedValue<String>(address(state2_.member68_))), pointer(state5_.member671_));
     state5_.member671_ = value1;
     value1 = UnpackTmntData(state5_.member671_);
     state5_.member671_ = value1;
@@ -123921,185 +122237,57 @@ Task<std::int32_t> MbcNpcTournament::ParseItemString(String parameter1, String p
 {
     FunctionScope context(*this, "ParseItemString");
     Host &engine = host();
-    member13462_ = parameter1;
-    member13463_ = parameter2;
-    String value1;
-    std::int32_t value2;
-    String value3;
-    Value value4;
-
-    member13464_ = 0;
-    if (std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13462_)))) == 0)
+    const auto item = engine.stringValue(pointer(parameter1));
+    if (item.empty())
     {
-        value1 = member13463_;
-        value2 = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(value1), 0, 1, 0, false, 0, false)));
-        engine.write(engine.element(pointer(value1), 0, 1, 0, false, 0, false), storedValue<std::int8_t>(0), 1);
+        engine.copyText(engine.buffer(pointer(parameter2)), std::string_view{});
+        co_return 0;
+    }
+
+    std::int32_t amount = 0;
+    if (const auto marker = item.find("AMNT"); marker != std::string::npos)
+    {
+        const auto begin = std::min(marker + 5, item.size());
+        const auto end = item.find_first_of(";@", begin);
+        const auto token = std::string_view(item).substr(begin, end == std::string::npos ? item.size() - begin : end - begin);
+        std::from_chars(token.data(), token.data() + token.size(), amount);
+    }
+
+    if (const auto marker = item.find("ITID"); marker == std::string::npos)
+    {
+        const auto separator = item.find_last_of('@');
+        const auto groupOffset = separator == std::string::npos ? 0 : separator + 1;
+        ScriptHelpers::call_UnloadMsgGroup_1(*this);
+        const auto loaded = co_await ScriptHelpers::call_LoadMsgGroup_1(*this, shifted(parameter1, integerBits(SferaNumeric::lowWord(groupOffset))));
+        (void)loaded;
+        const auto message = ScriptHelpers::call_gMsg_1(*this, 1);
+        engine.copyString(pointer(parameter2), pointer(message));
+        ScriptHelpers::call_UnloadMsgGroup_1(*this);
     }
     else
     {
-        value1 = engine.invoke<String>(Builtin::FindString, member13462_, storedValue<String>(address(member13470_)));
-        member13468_ = value1;
-        engine.fillBytes(memberBytes(member13465_), SferaNumeric::lowByte(0), 16u);
-        if (!(integerBits(member13468_) == 0))
-        {
-            member13468_ = shifted(member13468_, 5);
-            member13469_ = member13468_;
-            member13467_ = 0;
-            while (true)
-            {
-                engine.checkpoint();
-                value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13469_))));
-                if (value2 == 59)
-                {
-                    value2 = std::int32_t(value2 != 59);
-                }
-                else
-                {
-                    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13469_))));
-                    value2 = std::int32_t(value2 != 64);
-                }
-                if (!(value2 == 0))
-                {
-                    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13469_))));
-                    value2 = std::int32_t(value2 != 0);
-                }
-                if (value2 == 0)
-                {
-                    break;
-                }
-                {
-                    const auto previous = member13469_;
-                    const auto updated = shifted(previous, 1);
-                    setMemberView(member13469_, 0, storedValue<std::int32_t>(updated));
-                    value1 = updated;
-                }
-                {
-                    const auto previous = member13467_;
-                    const auto updated = add32(previous, 1);
-                    member13467_ = storedValue<std::int32_t>(updated);
-                    value2 = updated;
-                }
-                engine.checkpoint();
-                continue;
-                break;
-            }
-            engine.copyBytes(memberBytes(member13465_), pointer(member13468_), word(integer(member13467_)));
-            SferaText::scan(SferaText::terminated(memberBytes(member13465_)), SferaText::terminated(memberBytes(member13471_)), {memberBytes(member13464_)});
-        }
-        engine.fillBytes(memberBytes(member13465_), SferaNumeric::lowByte(0), 16u);
-        value1 = engine.invoke<String>(Builtin::FindString, member13462_, storedValue<String>(address(member13472_)));
-        member13468_ = value1;
-        if (integerBits(member13468_) == 0)
-        {
-            value1 = member13462_;
-            value2 = engine.stringLength(pointer(member13462_));
-            member13476_ = shifted(shifted(value1, multiply32(1, value2)), negate32(1));
-            while (true)
-            {
-                engine.checkpoint();
-                value1 = member13476_;
-                value3 = member13462_;
-                if (integerBits(value1) <= integerBits(value3))
-                {
-                    value2 = std::int32_t(integerBits(value1) > integerBits(value3));
-                }
-                else
-                {
-                    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13476_))));
-                    value2 = std::int32_t(value2 != 64);
-                }
-                if (value2 == 0)
-                {
-                    break;
-                }
-                {
-                    const auto previous = member13476_;
-                    const auto updated = shifted(previous, -1);
-                    setMemberView(member13476_, 0, storedValue<std::int32_t>(updated));
-                    value1 = previous;
-                }
-                engine.checkpoint();
-                continue;
-                break;
-            }
-            if (!(std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13476_)))) != 64))
-            {
-                {
-                    const auto previous = member13476_;
-                    const auto updated = shifted(previous, 1);
-                    setMemberView(member13476_, 0, storedValue<std::int32_t>(updated));
-                    value1 = previous;
-                }
-            }
-            value2 = ScriptHelpers::call_UnloadMsgGroup_1(*this);
-            value4 = co_await ScriptHelpers::call_LoadMsgGroup_1(*this, member13476_);
-            (void)(std::int32_t(value4.present) != 0);
-            value1 = member13463_;
-            value3 = ScriptHelpers::call_gMsg_1(*this, 1);
-            engine.copyString(pointer(value1), pointer(value3));
-            value2 = ScriptHelpers::call_UnloadMsgGroup_1(*this);
-        }
-        else
-        {
-            member13468_ = shifted(member13468_, 5);
-            member13469_ = member13468_;
-            member13467_ = 0;
-            while (true)
-            {
-                engine.checkpoint();
-                value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13469_))));
-                if (value2 == 59)
-                {
-                    value2 = std::int32_t(value2 != 59);
-                }
-                else
-                {
-                    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13469_))));
-                    value2 = std::int32_t(value2 != 64);
-                }
-                if (!(value2 == 0))
-                {
-                    value2 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13469_))));
-                    value2 = std::int32_t(value2 != 0);
-                }
-                if (value2 == 0)
-                {
-                    break;
-                }
-                {
-                    const auto previous = member13469_;
-                    const auto updated = shifted(previous, 1);
-                    setMemberView(member13469_, 0, storedValue<std::int32_t>(updated));
-                    value1 = updated;
-                }
-                {
-                    const auto previous = member13467_;
-                    const auto updated = add32(previous, 1);
-                    member13467_ = storedValue<std::int32_t>(updated);
-                    value2 = updated;
-                }
-                engine.checkpoint();
-                continue;
-                break;
-            }
-            engine.copyBytes(memberBytes(member13465_), pointer(member13468_), word(integer(member13467_)));
-            SferaText::scan(SferaText::terminated(memberBytes(member13465_)), SferaText::terminated(memberBytes(member13473_)), {memberBytes(member13413_)});
-            co_await engine.call(*this, true, storedValue<String>(address(member13474_)), member13413_, storedValue<String>(address(state2_.member89_)), 60);
-            value2 = ScriptHelpers::call_UnloadMsgGroup_1(*this);
-            value2 = ScriptHelpers::call_SetItemGroup_1(*this, member13413_);
-            value4 = co_await ScriptHelpers::call_LoadMsgGroup_1(*this, storedValue<String>(address(state2_.member89_)));
-            (void)(std::int32_t(value4.present) != 0);
-            value1 = member13463_;
-            value3 = ScriptHelpers::call_gMsg_1(*this, 1);
-            engine.copyString(pointer(value1), pointer(value3));
-            value2 = ScriptHelpers::call_UnloadMsgGroup_1(*this);
-        }
-        if (!(member13464_ <= 1))
-        {
-            value1 = member13463_;
-            value2 = engine.stringLength(pointer(member13463_));
-            engine.invoke<void>(Builtin::FormatText, shifted(value1, multiply32(1, value2)), storedValue<String>(address(member13477_)), member13464_);
-        }
+        const auto begin = std::min(marker + 5, item.size());
+        const auto end = item.find_first_of(";@", begin);
+        const auto token = std::string_view(item).substr(begin, end == std::string::npos ? item.size() - begin : end - begin);
+        std::int32_t itemId = 0;
+        std::from_chars(token.data(), token.data() + token.size(), itemId);
+        member13413_ = itemId;
+        static_cast<MbcMain &>(engine.mainModule()).GetMBLnam(itemId, storedValue<String>(address(state2_.member89_)), 60);
+        ScriptHelpers::call_UnloadMsgGroup_1(*this);
+        ScriptHelpers::call_SetItemGroup_1(*this, itemId);
+        const auto loaded = co_await ScriptHelpers::call_LoadMsgGroup_1(*this, storedValue<String>(address(state2_.member89_)));
+        (void)loaded;
+        const auto message = ScriptHelpers::call_gMsg_1(*this, 1);
+        engine.copyString(pointer(parameter2), pointer(message));
+        ScriptHelpers::call_UnloadMsgGroup_1(*this);
+    }
+
+    if (amount > 1)
+    {
+        auto output = SferaTextBuffer(engine.buffer(pointer(parameter2)));
+        output.append(" (");
+        output.append(std::to_string(amount));
+        output.append(")");
     }
     co_return 0;
 }
@@ -124119,9 +122307,11 @@ String MbcNpcTournament::UnpackTmntData(String parameter1)
     member13478_ = value1;
     value1 = engine.readPacked<4>(pointer(member13478_), memberBytes(member13411_));
     member13478_ = value1;
-    value1 = engine.invoke<String>(Builtin::ReadString, member13478_, storedValue<String>(address(member13415_)));
+    value1 = shifted(member13478_, add32(engine.stringLength(pointer(member13478_)), 1));
+    engine.copyString(pointer(storedValue<String>(address(member13415_))), pointer(member13478_));
     member13478_ = value1;
-    value1 = engine.invoke<String>(Builtin::ReadString, member13478_, storedValue<String>(address(member13417_)));
+    value1 = shifted(member13478_, add32(engine.stringLength(pointer(member13478_)), 1));
+    engine.copyString(pointer(storedValue<String>(address(member13417_))), pointer(member13478_));
     member13478_ = value1;
     return member13478_;
 }
@@ -125194,7 +123384,7 @@ Task<void> MbcNpcVirt::CheckExit()
             {
                 member13600_ = 63;
             }
-            value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, member13600_, member13598_);
+            value1 = g_sfera_mbc_runtime.nextProcessByModule(word(integer(member13600_)), member13598_);
             member13598_ = value1;
             if (!(value1 >= 0))
             {
@@ -125253,8 +123443,7 @@ Task<void> MbcPacket::Main()
     Host &engine = host();
     String value1;
 
-    value1 = engine.invoke<String>(Builtin::AllocateMemory, 500);
-    member13607_ = value1;
+    member13607_.clear();
     co_await Finish{};
 }
 
@@ -125622,20 +123811,15 @@ Task<void> ScriptHelpers::LoadMultiVariant11(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -125643,12 +123827,12 @@ Task<void> ScriptHelpers::LoadMultiVariant11(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    ScriptHelpers::sharedPart95(self, state4.member78_, state7.member7779_, state3.member79_, state10.member7780_, state4.member7608_);
-    state12.member13616_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 1, 4, 0, false, 0, false));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 2, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 4, 4, 0, false, 0, false));
+    ScriptHelpers::sharedPart95(self, state4.member78_, state7.member7779_, state3.member79_, state4.member7608_);
+    state12.member13616_ = state7.member7779_.parameters.percentageModifiers[1];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -125716,12 +123900,14 @@ Task<std::int32_t> MbcPacket::UseOwner(std::int32_t parameter1)
     co_await engine.call(*this, true, 17, value1, subtract32(member13603_, 4000), storedValue<String>(address(state2_.member89_)));
     value1 = integerBits(engine.current.module->processId);
     co_await engine.call(*this, true, 17, value1, member13604_, storedValue<String>(address(member13609_)));
-    value2 = member13607_;
+    member13607_.resize(500);
+    value2 = reference<String>(member13607_);
     value3 = ScriptHelpers::call_gMsg_1(*this, member13606_);
     engine.invoke<void>(Builtin::FormatText, value2, value3, storedValue<String>(address(member13609_)), storedValue<String>(address(state2_.member89_)));
+    member13607_.resize(word(engine.stringLength(pointer(value2))));
     value4 = storedValue<Value>(co_await engine.call(*this, true, storedValue<String>(address(member13650_))));
     value1 = integerBits(engine.current.module->processId);
-    value2 = member13607_;
+    value2 = reference<String>(member13607_);
     value5 = packColor(187, 187, 187);
     co_await engine.call(*this, false, value4, storedValue<String>(address(state11_.member11328_)), value1, value2, value5);
     control("CheckUseDist", ProgramAction::Start);
@@ -125819,7 +124005,7 @@ std::int32_t MbcPurse::GetInfo2(std::int32_t parameter1, std::int32_t parameter2
         value1 = state4_.member7819_;
         value2 = state52_.member11461_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(state2_.member89_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(address(state2_.member89_))));
     }
     return 0;
 }
@@ -126479,13 +124665,13 @@ Task<std::int32_t> MbcPwAmilus::GetInfo(std::int32_t parameter1, std::int32_t pa
     ScriptHelpers::AddInfo(*this, state2_, shifted(value1, multiply32(1, value3)));
     state7_.member7697_ = 0;
     state7_.member9463_ = 722;
-    if (std::int32_t(memberView<std::int8_t>(state18_.member7618_, 0)) != 0)
+    if (!state18_.member7618_.empty())
     {
         state7_.member7734_ = 0;
         state7_.member7697_ = 0;
         state7_.member9463_ = 255;
         co_await std::move(ScriptHelpers::helper60_1(*this, state2_, state7_)).in(*this, "helper60_1");
-        member13721_ = storedValue<String>(address(state18_.member7618_));
+        member13721_ = reference<String>(state18_.member7618_);
         value3 = std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13721_))));
         if (value3 > 56)
         {
@@ -127883,20 +126069,15 @@ Task<void> ScriptHelpers::LoadMultiVariant12(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -127904,26 +126085,19 @@ Task<void> ScriptHelpers::LoadMultiVariant12(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state3.member108_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state3.member108_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member8177_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member8177_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat101 = 0; repeat101 < 14; ++repeat101)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat101), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat101), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat101))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), 116, 16);
-    state9.member7922_ = storedValue<IntRef>(shifted(state7.member7779_, 188));
-    state4.member7608_ = engine.read<std::int32_t>(engine.indirect(payload(state9.member7922_)));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7922_), 2, 4, 0, false, 0, false));
-    state7.member8158_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7922_), 3, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7922_), 4, 4, 0, false, 0, false));
-    engine.copyBytes(memberBytes(state7.member11139_), pointer(shifted(state9.member7922_, 36)), 16u);
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), std::span<const std::int32_t>(state7.member7779_.parameters.coreValues));
+    state4.member7608_ = state7.member7779_.parameters.percentageModifiers[0];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state7.member8158_ = state7.member7779_.parameters.percentageAdjustments[0];
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
+    state7.member11139_ = {state7.member7779_.parameters.interactionArgument, state7.member7779_.parameters.auxiliaryArgument, state7.member7779_.parameters.effectId};
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -128205,20 +126379,15 @@ Task<void> ScriptHelpers::LoadMultiVariant13(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -128226,36 +126395,23 @@ Task<void> ScriptHelpers::LoadMultiVariant13(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state3.member108_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state3.member108_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member8177_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member8177_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat104 = 0; repeat104 < 14; ++repeat104)
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), std::span<const std::int32_t>(state7.member7779_.parameters.coreValues));
+    ScriptHelpers::sharedPart90(self, std::span(state11.member13898_), state7.member7779_, state4.member7608_, state2.member82_, state7.member7779_.parameters.additiveModifier, state7.member8158_, state7.member7779_.parameters.percentageAdjustments[0], state4.member83_, state7.member7779_.parameters.percentageAdjustments[1], state11.member13903_, state7.member7779_.parameters.overrides[0], state11.member13901_, state7.member7779_.parameters.overrides[1]);
+    state7.member12239_ = state7.member7779_.parameters.runtimeValue;
+    state7.member11139_ = {state7.member7779_.parameters.interactionArgument, state7.member7779_.parameters.auxiliaryArgument, state7.member7779_.parameters.effectId};
+    state11.member13899_ = {};
+    if (!state7.member7779_.textSelector.empty())
     {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat104), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat104), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat104))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), 116, 16);
-    ScriptHelpers::sharedPart90(self, std::span(state11.member13898_), state7.member7779_, state7.member7925_, state4.member7608_, state2.member82_, 2, state7.member8158_, 3, state4.member83_, 4, state11.member13903_, 5, state11.member13901_, 6);
-    state7.member12239_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 8, 4, 0, false, 0, false));
-    engine.copyBytes(memberBytes(state7.member11139_), pointer(shifted(state7.member7925_, 36)), 16u);
-    if (!(memberView<std::int32_t>(state7.member11139_, 12) == 0))
-    {
-        state11.member13899_ = storedValue<String>(shifted(storedValue<IntRef>(self.address(state7.member11139_)), 12));
-        if (std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(state11.member13899_)))) <= 57)
-        {
-            state11.member13899_ = storedValue<String>(0);
-        }
-        else
-        {
-            engine.copyBytes(memberBytes(state11.member13900_), pointer(state11.member13899_), 4u);
-            state11.member13899_ = storedValue<String>(self.address(state11.member13900_));
-        }
+        state11.member13900_ = state7.member7779_.textSelector;
+        state11.member13899_ = self.reference<String>(state11.member13900_);
     }
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -128656,20 +126812,15 @@ Task<void> ScriptHelpers::LoadMultiVariant14(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -128677,48 +126828,35 @@ Task<void> ScriptHelpers::LoadMultiVariant14(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state3.member108_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state3.member108_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member8177_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member8177_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat107 = 0; repeat107 < 14; ++repeat107)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat107), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat107), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat107))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), 116, 16);
-    engine.copyBytes(memberBytes(member13979_), pointer(shifted(state7.member7779_, 132)), 56u);
-    state7.member7925_ = storedValue<IntRef>(shifted(state7.member7779_, 188));
-    state4.member7608_ = engine.read<std::int32_t>(engine.indirect(payload(state7.member7925_)));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 2, 4, 0, false, 0, false));
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), std::span<const std::int32_t>(state7.member7779_.parameters.coreValues));
+    for (std::size_t index = 0; index < state7.member7779_.parameters.scaledModifiers.size(); ++index)
+        setMemberView(member13979_, index * 4, state7.member7779_.parameters.scaledModifiers[index]);
+    state4.member7608_ = state7.member7779_.parameters.percentageModifiers[0];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
     if (!(state2.member82_ <= 100))
     {
         state16.member13978_ = divide32(state2.member82_, 100);
         state2.member82_ = remainder32(state2.member82_, 100);
     }
-    state7.member8158_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 3, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 4, 4, 0, false, 0, false));
-    member13984_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 5, 4, 0, false, 0, false));
-    member13983_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 6, 4, 0, false, 0, false));
-    state9.member11138_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 8, 4, 0, false, 0, false));
-    engine.copyBytes(memberBytes(state7.member11139_), pointer(shifted(state7.member7925_, 36)), 16u);
-    if (!(memberView<std::int32_t>(state7.member11139_, 12) == 0))
+    state7.member8158_ = state7.member7779_.parameters.percentageAdjustments[0];
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
+    member13984_ = state7.member7779_.parameters.overrides[0];
+    member13983_ = state7.member7779_.parameters.overrides[1];
+    state9.member11138_ = state7.member7779_.parameters.runtimeValue;
+    state7.member11139_ = {state7.member7779_.parameters.interactionArgument, state7.member7779_.parameters.auxiliaryArgument, state7.member7779_.parameters.effectId};
+    member13981_ = {};
+    if (!state7.member7779_.textSelector.empty())
     {
-        member13981_ = storedValue<String>(shifted(storedValue<IntRef>(self.address(state7.member11139_)), 12));
-        if (std::int32_t(engine.read<std::int8_t>(engine.indirect(payload(member13981_)))) <= 57)
-        {
-            member13981_ = storedValue<String>(0);
-        }
-        else
-        {
-            engine.copyBytes(memberBytes(state7.member11133_), pointer(member13981_), 4u);
-            member13981_ = storedValue<String>(self.address(state7.member11133_));
-        }
+        state7.member11133_ = state7.member7779_.textSelector;
+        member13981_ = self.reference<String>(state7.member11133_);
     }
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -128736,7 +126874,7 @@ Task<std::int32_t> ScriptHelpers::UseWithVariant11(Module &self, ScriptState2 &s
     co_await engine.call(self, false, state7.member10781_, storedValue<String>(self.address(state7.member11222_)), setting1);
     value1 = state7.member11219_;
     value2 = integerBits(engine.current.module->processId);
-    co_await engine.call(self, false, value1, 45, value2, state7.member11220_, memberView<std::int32_t>(state7.member11139_, 0));
+    co_await engine.call(self, false, value1, 45, value2, state7.member11220_, state7.member11139_.interactionArgument);
     value1 = co_await std::move(ScriptHelpers::DoBoom(self, state16, state7.member11219_, state7.member11220_)).in(self, "DoBoom");
     co_return -1;
 }
@@ -128763,7 +126901,7 @@ Task<std::int32_t> ScriptHelpers::DoBoom(Module &self, ScriptState16 &state16, s
     while (true)
     {
         engine.checkpoint();
-        value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, 0, state16.member14044_);
+        value1 = g_sfera_mbc_runtime.nextProcessByModule(0, state16.member14044_);
         state16.member14044_ = value1;
         if (value1 < 0)
         {
@@ -128839,7 +126977,7 @@ template <std::size_t Variant, class State> Task<std::int32_t> ScriptHelpers::Us
     co_await engine.call(self, false, state8.member9542_, storedValue<String>(self.address(state8.member9544_)), setting1);
     value1 = state8.member9539_;
     value2 = integerBits(engine.current.module->processId);
-    co_await engine.call(self, false, value1, 45, value2, state7.member9540_, memberView<std::int32_t>(state7.member11139_, 0));
+    co_await engine.call(self, false, value1, 45, value2, state7.member9540_, state7.member11139_.interactionArgument);
     co_return 0;
 }
 
@@ -129114,7 +127252,7 @@ std::int32_t ScriptHelpers::SetMis(Module &self, ScriptState5 &state5, ScriptSta
     state57.member14165_[8] = state57.member14207_;
     state57.member14165_[9] = state57.member14208_;
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(self.address(state57.member14170_)), state57.member14192_, state57.member14209_);
+    engine.copyString(pointer(storedValue<String>(self.address(state57.member14170_))), pointer(state57.member14209_));
     value1 = ScriptHelpers::ModTpl(self, state57, argumentValue<std::int8_t>(std::int32_t(memberView<std::int8_t>(state57.member14170_, 5))));
     engine.invoke<void>(Builtin::FormatText, storedValue<String>(self.address(state57.member14213_)), storedValue<String>(self.address(state57.member14215_)), value1);
     value1 = std::int32_t(memberView<std::int8_t>(state57.member14170_, 8));
@@ -130523,7 +128661,7 @@ std::int32_t ScriptHelpers::lidVariant3(Module &self, ScriptState57 &state57, st
     value1 = state57.member14274_;
     value2 = state57.member14275_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(self.address(state57.member14165_, 0, 4)), 52);
+    engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(self.address(state57.member14165_, 0, 4))), word(integer(52)));
     return 0;
 }
 
@@ -133275,7 +131413,7 @@ template <std::size_t Variant, class State> Task<void> ScriptHelpers::ContManVar
     co_await Finish{};
 }
 
-Task<void> ScriptHelpers::LoadMultiVariant15(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, std::array<std::uint8_t, 4> &member14460_, IntRef &member14483_, std::int32_t parameter1, std::int32_t parameter2)
+Task<void> ScriptHelpers::LoadMultiVariant15(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, std::array<std::uint8_t, 4> &member14460_, std::span<const std::int32_t> &member14483_, std::int32_t parameter1, std::int32_t parameter2)
 {
     FunctionScope context(self, "LoadMulti");
     Host &engine = self.host();
@@ -133289,20 +131427,16 @@ Task<void> ScriptHelpers::LoadMultiVariant15(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
+    state7.member7779_ = MultiObject{};
+    value1 = integerBits(engine.current.module->processId);
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
+    state7.member7610_ = storedValue<std::int32_t>(value2);
+    if (storedValue<std::int32_t>(value2) == -1)
     {
+        state7.member7779_ = MultiObject{};
         co_return;
     }
-    value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
-    state7.member7610_ = storedValue<std::int32_t>(value2);
-    if (!(storedValue<std::int32_t>(value2) != -1))
-    {
-        goto branch9;
-    }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -133316,13 +131450,17 @@ Task<void> ScriptHelpers::LoadMultiVariant15(Module &self, ScriptState2 &state2,
         setMemberView(state2.member68_, (std::size_t{1} * word(engine.elementIndex(subtract32(value1, 2), -20, true))), storedValue<std::int8_t>(0));
         state4.member7621_ = subtract32(std::int32_t(memberView<std::int8_t>(state2.member68_, (std::size_t{1} * word(engine.elementIndex(subtract32(std::int32_t(state7.member7781_), 1), -20, true))))), 48);
     }
-    engine.copyBytes(memberBytes(member14460_), pointer(shifted(state7.member7779_, 38)), 2u);
-    engine.copyBytes(pointer(shifted(storedValue<String>(self.address(member14460_)), 2)), pointer(shifted(state7.member7779_, 58)), 2u);
-    ScriptHelpers::sharedPart95(self, state4.member78_, state7.member7779_, state3.member79_, member14483_, state4.member7608_);
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(member14483_), 2, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(member14483_), 4, 4, 0, false, 0, false));
-    branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    std::ranges::fill(member14460_, std::uint8_t{});
+    const auto primaryQualifierCount = std::min<std::size_t>(2, state7.member7779_.primaryQualifier.size());
+    const auto secondaryQualifierCount = std::min<std::size_t>(2, state7.member7779_.secondaryQualifier.size());
+    if (primaryQualifierCount != 0)
+        std::memcpy(member14460_.data(), state7.member7779_.primaryQualifier.data(), primaryQualifierCount);
+    if (secondaryQualifierCount != 0)
+        std::memcpy(member14460_.data() + 2, state7.member7779_.secondaryQualifier.data(), secondaryQualifierCount);
+    ScriptHelpers::sharedPart95(self, state4.member78_, state7.member7779_, state3.member79_, state4.member7608_);
+    state2.member82_ = member14483_[2];
+    state4.member83_ = member14483_[4];
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -134515,11 +132653,9 @@ Task<std::int32_t> ScriptHelpers::get_base_dfrquseVariant2(Module &self, ScriptS
     state7.member12263_ = divide32(state7.member12231_, 240);
     if (!(state7.member14629_ == 0))
     {
-        engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member14636_)), 280);
-        value1 = integerBits(engine.current.module->processId);
-        co_await engine.call(self, true, 53, value1, state7.member7609_, -2, state7.member14636_);
-        engine.readPacked<4>(pointer(shifted(state7.member14636_, 216)), memberBytes(state7.member12263_));
-        engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member14636_)));
+        MultiObject object;
+        ScriptHelpers::call_GetMulti_1(self, state7.member7609_, -2, object);
+        state7.member12263_ = object.parameters.durationUnits;
     }
     co_return state7.member12263_;
 }
@@ -135189,20 +133325,15 @@ Task<void> ScriptHelpers::LoadMultiVariant16(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -135210,22 +133341,16 @@ Task<void> ScriptHelpers::LoadMultiVariant16(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state3.member108_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state3.member108_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member8177_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member8177_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat117 = 0; repeat117 < 14; ++repeat117)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat117), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat117), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat117))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), 116, 16);
-    ScriptHelpers::sharedPart90(self, std::span(state7.member14664_), state7.member7779_, state7.member7925_, state4.member7608_, state2.member82_, 2, state7.member8158_, 3, state4.member83_, 4, state7.member14668_, 5, state7.member14666_, 6);
-    ScriptHelpers::sharedPart94(self, state7.member12239_, state7.member7925_, 8, state7.member12231_, std::span(state7.member11139_), state7.member14665_, std::span(state7.member11133_));
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), std::span<const std::int32_t>(state7.member7779_.parameters.coreValues));
+    ScriptHelpers::sharedPart90(self, std::span(state7.member14664_), state7.member7779_, state4.member7608_, state2.member82_, state7.member7779_.parameters.additiveModifier, state7.member8158_, state7.member7779_.parameters.percentageAdjustments[0], state4.member83_, state7.member7779_.parameters.percentageAdjustments[1], state7.member14668_, state7.member7779_.parameters.overrides[0], state7.member14666_, state7.member7779_.parameters.overrides[1]);
+    ScriptHelpers::sharedPart94(self, state7.member12239_, state7.member7779_, state7.member7779_.parameters.runtimeValue, state7.member12231_, state7.member11139_, state7.member14665_, state7.member11133_);
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -135280,7 +133405,7 @@ template <std::size_t Variant, class State> Task<std::int32_t> ScriptHelpers::Us
     co_await engine.call(self, false, state8.member9542_, storedValue<String>(self.address(state8.member9544_)), 27);
     value1 = state8.member9539_;
     value2 = integerBits(engine.current.module->processId);
-    co_await engine.call(self, false, value1, 45, value2, state7.member9540_, memberView<std::int32_t>(state7.member11139_, 0));
+    co_await engine.call(self, false, value1, 45, value2, state7.member9540_, state7.member11139_.interactionArgument);
     co_return 0;
 }
 
@@ -135662,20 +133787,15 @@ Task<void> ScriptHelpers::LoadMultiVariant17(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -135683,34 +133803,28 @@ Task<void> ScriptHelpers::LoadMultiVariant17(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state3.member108_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state3.member108_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member8177_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member8177_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat120 = 0; repeat120 < 14; ++repeat120)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat120), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat120), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat120))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), 116, 16);
-    engine.copyBytes(memberBytes(state58.member14718_), pointer(shifted(state7.member7779_, 132)), 56u);
-    state7.member7925_ = storedValue<IntRef>(shifted(state7.member7779_, 188));
-    state4.member7608_ = engine.read<std::int32_t>(engine.indirect(payload(state7.member7925_)));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 2, 4, 0, false, 0, false));
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), std::span<const std::int32_t>(state7.member7779_.parameters.coreValues));
+    for (std::size_t index = 0; index < state7.member7779_.parameters.scaledModifiers.size(); ++index)
+        setMemberView(state58.member14718_, index * 4, state7.member7779_.parameters.scaledModifiers[index]);
+    state4.member7608_ = state7.member7779_.parameters.percentageModifiers[0];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
     if (!(state2.member82_ <= 100))
     {
         state16.member13978_ = divide32(state2.member82_, 100);
         state2.member82_ = remainder32(state2.member82_, 100);
     }
-    state7.member8158_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 3, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 4, 4, 0, false, 0, false));
-    state58.member14723_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 5, 4, 0, false, 0, false));
-    state58.member14722_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 6, 4, 0, false, 0, false));
-    ScriptHelpers::sharedPart94(self, state9.member11138_, state7.member7925_, 8, state7.member12231_, std::span(state7.member11139_), state58.member14719_, std::span(state58.member14721_));
+    state7.member8158_ = state7.member7779_.parameters.percentageAdjustments[0];
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
+    state58.member14723_ = state7.member7779_.parameters.overrides[0];
+    state58.member14722_ = state7.member7779_.parameters.overrides[1];
+    ScriptHelpers::sharedPart94(self, state9.member11138_, state7.member7779_, state7.member7779_.parameters.runtimeValue, state7.member12231_, state7.member11139_, state58.member14719_, state58.member14721_);
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -136124,7 +134238,7 @@ Task<std::int32_t> MbcSpecabHa::GetInfo(std::int32_t parameter1, std::int32_t pa
     goto branch6;
 }
 
-Task<void> ScriptHelpers::LoadMultiVariant18(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, std::array<std::uint8_t, 56> &member14775_, String &member14776_, std::array<std::uint8_t, 6> &member14777_, std::array<std::uint8_t, 16> &member14779_, std::int32_t parameter1, std::int32_t parameter2)
+Task<void> ScriptHelpers::LoadMultiVariant18(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, std::array<std::uint8_t, 56> &member14775_, String &member14776_, std::string &member14777_, MultiObjectActionParameters &member14779_, std::int32_t parameter1, std::int32_t parameter2)
 {
     FunctionScope context(self, "LoadMulti");
     Host &engine = self.host();
@@ -136138,20 +134252,15 @@ Task<void> ScriptHelpers::LoadMultiVariant18(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -136159,26 +134268,20 @@ Task<void> ScriptHelpers::LoadMultiVariant18(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state3.member108_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state3.member108_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member8177_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member8177_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat123 = 0; repeat123 < 14; ++repeat123)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat123), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat123), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat123))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), 116, 16);
-    engine.copyBytes(memberBytes(member14775_), pointer(shifted(state7.member7779_, 132)), 56u);
-    state7.member7925_ = storedValue<IntRef>(shifted(state7.member7779_, 188));
-    state4.member7608_ = engine.read<std::int32_t>(engine.indirect(payload(state7.member7925_)));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 2, 4, 0, false, 0, false));
-    state7.member8158_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 3, 4, 0, false, 0, false));
-    ScriptHelpers::sharedPart94(self, state4.member83_, state7.member7925_, 4, state7.member12231_, std::span(member14779_), member14776_, std::span(member14777_));
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), std::span<const std::int32_t>(state7.member7779_.parameters.coreValues));
+    for (std::size_t index = 0; index < state7.member7779_.parameters.scaledModifiers.size(); ++index)
+        setMemberView(member14775_, index * 4, state7.member7779_.parameters.scaledModifiers[index]);
+    state4.member7608_ = state7.member7779_.parameters.percentageModifiers[0];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state7.member8158_ = state7.member7779_.parameters.percentageAdjustments[0];
+    ScriptHelpers::sharedPart94(self, state4.member83_, state7.member7779_, state7.member7779_.parameters.percentageAdjustments[1], state7.member12231_, member14779_, member14776_, member14777_);
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -136746,11 +134849,11 @@ std::int32_t MbcStEar::SCHN(std::int32_t parameter1, String parameter2, String p
     std::int32_t value1;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member14873_)), member14888_, member14889_);
+    engine.copyString(pointer(storedValue<String>(address(member14873_))), pointer(member14889_));
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member14874_)), member14888_, member14890_);
+    engine.copyString(pointer(storedValue<String>(address(member14874_))), pointer(member14890_));
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member14875_)), member14888_, member14891_);
+    engine.copyString(pointer(storedValue<String>(address(member14875_))), pointer(member14891_));
     member14877_ = member14893_;
     member14878_ = member14894_;
     member14879_ = member14892_;
@@ -137020,7 +135123,7 @@ std::int32_t MbcStEar::GetEar(std::int32_t parameter1, std::int32_t parameter2, 
         value1 = member14961_;
         value2 = member14963_;
         value3 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member14874_)));
+        engine.copyString(pointer(value2), pointer(storedValue<String>(address(member14874_))));
         value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(member14874_, 0))));
         return value1;
     }
@@ -137053,7 +135156,7 @@ std::int32_t MbcStEar::GetEar(std::int32_t parameter1, std::int32_t parameter2, 
     value1 = member14961_;
     value2 = member14963_;
     value3 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(member14873_)));
+    engine.copyString(pointer(value2), pointer(storedValue<String>(address(member14873_))));
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(member14873_, 0))));
     return value1;
 }
@@ -137346,7 +135449,7 @@ Task<std::int32_t> MbcStKey::CloseCont(std::int32_t parameter1)
     while (true)
     {
         engine.checkpoint();
-        value2 = engine.invoke<std::int32_t>(Builtin::FindProcess, 0, member15015_);
+        value2 = g_sfera_mbc_runtime.nextProcessByModule(0, member15015_);
         member15015_ = value2;
         if (value2 < 0)
         {
@@ -137573,7 +135676,7 @@ Task<std::int32_t> MbcStKey::LoadLab(std::int32_t parameter1)
     {
         co_return -1;
     }
-    if (!(integerBits(state5_.member11648_) == 0))
+    if (!state5_.member11648_.empty())
     {
         co_return -1;
     }
@@ -137586,19 +135689,19 @@ Task<std::int32_t> MbcStKey::LoadLab(std::int32_t parameter1)
         engine.invoke<void>(Builtin::FormattedLog, storedValue<String>(address(member15027_)), storedValue<String>(address(state2_.member89_)));
     }
     value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(address(state5_.member11648_)), add32(value1, 2), 1);
-    value2 = state5_.member11648_;
+    state5_.member11648_.assign(word(add32(value1, 2)), '\0');
+    value2 = reference<String>(state5_.member11648_);
     value1 = integerBits(SferaNumeric::lowWord(g_sfera_config_text_runtime.text().size()));
     g_sfera_config_text_runtime.copyTo(engine.buffer(pointer(value2)), word(value1));
     value1 = integerBits(engine.current.module->processId);
     co_await engine.call(*this, true, 40, value1, state41_.member9281_, storedValue<AddressRef>(address(member15036_)));
-    state41_.member11705_ = state5_.member11648_;
+    state41_.member11705_ = reference<String>(state5_.member11648_);
     value2 = engine.readPacked<4>(pointer(state41_.member11705_), memberBytes(member15029_));
     state41_.member11705_ = value2;
     member15033_ = shifted(state41_.member11705_, 20);
     if (!(member15029_ > 1))
     {
-        engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(address(state5_.member11648_)), 1);
+        state5_.member11648_ = {};
         co_return -1;
     }
     engine.copyBytes(memberBytes(member15038_), pointer(member15033_), 12u);
@@ -137714,7 +135817,7 @@ Task<std::int32_t> MbcStKey::LoadLab(std::int32_t parameter1)
         continue;
         break;
     }
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(address(state5_.member11648_)), 1);
+    state5_.member11648_ = {};
     co_return 0;
 }
 
@@ -138327,7 +136430,7 @@ Task<std::int32_t> MbcStMap::TestMap(float parameter1, float parameter2, float p
     co_return -1;
 }
 
-Task<void> ScriptHelpers::LoadMultiVariant19(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, ScriptState9 &state9, std::array<std::uint8_t, 40> &member15085_, std::array<std::uint8_t, 6> &member15088_, std::int32_t parameter1, std::int32_t parameter2)
+Task<void> ScriptHelpers::LoadMultiVariant19(Module &self, ScriptState2 &state2, ScriptState3 &state3, ScriptState4 &state4, ScriptState7 &state7, ScriptState9 &state9, std::array<std::uint8_t, 40> &member15085_, std::string &member15088_, std::int32_t parameter1, std::int32_t parameter2)
 {
     FunctionScope context(self, "LoadMulti");
     Host &engine = self.host();
@@ -138341,20 +136444,15 @@ Task<void> ScriptHelpers::LoadMultiVariant19(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -138362,19 +136460,20 @@ Task<void> ScriptHelpers::LoadMultiVariant19(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state4.member78_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state4.member78_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member79_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member79_ = state7.member7779_.scale;
     }
-    engine.copyBytes(memberBytes(member15085_), pointer(shifted(state7.member7779_, 128)), 40u);
-    state9.member7934_ = storedValue<IntRef>(shifted(state7.member7779_, 188));
-    state4.member7608_ = engine.read<std::int32_t>(engine.indirect(payload(state9.member7934_)));
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7934_), 2, 4, 0, false, 0, false));
-    state4.member83_ = engine.read<std::int32_t>(engine.element(pointer(state9.member7934_), 4, 4, 0, false, 0, false));
-    engine.copyBytes(memberBytes(member15088_), pointer(shifted(state9.member7934_, 56)), 4u);
+    setMemberView(member15085_, 0, state7.member7779_.parameters.coreValues.back());
+    for (std::size_t index = 0; index < 9; ++index)
+        setMemberView(member15085_, 4 + index * 4, state7.member7779_.parameters.scaledModifiers[index]);
+    state4.member7608_ = state7.member7779_.parameters.percentageModifiers[0];
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state4.member83_ = state7.member7779_.parameters.percentageAdjustments[1];
+    member15088_ = state7.member7779_.attributes.substr(0, 4);
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -138729,7 +136828,7 @@ Task<void> MbcStMap::ShowMap()
         }
         engine.sendInterfaceMessage(word(integer(member15169_)), SferaNumeric::enumFromBits<SphereUIUiMessage>(2601u), word(integer(storedValue<String>(address(member15186_)))), 0u, 1u);
         value2 = engine.interfaceControl(word(integer(member15149_)), 1);
-        engine.sendInterfaceMessage(word(integer(value2)), SferaNumeric::enumFromBits<SphereUIUiMessage>(2601u), word(integer(storedValue<String>(address(member15088_)))), 0u, 1u);
+        engine.sendInterfaceMessage(word(integer(value2)), SferaNumeric::enumFromBits<SphereUIUiMessage>(2601u), word(integer(reference<String>(member15088_))), 0u, 1u);
         member15159_ = 0;
         while (true)
         {
@@ -138974,7 +137073,7 @@ Task<void> MbcStMap::ShowMap()
     }
     engine.sendInterfaceMessage(word(integer(member15169_)), SferaNumeric::enumFromBits<SphereUIUiMessage>(2601u), word(integer(storedValue<String>(address(member15194_)))), 0u, 1u);
     value2 = engine.interfaceControl(word(integer(member15149_)), 1);
-    engine.sendInterfaceMessage(word(integer(value2)), SferaNumeric::enumFromBits<SphereUIUiMessage>(2601u), word(integer(storedValue<String>(address(member15088_)))), 0u, 1u);
+    engine.sendInterfaceMessage(word(integer(value2)), SferaNumeric::enumFromBits<SphereUIUiMessage>(2601u), word(integer(reference<String>(member15088_))), 0u, 1u);
     member15160_ = 0;
     member15159_ = 0;
     while (true)
@@ -139821,9 +137920,6 @@ Task<void> MbcStShamp::FillPict()
 Task<void> MbcStString::Main()
 {
     FunctionScope context(*this, "Main");
-    Host &engine = host();
-
-    engine.fillBytes(memberBytes(member15255_), SferaNumeric::lowByte(0), 280u);
     co_await Finish{};
 }
 
@@ -141056,7 +139152,7 @@ Task<void> MbcTelep7::Main()
     while (true)
     {
         engine.checkpoint();
-        value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, 103, member15464_);
+        value1 = g_sfera_mbc_runtime.nextProcessByModule(103, member15464_);
         member15464_ = value1;
         if (value1 < 0)
         {
@@ -141633,7 +139729,7 @@ Task<std::int32_t> ScriptHelpers::UseOwnerVariant42(Module &self, ScriptState7 &
         co_return -1;
     }
     engine.moveWorld(integer(state7.member7668_), SferaVec3F{real(0), 0.0500000007f, real(0)});
-    value2 = engine.invoke<std::int32_t>(Builtin::MovementContact, state7.member7668_);
+    value2 = state7.member7668_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state7.member7668_)), false));
     state7.member9159_ = value2;
     if (state7.member9159_ > 1)
     {
@@ -141758,7 +139854,6 @@ Task<std::int32_t> MbcToken::UseServer2(std::int32_t parameter1, std::int32_t pa
         state26_.member14555_ = storedValue<std::int32_t>(value1);
         value2 = integerBits(engine.current.module->processId);
         co_await engine.call(*this, true, storedValue<String>(address(state26_.member15548_)), value2, state26_.member14555_, storedValue<String>(address(state26_.member15542_)));
-        engine.invoke<void>(Builtin::Reserved122, 0, storedValue<String>(address(state26_.member15542_)), storedValue<String>(address(state2_.member89_)));
         throw std::runtime_error("token.UseServer: missing operand at 17450 after reserved no-result builtin 122");
     }
     value2 = state26_.member15544_;
@@ -142161,7 +140256,7 @@ Task<std::int32_t> ScriptHelpers::UseOwnerVariant43(Module &self, ScriptState7 &
     }
     state7.member9159_ = 1;
     engine.moveWorld(integer(state7.member7668_), SferaVec3F{real(0), 0.0500000007f, real(0)});
-    value2 = engine.invoke<std::int32_t>(Builtin::MovementContact, state7.member7668_);
+    value2 = state7.member7668_ < 0 ? 0 : integerBits(g_sfera_contacts.testMovement(word(integer(state7.member7668_)), false));
     state7.member9518_ = value2;
     if (value2 > 1)
     {
@@ -142578,9 +140673,9 @@ std::int32_t MbcTokenPrCpy::SetIsland(std::int32_t parameter1, String parameter2
     std::int32_t value1;
 
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member15588_)), member15637_, member15638_);
+    engine.copyString(pointer(storedValue<String>(address(member15588_))), pointer(member15638_));
     value1 = integerBits(engine.current.module->processId);
-    engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(member15589_)), member15637_, member15639_);
+    engine.copyString(pointer(storedValue<String>(address(member15589_))), pointer(member15639_));
     member15591_ = member15640_;
     member15592_ = member15641_;
     return 0;
@@ -143111,7 +141206,6 @@ Task<std::int32_t> MbcTokenS::UseServer2(std::int32_t parameter1, std::int32_t p
         state26_.member14555_ = storedValue<std::int32_t>(value1);
         value2 = integerBits(engine.current.module->processId);
         co_await engine.call(*this, true, storedValue<String>(address(state26_.member15548_)), value2, state26_.member14555_, storedValue<String>(address(state26_.member15542_)));
-        engine.invoke<void>(Builtin::Reserved122, 0, storedValue<String>(address(state26_.member15542_)), storedValue<String>(address(state2_.member89_)));
         throw std::runtime_error("token_s.UseServer: missing operand at 18577 after reserved no-result builtin 122");
     }
     value2 = state26_.member15544_;
@@ -143353,7 +141447,6 @@ Task<std::int32_t> MbcTokenst::UseServer2(std::int32_t parameter1, std::int32_t 
         state24_.member14844_ = storedValue<std::int32_t>(value3);
         value1 = integerBits(engine.current.module->processId);
         co_await engine.call(*this, true, storedValue<String>(address(state42_.member15686_)), value1, state24_.member14844_, storedValue<String>(address(state42_.member15684_)));
-        engine.invoke<void>(Builtin::Reserved122, 0, storedValue<String>(address(state42_.member15684_)), storedValue<String>(address(state2_.member89_)));
         throw std::runtime_error("tokenst.UseServer: missing operand at 17382 after reserved no-result builtin 122");
     }
     value1 = member11114_;
@@ -143799,7 +141892,7 @@ std::int32_t MbcTownTable::NPL(std::int32_t parameter1, std::int32_t parameter2,
     else
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, shifted(state48_.member9020_, multiply32(1, multiply32(state48_.member9044_, 20))), state48_.member9035_, state48_.member9039_);
+        engine.copyString(pointer(shifted(state48_.member9020_, multiply32(1, multiply32(state48_.member9044_, 20)))), pointer(state48_.member9039_));
     }
     if (integerBits(state48_.member9041_) == 0)
     {
@@ -143811,7 +141904,7 @@ std::int32_t MbcTownTable::NPL(std::int32_t parameter1, std::int32_t parameter2,
     else
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, shifted(state48_.member9022_, multiply32(1, multiply32(state48_.member9044_, 20))), state48_.member9035_, state48_.member9041_);
+        engine.copyString(pointer(shifted(state48_.member9022_, multiply32(1, multiply32(state48_.member9044_, 20)))), pointer(state48_.member9041_));
     }
     value1 = state48_.member9044_;
     value4 = state48_.member9021_;
@@ -143841,7 +141934,7 @@ std::int32_t MbcTownTable::NPL(std::int32_t parameter1, std::int32_t parameter2,
                 value1 = state48_.member9035_;
                 value4 = member15724_;
                 value3 = integerBits(engine.current.module->processId);
-                engine.invoke<void>(Builtin::CopyProcessString, value1, value4, value3, storedValue<String>(address(state3_.member8604_)));
+                engine.copyString(pointer(value4), pointer(storedValue<String>(address(state3_.member8604_))));
             }
         }
         else
@@ -144168,7 +142261,7 @@ Task<void> MbcVir1002::main()
             while (true)
             {
                 engine.checkpoint();
-                value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, 0, member12718_);
+                value1 = g_sfera_mbc_runtime.nextProcessByModule(0, member12718_);
                 member12718_ = value1;
                 if (value1 < 0)
                 {
@@ -144385,7 +142478,7 @@ Task<void> MbcVir1022::main()
         while (true)
         {
             engine.checkpoint();
-            value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, 0, member2_);
+            value1 = g_sfera_mbc_runtime.nextProcessByModule(0, member2_);
             member2_ = value1;
             if (value1 < 0)
             {
@@ -145087,7 +143180,7 @@ Task<std::int32_t> MbcVirus::SetModifiers(std::int32_t parameter1, std::int32_t 
             value1 = member15877_;
             value2 = member15879_;
             value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessMemory, value1, value2, value3, storedValue<IntRef>(address(member15885_, 0, 4)), 12);
+            engine.copyBytes(pointer(value2), pointer(storedValue<IntRef>(address(member15885_, 0, 4))), word(integer(12)));
         }
         co_return member15813_;
     }
@@ -145154,7 +143247,7 @@ Task<std::int32_t> MbcVirus::SetModifiers(std::int32_t parameter1, std::int32_t 
     if (!(integerBits(member15879_) == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<IntRef>(address(member15820_)), member15876_, member15879_, 56);
+        engine.copyBytes(pointer(storedValue<IntRef>(address(member15820_))), pointer(member15879_), word(integer(56)));
     }
     member15826_ = member15881_;
     member15824_ = member15880_;
@@ -145168,7 +143261,7 @@ Task<std::int32_t> MbcVirus::SetModifiers(std::int32_t parameter1, std::int32_t 
     if (!(integerBits(member15882_) == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessString, value1, storedValue<String>(address(state2_.member91_)), member15876_, member15882_);
+        engine.copyString(pointer(storedValue<String>(address(state2_.member91_))), pointer(member15882_));
     }
     if (!(member15883_ <= 0))
     {
@@ -146453,20 +144546,15 @@ Task<void> ScriptHelpers::LoadMultiVariant20(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -146474,11 +144562,11 @@ Task<void> ScriptHelpers::LoadMultiVariant20(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart118(self, std::span(state2.member68_), state7.member7781_, value1, value3, std::span(state10.member8262_), std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    ScriptHelpers::sharedPart95(self, state4.member78_, state7.member7779_, state3.member79_, state10.member7780_, state2.member76_);
-    state2.member82_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 2, 4, 0, false, 0, false));
-    state10.member8172_ = engine.read<std::int32_t>(engine.element(pointer(state10.member7780_), 4, 4, 0, false, 0, false));
+    ScriptHelpers::sharedPart95(self, state4.member78_, state7.member7779_, state3.member79_, state2.member76_);
+    state2.member82_ = state7.member7779_.parameters.additiveModifier;
+    state10.member8172_ = state7.member7779_.parameters.percentageAdjustments[1];
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -146598,7 +144686,7 @@ std::int32_t MbcVnExp::GetParam(std::int32_t parameter1, std::int32_t parameter2
             value1 = state4_.member132_;
             value2 = state2_.member134_;
             value3 = integerBits(engine.current.module->processId);
-            engine.invoke<void>(Builtin::CopyProcessString, value1, value2, value3, storedValue<String>(address(state2_.member89_)));
+            engine.copyString(pointer(value2), pointer(storedValue<String>(address(state2_.member89_))));
         }
         return state3_.member79_;
     }
@@ -146615,7 +144703,7 @@ std::int32_t MbcVnExp::GetParam(std::int32_t parameter1, std::int32_t parameter2
     if (!(value1 == 0))
     {
         value1 = integerBits(engine.current.module->processId);
-        engine.invoke<void>(Builtin::CopyProcessMemory, value1, storedValue<AddressRef>(address(state4_.member99_)), state4_.member132_, state2_.member134_, 8);
+        engine.copyBytes(pointer(storedValue<AddressRef>(address(state4_.member99_))), pointer(state2_.member134_), word(integer(8)));
         return memberView<std::int32_t>(state4_.member99_, 0);
     }
     value1 = state2_.member133_;
@@ -148050,7 +146138,6 @@ Task<std::int32_t> MbcVnTokensin::UseServer2(std::int32_t parameter1, std::int32
         state24_.member14844_ = storedValue<std::int32_t>(value3);
         value1 = integerBits(engine.current.module->processId);
         co_await engine.call(*this, true, storedValue<String>(address(state42_.member15686_)), value1, state24_.member14844_, storedValue<String>(address(state42_.member15684_)));
-        engine.invoke<void>(Builtin::Reserved122, 0, storedValue<String>(address(state42_.member15684_)), storedValue<String>(address(state2_.member89_)));
         throw std::runtime_error("vn_tokensin.UseServer: missing operand at 17382 after reserved no-result builtin 122");
     }
     value1 = member11114_;
@@ -148324,7 +146411,7 @@ Task<void> MbcVnWell::sendpop()
     while (true)
     {
         engine.checkpoint();
-        value1 = engine.invoke<std::int32_t>(Builtin::FindProcess, 0, member16185_);
+        value1 = g_sfera_mbc_runtime.nextProcessByModule(0, member16185_);
         member16185_ = value1;
         if (value1 < 0)
         {
@@ -148593,20 +146680,15 @@ Task<void> ScriptHelpers::LoadMultiVariant21(Module &self, ScriptState2 &state2,
     {
         co_return;
     }
-    state7.member7779_ = storedValue<String>(0);
-    engine.invoke<void>(Builtin::AllocateDynamic, storedValue<StringRef>(self.address(state7.member7779_)), 280);
-    if (!(integerBits(state7.member7779_) != 0))
-    {
-        co_return;
-    }
+    state7.member7779_ = MultiObject{};
     value1 = integerBits(engine.current.module->processId);
-    value2 = storedValue<Value>(co_await engine.call(self, true, 53, value1, state7.member7776_, state7.member7777_, state7.member7779_));
+    value2 = storedValue<Value>(ScriptHelpers::call_GetMulti_1(self, state7.member7776_, state7.member7777_, state7.member7779_));
     state7.member7610_ = storedValue<std::int32_t>(value2);
     if (!(storedValue<std::int32_t>(value2) != -1))
     {
         goto branch9;
     }
-    engine.copyBytes(memberBytes(state2.member68_), pointer(shifted(state7.member7779_, 20)), 20u);
+    SferaTextBuffer(memberBytes(state2.member68_)).assign(state7.member7779_.primaryResource);
     value1 = integerBits(SferaNumeric::lowWord(SferaText::length(memberBytes(state2.member68_, 0))));
     state7.member7781_ = storedValue<std::int8_t>(value1);
     if (!(std::int32_t(state7.member7781_) >= 2))
@@ -148614,23 +146696,17 @@ Task<void> ScriptHelpers::LoadMultiVariant21(Module &self, ScriptState2 &state2,
         co_return;
     }
     ScriptHelpers::sharedPart40(self, std::span(state2.member68_), state7.member7781_, value1, value3, state4.member7621_, std::span(state7.member7612_), state7.member7779_, std::span(state2.member91_));
-    state3.member108_ = std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 241, 1, 0, false, 0, false)));
-    if (!(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))) < 48))
+    state3.member108_ = std::int32_t(state7.member7779_.resolvedMode);
+    if (state7.member7779_.scale >= 0)
     {
-        state3.member8177_ = subtract32(add32(multiply32(subtract32(std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 242, 1, 0, false, 0, false))), 48), 10), std::int32_t(engine.read<std::int8_t>(engine.element(pointer(state7.member7779_), 243, 1, 0, false, 0, false)))), 48);
+        state3.member8177_ = state7.member7779_.scale;
     }
-    for (std::int32_t repeat136 = 0; repeat136 < 14; ++repeat136)
-    {
-        value1 = engine.read<std::int32_t>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat136), 4));
-        engine.copyBytes(pointer(storedValue<IntRef>(engine.field(pointer(self.address(state7.member7792_)), (4 * repeat136), 4))), pointer(shifted(state7.member7779_, (60 + 4 * repeat136))), 4u);
-    }
-    value1 = memberView<std::int32_t>(state7.member7792_, 56);
-    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), 116, 16);
-    ScriptHelpers::sharedPart90(self, std::span(state9.member11130_), state7.member7779_, state7.member7925_, state4.member7608_, state9.member7795_, 1, state2.member82_, 2, state7.member8158_, 3, state4.member83_, 4, state9.member11137_, 5);
-    state9.member11135_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 6, 4, 0, false, 0, false));
-    state9.member11138_ = engine.read<std::int32_t>(engine.element(pointer(state7.member7925_), 8, 4, 0, false, 0, false));
+    ScriptHelpers::sharedPart60(self, std::span(state7.member7792_), state7.member7779_, value1, std::span(state7.member11129_), std::span<const std::int32_t>(state7.member7779_.parameters.coreValues));
+    ScriptHelpers::sharedPart90(self, std::span(state9.member11130_), state7.member7779_, state4.member7608_, state9.member7795_, state7.member7779_.parameters.percentageModifiers[1], state2.member82_, state7.member7779_.parameters.additiveModifier, state7.member8158_, state7.member7779_.parameters.percentageAdjustments[0], state4.member83_, state7.member7779_.parameters.percentageAdjustments[1], state9.member11137_, state7.member7779_.parameters.overrides[0]);
+    state9.member11135_ = state7.member7779_.parameters.overrides[1];
+    state9.member11138_ = state7.member7779_.parameters.runtimeValue;
     branch9: ;
-    engine.invoke<void>(Builtin::FreeDynamic, storedValue<StringRef>(self.address(state7.member7779_)));
+    state7.member7779_ = MultiObject{};
     co_return;
 }
 
@@ -148872,7 +146948,7 @@ Task<std::int32_t> ScriptHelpers::UseWithVariant24(Module &self, ScriptState2 &s
     }
     value1 = state9.member16246_;
     value3 = integerBits(engine.current.module->processId);
-    co_await engine.call(self, false, value1, 45, value3, state9.member16247_, memberView<std::int32_t>(state7.member11139_, 0));
+    co_await engine.call(self, false, value1, 45, value3, state9.member16247_, state7.member11139_.interactionArgument);
     co_return 0;
 }
 
@@ -149353,6 +147429,18 @@ String ScriptHelpers::call_gMsg_1(Module &self, std::int32_t argument1)
     auto &selected = self.host().selectModule(self, [](Module &module) { return dynamic_cast<MbcGmsg *>(&module) != nullptr; });
     auto &target = static_cast<MbcGmsg &>(selected);
     return target.gMsg(argument1);
+}
+
+std::int32_t ScriptHelpers::call_GetMulti_1(Module &self, std::int32_t objectId, std::int32_t variant, MultiObject &output)
+{
+    auto &target = static_cast<MbcMain &>(self.host().mainModule());
+    return target.GetMulti(objectId, variant, output);
+}
+
+std::int32_t ScriptHelpers::call_GEFF_1(Module &self, std::int32_t effectIndex, EffectDefinition &output)
+{
+    auto &target = static_cast<MbcMain &>(self.host().mainModule());
+    return target.GEFF(effectIndex, output);
 }
 
 Task<std::int32_t> ScriptHelpers::call_CreateObj_1(Module &self, String argument1, std::int32_t argument2)
@@ -166005,7 +164093,7 @@ void ScriptHelpers::initializePart219(Module &self, ScriptState4 &state4, Script
     state7.member7792_ = initialData1569;
     state7.member11129_ = initialData1570;
     state9.member7795_ = 2190;
-    state7.member11139_ = initialData1571;
+    state7.member11139_ = {0, 340, 0};
     state8.member7790_ = initialData1568;
     state2.member307_ = {};
     state2.member306_ = {};
@@ -166058,7 +164146,7 @@ void ScriptHelpers::initializePart222(Module &self, ScriptState4 &state4, Script
 
 void ScriptHelpers::initializePart223(Module &self, ScriptState7 &state7, ScriptState8 &state8, ScriptState2 &state2, ScriptState9 &state9)
 {
-    state7.member11139_ = initialData1571;
+    state7.member11139_ = {0, 340, 0};
     state8.member7790_ = initialData1568;
     state2.member307_ = {};
     state2.member306_ = {};
@@ -166905,7 +164993,7 @@ void MbcMain::initializeMembers()
     member1932_ = initialMember<std::array<std::int32_t, 4>>(" \003\000\000\334\005\000\000\010\007\000\000\320\007");
     member1936_ = -1;
     member1942_ = 100;
-    member1983_ = initialMember<std::array<float, 10>>("\000\000\200?\315\314\314=\012\327#<o\022\203:\000\000\200?\000\000\200?\000\000\200?\000\000\200?\000\000\200?\000\000\200?");
+    multiObjectModeChances_ = initialMember<std::array<float, 10>>("\000\000\200?\315\314\314=\012\327#<o\022\203:\000\000\200?\000\000\200?\000\000\200?\000\000\200?\000\000\200?\000\000\200?");
     member2011_ = initialMember<std::array<std::int32_t, 60>>("\012\000\000\000\024\000\000\000\036\000\000\000(\000\000\0002\000\000\000<\000\000\000F\000\000\000P\000\000\000Z\000\000\000d\000\000\000n\000\000\000x\000\000\000\202\000\000\000\214\000\000\000\226\000\000\000\240\000\000\000\252\000\000\000\264\000\000\000\276\000\000\000\310\000\000\000\322\000\000\000\334\000\000\000\346\000\000\000\360\000\000\000\372\000\000\000\004\001\000\000\030\001\000\000,\001\000\000@\001\000\000T\001\000\000h\001\000\000\201\001\000\000\232\001\000\000\263\001\000\000\314\001\000\000\345\001\000\000\376\001\000\000\027\002\000\0000\002\000\000I\002\000\000b\002\000\000{\002\000\000\224\002\000\000\255\002\000\000\306\002\000\000\337\002\000\000\370\002\000\000\021\003\000\000*\003\000\000C\003\000\000\\\003\000\000u\003\000\000\216\003\000\000\247\003\000\000\300\003\000\000\331\003\000\000\362\003\000\000\013\004\000\000$\004\000\000=\004");
     member2013_ = initialMember<std::array<std::int32_t, 60>>("d\000\000\000\226\000\000\000\310\000\000\000\372\000\000\000,\001\000\000^\001\000\000\220\001\000\000\302\001\000\000\364\001\000\000&\002\000\000X\002\000\000\212\002\000\000\274\002\000\000\356\002\000\000 \003\000\000R\003\000\000\204\003\000\000\266\003\000\000\350\003\000\000\032\004\000\000L\004\000\000~\004\000\000\260\004\000\000\342\004\000\000\024\005\000\000F\005\000\000x\005\000\000\252\005\000\000\334\005\000\000\016\006\000\000@\006\000\000r\006\000\000\244\006\000\000\326\006\000\000\010\007\000\000:\007\000\000l\007\000\000\236\007\000\000\320\007\000\000\002\010\000\0004\010\000\000f\010\000\000\230\010\000\000\312\010\000\000\374\010\000\000.\011\000\000`\011\000\000\222\011\000\000\304\011\000\000\366\011\000\000(\012\000\000Z\012\000\000\214\012\000\000\276\012\000\000\360\012\000\000\"\013\000\000T\013\000\000\206\013\000\000\270\013\000\000\200\014");
     member2015_ = initialMember<std::array<std::int32_t, 60>>("d\000\000\000d\000\000\000d\000\000\000d\000\000\000}\000\000\000}\000\000\000}\000\000\000}\000\000\000}\000\000\000\226\000\000\000\226\000\000\000\226\000\000\000\226\000\000\000\226\000\000\000\257\000\000\000\257\000\000\000\257\000\000\000\257\000\000\000\257\000\000\000\310\000\000\000\310\000\000\000\310\000\000\000\310\000\000\000\310\000\000\000\341\000\000\000\341\000\000\000\341\000\000\000\341\000\000\000\341\000\000\000\372\000\000\000\372\000\000\000\372\000\000\000\372\000\000\000\372\000\000\000\023\001\000\000\023\001\000\000\023\001\000\000\023\001\000\000\023\001\000\000,\001\000\000,\001\000\000,\001\000\000,\001\000\000,\001\000\000E\001\000\000E\001\000\000E\001\000\000E\001\000\000E\001\000\000^\001\000\000^\001\000\000^\001\000\000^\001\000\000^\001\000\000w\001\000\000w\001\000\000w\001\000\000w\001\000\000w\001\000\000\220\001");
@@ -167101,9 +165189,7 @@ void MbcMain::initializeMembers()
     member2314_ = initialData187;
     member2316_ = initialMember<std::array<std::int32_t, 10>>("\006\000\000\000\003\000\000\000\001\000\000\000\003\000\000\000\006\000\000\000\014\000\000\000\030\000\000\0000\000\000\000H\000\000\000\006");
     member2327_ = initialMember<std::array<std::uint8_t, 45>>("getMissionFactorSet ERROR: maxLevel=%d y=%d\012");
-    member2341_ = initialMember<std::array<std::int32_t, 15>>("\001\000\000\000\002\000\000\000\003\000\000\000\005\000\000\000\007\000\000\000\011\000\000\000\014\000\000\000\017\000\000\000\022\000\000\000\027\000\000\000\034\000\000\000\"\000\000\000%\000\000\000*\000\000\0000");
-    member2354_ = initialMember<std::array<std::int8_t, 5>>("UERSN");
-    member2356_ = initialData21;
+    multiObjectScales_ = initialMember<std::array<std::int32_t, 15>>("\001\000\000\000\002\000\000\000\003\000\000\000\005\000\000\000\007\000\000\000\011\000\000\000\014\000\000\000\017\000\000\000\022\000\000\000\027\000\000\000\034\000\000\000\"\000\000\000%\000\000\000*\000\000\0000");
     member2372_ = initialData591;
     member2373_ = initialData592;
     member2403_ = initialMember<std::array<std::uint8_t, 32>>("Information for special point \271");
@@ -167345,10 +165431,7 @@ void MbcMain::initializeMembers()
     member3115_ = initialData688;
     member3116_ = initialMember<std::array<std::uint8_t, 15>>("CHAT_LIST_FONT");
     member3117_ = initialData690;
-    member3130_ = initialData691;
     member3131_ = initialMember<std::array<std::uint8_t, 59>>("_main::dumpShopItems(): failed to open item IDs file \"%s\"\012");
-    member3132_ = initialData691;
-    member3135_ = initialData691;
     member3136_ = initialMember<std::array<String, 5>>("_main::dumpShopItems(): failed to parse item IDs from file\012");
     member3140_ = initialMember<std::array<std::uint8_t, 44>>("_main::dumpShopItems(): dumping %d item(s)\012");
     member3145_ = initialData695;
@@ -167389,7 +165472,6 @@ void MbcMain::initializeMembers()
     bindNative(*this, Entry::EError, &MbcMain::EError);
     bindNative(*this, Entry::EHalt, &MbcMain::EHalt);
     bindNative(*this, Entry::EnableShopButton, &MbcMain::EnableShopButton, std::tuple{}, true);
-    bindNative(*this, Entry::GEFF, &MbcMain::GEFF, std::tuple{}, true);
     bindNative(*this, Entry::GENM, &MbcMain::GENM, std::tuple{}, true);
     bindNative(*this, Entry::GETLG, &MbcMain::GETLG, std::tuple{}, true);
     bindNative(*this, Entry::GETPD, &MbcMain::GETPD, std::tuple{}, true);
@@ -167408,7 +165490,6 @@ void MbcMain::initializeMembers()
     bindNative(*this, Entry::GetMBLnam, &MbcMain::GetMBLnam, std::tuple{}, true);
     bindNative(*this, Entry::GetMName, &MbcMain::GetMName, std::tuple{}, true);
     bindNative(*this, Entry::GetMainServerURL, &MbcMain::GetMainServerURL, std::tuple{}, true);
-    bindNative(*this, Entry::GetMulti, &MbcMain::GetMulti, std::tuple{}, true);
     bindNative(*this, Entry::GetPlayerID, &MbcMain::GetPlayerID, std::tuple{}, true);
     bindNative(*this, Entry::GetRndName, &MbcMain::GetRndName, std::tuple{}, true);
     bindNative(*this, Entry::GetRoom, &MbcMain::GetRoom, std::tuple{}, true);
@@ -167565,7 +165646,6 @@ void MbcMain::initializeMembers()
     bindNative(*this, Entry::cm_setTitle, &MbcMain::cm_setTitle, std::tuple{}, true);
     bindNative(*this, Entry::cm_show, &MbcMain::cm_show, std::tuple{}, true);
     bindNative(*this, Entry::composeWildcard, &MbcMain::composeWildcard, std::tuple{}, true);
-    bindNative(*this, Entry::computeLinesNumber, &MbcMain::computeLinesNumber, std::tuple{}, true);
     bindNative(*this, Entry::computeMatchingFunctionsNumber, &MbcMain::computeMatchingFunctionsNumber, std::tuple{}, true);
     bindNative(*this, Entry::dumpShopItems, &MbcMain::dumpShopItems, std::tuple{}, true);
     bindNative(*this, Entry::executeCommandByAbbreviation, &MbcMain::executeCommandByAbbreviation, std::tuple{}, true);
@@ -167577,9 +165657,6 @@ void MbcMain::initializeMembers()
     bindNative(*this, Entry::getLastGVG, &MbcMain::getLastGVG, std::tuple{}, true);
     bindNative(*this, Entry::getMaxHealthAndPrana, &MbcMain::getMaxHealthAndPrana, std::tuple{}, true);
     bindNative(*this, Entry::getMissionFactorSet, &MbcMain::getMissionFactorSet, std::tuple{}, true);
-    bindNative(*this, Entry::getMultiobjGroup, &MbcMain::getMultiobjGroup, std::tuple{}, true);
-    bindNative(*this, Entry::getMultiobjRecord, &MbcMain::getMultiobjRecord, std::tuple{}, true);
-    bindNative(*this, Entry::getMultiobjectScrpt, &MbcMain::getMultiobjectScrpt, std::tuple{}, true);
     bindNative(*this, Entry::getPlayerIDByName, &MbcMain::getPlayerIDByName, std::tuple{}, true);
     bindNative(*this, Entry::getTmntData, &MbcMain::getTmntData, std::tuple{}, true);
     bindNative(*this, Entry::getWasUpdate, &MbcMain::getWasUpdate, std::tuple{}, true);
@@ -167590,7 +165667,6 @@ void MbcMain::initializeMembers()
     bindNative(*this, Entry::isValidAcronym, &MbcMain::isValidAcronym, std::tuple{}, true);
     bindNative(*this, Entry::listMatchingCommands, &MbcMain::listMatchingCommands, std::tuple{}, true);
     bindNative(*this, Entry::loadChatFonts, &MbcMain::loadChatFonts, std::tuple{}, true);
-    bindNative(*this, Entry::loadItemIDsAndPrefixes, &MbcMain::loadItemIDsAndPrefixes, std::tuple{}, true);
     bindNative(*this, Entry::mouseOverChat, &MbcMain::mouseOverChat, std::tuple{}, true);
     bindNative(*this, Entry::runCrcCalculation, &MbcMain::runCrcCalculation, std::tuple{}, true);
     bindNative(*this, Entry::runSayTryRestart, &MbcMain::runSayTryRestart, std::tuple{}, true);
@@ -167614,7 +165690,6 @@ void MbcMain::initializeMembers()
     bindCallback(40, Entry::GetRoomCoord);
     bindCallback(41, Entry::GetRoom);
     bindCallback(47, Entry::WhatServer);
-    bindCallback(53, Entry::GetMulti);
     bindCallback(56, Entry::NCity);
     bindCallback(57, Entry::GENM);
     bindCallback(63, Entry::TestUnique);
@@ -177999,12 +176074,6 @@ void MbcNpcTournament::initializeMembers()
     member13448_ = initialData1403;
     member13452_ = initialData1;
     member13453_ = initialData1;
-    member13470_ = initialMember<std::array<std::uint8_t, 5>>("AMNT");
-    member13471_ = initialData21;
-    member13472_ = initialData1386;
-    member13473_ = initialData21;
-    member13474_ = initialData1274;
-    member13477_ = initialData38;
     member13493_ = initialData32;
     member13506_ = initialMember<std::array<std::uint8_t, 13>>("tmnt_reg_gvg");
     member13511_ = 6;
@@ -178832,7 +176901,7 @@ void MbcPwElixir::initializeMembers()
     state2_.member104_ = {};
     state7_.member7792_ = initialData184;
     state7_.member11129_ = initialData1429;
-    state7_.member11139_ = initialData1430;
+    state7_.member11139_ = {110, 0, 102};
     state8_.member7790_ = initialData1143;
     state9_.member7830_ = {};
     state2_.member307_ = {};
@@ -178897,7 +176966,7 @@ void MbcPwElixir1::initializeMembers()
     state2_.member104_ = {};
     state7_.member7792_ = initialData184;
     state7_.member11129_ = initialData1429;
-    state7_.member11139_ = initialData1430;
+    state7_.member11139_ = {110, 0, 102};
     state7_.member9234_ = initialData1226;
     state8_.member7790_ = initialData1143;
     state9_.member7830_ = {};
@@ -178960,7 +177029,7 @@ void MbcPwFb01::initializeMembers()
     state2_.member104_ = {};
     state7_.member7792_ = initialData1431;
     state7_.member11129_ = initialMember<std::array<std::uint8_t, 16>>("\000\000\000\000\354\377\377\377");
-    state7_.member11139_ = initialMember<std::array<std::uint8_t, 16>>("Z\000\000\000\000\000\000\000d");
+    state7_.member11139_ = {90, 0, 100};
     state9_.member7830_ = {};
     state2_.member307_ = {};
     state2_.member306_ = {};
@@ -179014,7 +177083,7 @@ void MbcPwFb02::initializeMembers()
     state2_.member104_ = {};
     state7_.member7792_ = initialData184;
     state7_.member11129_ = initialData1429;
-    state7_.member11139_ = initialData1430;
+    state7_.member11139_ = {110, 0, 102};
     state9_.member7830_ = {};
     state2_.member307_ = {};
     state2_.member306_ = {};
@@ -179072,7 +177141,7 @@ void MbcPwFb03::initializeMembers()
     state2_.member104_ = {};
     state7_.member7792_ = initialData184;
     state7_.member11129_ = initialData1429;
-    state7_.member11139_ = initialData1430;
+    state7_.member11139_ = {110, 0, 102};
     member13991_ = {1349805383, 1702453612, 4475250};
     member13992_ = initialData138;
     state9_.member7830_ = {};
@@ -179147,7 +177216,7 @@ void MbcPwFb04::initializeMembers()
     state2_.member104_ = {};
     state7_.member7792_ = initialData184;
     state7_.member11129_ = initialData1429;
-    state7_.member11139_ = initialData1430;
+    state7_.member11139_ = {110, 0, 102};
     state9_.member7830_ = {};
     state2_.member307_ = {};
     state2_.member306_ = {};
@@ -179211,7 +177280,7 @@ void MbcPwFb05::initializeMembers()
     state2_.member104_ = {};
     state7_.member7792_ = initialData184;
     state7_.member11129_ = initialData1429;
-    state7_.member11139_ = initialData1430;
+    state7_.member11139_ = {110, 0, 102};
     state9_.member7830_ = {};
     state2_.member307_ = {};
     state2_.member306_ = {};
@@ -179406,7 +177475,7 @@ void MbcPwHeal1::initializeMembers()
     state2_.member104_ = {};
     state7_.member7792_ = initialData1439;
     state7_.member11129_ = initialMember<std::array<std::uint8_t, 16>>("\000\000\000\000\031");
-    state7_.member11139_ = initialMember<std::array<std::uint8_t, 16>>("\322\000\000\000\240\000\000\000\000\000\000\000\323");
+    state7_.member11139_ = {210, 160, 0};
     state9_.member7830_ = {};
     state2_.member307_ = {};
     state2_.member306_ = {};
@@ -184242,7 +182311,7 @@ void MbcVnSummon::initializeMembers()
     state7_.member12231_ = 60;
     state7_.member7792_ = {};
     state7_.member14666_ = 6;
-    state7_.member11139_ = initialMember<std::array<std::uint8_t, 16>>("\010\002\000\000X\002\000\000\000\000\000\000\355\001");
+    state7_.member11139_ = {520, 600, 0};
     state3_.member8535_ = initialData161;
     state2_.member307_ = {};
     state2_.member306_ = {};
@@ -184668,7 +182737,7 @@ void MbcWpAxeBoar::initializeMembers()
     state7_.member7792_ = initialData1569;
     state7_.member11129_ = initialData1570;
     state9_.member7795_ = 2190;
-    state7_.member11139_ = initialData1571;
+    state7_.member11139_ = {0, 340, 0};
     state8_.member7790_ = initialData1568;
     state2_.member307_ = {};
     state2_.member306_ = {};

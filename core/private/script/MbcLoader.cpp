@@ -33,7 +33,15 @@ void SferaMbcProcessRecord::appendModule(std::shared_ptr<SphereScripts::Module> 
 {
     std::size_t count = 0;
     for (const auto definitions : module->programs())
-        count += definitions.size();
+        for (const auto &definition : definitions)
+        {
+            ++count;
+            if (!module->method(definition.name) &&
+                (definition.initialState != 0 || definition.priority != 0 || definition.cleanup != SphereScripts::Entry::None))
+                throw std::logic_error("Scheduled program has no bound native function: " +
+                                       std::string(module->moduleName()) + "::" +
+                                       std::string(SphereScripts::entryName(definition.name)));
+        }
     if (count > 32767u - programs.size() || module->functionCount() > 65535u - functionCount())
         throw std::length_error("Too many native script programs or callable names");
     auto expanded = programs;
@@ -47,8 +55,6 @@ void SferaMbcProcessRecord::appendModule(std::shared_ptr<SphereScripts::Module> 
             program.module = module;
             program.body = module->method(definition.name);
             program.cleanupBody = module->method(definition.cleanup);
-            if (!program.body)
-                throw std::logic_error("Scheduled program has no bound native function");
             program.state = definition.initialState;
             program.priority = definition.priority;
             expanded.push_back(std::move(program));
@@ -103,6 +109,14 @@ SphereScripts::Module &SferaMbcRuntime::selectModule(SphereScripts::Module &call
         if (accepts(**candidate))
             return **candidate;
     throw std::runtime_error("Required native script module is not loaded");
+}
+
+SphereScripts::Module &SferaMbcRuntime::mainModule()
+{
+    auto *process = findProcess(0);
+    if (!process || process->modules.empty())
+        throw std::runtime_error("Main native script module is not loaded");
+    return *process->modules.front();
 }
 
 std::uint32_t SferaMbcRuntime::loadProcess(std::string_view name, std::uint32_t requestedIndex)
@@ -244,9 +258,6 @@ std::uint32_t SferaMbcRuntime::unloadProcess(std::uint32_t index)
     for (auto &program : process.programs)
         if (program.continuation)
             program.continuation->execution.cancelled = true;
-    for (const auto address : process.owned_buffers)
-        releaseDynamic(address);
-    process.owned_buffers.clear();
     for (const auto &module : process.modules)
         forgetMemory(module.get());
     forgetMemory(&process);

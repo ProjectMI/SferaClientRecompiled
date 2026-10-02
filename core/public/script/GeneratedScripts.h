@@ -6,6 +6,91 @@ namespace SphereScripts
 {
 class ScriptHelpers;
 
+enum class MultiObjectMode : std::int32_t
+{
+    None = 0,
+    E = 69,
+    N = 78,
+    R = 82,
+    S = 83,
+    U = 85
+};
+
+struct MultiObjectParameters
+{
+    std::int32_t mergeMode{};
+    std::int32_t primaryScale{};
+    std::array<std::int32_t, 4> fixedValues{};
+    std::array<std::int32_t, 8> conditionalScaledValues{};
+    std::array<std::int32_t, 4> coreValues{};
+    std::array<std::int32_t, 14> scaledModifiers{};
+    std::array<std::int32_t, 2> percentageModifiers{};
+    std::int32_t additiveModifier{};
+    std::array<std::int32_t, 2> percentageAdjustments{};
+    std::array<std::int32_t, 2> overrides{};
+    std::int32_t durationUnits{};
+    std::int32_t runtimeValue{};
+    std::int32_t interactionArgument{};
+    std::int32_t auxiliaryArgument{};
+    std::int32_t effectId{};
+};
+
+struct MultiObject
+{
+    std::string script;
+    std::string primaryResource;
+    std::string secondaryResource;
+    std::string primaryQualifier;
+    std::string secondaryQualifier;
+    MultiObjectParameters parameters;
+    std::optional<std::int32_t> numericSelector;
+    std::string textSelector;
+    MultiObjectMode variantMode{MultiObjectMode::None};
+    MultiObjectMode resolvedMode{MultiObjectMode::None};
+    std::int32_t scale{-1};
+    std::string attributes;
+    std::optional<std::int32_t> modifierCode;
+    std::optional<std::int32_t> modifierLevel;
+    std::array<bool, 26> flags{};
+    std::int32_t group{-1};
+};
+
+struct MultiObjectActionParameters
+{
+    std::int32_t interactionArgument{};
+    std::int32_t auxiliaryArgument{};
+    std::int32_t effectId{};
+};
+
+struct EffectDefinition
+{
+    std::int32_t projectileEffectId{};
+    std::int32_t sourceEffectId{};
+    std::int32_t impactEffectId{};
+    std::int32_t targetEffectId{};
+    std::int32_t travelDurationPercent{};
+    std::string projectileResource;
+};
+
+struct ShopItemSelection
+{
+    std::int32_t objectId{};
+    std::int32_t variant{};
+};
+
+struct UniqueDefinition
+{
+    std::int32_t id{};
+    std::int32_t group{};
+    std::int32_t initialRemaining{};
+    bool active{};
+    std::string text;
+    std::int32_t remaining{};
+    std::int32_t revision{};
+    std::int32_t reserved0{};
+    std::int32_t reserved1{};
+};
+
 enum class Entry : std::uint16_t
 {
     None,
@@ -1687,8 +1772,7 @@ struct ScriptState2
     std::int32_t member5674_{};
     std::int32_t member5676_{};
     std::int32_t member5677_{};
-    std::array<std::uint8_t, 20> member5678_{};
-    std::array<std::uint8_t, 20> member5680_{};
+    EffectDefinition member5678_{};
     Address member5682_{};
     Address member5683_{};
     Address member5684_{};
@@ -1699,7 +1783,6 @@ struct ScriptState2
     std::int32_t member5689_{};
     std::int32_t member5690_{};
     std::int32_t member5691_{};
-    std::array<std::uint8_t, 5> member5692_{};
     std::int32_t member5693_{};
     std::int32_t member5694_{};
     String member5696_{};
@@ -2101,7 +2184,7 @@ struct ScriptState5
     String member10775_{};
     String member10777_{};
     std::array<std::uint8_t, 6> member11603_{};
-    String member11648_{};
+    std::string member11648_{};
     std::array<std::uint8_t, 6> member11685_{};
     std::int32_t member11888_{};
     std::array<std::uint8_t, 6> member13649_{};
@@ -2218,7 +2301,7 @@ struct ScriptState7
     std::array<std::uint8_t, 16> member7770_{};
     std::int32_t member7776_{};
     std::int32_t member7777_{};
-    String member7779_{};
+    MultiObject member7779_{};
     std::int8_t member7781_{};
     IntRef member7783_{};
     std::int32_t member7784_{};
@@ -2254,7 +2337,6 @@ struct ScriptState7
     std::array<std::uint8_t, 29> member7911_{};
     std::array<std::uint8_t, 40> member7912_{};
     std::array<std::uint8_t, 18> member7913_{};
-    IntRef member7925_{};
     String member7929_{};
     std::int32_t member7961_{};
     std::int32_t member7963_{};
@@ -2354,8 +2436,8 @@ struct ScriptState7
     std::array<std::uint8_t, 4> member11045_{};
     std::array<std::uint8_t, 5> member11046_{};
     std::array<std::uint8_t, 16> member11129_{};
-    std::array<std::uint8_t, 6> member11133_{};
-    std::array<std::uint8_t, 16> member11139_{};
+    std::string member11133_;
+    MultiObjectActionParameters member11139_{};
     String member11145_{};
     std::array<std::uint8_t, 9> member11146_{};
     std::array<std::uint8_t, 1> member11175_{};
@@ -2431,7 +2513,6 @@ struct ScriptState7
     std::array<std::uint8_t, 18> member13945_{};
     std::array<std::uint8_t, 1> member14119_{};
     std::int32_t member14629_{};
-    String member14636_{};
     std::array<std::uint8_t, 18> member14650_{};
     std::array<std::uint8_t, 56> member14664_{};
     String member14665_{};
@@ -2578,8 +2659,6 @@ struct ScriptState9
     std::array<std::int8_t, 8> member7893_{};
     std::array<std::uint8_t, 18> member7903_{};
     std::array<std::uint8_t, 1> member7904_{};
-    IntRef member7922_{};
-    IntRef member7934_{};
     float member7959_{};
     std::int32_t member7962_{};
     std::int32_t member7964_{};
@@ -2776,7 +2855,6 @@ struct ScriptState9
 struct ScriptState10
 {
     ScriptState10();
-    IntRef member7780_{};
     std::array<std::uint8_t, 18> member7987_{};
     std::int32_t member8152_{};
     std::int32_t member8153_{};
@@ -2791,11 +2869,11 @@ struct ScriptState10
     std::array<std::uint8_t, 16> member8180_{};
     std::array<std::uint8_t, 56> member8182_{};
     String member8184_{};
-    std::array<std::uint8_t, 6> member8186_{};
+    std::string member8186_;
     std::int32_t member8188_{};
     std::int32_t member8190_{};
     std::int32_t member8191_{};
-    std::array<std::uint8_t, 16> member8193_{};
+    MultiObjectActionParameters member8193_{};
     IntRef member8196_{};
     IntRef member8197_{};
     IntRef member8198_{};
@@ -2935,7 +3013,7 @@ struct ScriptState11
     std::array<std::uint8_t, 1> member13866_{};
     std::array<std::uint8_t, 56> member13898_{};
     String member13899_{};
-    std::array<std::uint8_t, 6> member13900_{};
+    std::string member13900_;
     std::int32_t member13901_{};
     std::int32_t member13902_{};
     std::int32_t member13903_{};
@@ -3027,7 +3105,7 @@ struct ScriptState17
 struct ScriptState18
 {
     ScriptState18();
-    std::array<std::uint8_t, 6> member7618_{};
+    std::string member7618_;
     std::int32_t member7638_{};
     String member7639_{};
     String member7702_{};
@@ -3885,7 +3963,7 @@ struct ScriptState58
     ScriptState58();
     std::array<std::uint8_t, 56> member14718_{};
     String member14719_{};
-    std::array<std::uint8_t, 6> member14721_{};
+    std::string member14721_;
     std::int32_t member14722_{};
     std::int32_t member14723_{};
     std::int8_t member14740_{};
@@ -5037,6 +5115,7 @@ class MbcInventory final : public Module
 class MbcMain final : public Module
 {
     friend class ScriptHelpers;
+    friend class MbcNpcTournament;
   public:
     explicit MbcMain(Host &host);
     void initializeMembers() override;
@@ -5127,9 +5206,9 @@ class MbcMain final : public Module
     std::int32_t GetMBLnam(std::int32_t parameter1, String parameter2, std::int32_t parameter3);
     std::int32_t AtoR(std::int32_t parameter1, String parameter2);
     std::int32_t CalcRash(std::int32_t parameter1, String parameter2, IntRef parameter3);
-    std::int32_t GEFF(std::int32_t parameter1, std::int32_t parameter2, AddressRef parameter3, String parameter4);
+    std::int32_t GEFF(std::int32_t effectIndex, EffectDefinition &output);
     std::int32_t getMissionFactorSet(std::int32_t parameter1, std::int32_t parameter2);
-    std::int32_t GetMulti(std::int32_t parameter1, std::int32_t parameter2, std::int32_t parameter3, String parameter4);
+    std::int32_t GetMulti(std::int32_t objectId, std::int32_t variant, MultiObject &output);
     void get_crc(std::int32_t parameter1, IntRef parameter2, IntRef parameter3);
     std::int32_t get_pathlist(std::int32_t parameter1, std::int32_t parameter2, String parameter3);
     std::int32_t LastACC();
@@ -5244,9 +5323,6 @@ class MbcMain final : public Module
     std::int32_t GetShopID();
     std::int32_t SetShopID(std::int32_t parameter1);
     Task<void> SlowSteps();
-    std::int32_t getMultiobjRecord(std::int32_t parameter1, StringRef parameter2);
-    std::int32_t getMultiobjGroup(String parameter1);
-    std::int32_t getMultiobjectScrpt(String parameter1, String parameter2);
     Task<void> ProgressUpdater();
     std::int32_t SetFlagLoadscrOnTop(std::int32_t parameter1);
     Task<void> Shadowon2();
@@ -5264,8 +5340,8 @@ class MbcMain final : public Module
     std::int32_t insrtHText2ChatEdit(String parameter1);
     Task<std::int32_t> insrtItemInfo2Edit(std::int32_t parameter1);
     Value loadChatFonts();
-    std::int32_t computeLinesNumber(String parameter1);
-    std::int32_t loadItemIDsAndPrefixes(String parameter1, AddressRef parameter2, std::int32_t parameter3);
+    std::int32_t computeLinesNumber(std::string_view filename);
+    std::int32_t loadItemIDsAndPrefixes(std::string_view filename, std::vector<ShopItemSelection> &items, std::int32_t maximumCount);
     Task<Value> dumpShopItems();
     Task<void> Conts();
     std::int32_t CreateUmap(String parameter1, std::int32_t parameter2, std::int32_t parameter3);
@@ -5564,7 +5640,7 @@ class MbcMain final : public Module
     std::int32_t member1863_{};
     IntRef member1864_{};
     String member1865_{};
-    String member1866_{};
+    std::string member1866_{};
     String member1867_{};
     String member1868_{};
     String member1869_{};
@@ -5591,14 +5667,13 @@ class MbcMain final : public Module
     std::int32_t member1900_{};
     std::int32_t member1901_{};
     std::int32_t member1902_{};
-    IntRef member1903_{};
+    std::array<std::int32_t, 27000> member1903_{};
     std::int32_t member1904_{};
     std::int32_t member1905_{};
     std::array<std::uint8_t, 100> member1907_{};
     std::array<std::uint8_t, 100> member1909_{};
-    IntRef member1911_{};
-    std::int32_t member1912_{};
-    std::array<std::uint8_t, 200> member1914_{};
+    std::vector<std::int32_t> member1911_{};
+    std::vector<std::int32_t> availableUniqueDefinitions_{};
     IntRef member1916_{};
     std::int32_t member1918_{};
     std::array<IntRef, 500> member1920_{};
@@ -5610,37 +5685,33 @@ class MbcMain final : public Module
     std::array<std::int32_t, 4> member1932_{};
     std::array<std::int32_t, 500> member1934_{};
     std::int32_t member1936_{};
-    std::array<std::uint8_t, 800> member1938_{};
-    std::array<std::uint8_t, 54400> member1940_{};
+    std::array<std::vector<std::int32_t>, 200> uniqueDefinitionsByGroup_{};
     std::int32_t member1942_{};
     std::int32_t member1943_{};
     std::array<String, 500> member1945_{};
-    String member1947_{};
+    std::array<std::int8_t, 5000> member1947_{};
     std::array<std::uint8_t, 256> member1949_{};
     String member1951_{};
-    String member1952_{};
-    String member1953_{};
-    StringRef member1954_{};
-    StringRef member1955_{};
-    String member1956_{};
-    String member1957_{};
-    StringRef member1958_{};
-    String member1959_{};
-    std::array<std::int8_t, 26> member1961_{};
-    String member1963_{};
+    std::string member1952_{};
+    std::string member1953_{};
+    std::vector<String> member1954_{};
+    std::vector<String> member1955_{};
+    std::vector<MultiObject> multiObjects_{};
+    std::vector<MultiObject> multiObjectVariants_{};
+    std::array<std::int32_t, 26> multiObjectVariantCounts_{};
+    std::string member1963_{};
     std::array<std::uint8_t, 560> member1965_{};
-    String member1967_{};
-    StringRef member1968_{};
-    String member1969_{};
-    String member1970_{};
-    String member1972_{};
+    std::array<EffectDefinition, 500> effectDefinitions_{};
+    std::vector<std::string> indexedConfigurations_{};
+    std::vector<UniqueDefinition> uniqueDefinitions_{};
+    std::vector<std::string> member1972_{};
     std::array<std::uint8_t, 64> member1974_{};
     std::array<std::uint8_t, 30> member1976_{};
     std::array<std::uint8_t, 64> member1978_{};
     std::intptr_t parameterFileSearch_ = -1;
     std::int8_t member1981_{};
-    std::array<float, 10> member1983_{};
-    std::array<float, 26> member1985_{};
+    std::array<float, 10> multiObjectModeChances_{};
+    std::array<float, 26> multiObjectGroupChances_{};
     std::array<std::int32_t, 33> member1987_{};
     std::int32_t member1989_{};
     std::array<std::int32_t, 100> member1991_{};
@@ -5880,7 +5951,6 @@ class MbcMain final : public Module
     std::int32_t member2252_{};
     std::int32_t member2253_{};
     std::int32_t member2254_{};
-    String member2255_{};
     std::array<std::uint8_t, 19> member2256_{};
     std::array<std::uint8_t, 1> member2257_{};
     String member2258_{};
@@ -5890,7 +5960,6 @@ class MbcMain final : public Module
     std::int32_t member2262_{};
     String member2263_{};
     std::int32_t member2264_{};
-    std::array<std::uint8_t, 280> member2266_{};
     std::int32_t member2268_{};
     std::int32_t member2270_{};
     String member2271_{};
@@ -5928,38 +5997,11 @@ class MbcMain final : public Module
     std::int32_t member2312_{};
     std::array<std::int32_t, 4> member2314_{};
     std::array<std::int32_t, 10> member2316_{};
-    std::int32_t member2318_{};
-    std::int32_t member2319_{};
-    AddressRef member2320_{};
-    String member2321_{};
-    IntRef member2323_{};
-    String member2324_{};
     std::int32_t member2325_{};
     std::int32_t member2326_{};
     std::array<std::uint8_t, 45> member2327_{};
     std::int32_t member2329_{};
-    std::int32_t member2330_{};
-    std::int32_t member2331_{};
-    std::int32_t member2332_{};
-    String member2333_{};
-    IntRef member2334_{};
-    IntRef member2335_{};
-    IntRef member2336_{};
-    std::int32_t member2337_{};
-    std::int32_t member2339_{};
-    std::array<std::int32_t, 15> member2341_{};
-    std::int32_t member2343_{};
-    IntRef member2344_{};
-    std::int32_t member2345_{};
-    std::int32_t member2346_{};
-    std::int32_t member2347_{};
-    std::int32_t member2348_{};
-    std::int32_t member2349_{};
-    String member2350_{};
-    String member2351_{};
-    String member2352_{};
-    std::array<std::int8_t, 5> member2354_{};
-    std::array<std::uint8_t, 3> member2356_{};
+    std::array<std::int32_t, 15> multiObjectScales_{};
     std::int32_t member2357_{};
     IntRef member2358_{};
     IntRef member2359_{};
@@ -6071,40 +6113,9 @@ class MbcMain final : public Module
     std::int32_t member2478_{};
     std::array<std::uint8_t, 6> member2479_{};
     std::array<std::uint8_t, 10> member2480_{};
-    std::int32_t member2481_{};
-    std::int32_t member2482_{};
-    std::int32_t member2483_{};
-    IntRef member2484_{};
-    std::int32_t member2485_{};
     std::array<std::uint8_t, 21> member2486_{};
-    String member2488_{};
-    std::array<std::uint8_t, 152> member2490_{};
-    std::int32_t member2492_{};
-    IntRef member2493_{};
-    std::int32_t member2494_{};
-    std::int32_t member2495_{};
-    std::int32_t member2496_{};
-    std::int32_t member2497_{};
-    std::int32_t member2498_{};
-    std::int32_t member2499_{};
-    String member2500_{};
-    std::int32_t member2501_{};
-    std::int32_t member2502_{};
-    String member2503_{};
-    std::int32_t member2504_{};
-    std::int32_t member2505_{};
-    IntRef member2506_{};
-    IntRef member2507_{};
-    std::int32_t member2508_{};
-    std::int32_t member2509_{};
-    std::int32_t member2510_{};
-    std::int32_t member2511_{};
-    std::array<std::uint8_t, 152> member2513_{};
     std::array<std::uint8_t, 21> member2515_{};
     std::array<std::uint8_t, 21> member2516_{};
-    std::int32_t member2517_{};
-    std::int32_t member2518_{};
-    IntRef member2520_{};
     std::int32_t member2521_{};
     std::int32_t member2522_{};
     std::int32_t member2523_{};
@@ -6195,7 +6206,6 @@ class MbcMain final : public Module
     std::array<std::uint8_t, 2> member2626_{};
     std::array<std::uint8_t, 2> member2627_{};
     std::array<std::uint8_t, 5> member2628_{};
-    std::array<std::uint8_t, 1> member2629_{};
     String member2630_{};
     std::array<std::uint8_t, 29> member2631_{};
     String member2632_{};
@@ -6608,28 +6618,9 @@ class MbcMain final : public Module
     std::array<std::uint8_t, 11> member3115_{};
     std::array<std::uint8_t, 15> member3116_{};
     std::array<std::uint8_t, 15> member3117_{};
-    String member3118_{};
-    String member3120_{};
-    std::int32_t member3121_{};
-    String member3122_{};
-    String member3123_{};
-    AddressRef member3124_{};
-    std::int32_t member3125_{};
-    String member3126_{};
-    String member3127_{};
-    std::int32_t member3128_{};
-    std::int32_t member3129_{};
-    std::array<std::uint8_t, 18> member3130_{};
     std::array<std::uint8_t, 59> member3131_{};
-    std::array<std::uint8_t, 18> member3132_{};
-    AddressRef member3134_{};
-    std::array<std::uint8_t, 18> member3135_{};
     std::array<String, 5> member3136_{};
-    std::int32_t member3138_{};
-    std::int32_t member3139_{};
     std::array<std::uint8_t, 44> member3140_{};
-    String member3141_{};
-    std::array<std::uint8_t, 280> member3143_{};
     std::array<std::uint8_t, 4> member3145_{};
     std::array<std::uint8_t, 4> member3146_{};
     std::array<std::uint8_t, 4> member3147_{};
@@ -6926,7 +6917,7 @@ class MbcPcontrol final : public Module
     Address member3246_{};
     std::array<std::uint8_t, 6096> member3248_{};
     std::array<std::uint8_t, 128> member3250_{};
-    String member3252_{};
+    std::string member3252_{};
     String member3253_{};
     std::array<std::uint8_t, 128> member3255_{};
     std::int32_t member3257_{};
@@ -6973,7 +6964,7 @@ class MbcPcontrol final : public Module
     IntRef member3298_{};
     std::array<std::uint8_t, 2560> member3300_{};
     std::array<std::uint8_t, 80> member3302_{};
-    IntRef member3304_{};
+    std::array<std::int32_t, 30> member3304_{};
     std::int32_t member3305_{};
     std::array<std::int32_t, 14> member3307_{};
     std::array<std::uint8_t, 32> member3309_{};
@@ -9424,8 +9415,7 @@ class MbcPlayer final : public Module
     std::int32_t member6136_{};
     std::array<std::uint8_t, 8> member6137_{};
     std::array<std::uint8_t, 11> member6138_{};
-    String member6140_{};
-    String member6141_{};
+    std::string member6140_;
     std::int32_t member6142_{};
     std::int32_t member6143_{};
     std::int32_t member6144_{};
@@ -9947,7 +9937,6 @@ class MbcPlayer final : public Module
     std::array<std::uint8_t, 9> member6746_{};
     std::array<std::uint8_t, 10> member6747_{};
     std::array<std::uint8_t, 11> member6748_{};
-    std::array<std::uint8_t, 1> member6749_{};
     std::array<std::uint8_t, 20> member6750_{};
     std::array<std::uint8_t, 18> member6751_{};
     std::array<std::uint8_t, 13> member6752_{};
@@ -13385,9 +13374,9 @@ class MbcEntry final : public Module
     ScriptState10 state10_{};
     ScriptState11 state11_{};
     std::int32_t member911_{};
-    IntRef member10921_{};
-    IntRef member10922_{};
-    IntRef member10923_{};
+    std::array<std::int32_t, 400> member10921_{};
+    std::array<std::int32_t, 400> member10922_{};
+    std::array<std::int32_t, 400> member10923_{};
     std::array<Address, 2> member10925_{};
     std::array<std::uint8_t, 8> member10927_{};
     std::int32_t member10928_{};
@@ -13917,7 +13906,7 @@ class MbcIncubator final : public Module
     std::array<std::uint8_t, 7> member11493_{};
     std::array<std::uint8_t, 6> member11494_{};
     std::array<std::uint8_t, 7> member11495_{};
-    String member11497_{};
+    std::array<std::string, 20> member11497_{};
     std::array<std::uint8_t, 80> member11499_{};
     std::array<std::int32_t, 20> member11501_{};
     std::array<std::uint8_t, 80> member11503_{};
@@ -15725,20 +15714,6 @@ class MbcNpcTournament final : public Module
     std::int32_t member13458_{};
     String member13459_{};
     std::array<std::uint8_t, 20> member13460_{};
-    String member13462_{};
-    String member13463_{};
-    std::int32_t member13464_{};
-    std::array<std::uint8_t, 16> member13465_{};
-    std::int32_t member13467_{};
-    String member13468_{};
-    String member13469_{};
-    std::array<std::uint8_t, 5> member13470_{};
-    std::array<std::uint8_t, 3> member13471_{};
-    std::array<std::uint8_t, 5> member13472_{};
-    std::array<std::uint8_t, 3> member13473_{};
-    std::array<std::uint8_t, 10> member13474_{};
-    String member13476_{};
-    std::array<std::uint8_t, 6> member13477_{};
     String member13478_{};
     std::int32_t member13479_{};
     std::int32_t member13480_{};
@@ -15896,7 +15871,7 @@ class MbcPacket final : public Module
     std::int32_t member13604_{};
     std::int32_t member13605_{};
     std::int32_t member13606_{};
-    String member13607_{};
+    std::string member13607_{};
     std::array<std::uint8_t, 64> member13609_{};
     std::int32_t member13611_{};
     std::int32_t member13612_{};
@@ -16697,7 +16672,7 @@ class MbcRhomb final : public Module
     ScriptState17 state17_{};
     std::array<std::uint8_t, 20> member14451_{};
     std::array<std::uint8_t, 4> member14460_{};
-    IntRef member14483_{};
+    std::span<const std::int32_t> member14483_{};
     std::array<std::uint8_t, 11> member14484_{};
 };
 
@@ -17121,8 +17096,8 @@ class MbcSpecabHa final : public Module
     ScriptState16 state16_{};
     std::array<std::uint8_t, 56> member14775_{};
     String member14776_{};
-    std::array<std::uint8_t, 6> member14777_{};
-    std::array<std::uint8_t, 16> member14779_{};
+    std::string member14777_;
+    MultiObjectActionParameters member14779_{};
     std::int8_t member14785_{};
     std::array<std::int8_t, 14> member14790_{};
     std::array<std::int8_t, 14> member14792_{};
@@ -17718,7 +17693,7 @@ class MbcStMap final : public Module
     ScriptState13 state13_{};
     std::array<std::uint8_t, 40> member15085_{};
     std::int32_t member15086_{};
-    std::array<std::uint8_t, 6> member15088_{};
+    std::string member15088_;
     String member15090_{};
     std::array<std::uint8_t, 96> member15091_{};
     std::array<std::uint8_t, 96> member15093_{};
@@ -17887,7 +17862,6 @@ class MbcStString final : public Module
     std::int32_t member15252_{};
     std::int32_t member15253_{};
     std::array<std::uint8_t, 20> member15254_{};
-    std::array<std::uint8_t, 280> member15255_{};
     std::int32_t member15257_{};
     std::int32_t member15258_{};
     std::array<String, 2> member15284_{};

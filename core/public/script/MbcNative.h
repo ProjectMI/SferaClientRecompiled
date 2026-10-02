@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <algorithm>
 #include <array>
@@ -111,6 +111,24 @@ template <ReferenceType T> Address pointer(T value) noexcept
     return T::type % 16 ? referenceCast<Address>(value) : Address{value.base, 0, 0};
 }
 template <class T> requires (!ReferenceType<T> && !std::is_same_v<T, Value>) Address pointer(T value) noexcept { return {word(value), 0, 0}; }
+template <class T, std::size_t Extent> requires (!std::is_const_v<T>)
+std::span<std::byte> pointer(std::span<T, Extent> value) noexcept
+{
+    return std::as_writable_bytes(value);
+}
+template <class T, std::size_t Extent> requires (!std::is_const_v<T>)
+std::span<std::byte> pointer(std::array<T, Extent> &value) noexcept
+{
+    return std::as_writable_bytes(std::span(value));
+}
+template <class T, class Allocator> std::span<std::byte> pointer(std::vector<T, Allocator> &value) noexcept
+{
+    return std::as_writable_bytes(std::span(value));
+}
+inline std::span<std::byte> pointer(std::string &value) noexcept
+{
+    return std::as_writable_bytes(std::span(value.data(), value.size()));
+}
 
 template <class To, class From> To argumentValue(From source)
 {
@@ -484,6 +502,7 @@ class Host
     Context current;
     Execution *execution{};
     virtual Module &selectModule(Module &caller, bool (*accepts)(Module &)) = 0;
+    virtual Module &mainModule() = 0;
     // Typed client services. Known source calls never enter invokeEngine.
     virtual std::int32_t processModule(std::uint32_t id) const = 0;
     virtual std::int32_t tickValue() const = 0;
@@ -530,7 +549,7 @@ class Host
     }
     virtual Value invokeEngine(Builtin command, std::span<const Argument> arguments) = 0;
     virtual Task<Value> callProcess(Module &caller, bool mainProcess, std::vector<Argument> arguments) = 0;
-    virtual Address mapObject(void *address, std::size_t size, const void *owner) = 0;
+    virtual Address mapObject(const void *address, std::size_t size, const void *owner) = 0;
     virtual void forgetObject(const void *owner) noexcept = 0;
     virtual std::span<std::byte> memory(Address address, std::size_t size) = 0;
     virtual std::span<std::byte> memory(Address address) = 0;
@@ -717,10 +736,24 @@ class Host
         std::memcpy(&value, bytes.data(), sizeof(T));
         return value;
     }
+    template <class T> T read(std::span<std::byte> source)
+    {
+        const auto bytes = rawBuffer(source, sizeof(T));
+        T value;
+        std::memcpy(&value, bytes.data(), sizeof(T));
+        return value;
+    }
     template <class T> void write(Address address, const T &value, std::size_t sourceWidth = sizeof(T))
     {
         validate(address, sourceWidth);
         const auto bytes = memory(address, sizeof(T));
+        std::memcpy(bytes.data(), &value, sizeof(T));
+    }
+    template <class T> void write(std::span<std::byte> destination, const T &value, std::size_t sourceWidth = sizeof(T))
+    {
+        if (sourceWidth > destination.size())
+            diagnoseBuffer(destination, SferaNumeric::lowWord(sourceWidth));
+        const auto bytes = rawBuffer(destination, sizeof(T));
         std::memcpy(bytes.data(), &value, sizeof(T));
     }
     std::int32_t elementIndex(std::int32_t index, std::int32_t count, bool absolute)
@@ -751,11 +784,34 @@ class Host
         validate(value, 1, true);
         return value;
     }
+    static std::span<std::byte> indirect(std::span<std::byte> value)
+    {
+        return value;
+    }
     Address field(Address base, std::uint32_t offset, std::uint32_t width)
     {
         base.base += offset;
         validate(base, 1, true);
         return {base.base, base.base, base.base + width - 1u};
+    }
+    std::span<std::byte> field(std::span<std::byte> base, std::uint32_t offset, std::uint32_t width)
+    {
+        if (offset > base.size() || width > base.size() - offset)
+            diagnoseBuffer(base, offset + width);
+        return rawBuffer(base.subspan(offset), width);
+    }
+    std::span<std::byte> element(std::span<std::byte> base, std::int32_t index, std::uint32_t stride, std::int32_t count,
+                                bool absolute, std::uint32_t sourceWidth, bool bounded)
+    {
+        if (bounded)
+            index = elementIndex(index, count, absolute);
+        if (index < 0)
+            throw std::out_of_range("Negative native buffer index");
+        const auto offset = std::size_t(stride) * std::size_t(index);
+        if (offset > base.size())
+            diagnoseBuffer(base, SferaNumeric::lowWord(offset));
+        auto result = base.subspan(offset);
+        return absolute ? rawBuffer(result, sourceWidth) : result;
     }
 };
 
@@ -921,6 +977,45 @@ class Module : public std::enable_shared_from_this<Module>
         result.end = result.base + SferaNumeric::lowWord(width) - 1u;
         return result;
     }
+    template <class T, std::size_t Extent> Address address(std::array<T, Extent> &object, std::size_t offset = 0, std::size_t width = 0)
+    {
+        return address(std::span(object), offset, width);
+    }
+    template <class T, class Allocator> Address address(std::vector<T, Allocator> &object, std::size_t offset = 0, std::size_t width = 0)
+    {
+        return address(std::span(object), offset, width);
+    }
+    Address address(std::string &object, std::size_t offset = 0, std::size_t width = 0)
+    {
+        const auto size = object.size();
+        if (offset > size)
+            throw std::out_of_range("Native string offset is outside its storage");
+        if (width == 0)
+            width = size - offset;
+        if (width > size - offset)
+            throw std::out_of_range("Native string view is outside its storage");
+        auto result = host_.mapObject(object.data(), size + 1, this);
+        result.base += SferaNumeric::lowWord(offset);
+        result.begin = result.base;
+        result.end = width ? result.base + SferaNumeric::lowWord(width) - 1u : result.base;
+        return result;
+    }
+    template <ReferenceType R, class T, std::size_t Extent> R reference(std::span<T, Extent> object, std::size_t offset = 0, std::size_t width = 0)
+    {
+        return referenceCast<R>(address(object, offset, width));
+    }
+    template <ReferenceType R, class T, std::size_t Extent> R reference(std::array<T, Extent> &object, std::size_t offset = 0, std::size_t width = 0)
+    {
+        return referenceCast<R>(address(object, offset, width));
+    }
+    template <ReferenceType R, class T, class Allocator> R reference(std::vector<T, Allocator> &object, std::size_t offset = 0, std::size_t width = 0)
+    {
+        return referenceCast<R>(address(object, offset, width));
+    }
+    template <ReferenceType R> R reference(std::string &object, std::size_t offset = 0, std::size_t width = 0)
+    {
+        return referenceCast<R>(address(object, offset, width));
+    }
     template <ReferenceType R, class T> R reference(T &object, std::size_t offset = 0, std::size_t width = sizeof(T))
     {
         return referenceCast<R>(address(object, offset, width));
@@ -950,16 +1045,13 @@ inline void Host::checkpoint(std::uint32_t work)
     {
     case Builtin::Window: message += "Window"; break;
     case Builtin::Text: message += "Text"; break;
-    case Builtin::RebaseSlice: message += "RebaseSlice"; break;
     case Builtin::System: message += "System"; break;
-    case Builtin::Configuration: message += "Configuration"; break;
     case Builtin::ContainerCommand: message += "ContainerCommand"; break;
     case Builtin::ContainerManagement: message += "ContainerManagement"; break;
-    case Builtin::ParseText: message += "ParseText"; break;
     default: message += "Engine"; break;
     }
     message += "(" + std::to_string(SferaNumeric::enumBits(command)) + ")";
-    if (!arguments.empty() && (command == Builtin::Window || command == Builtin::System || command == Builtin::Configuration))
+    if (!arguments.empty() && (command == Builtin::Window || command == Builtin::System))
         message += "; selector=" + std::to_string(integer(arguments.front().value));
     message += "; argc=" + std::to_string(arguments.size());
     if (current.module)
@@ -1191,6 +1283,19 @@ std::span<std::byte> memberBytes(std::span<T, Extent> object, std::size_t offset
         throw std::out_of_range("Native member view crosses its owning object");
     return bytes.subspan(offset, size);
 }
+template <class T, class Allocator>
+std::span<std::byte> memberBytes(std::vector<T, Allocator> &object, std::size_t offset = 0, std::size_t size = SIZE_MAX)
+{
+    return memberBytes(std::span(object), offset, size);
+}
+inline std::span<std::byte> memberBytes(std::string &object, std::size_t offset = 0, std::size_t size = SIZE_MAX)
+{
+    auto bytes = std::as_writable_bytes(std::span(object.data(), object.size()));
+    if (offset > bytes.size())
+        throw std::out_of_range("Native string offset is outside its storage");
+    const auto available = bytes.size() - offset;
+    return bytes.subspan(offset, size == SIZE_MAX ? available : std::min(size, available));
+}
 template <class T> std::span<std::byte> memberBytes(T &object, std::size_t offset = 0, std::size_t size = SIZE_MAX)
 {
     return memberBytes(std::span{std::addressof(object), std::size_t{1}}, offset, size);
@@ -1225,6 +1330,25 @@ template <class T, class Buffer> void setMemberView(Buffer &buffer, std::size_t 
     if (offset > sizeof(Buffer) || sizeof(T) > sizeof(Buffer) - offset)
         throw std::out_of_range("Native member view crosses its owning object");
     std::memcpy(reinterpret_cast<std::byte *>(std::addressof(buffer)) + offset, &value, sizeof(T));
+}
+template <class T, std::size_t Extent, class U> requires (!std::is_const_v<T>)
+std::span<std::byte> shifted(std::span<T, Extent> base, U displacement)
+{
+    return memberBytes(base, std::size_t(word(displacement)));
+}
+template <class T, std::size_t Extent, class U>
+std::span<std::byte> shifted(std::array<T, Extent> &base, U displacement)
+{
+    return memberBytes(std::span(base), std::size_t(word(displacement)));
+}
+template <class T, class Allocator, class U>
+std::span<std::byte> shifted(std::vector<T, Allocator> &base, U displacement)
+{
+    return memberBytes(base, std::size_t(word(displacement)));
+}
+template <class U> std::span<std::byte> shifted(std::string &base, U displacement)
+{
+    return memberBytes(base, std::size_t(word(displacement)));
 }
 template <class T, class U> T shifted(T base, U displacement)
 {

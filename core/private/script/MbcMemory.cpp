@@ -92,7 +92,7 @@ std::string SferaMbcRuntime::memoryDiagnostic(std::string_view message, std::uin
     return result;
 }
 
-std::uint8_t *SferaMbcRuntime::memoryAt(std::uint32_t address, std::size_t size, SferaMbcProcessRecord *) const
+std::uint8_t *SferaMbcRuntime::memoryAt(std::uint32_t address, std::size_t size) const
 {
     auto entry = mapped_memory.upper_bound(address);
     if (entry == mapped_memory.begin())
@@ -105,7 +105,7 @@ std::uint8_t *SferaMbcRuntime::memoryAt(std::uint32_t address, std::size_t size,
     return const_cast<std::uint8_t *>(region.data) + offset;
 }
 
-std::span<std::uint8_t> SferaMbcRuntime::memoryRange(std::uint32_t address, SferaMbcProcessRecord *) const
+std::span<std::uint8_t> SferaMbcRuntime::memoryRange(std::uint32_t address) const
 {
     auto entry = mapped_memory.upper_bound(address);
     if (entry == mapped_memory.begin())
@@ -116,22 +116,22 @@ std::span<std::uint8_t> SferaMbcRuntime::memoryRange(std::uint32_t address, Sfer
         throw std::out_of_range(memoryDiagnostic("Invalid native memory range", address, 0));
     return {const_cast<std::uint8_t *>(entry->second.data) + offset, entry->second.size - offset};
 }
-std::span<std::uint8_t> SferaMbcRuntime::memoryBytes(std::uint32_t address, std::size_t count, SferaMbcProcessRecord *process) const
+std::span<std::uint8_t> SferaMbcRuntime::memoryBytes(std::uint32_t address, std::size_t count) const
 {
     if (count == 0)
         return {};
-    return {memoryAt(address, count, process), count};
+    return {memoryAt(address, count), count};
 }
 
-SferaTextBuffer SferaMbcRuntime::textBufferAt(std::uint32_t address, SferaMbcProcessRecord *process) const
+SferaTextBuffer SferaMbcRuntime::textBufferAt(std::uint32_t address) const
 {
-    return SferaTextBuffer(memoryRange(address, process));
+    return SferaTextBuffer(memoryRange(address));
 }
 
 
-std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32 &slice, SferaMbcProcessRecord *process) const
+std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32 &slice) const
 {
-    auto bytes = memoryRange(slice.base, process);
+    auto bytes = memoryRange(slice.base);
     if (slice.begin != 0)
     {
         if (slice.base < slice.begin || slice.base > slice.end)
@@ -144,19 +144,19 @@ std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32 
     return bytes;
 }
 
-std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32 &slice, std::size_t count, SferaMbcProcessRecord *process) const
+std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32 &slice, std::size_t count) const
 {
     if (count == 0)
         return {};
-    return SferaBinary::range(sliceBytes(slice, process), 0, count);
+    return SferaBinary::range(sliceBytes(slice), 0, count);
 }
 
-SferaTextBuffer SferaMbcRuntime::textBuffer(const SferaSliceReference32 &slice, SferaMbcProcessRecord *process) const
+SferaTextBuffer SferaMbcRuntime::textBuffer(const SferaSliceReference32 &slice) const
 {
-    return SferaTextBuffer(sliceBytes(slice, process));
+    return SferaTextBuffer(sliceBytes(slice));
 }
 
-std::string SferaMbcRuntime::textIn(const SferaSliceReference32 &slice, SferaMbcProcessRecord *process) const
+std::string SferaMbcRuntime::textIn(const SferaSliceReference32 &slice) const
 {
     // A default string reference points at the reserved zero prefix of the
     // original MBC data. Preserve its empty value without mapping writable memory
@@ -165,14 +165,14 @@ std::string SferaMbcRuntime::textIn(const SferaSliceReference32 &slice, SferaMbc
         return {};
     // Preserve the MBC string ABI: the declared extent may exclude the NUL or
     // describe an addressed element. The owning memory region is the hard boundary.
-    return SferaText::terminated(memoryRange(slice.base, process));
+    return SferaText::terminated(memoryRange(slice.base));
 }
 
-std::string SferaMbcRuntime::textIn(const SferaSliceReference32 &slice, std::size_t limit, SferaMbcProcessRecord *process) const
+std::string SferaMbcRuntime::textIn(const SferaSliceReference32 &slice, std::size_t limit) const
 {
     if (limit == 0 || (slice.base == 0 && slice.begin == 0 && slice.end == 0))
         return {};
-    return SferaText::prefix(memoryRange(slice.base, process), limit);
+    return SferaText::prefix(memoryRange(slice.base), limit);
 }
 
 std::string SferaMbcRuntime::textAt(std::uint32_t address) const
@@ -297,14 +297,6 @@ SphereScripts::String SferaMbcRuntime::processReference(std::uint32_t process, S
     if (value.base)
         memoryAt(value.base, 0);
     return SphereScripts::referenceCast<SphereScripts::String>(value);
-}
-
-SferaSliceReference32 SferaMbcRuntime::rebaseSlice(SferaSliceReference32 slice, SferaMbcProcessRecord &)
-{
-    // References identify mapped native objects and are already process-neutral.
-    if (slice.base != 0)
-        memoryAt(slice.base, 0);
-    return slice;
 }
 
 void SferaMbcRuntime::forgetMemory(const void *owner, const void *data, std::size_t size)

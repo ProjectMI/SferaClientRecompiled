@@ -100,7 +100,6 @@ struct SferaMbcProcessRecord
     bool activateProgram(std::size_t index);
     bool activateProgram(std::string_view name);
     void appendCommand(std::string_view command);
-    std::uint32_t growMemory(std::size_t size);
     SphereScripts::Method findFunction(std::string_view name);
     int findProgram(const SphereScripts::Module &module, std::string_view name) const;
     void appendModule(std::shared_ptr<SphereScripts::Module> module);
@@ -114,7 +113,6 @@ struct SferaMbcProcessRecord
     std::uint32_t module_tag{};
     std::vector<std::shared_ptr<SphereScripts::Module>> modules;
     std::vector<ScriptProgramDiagnostic> programs;
-    std::vector<std::uint32_t> owned_buffers;
     int32_t chain_prev_index = -1;
     int32_t chain_next_index = -1;
     uint16_t program_map_a[4];

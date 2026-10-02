@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <array>
 #include <cstddef>
@@ -79,22 +79,21 @@ struct SferaMbcRuntime : SphereScripts::Host
     std::unordered_map<std::uint32_t, SferaMbcRuntimeNativeResource> native_resources;
     std::unordered_map<SferaMbcRuntimeNativeResource, std::uint32_t> native_resource_ids;
     std::uint32_t next_native_handle = 1;
-    std::span<std::uint8_t> memoryRange(std::uint32_t address, SferaMbcProcessRecord *process = nullptr) const;
-    // Legacy pointer/count operations are bounded by their process or mapped region.
-    std::span<std::uint8_t> memoryBytes(std::uint32_t address, std::size_t count, SferaMbcProcessRecord *process = nullptr) const;
-    SferaTextBuffer textBufferAt(std::uint32_t address, SferaMbcProcessRecord *process = nullptr) const;
-    std::span<std::uint8_t> sliceBytes(const SferaSliceReference32 &slice, SferaMbcProcessRecord *process = nullptr) const;
-    std::span<std::uint8_t> sliceBytes(const SferaSliceReference32 &slice, std::size_t count, SferaMbcProcessRecord *process = nullptr) const;
+    std::span<std::uint8_t> memoryRange(std::uint32_t address) const;
+    // Legacy pointer/count operations are bounded by their mapped region.
+    std::span<std::uint8_t> memoryBytes(std::uint32_t address, std::size_t count) const;
+    SferaTextBuffer textBufferAt(std::uint32_t address) const;
+    std::span<std::uint8_t> sliceBytes(const SferaSliceReference32 &slice) const;
+    std::span<std::uint8_t> sliceBytes(const SferaSliceReference32 &slice, std::size_t count) const;
     // MBC text arguments have C-string semantics; slice metadata may describe only an element.
-    std::string textIn(const SferaSliceReference32 &slice, SferaMbcProcessRecord *process = nullptr) const;
-    std::string textIn(const SferaSliceReference32 &slice, std::size_t limit, SferaMbcProcessRecord *process = nullptr) const;
+    std::string textIn(const SferaSliceReference32 &slice) const;
+    std::string textIn(const SferaSliceReference32 &slice, std::size_t limit) const;
     std::string memoryDiagnostic(std::string_view message, std::uint32_t address, std::size_t size) const;
-    std::uint8_t *memoryAt(std::uint32_t address, std::size_t size, SferaMbcProcessRecord *process = nullptr) const;
+    std::uint8_t *memoryAt(std::uint32_t address, std::size_t size) const;
     std::string textAt(std::uint32_t address) const;
     std::string textAt(std::uint32_t address, std::size_t limit) const;
-    SferaTextBuffer textBuffer(const SferaSliceReference32 &slice, SferaMbcProcessRecord *process = nullptr) const;
+    SferaTextBuffer textBuffer(const SferaSliceReference32 &slice) const;
     std::uint32_t mapMemory(const void *data, std::size_t size, const void *owner = nullptr);
-    SferaSliceReference32 rebaseSlice(SferaSliceReference32 slice, SferaMbcProcessRecord &source);
     void forgetMemory(const void *owner, const void *data = nullptr, std::size_t size = 0);
     void clearMappedMemory() noexcept;
     std::uint32_t addMemoryRegion(SferaMbcRuntimeMemoryRegion region);
@@ -196,6 +195,8 @@ struct SferaMbcRuntime : SphereScripts::Host
     void sendRegion(int slotIndex, std::uint32_t region, std::uint32_t flags);
     void windowCommand();
     std::int32_t processModule(std::uint32_t id) const override;
+    std::int32_t nextProcessByModule(std::uint32_t module, std::optional<std::int32_t> previous = {}) const;
+    std::int32_t nextProcessByName(std::string_view name, std::optional<std::int32_t> previous = {}) const;
     std::int32_t tickValue() const override;
     std::int32_t keyState(std::uint32_t key) const override;
     std::string stringValue(SphereScripts::Address value, std::size_t limit = SIZE_MAX) const override;
@@ -240,9 +241,10 @@ struct SferaMbcRuntime : SphereScripts::Host
     WorldObject *selectWorldObject(std::int32_t handle);
     void trackControlledPosition(std::int32_t handle, const WorldObject &object);
     SphereScripts::Module &selectModule(SphereScripts::Module &caller, bool (*accepts)(SphereScripts::Module &)) override;
+    SphereScripts::Module &mainModule() override;
     SphereScripts::Value invokeEngine(SferaMbcRuntimeBuiltin command, std::span<const SphereScripts::Argument> arguments) override;
     SphereScripts::Task<SphereScripts::Value> callProcess(SphereScripts::Module &caller, bool mainProcess, std::vector<SphereScripts::Argument> arguments) override;
-    SphereScripts::Address mapObject(void *address, std::size_t size, const void *owner) override;
+    SphereScripts::Address mapObject(const void *address, std::size_t size, const void *owner) override;
     void forgetObject(const void *owner) noexcept override;
     std::span<std::byte> memory(SphereScripts::Address address, std::size_t size) override;
     std::span<std::byte> memory(SphereScripts::Address address) override;
