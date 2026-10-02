@@ -7,7 +7,6 @@
 #include <exception>
 #include <fcntl.h>
 #include <format>
-#include <io.h>
 #include <iterator>
 #include <list>
 #include <memory>
@@ -440,19 +439,6 @@ void SferaMbcProcessRecord::releaseResources()
             case SferaMbcProcessRecordResourceKind::worldObject:
                 g_sfera_world_objects.destroy(entry.handle);
                 break;
-            case SferaMbcProcessRecordResourceKind::file:
-                ::_close(SferaNumeric::signedWord(entry.handle));
-                break;
-            case SferaMbcProcessRecordResourceKind::fileSearch:
-            {
-                const auto search = g_sfera_mbc_runtime.nativeResource<std::intptr_t>(entry.handle);
-                if (search != -1)
-                {
-                    ::_findclose(search);
-                    g_sfera_mbc_runtime.forgetNativeResource(search);
-                }
-                break;
-            }
             case SferaMbcProcessRecordResourceKind::dynamicArray:
             {
                 std::uint32_t offset{};
@@ -621,6 +607,11 @@ SphereScripts::Address SferaMbcRuntime::mapObject(void *address, std::size_t siz
 void SferaMbcRuntime::forgetObject(const void *owner) noexcept
 {
     forgetMemory(owner);
+}
+
+std::span<std::byte> SferaMbcRuntime::memory(SphereScripts::Address address)
+{
+    return std::as_writable_bytes(memoryRange(address.base));
 }
 
 std::span<std::byte> SferaMbcRuntime::memory(SphereScripts::Address address, std::size_t size)

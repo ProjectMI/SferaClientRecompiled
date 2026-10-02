@@ -152,12 +152,7 @@ void SferaMbcRuntime::systemCommand()
     case 510:
         executeSystemRuntime(operation);
         return;
-    case 19:
-    case 20:
-    case 21:
     case 64:
-    case 66:
-    case 67:
     case 68:
     case 73:
     case 75:
@@ -614,70 +609,11 @@ void SferaMbcRuntime::executeSystemResources(std::int32_t operation)
 {
     switch (operation)
     {
-    case 19:
-    case 20:
-    {
-        const auto patternOrHandle = nextWord();
-        const auto destination = systemCommandAddress(operation == 19 ? "FINDFIRST" : "FINDNEXT");
-        if (execution_failed)
-            return;
-        const auto result = operation == 19 ? ::_findfirst64i32(systemCommandText(patternOrHandle).data(), &script_find_data)
-                                            : ::_findnext64i32(nativeResource<std::intptr_t>(patternOrHandle), &script_find_data);
-        std::uint32_t value = UINT32_MAX;
-        if (result != -1)
-        {
-            if (operation == 19)
-            {
-                try
-                {
-                    value = nativeHandle(result);
-                    active_process->registerResource(value, SferaMbcRuntimeResourceKind::fileSearch);
-                }
-                catch (...)
-                {
-                    forgetNativeResource(result);
-                    ::_findclose(result);
-                    throw;
-                }
-            }
-            else
-                value = SferaNumeric::lowWord(result);
-            copyText({destination, 0, 0}, script_find_data.name);
-        }
-        else
-            copyText({destination, 0, 0}, {});
-        pushInteger(value);
-        return;
-    }
-    case 21:
-    {
-        const auto handle = nextWord();
-        if (!execution_failed)
-        {
-            const auto search = nativeResource<std::intptr_t>(handle);
-            if (search != -1)
-            {
-                ::_findclose(search);
-                forgetNativeResource(search);
-            }
-            active_process->unregisterResource(handle, SferaMbcRuntimeResourceKind::fileSearch);
-        }
-        return;
-    }
     case 64:
     {
         const auto track = systemCommandAddress("PLAY_MUSIC");
         if (!execution_failed)
             g_sfera_sound_runtime.requestTrack(track != 0 && !systemCommandText(track).empty() ? std::optional<std::string_view>{systemCommandText(track)} : std::nullopt);
-        return;
-    }
-    case 66:
-    case 67:
-    {
-        const auto destination = systemCommandAddress(operation == 66 ? "GZ_PACK, 1" : "GZ_UNPACK, 1");
-        const auto source = systemCommandAddress(operation == 66 ? "GZ_PACK, 2" : "GZ_UNPACK, 2");
-        if (!execution_failed)
-            pushInteger(g_sfera_files.transformEnvelope(std::string(systemCommandText(destination)), std::string(systemCommandText(source)), operation == 66));
         return;
     }
     case 68:

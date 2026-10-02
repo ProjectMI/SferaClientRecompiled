@@ -36,6 +36,40 @@
 #include "ui/widgets/Popups.h"
 #include "ui/widgets/TextEditors.h"
 
+std::int32_t SferaMbcRuntime::interfaceControl(std::uint32_t handle, std::int32_t id, bool listItem)
+{
+    checkEngineFailure();
+    auto *window = nativeResource<SphereUIWindow *>(handle);
+    SphereUIWindow *result = nullptr;
+    if (window)
+    {
+        if (!listItem)
+            result = window->controlAt(id);
+        else if (auto *list = window->asListItemCtrl())
+            result = list->itemAt(id);
+    }
+    const auto resultHandle = nativeHandle(result);
+    checkEngineFailure();
+    return SferaNumeric::signedWord(resultHandle);
+}
+
+void SferaMbcRuntime::closeInterface(std::uint32_t handle)
+{
+    checkEngineFailure();
+    g_sfera_interface.closeWindow(nativeResource<SphereUIWindow *>(handle), true);
+    active_process->unregisterResource(handle, SferaMbcRuntimeResourceKind::interfaceWindow);
+    checkEngineFailure();
+}
+
+std::int32_t SferaMbcRuntime::sendInterfaceMessage(std::uint32_t handle, SphereUIUiMessage message,
+                                                 std::uint32_t first, std::uint32_t second, std::uint32_t flags)
+{
+    checkEngineFailure();
+    MbcUiMessageCodec(*this, flags).dispatch(nativeResource<SphereUIWindow *>(handle), message, first, second);
+    checkEngineFailure();
+    return 0;
+}
+
 auto SferaMbcRuntime::windowCommandRead(std::array<std::int32_t, 6> &arguments, std::size_t count)
 {
     for (std::size_t index = 0; index < count; ++index)
@@ -98,15 +132,13 @@ void SferaMbcRuntime::windowCommand()
         if (!windowCommandRead(arguments, 1))
             return;
         const std::uint32_t handle = arguments[0];
-        auto resource = SferaMbcRuntimeResourceKind::gameWindow;
         if (operation == SferaMbcRuntimeWindowOperation::Destroy)
-            GameInterface::destroyWindow(handle);
-        else
         {
-            resource = SferaMbcRuntimeResourceKind::interfaceWindow;
-            g_sfera_interface.closeWindow(nativeResource<SphereUIWindow *>(handle), true);
+            GameInterface::destroyWindow(handle);
+            active_process->unregisterResource(handle, SferaMbcRuntimeResourceKind::gameWindow);
         }
-        active_process->unregisterResource(handle, resource);
+        else
+            closeInterface(handle);
         break;
     }
     case SferaMbcRuntimeWindowOperation::DisplayWidth:
@@ -321,26 +353,15 @@ void SferaMbcRuntime::windowCommand()
     {
         if (!windowCommandRead(arguments, 2))
             return;
-        auto *window = nativeResource<SphereUIWindow *>(SferaNumeric::word(arguments[0]));
-        SphereUIWindow *result = nullptr;
-        if (window)
-        {
-            if (operation == SferaMbcRuntimeWindowOperation::ControlAt)
-                result = window->controlAt(arguments[1]);
-            else if (auto *list = window->asListItemCtrl())
-                result = list->itemAt(arguments[1]);
-        }
-        pushInteger(nativeHandle(result));
+        pushInteger(interfaceControl(SferaNumeric::word(arguments[0]), arguments[1], operation == SferaMbcRuntimeWindowOperation::ItemAt));
         break;
     }
     case SferaMbcRuntimeWindowOperation::SendMessage:
     {
         if (!windowCommandRead(arguments, 5))
             return;
-        MbcUiMessageCodec codec(*this, SferaNumeric::word(arguments[4]));
-        codec.dispatch(nativeResource<SphereUIWindow *>(SferaNumeric::word(arguments[0])), SferaNumeric::enumFromBits<SphereUIUiMessage>(SferaNumeric::word(arguments[1])),
-                       SferaNumeric::word(arguments[2]), SferaNumeric::word(arguments[3]));
-        pushInteger(0);
+        pushInteger(sendInterfaceMessage(SferaNumeric::word(arguments[0]), SferaNumeric::enumFromBits<SphereUIUiMessage>(SferaNumeric::word(arguments[1])),
+                                         SferaNumeric::word(arguments[2]), SferaNumeric::word(arguments[3]), SferaNumeric::word(arguments[4])));
         break;
     }
     case SferaMbcRuntimeWindowOperation::GetText:

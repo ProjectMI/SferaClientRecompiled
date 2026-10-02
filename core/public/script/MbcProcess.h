@@ -78,8 +78,6 @@ enum SferaMbcProcessRecordFlags : std::uint32_t
 enum class SferaMbcProcessRecordResourceKind
 {
     worldObject,
-    file,
-    fileSearch,
     dynamicArray,
     textControl,
     spriteControl,

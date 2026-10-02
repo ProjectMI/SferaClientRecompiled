@@ -9,6 +9,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <initializer_list>
+#include <variant>
+#include <utility>
 #include <istream>
 #include <limits>
 #include <optional>
@@ -34,6 +37,15 @@ struct SferaTextHash : std::equal_to<>
 class SferaText
 {
   public:
+    static int scan(const std::string &text, const std::string &pattern, std::span<const std::span<std::byte>> outputs);
+    static int scan(const std::string &text, const std::string &pattern, std::initializer_list<std::span<std::byte>> outputs)
+    {
+        return scan(text, pattern, std::span(outputs.begin(), outputs.size()));
+    }
+    static std::span<std::byte> readInteger(std::span<std::byte> source, std::span<std::byte> destination);
+    static std::span<std::byte> skipSpaces(std::span<std::byte> source);
+    static std::span<std::byte> skipBlankLine(std::span<std::byte> source);
+    static std::span<std::byte> skipLine(std::span<std::byte> source);
     template <class Mapping> static void transformBytes(std::string &text, Mapping mapping)
     {
         for (auto &byte : std::as_writable_bytes(std::span(text)))
@@ -106,15 +118,23 @@ class SferaText
     {
         return fromBytes(std::as_bytes(bytes));
     }
-    static inline std::size_t length(std::span<const std::uint8_t> bytes, std::size_t limit = std::numeric_limits<std::size_t>::max())
+    static inline std::size_t length(std::span<const std::byte> bytes, std::size_t limit = std::numeric_limits<std::size_t>::max())
     {
         if (limit == 0)
             return 0;
         const auto field = bytes.first(std::min(bytes.size(), limit));
-        const auto end = std::find(field.begin(), field.end(), std::uint8_t{});
+        const auto end = std::find(field.begin(), field.end(), std::byte{});
         if (end == field.end() && limit > bytes.size())
             throw std::out_of_range("Unterminated text buffer");
         return static_cast<std::size_t>(end - field.begin());
+    }
+    static inline std::size_t length(std::span<const std::uint8_t> bytes, std::size_t limit = std::numeric_limits<std::size_t>::max())
+    {
+        return length(std::as_bytes(bytes), limit);
+    }
+    static inline std::string terminated(std::span<const std::byte> bytes)
+    {
+        return fromBytes(bytes.first(length(bytes)));
     }
     static inline std::string prefix(std::span<const std::uint8_t> bytes, std::size_t limit)
     {
@@ -222,6 +242,15 @@ class SferaText
     }
 
   private:
+    template <class T> static void scanTextNumber(auto &references, std::size_t &output, auto &numbers, auto &destinations);
+    static char scanTextCharacter(const std::string &pattern, std::size_t position);
+    template <std::size_t Index>
+    static int scanValues(const std::string &text, const std::string &normalized, const std::array<unsigned, 4> &capacities,
+                          const std::array<void *, 4> &destinations, std::array<int, 4> &completed, auto... arguments);
+    template <class T> static void scanTextStoreNumber(const T &value, std::span<std::byte> destination, std::size_t characters);
+    template <class T> static void scanTextStoreText(const T &value, std::span<std::byte> destination, std::size_t characters);
+    template <bool Text, std::size_t Index = 0, class... Values>
+    static void scanTextStoreVariant(const std::variant<Values...> &value, std::span<std::byte> destination, std::size_t characters);
     static int lowercaseByte(std::uint8_t value)
     {
         return std::tolower(value);

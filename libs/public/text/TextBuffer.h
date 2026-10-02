@@ -15,7 +15,10 @@ class SferaTextBuffer;
 class SferaTextBuffer
 {
   public:
-    explicit SferaTextBuffer(std::span<std::uint8_t> bytes) noexcept : bytes_(bytes)
+    explicit SferaTextBuffer(std::span<std::uint8_t> bytes) noexcept : bytes_(std::as_writable_bytes(bytes))
+    {
+    }
+    explicit SferaTextBuffer(std::span<std::byte> bytes) noexcept : bytes_(bytes)
     {
     }
     std::size_t size() const noexcept
@@ -41,7 +44,7 @@ class SferaTextBuffer
         const auto count = std::min(source.size(), size() - 1);
         if (count != 0)
             std::memmove(bytes_.data(), source.data(), count);
-        bytes_[count] = 0;
+        bytes_[count] = std::byte{};
         return count;
     }
     void assign(std::string_view source) const
@@ -63,7 +66,7 @@ class SferaTextBuffer
         if (capacity > size())
             throw std::out_of_range("Bounded text destination is too small");
         const auto copied = limited(capacity).write(source);
-        bytes_[capacity - 1] = 0;
+        bytes_[capacity - 1] = std::byte{};
         return copied;
     }
     // MBC bounded copies write count bytes of payload/padding and one final NUL.
@@ -72,10 +75,10 @@ class SferaTextBuffer
         if (count >= size())
             throw std::out_of_range("Padded text destination is too small");
         const auto copied = limited(count + 1).write(source);
-        std::ranges::fill(bytes_.subspan(copied, count + 1 - copied), std::uint8_t{});
+        std::ranges::fill(bytes_.subspan(copied, count + 1 - copied), std::byte{});
         return copied;
     }
 
   private:
-    std::span<std::uint8_t> bytes_;
+    std::span<std::byte> bytes_;
 };

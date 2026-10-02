@@ -7,6 +7,7 @@
 #include <coroutine>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <functional>
@@ -20,11 +21,17 @@
 #include <string_view>
 #include <tuple>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
+#include "binary/Binary.h"
 #include "numeric/Numeric.h"
+#include "math/Vector.h"
+#include "text/Text.h"
 #include "script/MbcCommands.h"
+
+enum class SphereUIUiMessage : std::uint32_t;
 
 namespace SphereScripts
 {
@@ -160,6 +167,46 @@ template <class Left, class Right> std::int32_t remainder32(Left left, Right rig
 }
 template <class T> std::int32_t negate32(T value) noexcept { return integerBits(0u - word(value)); }
 template <class T> std::int32_t storedByte(T value) noexcept { return std::uint8_t(word(value)); }
+
+// Native arithmetic uses the same intermediate precision and word semantics
+// as the original engine. These functions have no argument or result protocol.
+inline float sine(float value) { return SferaNumeric::real32(std::sin(double{value})); }
+inline float cosine(float value) { return SferaNumeric::real32(std::cos(double{value})); }
+inline float exponential(float value) { return SferaNumeric::real32(std::exp(double{value})); }
+inline float absoluteReal(float value)
+{
+    const double wide = value;
+    return SferaNumeric::real32(wide < 0.0 ? -wide : wide);
+}
+inline float squareRoot(float value) { return SferaNumeric::real32(std::sqrt(double{absoluteReal(value)})); }
+inline float arcTangent(float y, float x) { return SferaNumeric::real32(std::atan2(double{y}, double{x})); }
+inline std::int32_t absoluteInteger(std::int32_t value) { return value < 0 ? integerBits(0u - word(value)) : value; }
+inline float randomReal() { return std::rand() / 32768.0f; }
+inline std::int32_t packColor(std::int32_t red, std::int32_t green, std::int32_t blue)
+{
+    return integerBits(0xff000000u | ((word(red) & 255u) << 16) | ((word(green) & 255u) << 8) | (word(blue) & 255u));
+}
+inline std::int32_t scaleColor(std::int32_t color, float factor)
+{
+    const auto bits = word(color);
+    const double scale = factor;
+    return packColor(SferaNumeric::truncateInt(((bits >> 16) & 255u) * scale),
+                     SferaNumeric::truncateInt(((bits >> 8) & 255u) * scale),
+                     SferaNumeric::truncateInt((bits & 255u) * scale));
+}
+inline float distanceSquared(SferaVec3F first, SferaVec3F second)
+{
+    const double x = double{first.x} - second.x;
+    const double y = double{first.y} - second.y;
+    const double z = double{first.z} - second.z;
+    return SferaNumeric::real32(y * y + x * x + z * z);
+}
+
+inline std::int32_t compareStrings(std::string_view first, std::string_view second)
+{
+    const auto result = SferaText::compare(first, second);
+    return (result > 0) - (result < 0);
+}
 
 struct Argument
 {
@@ -437,11 +484,56 @@ class Host
     Context current;
     Execution *execution{};
     virtual Module &selectModule(Module &caller, bool (*accepts)(Module &)) = 0;
+    // Typed client services. Known source calls never enter invokeEngine.
+    virtual std::int32_t processModule(std::uint32_t id) const = 0;
+    virtual std::int32_t tickValue() const = 0;
+    virtual std::int32_t keyState(std::uint32_t key) const = 0;
+    virtual std::string stringValue(Address value, std::size_t limit = SIZE_MAX) const = 0;
+    virtual std::uint32_t namedValue(std::string_view name, int index = 0) = 0;
+    virtual void setNamedValue(std::string_view name, std::uint32_t value, int index = 0) = 0;
+    virtual void setAnimation(std::int32_t handle, std::int32_t value, bool secondary = false) = 0;
+    virtual void setFrame(std::int32_t handle, std::int32_t value, bool secondary = false) = 0;
+    virtual std::int32_t animationLength(std::int32_t handle, std::int32_t animation) = 0;
+    virtual void setInterpolation(std::int32_t handle, float value) = 0;
+    virtual std::int32_t objectProcess(std::int32_t handle) = 0;
+    virtual void setPosition(std::int32_t handle, SferaVec3F value, bool updateSpatial = false,
+                             std::optional<std::int32_t> membership = {}) = 0;
+    virtual void moveWorld(std::int32_t handle, SferaVec3F value) = 0;
+    virtual void setRotation(std::int32_t handle, SferaVec3F value) = 0;
+    virtual void moveLocal(std::int32_t handle, SferaVec3F value) = 0;
+    virtual void rotateObject(std::int32_t handle, SferaVec3F value) = 0;
+    virtual void setCommandVelocity(std::int32_t handle, float x, float z, std::optional<float> y = {}) = 0;
+    virtual void setVerticalVelocity(std::int32_t handle, float value) = 0;
+    virtual void setVerticalResponse(std::int32_t handle, std::int32_t response) = 0;
+    virtual void setAngularVelocity(std::int32_t handle, float value) = 0;
+    virtual std::optional<SferaVec3F> objectPosition(std::int32_t handle) = 0;
+    virtual std::optional<SferaVec3F> objectRotation(std::int32_t handle) = 0;
+    virtual std::optional<SferaVec3F> objectBasis(std::int32_t handle) = 0;
+    virtual float positionComponent(std::int32_t handle, std::size_t axis) = 0;
+    virtual float rotationComponent(std::int32_t handle, std::size_t axis) = 0;
+    virtual void setRenderEnabled(std::int32_t handle, bool enabled) = 0;
+    virtual void destroyObject(std::int32_t handle) = 0;
+    virtual void destroyText(std::int32_t handle) = 0;
+    virtual void destroySprite(std::int32_t handle) = 0;
+    virtual std::int32_t createObject(std::string_view name, std::uint32_t kind, std::int32_t independent = 0) = 0;
+    virtual std::int32_t interfaceControl(std::uint32_t handle, std::int32_t id, bool listItem = false) = 0;
+    virtual void closeInterface(std::uint32_t handle) = 0;
+    virtual std::int32_t sendInterfaceMessage(std::uint32_t handle, SphereUIUiMessage message,
+                                             std::uint32_t first, std::uint32_t second, std::uint32_t flags) = 0;
+    virtual bool validateBorrowed(Address value) = 0;
+    virtual String processReference(std::uint32_t process, Address value) = 0;
+    template <ReferenceType T> void borrowReference(T &value)
+    {
+        const auto address = pointer(value);
+        if (validateBorrowed(address))
+            value = referenceCast<T>(address);
+    }
     virtual Value invokeEngine(Builtin command, std::span<const Argument> arguments) = 0;
     virtual Task<Value> callProcess(Module &caller, bool mainProcess, std::vector<Argument> arguments) = 0;
     virtual Address mapObject(void *address, std::size_t size, const void *owner) = 0;
     virtual void forgetObject(const void *owner) noexcept = 0;
     virtual std::span<std::byte> memory(Address address, std::size_t size) = 0;
+    virtual std::span<std::byte> memory(Address address) = 0;
     virtual void programAction(Module &module, std::string_view program, ProgramAction action) = 0;
     virtual bool alive(const Module &module) const noexcept = 0;
     virtual void warning(std::string_view message) = 0;
@@ -471,6 +563,138 @@ class Host
         return callProcess(caller, mainProcess, std::vector<Argument>{Argument(std::forward<Args>(args))...});
     }
     void checkpoint(std::uint32_t work = 1);
+    // A stored reference is resolved only at this compatibility boundary. Native
+    // members pass a span directly and never enter the address registry.
+    static bool containsBuffer(Address value, std::size_t count) noexcept
+    {
+        return value.base >= 4 && value.base < UINT32_MAX - 3u &&
+               (!value.begin || (value.base >= value.begin && value.base <= value.end &&
+               (!count || count - 1u <= value.end - value.base)));
+    }
+    static bool containsBuffer(std::span<std::byte> value, std::size_t count) noexcept
+    {
+        return !value.empty() && (!count || count <= value.size());
+    }
+    virtual void diagnoseBuffer(Address &value, std::uint32_t count) = 0;
+    void diagnoseBuffer(std::span<std::byte> value, std::uint32_t count)
+    {
+        warning(std::format("Native buffer range error; available={}; requested={}", value.size(), count));
+    }
+    std::span<std::byte> buffer(Address value, std::size_t count = SIZE_MAX)
+    {
+        if (!count)
+            return {};
+        auto result = memory(value);
+        if (value.begin)
+        {
+            if (value.base < value.begin || value.base > value.end)
+                throw std::out_of_range("Invalid bounded script slice");
+            const auto size = std::uint64_t{value.end} - value.base + 1;
+            if (size < result.size())
+                result = result.first(size);
+        }
+        return count == SIZE_MAX ? result : SferaBinary::range(result, 0, count);
+    }
+    static std::span<std::byte> buffer(std::span<std::byte> value, std::size_t count = SIZE_MAX)
+    {
+        return count == SIZE_MAX ? value : SferaBinary::range(value, 0, count);
+    }
+    std::span<std::byte> rawBuffer(Address value, std::size_t count)
+    {
+        return count ? memory(value, count) : std::span<std::byte>{};
+    }
+    static std::span<std::byte> rawBuffer(std::span<std::byte> value, std::size_t count)
+    {
+        return SferaBinary::range(value, 0, count);
+    }
+    static String advanceBuffer(Address value, std::size_t count = 0) noexcept
+    {
+        value.base += SferaNumeric::lowWord(count);
+        return referenceCast<String>(value);
+    }
+    static std::span<std::byte> advanceBuffer(std::span<std::byte> value, std::size_t count = 0)
+    {
+        return SferaBinary::range(value, count, value.size() - std::min(count, value.size()));
+    }
+    std::string stringValue(std::span<std::byte> value, std::size_t limit = SIZE_MAX) const
+    {
+        return SferaText::fromBytes(value.first(SferaText::length(value, limit)));
+    }
+    template <class Destination, class Source> void copyBytes(Destination destination, Source source, std::uint32_t count)
+    {
+        if (count && !containsBuffer(destination, count))
+            diagnoseBuffer(destination, count);
+        const auto output = rawBuffer(destination, count);
+        const auto input = rawBuffer(source, count);
+        SferaBinary::copy(output, input);
+    }
+    template <class Destination> void fillBytes(Destination destination, std::uint8_t value, std::uint32_t count)
+    {
+        if (count && !containsBuffer(destination, count))
+            diagnoseBuffer(destination, count);
+        const auto output = rawBuffer(destination, count);
+        std::fill(output.begin(), output.end(), std::byte{value});
+    }
+    template <std::size_t Width, class Source, class Destination>
+        requires (Width >= 1 && Width <= 4)
+    auto readPacked(Source source, Destination destination)
+    {
+        if (!containsBuffer(source, Width))
+            diagnoseBuffer(source, Width);
+        else if (!containsBuffer(destination, Width))
+            diagnoseBuffer(destination, Width);
+        else
+        {
+            const auto input = buffer(source, Width);
+            // Two/three-byte reads zero-extend the destination word. One-byte
+            // reads leave the other bytes alone, including aliased destinations.
+            const auto output = rawBuffer(destination, Width == 1 ? 1 : 4);
+            SferaBinary::readPacked(input, output);
+            return advanceBuffer(source, Width);
+        }
+        return advanceBuffer(source);
+    }
+    template <std::size_t Width, class Destination>
+        requires (Width >= 1 && Width <= 4)
+    auto writePacked(Destination destination, std::uint32_t value)
+    {
+        if (!containsBuffer(destination, Width))
+            diagnoseBuffer(destination, Width);
+        else
+        {
+            SferaBinary::writePacked(buffer(destination, Width), value);
+            return advanceBuffer(destination, Width);
+        }
+        return advanceBuffer(destination);
+    }
+    virtual std::uint32_t copyText(std::span<std::byte> destination, std::string_view source, int capacity = 0) = 0;
+    template <class Destination, class Source>
+        requires ((std::is_same_v<Destination, Address> || std::is_same_v<Destination, std::span<std::byte>>) &&
+                  (std::is_same_v<Source, Address> || std::is_same_v<Source, std::span<std::byte>>))
+    auto copyString(Destination destination, Source source, int capacity = 0)
+    {
+        if (!containsBuffer(source, 1))
+        {
+            diagnoseBuffer(source, 0);
+            return advanceBuffer(destination);
+        }
+        // Own the source before modifying the destination: strings may overlap.
+        const auto input = stringValue(source);
+        const auto length = copyText(buffer(destination), input, capacity);
+        if (!containsBuffer(destination, length))
+            diagnoseBuffer(destination, length);
+        return advanceBuffer(destination);
+    }
+    virtual std::int32_t stringLength(Address source, std::optional<std::int32_t> limit = {}) = 0;
+    std::int32_t stringLength(std::span<std::byte> source, std::optional<std::int32_t> limit = {})
+    {
+        const auto length = limit && *limit <= 0 ? 0 : SferaText::length(source, limit ? std::size_t(*limit) : SIZE_MAX);
+        const auto result = integerBits(SferaNumeric::lowWord(length));
+        if (limit && result == *limit)
+            warning(std::format("ffstrlen(): end of string was not found in buffer of size {}\n", *limit));
+        return result;
+    }
+
     void validate(Address &address, std::size_t width, bool allowNull = false)
     {
         const bool pointerFits = allowNull || (address.base >= 4 && address.base < UINT32_MAX - 3u);
@@ -499,19 +723,22 @@ class Host
         const auto bytes = memory(address, sizeof(T));
         std::memcpy(bytes.data(), &value, sizeof(T));
     }
+    std::int32_t elementIndex(std::int32_t index, std::int32_t count, bool absolute)
+    {
+        const auto size = count < 0 ? 0u - word(count) : word(count);
+        if (index < 0 || word(index) >= size)
+        {
+            warning("Array boundary error in native script");
+            const auto last = integerBits(size - 1u);
+            index = absolute ? (index < 0 ? 0 : last) : (index >= 0 && last < 0 ? 0 : last);
+        }
+        return index;
+    }
     Address element(Address base, std::int32_t index, std::uint32_t stride, std::int32_t count,
                     bool absolute, std::uint32_t sourceWidth, bool bounded)
     {
         if (bounded)
-        {
-            const auto size = count < 0 ? 0u - word(count) : word(count);
-            if (index < 0 || word(index) >= size)
-            {
-                warning("Array boundary error in native script");
-                const auto last = integerBits(size - 1u);
-                index = absolute ? (index < 0 ? 0 : last) : (index >= 0 && last < 0 ? 0 : last);
-            }
-        }
+            index = elementIndex(index, count, absolute);
         base.base += stride * word(index);
         if (absolute)
             base = {base.base, base.base, base.base + sourceWidth - 1u};
@@ -563,6 +790,7 @@ struct Method
     bool external{};
     Value (*invokeSync)(const Method &, std::span<const Argument>){};
     std::shared_ptr<const void> binding;
+    const std::type_info *bindingType{};
 
     explicit operator bool() const noexcept { return owner != nullptr && execute != nullptr; }
     void validate(std::size_t count) const
@@ -581,6 +809,11 @@ struct Method
         return invokeSync(*this, arguments);
     }
     Task<Value> start(std::vector<Argument> arguments) const;
+    template <class Binding> const Binding *bound() const noexcept
+    {
+        return bindingType && *bindingType == typeid(Binding) ? static_cast<const Binding *>(binding.get()) : nullptr;
+    }
+
 };
 
 class Module : public std::enable_shared_from_this<Module>
@@ -717,7 +950,6 @@ inline void Host::checkpoint(std::uint32_t work)
     {
     case Builtin::Window: message += "Window"; break;
     case Builtin::Text: message += "Text"; break;
-    case Builtin::CloseFile: message += "CloseFile"; break;
     case Builtin::RebaseSlice: message += "RebaseSlice"; break;
     case Builtin::System: message += "System"; break;
     case Builtin::Configuration: message += "Configuration"; break;
@@ -873,9 +1105,13 @@ struct NativeBinding<Function, Arity, std::index_sequence<Fields...>, std::index
     template <std::size_t... Arguments>
     decltype(auto) call(Module &module, std::span<const Argument> arguments, std::index_sequence<Arguments...>) const
     {
+        return callNative(module, nativeArgument<Parameter<Arguments>>(arguments, Arguments)...);
+    }
+    template <class... Args> requires (sizeof...(Args) == Arity)
+    decltype(auto) callNative(Module &module, Args &&...arguments) const
+    {
         return Signature::apply(function, static_cast<typename Signature::Owner &>(module), std::get<Fields>(state)...,
-            nativeArgument<Parameter<Arguments>>(arguments, Arguments)...,
-            storedValue<Parameter<Arity + Settings>>(settings[Settings])...);
+            std::forward<Args>(arguments)..., storedValue<Parameter<Arity + Settings>>(settings[Settings])...);
     }
     static Value invoke(const Method &method, std::span<const Argument> arguments)
     {
@@ -937,9 +1173,27 @@ void bindNative(Module &owner, Entry key, Function function, std::tuple<Fields..
             return fields;
     }();
     result.binding = std::make_shared<const Binding>(function, state, settings);
+    result.bindingType = &typeid(Binding);
     if constexpr (!Signature::asynchronous)
         result.invokeSync = &Binding::invoke;
     owner.define(std::move(result));
+}
+
+template <class T, std::size_t Extent>
+std::span<std::byte> memberBytes(std::span<T, Extent> object, std::size_t offset = 0, std::size_t size = SIZE_MAX)
+{
+    auto bytes = std::as_writable_bytes(object);
+    if (offset > bytes.size())
+        throw std::out_of_range("Native member offset crosses its owning object");
+    if (size == SIZE_MAX)
+        size = bytes.size() - offset;
+    if (size > bytes.size() - offset)
+        throw std::out_of_range("Native member view crosses its owning object");
+    return bytes.subspan(offset, size);
+}
+template <class T> std::span<std::byte> memberBytes(T &object, std::size_t offset = 0, std::size_t size = SIZE_MAX)
+{
+    return memberBytes(std::span{std::addressof(object), std::size_t{1}}, offset, size);
 }
 
 // Small layout operations for addressable game records. Ordinary scalar fields

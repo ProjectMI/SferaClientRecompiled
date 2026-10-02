@@ -5637,7 +5637,7 @@ class MbcMain final : public Module
     std::array<std::uint8_t, 64> member1974_{};
     std::array<std::uint8_t, 30> member1976_{};
     std::array<std::uint8_t, 64> member1978_{};
-    std::int32_t member1980_{};
+    std::intptr_t parameterFileSearch_ = -1;
     std::int8_t member1981_{};
     std::array<float, 10> member1983_{};
     std::array<float, 26> member1985_{};

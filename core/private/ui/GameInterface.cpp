@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <dinput.h>
 #include <functional>
+#include <io.h>
 #include <memory>
 #include <optional>
 #include <span>

@@ -24,12 +24,29 @@ class SferaBinary
             throw std::out_of_range("Binary range exceeds its buffer");
         return bytes.subspan(offset, count);
     }
-    static inline void copy(std::span<std::uint8_t> destination, std::span<const std::uint8_t> source)
+    template <class Byte> requires (std::is_same_v<Byte, std::uint8_t> || std::is_same_v<Byte, std::byte>)
+    static void copy(std::span<Byte> destination, std::type_identity_t<std::span<const Byte>> source)
     {
         if (source.size() > destination.size())
             throw std::out_of_range("Binary destination is too small");
         if (!source.empty())
             std::memmove(destination.data(), source.data(), source.size());
+    }
+    static void readPacked(std::span<const std::byte> source, std::span<std::byte> destination)
+    {
+        if (source.empty() || source.size() > sizeof(std::uint32_t))
+            throw std::out_of_range("Invalid packed integer width");
+        const auto output = range(destination, 0, source.size() == 1 ? 1 : 4);
+        std::uint32_t value{};
+        // Stage before storing: source and destination may overlap.
+        std::memcpy(&value, source.data(), source.size());
+        std::memcpy(output.data(), &value, output.size());
+    }
+    static void writePacked(std::span<std::byte> destination, std::uint32_t value)
+    {
+        if (destination.empty() || destination.size() > sizeof(value))
+            throw std::out_of_range("Invalid packed integer width");
+        std::memcpy(destination.data(), &value, destination.size());
     }
     static inline bool read(std::istream &stream, std::span<std::uint8_t> destination)
     {

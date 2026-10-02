@@ -25,6 +25,7 @@
 #include "resources/FileResources.h"
 #include "script/MbcBitStream.h"
 #include "script/MbcRuntime.h"
+#include "script/ConfigText.h"
 #include "script/MbcValue.h"
 #include "script/ScriptContainer.h"
 #include "text/Text.h"
@@ -33,6 +34,33 @@
 // The runtime owns incomplete resource types; instantiate their lifetimes here.
 SferaMbcRuntime::SferaMbcRuntime() = default;
 SferaMbcRuntime::~SferaMbcRuntime() = default;
+
+void SferaMbcRuntime::diagnoseBuffer(SphereScripts::Address &value, std::uint32_t count)
+{
+    SferaSliceReference32 slice{value.base, value.begin, value.end};
+    slice.diagnoseRange(count);
+    value = {slice.base, slice.begin, slice.end};
+}
+
+std::uint32_t SferaMbcRuntime::copyText(std::span<std::byte> destination, std::string_view source, int capacity)
+{
+    checkEngineFailure();
+    return copyString(SferaTextBuffer(destination), source, capacity);
+}
+
+std::int32_t SferaMbcRuntime::stringLength(SphereScripts::Address source, std::optional<std::int32_t> limit)
+{
+    checkEngineFailure();
+    if (source.base == 0)
+        WorldDiagnostics::warning("ffstrlen(): NULL-pointer dereferencing\n");
+    const bool empty = source.base == 0 && source.begin == 0 && source.end == 0;
+    std::uint32_t length = 0;
+    if (!empty && (!limit || *limit > 0))
+        length = SferaNumeric::lowWord(SferaText::length(memoryRange(source.base), limit ? std::size_t(*limit) : SIZE_MAX));
+    if (limit && SferaNumeric::signedWord(length) == *limit)
+        WorldDiagnostics::warning(std::format("ffstrlen(): end of string was not found in buffer of size {}\n", *limit));
+    return SferaNumeric::signedWord(length);
+}
 
 std::string SferaMbcRuntime::memoryDiagnostic(std::string_view message, std::uint32_t address, std::size_t size) const
 {
@@ -100,18 +128,7 @@ SferaTextBuffer SferaMbcRuntime::textBufferAt(std::uint32_t address, SferaMbcPro
     return SferaTextBuffer(memoryRange(address, process));
 }
 
-std::uint64_t SferaMbcRuntime::memoryLifetime(std::uint32_t address) const
-{
-    if (address < mappedAddressBegin)
-        return 0;
-    auto entry = mapped_memory.upper_bound(address);
-    if (entry == mapped_memory.begin())
-        throw std::out_of_range(memoryDiagnostic("Unknown mapped memory lifetime", address, 0));
-    --entry;
-    if (address - entry->first >= entry->second.size)
-        throw std::out_of_range(memoryDiagnostic("Invalid mapped memory lifetime", address, 0));
-    return entry->second.lifetime;
-}
+
 std::span<std::uint8_t> SferaMbcRuntime::sliceBytes(const SferaSliceReference32 &slice, SferaMbcProcessRecord *process) const
 {
     auto bytes = memoryRange(slice.base, process);
@@ -186,9 +203,6 @@ std::uint32_t SferaMbcRuntime::addMemoryRegion(SferaMbcRuntimeMemoryRegion regio
     if (candidate + region.size > UINT32_MAX - 3u)
         throw std::length_error("Script address space exhausted");
     const auto address = SferaNumeric::lowWord(candidate);
-    if (next_memory_lifetime == 0)
-        throw std::overflow_error("Memory mapping lifetime exhausted");
-    region.lifetime = next_memory_lifetime++;
     const auto entry = mapped_memory.emplace(address, region).first;
     const auto native = reinterpret_cast<std::uintptr_t>(region.data);
     bool indexed = false;
@@ -259,6 +273,32 @@ std::uint32_t SferaMbcRuntime::mapMemory(const void *data, std::size_t size, con
     return addMemoryRegion({static_cast<const std::uint8_t *>(data), size, owner});
 }
 
+bool SferaMbcRuntime::validateBorrowed(SphereScripts::Address value)
+{
+    checkEngineFailure();
+    if (!execution || execution->calls.empty() || execution->depth != execution->calls.back().depth + 1)
+        return false;
+    auto *owner = findProcess(execution->calls.back().caller.module->processId);
+    if (owner == nullptr)
+        return false;
+    if (value.base)
+        memoryAt(value.base, 0);
+    return true;
+}
+
+SphereScripts::String SferaMbcRuntime::processReference(std::uint32_t process, SphereScripts::Address value)
+{
+    checkEngineFailure();
+    if (findProcess(process) == nullptr)
+    {
+        active_tag = UINT32_MAX;
+        return {};
+    }
+    if (value.base)
+        memoryAt(value.base, 0);
+    return SphereScripts::referenceCast<SphereScripts::String>(value);
+}
+
 SferaSliceReference32 SferaMbcRuntime::rebaseSlice(SferaSliceReference32 slice, SferaMbcProcessRecord &)
 {
     // References identify mapped native objects and are already process-neutral.
@@ -291,6 +331,11 @@ void SferaMbcRuntime::forgetMemory(const void *owner, const void *data, std::siz
             mapped_native_memory.erase(indexed);
         else
             overlapping_native_memory.erase(entry->first);
+        if (configuration_source == std::addressof(entry->second))
+        {
+            g_sfera_config_text_runtime.releaseText();
+            configuration_source = nullptr;
+        }
         mapped_memory.erase(entry);
         current = mapped_memory_owners.erase(current);
     }
@@ -298,6 +343,11 @@ void SferaMbcRuntime::forgetMemory(const void *owner, const void *data, std::siz
 
 void SferaMbcRuntime::clearMappedMemory() noexcept
 {
+    if (configuration_source)
+    {
+        g_sfera_config_text_runtime.releaseText();
+        configuration_source = nullptr;
+    }
     mapped_native_memory.clear();
     overlapping_native_memory.clear();
     mapped_memory_owners.clear();

@@ -42,8 +42,10 @@ GrassMapMngr TerrainAssets::color_map{};
 std::unique_ptr<SkyEnvironment> SceneSky::high_resolution_environment{};
 std::unique_ptr<SkyEnvironment> SceneSky::environment{};
 std::string WorldDiagnostics::message;
-SferaMbcRuntime g_sfera_mbc_runtime;
+// Borrowed configuration is released while runtime owners are being destroyed.
+SferaConfigTextRuntime g_sfera_config_text_runtime;
 SferaFileManager g_sfera_files;
+SferaMbcRuntime g_sfera_mbc_runtime;
 SferaErrorLogRuntime g_sfera_error_log_runtime;
 SferaLogRuntime g_sfera_log_runtime;
 SferaGraphicsRuntime g_sfera_graphics_runtime{.fog_distance = 100.0f,
@@ -71,7 +73,6 @@ GameFontAtlas g_sfera_font_runtime;
 PlayerLists g_sfera_player_lists;
 SferaInputDevices g_sfera_direct_input_runtime;
 SferaServerWall g_sfera_server_wall{.texture_id = -1};
-SferaConfigTextRuntime g_sfera_config_text_runtime;
 WorldObjects g_sfera_world_objects{.max_occupied_object_handle = UINT32_MAX, .controlled_object_handle = UINT32_MAX};
 SferaLightRuntime g_sfera_light_runtime;
 SferaWeatherRuntime g_sfera_weather_runtime;

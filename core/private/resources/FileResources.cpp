@@ -1,5 +1,7 @@
 #include <sys/utime.h>
 #include <algorithm>
+#include <cerrno>
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -30,6 +32,10 @@ SferaFileManager::~SferaFileManager()
 {
     for (const auto &file : open_files)
         ::_close(file.first);
+    for (const auto &file : owned_files)
+        ::_close(file.first);
+    for (const auto &search : owned_searches)
+        ::_findclose(search.first);
 }
 
 SferaFileManagerScopedFile::~SferaFileManagerScopedFile() noexcept
@@ -129,6 +135,152 @@ int SferaFileManager::create(const std::string &filename)
     if (error_reporting_enabled)
         reportError("Unable to create file: ", filename);
     return -1;
+}
+
+int SferaFileManager::openOwned(const std::string &filename, int flags, std::uint64_t owner)
+{
+    ::_chmod(filename.c_str(), _S_IREAD | _S_IWRITE);
+    int descriptor = -1;
+    ::_sopen_s(&descriptor, filename.c_str(), flags | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+    if (descriptor >= 0)
+    {
+        try
+        {
+            owned_files.insert_or_assign(descriptor, owner);
+        }
+        catch (...)
+        {
+            ::_close(descriptor);
+            throw;
+        }
+    }
+    return descriptor;
+}
+
+void SferaFileManager::release(int descriptor) noexcept
+{
+    if (descriptor < 0)
+        return;
+    ::_close(descriptor);
+    owned_files.erase(descriptor);
+    open_files.erase(descriptor);
+}
+
+void SferaFileManager::releaseOwner(std::uint64_t owner) noexcept
+{
+    for (auto entry = owned_files.begin(); entry != owned_files.end();)
+    {
+        if (entry->second == owner)
+            release((entry++)->first);
+        else
+            ++entry;
+    }
+    for (auto entry = owned_searches.begin(); entry != owned_searches.end();)
+    {
+        if (entry->second == owner)
+            endSearch((entry++)->first);
+        else
+            ++entry;
+    }
+}
+
+std::intptr_t SferaFileManager::beginSearch(const std::string &pattern, std::string &name, std::uint64_t owner)
+{
+    _finddata64i32_t entry{};
+    const auto handle = ::_findfirst64i32(pattern.c_str(), &entry);
+    if (handle != -1)
+    {
+        try
+        {
+            owned_searches.insert_or_assign(handle, owner);
+        }
+        catch (...)
+        {
+            ::_findclose(handle);
+            throw;
+        }
+        name = entry.name;
+    }
+    else
+        name.clear();
+    return handle;
+}
+
+int SferaFileManager::nextSearch(std::intptr_t search, std::string &name)
+{
+    _finddata64i32_t entry{};
+    const auto result = ::_findnext64i32(search, &entry);
+    if (result != -1)
+        name = entry.name;
+    else
+        name.clear();
+    return result;
+}
+
+void SferaFileManager::endSearch(std::intptr_t search) noexcept
+{
+    if (search == -1)
+        return;
+    ::_findclose(search);
+    owned_searches.erase(search);
+}
+
+int SferaFileManager::readSome(int descriptor, std::span<std::byte> destination)
+{
+    if (destination.empty())
+        return 0;
+    if (destination.size() > std::size_t{INT_MAX})
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    return ::_read(descriptor, destination.data(), SferaNumeric::lowWord(destination.size()));
+}
+
+int SferaFileManager::writeSome(int descriptor, std::span<const std::byte> source)
+{
+    if (source.empty() || descriptor < 0)
+        return 0;
+    if (source.size() > std::size_t{INT_MAX})
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    return ::_write(descriptor, source.data(), SferaNumeric::lowWord(source.size()));
+}
+
+int SferaFileManager::readLine(int descriptor, std::span<std::byte> destination)
+{
+    if (destination.size() > std::size_t{INT_MAX})
+        throw std::length_error("Line buffer capacity exceeds native integer range");
+    int size = 0;
+    // A full buffer and an EOF without a delimiter do not append a terminator.
+    while (std::cmp_less(size, destination.size()))
+    {
+        std::byte character{};
+        if (::_read(descriptor, &character, sizeof(character)) != 1)
+            break;
+        if (character == std::byte{'\n'} || character == std::byte{0})
+        {
+            destination[size] = std::byte{0};
+            break;
+        }
+        destination[size++] = character;
+    }
+    return size;
+}
+
+std::int64_t SferaFileManager::modificationTime(int descriptor)
+{
+    struct _stat64i32 status{};
+    ::_fstat64i32(descriptor, &status);
+    return status.st_mtime;
+}
+
+void SferaFileManager::setModificationTime(int descriptor, std::int64_t time)
+{
+    __utimbuf64 times{time, time};
+    ::_futime64(descriptor, &times);
 }
 
 const std::string *SferaFileManager::filenameFor(int descriptor, std::string_view invalid_handle_message) const

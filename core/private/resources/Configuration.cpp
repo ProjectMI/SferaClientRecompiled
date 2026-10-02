@@ -1,9 +1,11 @@
 #include <algorithm>
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <exception>
 #include <fstream>
+#include <format>
 #include <ios>
 #include <iterator>
 #include <new>
@@ -24,9 +26,8 @@
 #include "numeric/Numeric.h"
 #include "resources/FileResources.h"
 #include "script/ConfigText.h"
-#include "script/MbcProcess.h"
-#include "script/MbcRuntime.h"
 #include "text/Text.h"
+#include "text/TextBuffer.h"
 
 std::size_t SferaConfigTextRuntime::copyText(std::string_view source)
 {
@@ -36,33 +37,22 @@ std::size_t SferaConfigTextRuntime::copyText(std::string_view source)
     filename.clear();
     return count;
 }
-std::span<std::uint8_t> SferaConfigTextRuntime::borrowedBytes(const SferaConfigTextRuntimeBorrowedText &view) const
-{
-    if (view.process && (view.process->chain_prev_index < 0 || view.process->lifetime != view.process_lifetime))
-        throw std::out_of_range("Configuration source process is no longer alive");
-    if (g_sfera_mbc_runtime.memoryLifetime(view.address) != view.mapping_lifetime)
-        throw std::out_of_range("Configuration source mapping was replaced");
-    auto bytes = g_sfera_mbc_runtime.memoryRange(view.address, view.process);
-    if (view.capacity > bytes.size())
-        throw std::out_of_range("Configuration source buffer shrank");
-    return bytes.first(view.capacity);
-}
+
 std::string SferaConfigTextRuntime::text() const
 {
     if (const auto *owned = std::get_if<std::string>(&storage_))
         return *owned;
-    const auto bytes = borrowedBytes(std::get<SferaConfigTextRuntimeBorrowedText>(storage_));
+    const auto bytes = std::get<std::span<std::byte>>(storage_);
+    if (bytes.empty())
+        throw std::out_of_range("Configuration source was released");
     return SferaText::terminated(bytes);
 }
 
-void SferaConfigTextRuntime::useText(std::uint32_t address, std::size_t capacity, SferaMbcProcessRecord *process)
+void SferaConfigTextRuntime::useText(std::span<std::byte> source)
 {
-    if (address >= SferaMbcRuntime::mappedAddressBegin)
-        process = nullptr;
-    SferaConfigTextRuntimeBorrowedText view{address, std::min(capacity, text_capacity), process, process ? process->lifetime : 0, g_sfera_mbc_runtime.memoryLifetime(address)};
-    const auto bytes = borrowedBytes(view);
-    (void)SferaText::length(bytes);
-    storage_ = view;
+    source = source.first(std::min(source.size(), text_capacity));
+    (void)SferaText::length(source);
+    storage_ = source;
     filename.clear();
 }
 
@@ -103,7 +93,7 @@ std::optional<std::string> SferaConfigTextRuntime::readString(std::string_view k
     return result;
 }
 
-auto SferaConfigTextRuntime::appendDecodedBits(std::vector<std::uint8_t> &decoded, std::span<std::uint8_t> destination, unsigned &pending, unsigned &bits, unsigned value, unsigned count)
+auto SferaConfigTextRuntime::appendDecodedBits(std::vector<std::uint8_t> &decoded, std::span<std::byte> destination, unsigned &pending, unsigned &bits, unsigned value, unsigned count)
 {
     const auto required = (bits + count + 7u) / 8u;
     if (decoded.size() > destination.size() || required > destination.size() - decoded.size())
@@ -119,8 +109,9 @@ auto SferaConfigTextRuntime::appendDecodedBits(std::vector<std::uint8_t> &decode
     return true;
 }
 
-bool SferaConfigTextRuntime::readBinary(std::string_view key, std::span<std::uint8_t> destination) const
+bool SferaConfigTextRuntime::readBinary(std::string_view key, std::span<std::byte> destination, std::size_t capacity) const
 {
+    destination = destination.first(std::min(capacity, destination.size()));
     const auto input = find(key);
     if (!input)
         return false;
@@ -156,16 +147,16 @@ bool SferaConfigTextRuntime::readBinary(std::string_view key, std::span<std::uin
         if (decoded.size() == destination.size())
             return false;
         const auto mask = (1u << bits) - 1u;
-        decoded.push_back(SferaNumeric::lowByte((destination[decoded.size()] & ~mask) | (pending & mask)));
+        decoded.push_back(SferaNumeric::lowByte((std::to_integer<std::uint8_t>(destination[decoded.size()]) & ~mask) | (pending & mask)));
     }
-    SferaBinary::copy(destination, decoded);
+    SferaBinary::copy(destination, std::as_bytes(std::span(decoded)));
     return true;
 }
 
-std::size_t SferaConfigTextRuntime::copyTo(std::span<std::uint8_t> destination) const
+std::size_t SferaConfigTextRuntime::copyTo(std::span<std::byte> destination, std::size_t capacity) const
 {
     const auto input = text();
-    const auto count = std::min(destination.size(), input.size());
+    const auto count = std::min({destination.size(), input.size(), capacity});
     if (count != 0)
         std::memmove(destination.data(), input.data(), count);
     return count;
@@ -224,17 +215,17 @@ bool SferaConfigTextRuntime::save(bool compressed) const
         return false;
     }
 }
-std::string SferaConfigTextRuntime::encodeBinary(const std::uint8_t *input, std::size_t size)
+std::string SferaConfigTextRuntime::encodeBinary(std::span<const std::byte> input)
 {
     constexpr std::string_view alphabet = "0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmno";
     static_assert(alphabet.size() == 64u);
     std::string result;
-    result.reserve(size * CHAR_BIT / 6 + 3);
+    result.reserve(input.size() * CHAR_BIT / 6 + 3);
     std::uint32_t pending = 0;
     std::uint32_t count = 0;
-    for (std::size_t index = 0; index < size; ++index)
+    for (std::size_t index = 0; index < input.size(); ++index)
     {
-        pending |= input[index] << count;
+        pending |= std::to_integer<std::uint8_t>(input[index]) << count;
         count += CHAR_BIT;
         while (count >= 6)
         {
@@ -251,17 +242,15 @@ std::string SferaConfigTextRuntime::encodeBinary(const std::uint8_t *input, std:
 }
 bool SferaConfigTextRuntime::writeValue(std::string_view key, std::string_view value, bool quoted)
 {
+    if (quoted && key.starts_with('*'))
+        throw std::invalid_argument("Binary configuration value requires a source buffer and size");
     std::string next(text());
-    auto *borrowed = std::get_if<SferaConfigTextRuntimeBorrowedText>(&storage_);
-    const auto capacity = borrowed ? std::min(borrowed->capacity, text_capacity) : text_capacity;
+    auto *borrowed = std::get_if<std::span<std::byte>>(&storage_);
+    const auto capacity = borrowed ? borrowed->size() : text_capacity;
     if (!SferaText::replaceConfigValue(next, key, value, quoted, capacity))
         return false;
     if (borrowed)
-    {
-        const auto bytes = borrowedBytes(*borrowed);
-        std::copy(next.begin(), next.end(), bytes.begin());
-        bytes[next.size()] = 0;
-    }
+        SferaTextBuffer(*borrowed).assign(next);
     else
         std::get<std::string>(storage_).swap(next);
     return true;
@@ -331,4 +320,43 @@ SphereRenderConfigDocument SphereRenderConfigDocument::open(const std::string &p
         error.write(exception.what());
         throw;
     }
+}
+
+bool SferaConfigTextRuntime::writeValue(std::string_view key, std::int32_t value)
+{
+    if (key.starts_with('*'))
+        throw std::invalid_argument("Binary configuration value requires a source buffer and size");
+    return writeValue(key, std::to_string(value), false);
+}
+
+bool SferaConfigTextRuntime::writeValue(std::string_view key, float value)
+{
+    if (key.starts_with('*'))
+        throw std::invalid_argument("Binary configuration value requires a source buffer and size");
+    return writeValue(key, std::format("{:f}", value), false);
+}
+
+bool SferaConfigTextRuntime::writeBinary(std::string_view key, std::span<const std::byte> value, int size)
+{
+    if (!key.starts_with('*'))
+        throw std::invalid_argument("Binary configuration key must begin with '*'");
+    if (size < 0 || size > (text_capacity - 4) * 3 / 4)
+        throw std::out_of_range("cfg_set: invalid binary size");
+    return writeValue(key, encodeBinary(SferaBinary::range(value, 0, size)), false);
+}
+
+bool SferaConfigTextRuntime::writeValue(std::string_view key, std::span<const std::byte> value, int size)
+{
+    if (key.starts_with('*'))
+        return writeBinary(key, value, size);
+    return writeValue(key, SferaText::terminated(value), true);
+}
+
+bool SferaConfigTextRuntime::readString(std::string_view key, std::span<std::byte> destination, std::size_t capacity) const
+{
+    if (key.starts_with('*'))
+        return readBinary(key, destination, capacity);
+    auto output = SferaTextBuffer(destination).limited(capacity);
+    const auto value = readString(key);
+    return value && !output.empty() && output.write(*value) == value->size();
 }

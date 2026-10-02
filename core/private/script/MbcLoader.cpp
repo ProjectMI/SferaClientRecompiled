@@ -9,6 +9,7 @@
 
 #include "diagnostics/Diagnostics.h"
 #include "numeric/Numeric.h"
+#include "resources/FileResources.h"
 #include "script/GeneratedScripts.h"
 #include "script/MbcRuntime.h"
 
@@ -184,6 +185,7 @@ std::uint32_t SferaMbcRuntime::linkProcess(std::string_view name)
     if (process.modules.size() >= 8)
     {
         reportError("Cannot link more than eight native module instances: ", name);
+        checkEngineFailure();
         return UINT32_MAX;
     }
     std::shared_ptr<SphereScripts::Module> module;
@@ -238,6 +240,7 @@ std::uint32_t SferaMbcRuntime::unloadProcess(std::uint32_t index)
     process.chain_prev_index = -1;
     if (!process.cleanup_entries.empty())
         process.releaseResources();
+    g_sfera_files.releaseOwner(process.lifetime);
     for (auto &program : process.programs)
         if (program.continuation)
             program.continuation->execution.cancelled = true;

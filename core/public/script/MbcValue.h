@@ -16,13 +16,12 @@ struct SferaMbcRuntimeMemoryRegion
     const std::uint8_t *data;
     std::size_t size;
     const void *owner;
-    std::uint64_t lifetime = 0;
     const void *address() const noexcept
     {
         return data;
     }
 };
-using SferaMbcRuntimeNativeResource = std::variant<SphereUIWindow *, SferaActiveEffect *, SferaScriptContainer *, std::intptr_t>;
+using SferaMbcRuntimeNativeResource = std::variant<SphereUIWindow *, SferaActiveEffect *, SferaScriptContainer *>;
 
 struct SferaMbcValue;
 struct SferaSliceReference32;
